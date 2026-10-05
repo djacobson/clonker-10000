@@ -1,5 +1,8 @@
-# clonker-10000
+# THE CLONKER 10000
 
-**`THE CLONKER 10000`** is a diy “makers” project to build a cutom remote control for my home theater and HiFi stereo desires. 
+**`THE CLONKER 10000`** is a DIY “makers” project to build a cutom remote control for my home theater and HiFi stereo desires. 
+
+## Inspiration
+
 
 is a subtask and data transfer helper class; **push** only, client-side only (no custom server-side app needed). It is a packaged module, for integration in any Python app, which implements a task-subtask (parent-child, M / S, manager-worker, leader-follower, etc.) patter
