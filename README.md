@@ -1,4 +1,5 @@
-# THE CLONKER 10000 (extreme Beta version)
+# THE CLONKER 10000
+(extreme Beta version)
 
 <p align="center">
   <img src="images/main_knobs.jpeg" width="350" alt="Clonker Main Knobs">
