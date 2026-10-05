@@ -16,7 +16,8 @@
 </p>
 
 **`THE CLONKER 10000`** is a DIY “maker” project to build a custom remote control for my home theater and HiFi stereo desires.
-<small>(Note: For now, imagine the above awesome controls mounted on a big-ass, honk’n brick of a case that possibly will weigh anywhere from .5 to 10 lbs. 😉 )</small>
+
+*(Note: For now, imagine the above awesome controls mounted on a big-ass, honk’n brick of a case that will possibly weigh anywhere from .5 to 10 lbs. 😉)*
 
 ## Inspiration
 
