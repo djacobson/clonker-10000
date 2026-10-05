@@ -36,7 +36,10 @@ I dislike modern remote controls. I think their designers have forgotten that hu
        style="vertical-align: top;">
 </p>
 
-AND I want my tactile controls to please my aging ears with accompanying audio feedback like **CLONK**. Thus was born **The Clonker 10000** maker project … my realization that the only way I was going to get what I desire was to build it myself.
+AND I want my tactile controls to please my aging ears with accompanying **audio** feedback like **CLONK**. Thus was born **The Clonker 10000** maker project … my realization that the only way I was going to get what I desire was to build it myself.
 
-More stuff to come…
+## Technical Details
 
+This Beta version of The Clonker will be a WiFi-only device, containing an easily programmable FeatherS3[D] ESP32-S3 controller running Circuit Python. It will first be tested against my own equipment; Roku Ultra streaming devices, Denon AVR Amplifier Receivers, possibly LG TVs. I definitely plan to test it against Apple TVs and Amazon Fire sticks shortly after the initial birth. I have no plans on adding IR to it at this time.
+
+More awesome stuff to come…
