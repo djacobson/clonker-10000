@@ -36,7 +36,7 @@ I dislike modern remote controls. I think their designers have forgotten that hu
        style="vertical-align: top;">
 </p>
 
-AND I want my tactile controls to please my aging ears with accompanying **audio** feedback like **CLONK**. Thus was born **ker 10000** maker project … my realization that the only way I was going to get what I desire was to build it myself.
+AND I want my tactile controls to please my aging ears with accompanying **audio** feedback like **CLONK**. Thus was born **The Clonker 10000** maker project … my realization that the only way I was going to get what I desire was to build it myself.
 
 ## Technical Details
 
