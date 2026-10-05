@@ -1,4 +1,4 @@
-# THE CLONKER 10000
+# THE CLONKER 10000 (extreme Beta version)
 
 <p align="center">
   <img src="images/main_knobs.jpeg" width="350" alt="Clonker Main Knobs">
@@ -36,3 +36,6 @@ I dislike modern remote controls. I think their designers have forgotten that hu
 </p>
 
 AND I want my tactile controls to please my aging ears with accompanying audio feedback like **CLONK**. Thus was born **The Clonker 10000** maker project … my realization that the only way I was going to get what I desire was to build it myself.
+
+More stuff to come…
+
