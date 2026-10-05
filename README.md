@@ -18,7 +18,7 @@
 
 **`THE CLONKER 10000`** is a DIY “maker” project to build a custom remote control for my home theater and HiFi stereo desires.
 
-*(Note: For now, imagine the above awesome controls mounted on a big-ass, honk’n brick of a case that will possibly weigh anywhere from 0.5 to 10 lbs. 😉)*
+*(Note: For now, imagine the above awesome controls mounted on a big-ass, honkin’ brick of a case that will possibly weigh anywhere from 0.5 to 10 lbs. 😉)*
 
 ## Inspiration
 
@@ -40,6 +40,12 @@ AND I want my tactile controls to please my aging ears with accompanying **audio
 
 ## Technical Details
 
-This Beta version of The Clonker will be a Wi-Fi-only device, containing an easily programmable FeatherS3[D] ESP32-S3 controller running CircuitPython. It will first be tested against my own equipment; Roku Ultra streaming devices, Denon AVR Amplifier Receivers, possibly LG TVs. I definitely plan to test it against Apple TVs and Amazon Fire TV Sticks shortly after the initial birth. I have no plans on adding IR to it at this time.
+This Beta version of The Clonker will be a Wi-Fi-only device, containing an easily programmable FeatherS3[D] ESP32-S3 controller running CircuitPython. It will first be tested against my own equipment: Roku Ultra streaming devices, Denon AV receivers, and possibly LG TVs. I definitely plan to test it against Apple TVs and Amazon Fire TV Sticks shortly after the initial birth. I have no plans on adding IR to it at this time.
+
+## Current Hardware
+
+Note: Just some high-lights for now…
+
+FeatherS3[D] ESP32-S3 · Grayhill optical VOLUME encoder · Bourns SELECT encoder · Kilo metal knobs · metal navigation buttons · tiny OLED · I²S amp + speaker · illuminated SYSTEM MASTER
 
 More awesome stuff to come…
