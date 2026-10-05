@@ -11,9 +11,15 @@
 I dislike modern remote controls. I think their designers have forgotten that humans are tactile beasts. I want a remote control that I can fumble around for in the dark, pick up, and use effortlessly. Yes, I am aware of “big button” products created for accessibility (very commendable) … BUT, I desire to handle REAL controls; I’d like my fingertips to caress beautiful metallic buttons and knobs I have only seen the likes of in other industries, i.e., HiFi stereo systems, nuclear submarines, etc. Some of the vintage TV remotes came close but, still, meh.
 
 <p align="center">
-  <img src="images/nr1_nuclear_sub.jpeg" height="300" alt="NR-1 Nuclear Submarine"
+  <img src="images/nr1_nuclear_sub.jpeg"
+       height="300"
+       alt="NR-1 Nuclear Submarine"
+       style="vertical-align: top;">
   &nbsp;&nbsp;
-  <img src="images/vintage_zenith_remote.jpeg" height="300" alt="Vintage Zenith Remote">
+  <img src="images/vintage_zenith_remote.jpeg"
+       height="300"
+       alt="Vintage Zenith Remote"
+       style="vertical-align: top;">
 </p>
 
 AND I want my tactile controls to please my aging ears with accompanying audio feedback like **CLONK**. Thus was born **The Clonker 10000** maker project … my realization that the only way I was going to get what I desire was to build it myself.
