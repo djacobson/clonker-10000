@@ -48,4 +48,15 @@ Note: Just some high-lights for now…
 
 FeatherS3[D] ESP32-S3 · Grayhill optical VOLUME encoder · Bourns SELECT encoder · Kilo metal knobs · metal navigation buttons · tiny OLED · I²S amp + speaker · illuminated SYSTEM MASTER
 
+## Sample Software Functionality
+
+Volume (ofc), Power ON / OFF, Navigation arrows and Select, and some audio / video selections like below…
+
+<p align="left">
+  <img src="images/IMG_4742"
+       height="300"
+       alt="Sample Functions"
+       style="vertical-align: top;">
+</p>
+
 More awesome stuff to come…
