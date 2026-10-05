@@ -1,6 +1,6 @@
 # THE CLONKER 10000
 
-<img src="images/main_knobs.jpg" width="350" alt="Clonker Main Knobs">
+<img src="images/main_knobs.jpeg" width="350" alt="Clonker Main Knobs">
 
 **`THE CLONKER 10000`** is a DIY “makers” project to build a cutom remote control for my home theater and HiFi stereo desires. 
 
