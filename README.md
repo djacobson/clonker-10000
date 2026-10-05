@@ -3,6 +3,17 @@
 <p align="center">
   <img src="images/main_knobs.jpeg" width="350" alt="Clonker Main Knobs">
 </p>
+<p align="center">
+  <img src="images/tmp_oled_screen.jpeg"
+       height="150"
+       alt="Clonker Stupid Screen"
+       style="vertical-align: top;">
+  &nbsp;&nbsp;
+  <img src="images/tmp_tri_selector.jpeg"
+       height="150"
+       alt="Clonker Sample System Selector"
+       style="vertical-align: top;">
+</p>
 
 **`THE CLONKER 10000`** is a DIY “maker” project to build a custom remote control for my home theater and HiFi stereo desires.
 
