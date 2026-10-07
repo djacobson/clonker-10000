@@ -50,7 +50,7 @@ FeatherS3[D] ESP32-S3 · Grayhill optical VOLUME encoder · Bourns SELECT encode
 
 ## Sample Software Functionality
 
-Volume (ofc), Power ON / OFF, Navigation arrows and Select, and some audio / video selections like below…
+Volume (ofc), Power ON / OFF, Navigation arrows and Select, and some audio / video selections like below… Also, see the [Architecture Document](ARCHITECTURE.md) 
 
 <p align="left">
   <img src="images/IMG_4742.png"
