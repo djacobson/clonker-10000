@@ -149,6 +149,153 @@ An iOS Shortcut remains a possible client of the same API, not a discarded idea.
 
 A minimal form with `Room name`, `Button label`, and `Device URL` is enough to prove browser -> HTTP POST -> XML file -> reboot -> reload. Only then expand to all rooms, endpoints, and action mappings.
 
+
+## Planned Application Services and Event Dispatcher (October 9, 2026)
+
+**Status: design proposal; not yet implemented.** The first prototype must not change the current `code.py` startup behavior, `settings.toml`, Wi-Fi configuration, or sleep behavior.
+
+### Cooperative dispatcher
+
+The application will use a small event queue and dispatcher to decouple event producers from handlers. Producers may initially be simulated GPIO/encoder inputs, an idle timer, and an HTML configuration form.
+
+Events use generic names such as:
+
+- `CONFIG_CHANGED`
+- `BUTTON_PRESSED`
+- `ENCODER_TURNED`
+- `IDLE_TIMEOUT`
+- `ACTIVITY_DETECTED`
+
+The dispatcher routes events to handlers. Hardware-specific and device-specific work remains in separate modules.
+
+An idle timeout initially logs `Would light sleep` **without actually entering sleep**. Real sleep behavior is deferred.
+
+### Proposed module organization
+
+- `clonker/main.py` — Initialize services and run the application loop.
+- `clonker/events.py` — Event names and payload conventions.
+- `clonker/dispatcher.py` — Queue and route events.
+- `clonker/actions.py` — Simulated command handlers initially.
+- `clonker/config.py` — Read, validate, and eventually save configuration.
+- `clonker/web.py` — HTML configuration interface and HTTP endpoints.
+- `clonker/clock.py` — Timekeeping, independent of logging.
+- `clonker/logger.py` — Serial-console logging.
+
+These names are provisional.
+
+### Main application loop
+
+Conceptual pseudocode:
+
+```python
+while True:
+    web_server.poll()
+    simulated_inputs.poll()
+    idle_timer.poll()
+    dispatcher.poll()
+    clock.poll()
+```
+
+This is an architectural illustration, not executable code.
+
+**Important:** Calling `poll()` does not automatically make an operation nonblocking. Network operations must be designed and tested to avoid delaying Clonker’s responsiveness.
+
+### Clock architecture
+
+The clock service is independent of the logger and dispatcher.
+
+**DEFAULTTIME**
+
+- Available immediately at startup.
+- Uses `time.monotonic()` for elapsed seconds.
+- Requires no Wi-Fi, NTP, or external clock.
+- Requires no flash writes.
+
+**BROWSER**
+
+- A future HTML configuration page can send the iPad’s current UTC time.
+- Clonker stores a clock reference in RAM.
+- Subsequent timestamps advance using the monotonic timer.
+- No startup delay or external service dependency.
+
+**NTP**
+
+- Optional future clock source.
+- May improve time accuracy automatically.
+- Must never delay startup.
+- Network operations must be bounded or genuinely nonblocking.
+- Failure must not interfere with Clonker’s normal operation.
+
+The clock reference is not persisted to flash. After restarting, Clonker returns to DEFAULTTIME until another clock source becomes available.
+
+### Logger architecture
+
+The logger obtains timestamps from `clonker/clock.py`.
+
+Initial implementation:
+
+- Serial terminal output only.
+- No persistent event log.
+- No RAM log history.
+- No flash writes during logging.
+- No external logging libraries.
+
+Example output:
+
+```text
+[DEFAULTTIME +00004.2s] BOOT Clonker started
+[DEFAULTTIME +00005.1s] CONFIG_LOADED Settings loaded
+2026-10-09T17:03:15Z TIME_SET Source=Browser
+2026-10-09T17:03:22Z BUTTON_PRESSED SELECT
+```
+
+Future enhancements may include severity levels, RAM event history, a web-based log viewer, and bounded persistent log files.
+
+Logging must not prevent control actions if an output operation fails.
+
+### Configuration prototype
+
+Editable settings will live in a separate persistent XML file, tentatively:
+
+`/clonker_config.xml`
+
+The Python configuration module will handle:
+
+- Reading XML settings.
+- Validating configuration values.
+- Saving changes when appropriate.
+- Reloading settings following `CONFIG_CHANGED`.
+
+XML is the preferred experimental format, but its suitability for CircuitPython must be verified.
+
+The HTML interface will eventually submit configuration changes to the application server, tentatively on port 8080, separate from CircuitPython Web Workflow.
+
+Application flash writes require testing filesystem permissions and concurrent Web Workflow behavior first. Configuration changes should be validated, and unnecessary flash writes avoided.
+
+### Incremental development plan
+
+1. Implement `clock.py` with DEFAULTTIME and `logger.py` with serial output.
+2. Implement the dispatcher with simulated GPIO, encoder, and idle events.
+3. Read and validate XML configuration.
+4. Build the HTML configuration interface.
+5. Add controlled XML saving and CONFIG_CHANGED reloading.
+6. Add optional browser-provided time.
+7. Integrate actual hardware and network commands incrementally.
+
+### Deferred features
+
+The following are not required for the initial prototype:
+
+- NTP synchronization.
+- Persistent event logs.
+- RAM log history.
+- Real light-sleep transitions.
+- Deep-sleep experiments.
+- Startup-blocking optional services.
+
+**Design principle:** Clonker’s primary job is to respond to physical controls promptly. Configuration, logging, clock synchronization, and other supporting services must not compromise that responsiveness.
+
+
 ## Power, Wake, and System Control
 
 **Clonker's own sleep state is separate from the theater's POWER action.** The guarded SYSTEM/POWER button is a logical input, not a battery-disconnect switch. It may send a configurable room POWER command when the Clonker is awake.
