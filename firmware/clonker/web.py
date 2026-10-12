@@ -12,6 +12,7 @@
 
 import wifi
 import socketpool
+import json
 
 from clonker import clock
 from clonker import logger
@@ -99,29 +100,40 @@ def poll():
             content_type = "text/html; charset=utf-8"
 
         elif first_line.startswith(b"GET /api/clock "):
-            import json
             body = json.dumps(clock_status())
             status = "200 OK"
             content_type = "application/json"
+
+        elif first_line.startswith(b"POST /api/clock?utc="):
+            content_type = "application/json"
+
+            try:
+                # Extract UTC seconds from the URL.
+                path = first_line.split(b" ", 2)[1]
+                value = path.split(b"utc=", 1)[1]
+
+                # Ensure the query contains only a timestamp.
+                if not value.isdigit():
+                    raise ValueError("Invalid timestamp")
+
+                utc_seconds = int(value)
+
+                # clock.py validates the timestamp range.
+                clock.set_utc(utc_seconds, "BROWSER")
+
+                logger.info("Clock synchronized from browser")
+
+                body = json.dumps(clock_status())
+                status = "200 OK"
+
+            except (ValueError, OverflowError):
+                body = '{"error":"Invalid UTC timestamp"}'
+                status = "400 Bad Request"
 
         else:
             body = "Not Found"
             status = "404 Not Found"
             content_type = "text/plain"
-
-        payload = body.encode("utf-8")
-
-        header = (
-            "HTTP/1.1 {}\r\n"
-            "Content-Type: {}\r\n"
-            "Content-Length: {}\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-        ).format(
-            status,
-            content_type,
-            len(payload)
-        )
 
         client.sendall(header.encode("utf-8"))
         client.sendall(payload)
