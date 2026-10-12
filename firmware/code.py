@@ -1,3 +1,5 @@
+print("Hello World!")
+
 # Auto-start REPL cmd
 
 #
