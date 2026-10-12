@@ -79,16 +79,39 @@
     </section>
 </main>
 
+
 <script>
-    // Future:
-    // GET  /api/clock
-    // POST /api/clock
-    //
-    // These will communicate with
-    // clonker/clock.py through web.py.
-    //
-    // The button stays disabled until
-    // those endpoints are implemented.
+    async function updateClock() {
+        try {
+            const response = await fetch("/api/clock", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+
+            const clock = await response.json();
+
+            document.getElementById("clock-source")
+                .textContent = clock.source;
+
+            document.getElementById("clock-time")
+                .textContent = clock.timestamp;
+
+        } catch (error) {
+            console.error("Clock update failed:", error);
+
+            document.getElementById("clock-source")
+                .textContent = "Connection error";
+        }
+    }
+
+    // Read clock status when the page opens.
+    updateClock();
+
+    // Refresh the display every 5 seconds.
+    setInterval(updateClock, 5000);
 </script>
 
 </body>
