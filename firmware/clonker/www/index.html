@@ -73,7 +73,7 @@
             </span>
         </p>
 
-        <button id="sync-clock" disabled>
+        <button id="sync-clock">
             Synchronize with Browser
         </button>
     </section>
@@ -106,6 +106,40 @@
                 .textContent = "Connection error";
         }
     }
+
+    async function synchronizeClock() {
+        const button = document.getElementById("sync-clock");
+        button.disabled = true;
+
+        try {
+            const utc = Math.floor(Date.now() / 1000);
+
+            const response = await fetch(
+                "/api/clock?utc=" + utc,
+                {
+                    method: "POST",
+                    cache: "no-store"
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+
+            await updateClock();
+
+        } catch (error) {
+            console.error("Clock sync failed:", error);
+            alert("Clock synchronization failed: " + error.message);
+
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    // Connect the button to its handler.
+    document.getElementById("sync-clock")
+        .addEventListener("click", synchronizeClock);
 
     // Read clock status when the page opens.
     updateClock();
