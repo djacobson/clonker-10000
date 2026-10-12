@@ -1,0 +1,95 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>The Clonker 10000</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #20242a;
+            color: #f0f0f0;
+            margin: 0;
+            padding: 24px;
+        }
+
+        main {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #e6b85c;
+        }
+
+        .panel {
+            background: #30363e;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        button {
+            background: #e6b85c;
+            color: #20242a;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 18px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+        }
+
+        .value {
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body>
+<main>
+    <h1>THE CLONKER 10000</h1>
+
+    <section class="panel">
+        <h2>System Clock</h2>
+
+        <p>
+            Clock source:
+            <span class="value" id="clock-source">
+                Not connected
+            </span>
+        </p>
+
+        <p>
+            Current time:
+            <span class="value" id="clock-time">
+                Not available
+            </span>
+        </p>
+
+        <button id="sync-clock" disabled>
+            Synchronize with Browser
+        </button>
+    </section>
+</main>
+
+<script>
+    // Future:
+    // GET  /api/clock
+    // POST /api/clock
+    //
+    // These will communicate with
+    // clonker/clock.py through web.py.
+    //
+    // The button stays disabled until
+    // those endpoints are implemented.
+</script>
+
+</body>
+</html>
