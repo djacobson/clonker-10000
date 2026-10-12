@@ -135,6 +135,20 @@ def poll():
             status = "404 Not Found"
             content_type = "text/plain"
 
+        payload = body.encode("utf-8")
+
+        header = (
+            "HTTP/1.1 {}\r\n"
+            "Content-Type: {}\r\n"
+            "Content-Length: {}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        ).format(
+            status,
+            content_type,
+            len(payload)
+        )
+
         client.sendall(header.encode("utf-8"))
         client.sendall(payload)
 
