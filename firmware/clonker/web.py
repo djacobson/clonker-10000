@@ -12,7 +12,7 @@ from clonker import clock
 from clonker import logger
 
 
-WEB_ROOT = os.path.dirname(__file__) + "/www"
+WEB_ROOT = "/clonker/www"
 
 
 def clock_page():
