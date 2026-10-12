@@ -5,11 +5,8 @@ import time
 
 from clonker import logger
 from clonker import web
+from clonker.controls import switches
 
-
-# Simulated CONFIG switch.
-# Later replaced by a physical GPIO input.
-CONFIG_MODE_ENABLED = True
 
 # Management HTTP service is low priority.
 WEB_POLL_INTERVAL = 0.05
@@ -32,7 +29,7 @@ def main():
             # Priority 3: Timers (future)
 
             # Priority 4: CONFIG web interface
-            config_mode = CONFIG_MODE_ENABLED
+            config_mode = switches.config_enabled()
 
             if config_mode and not web_running:
                 web.start()
