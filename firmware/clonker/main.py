@@ -1,8 +1,56 @@
+# The Clonker 10000
+# clonker/main.py
+
 import time
 
+from clonker import logger
+from clonker import web
+
+
+# Simulated CONFIG switch.
+# Later replaced by a physical GPIO input.
+CONFIG_MODE_ENABLED = True
+
+# Management HTTP service is low priority.
+WEB_POLL_INTERVAL = 0.05
+
+
 def main():
-    print("THE CLONKER 10000")
-    print("Application started!")
-    print("Running from clonker/main.py")
-    print("Uptime:", time.monotonic())
-	
+    logger.info("THE CLONKER 10000")
+    logger.info("Application started")
+
+    web_running = False
+    next_web_poll = time.monotonic()
+
+    try:
+        while True:
+
+            # Priority 1: GPIO inputs (future)
+
+            # Priority 2: Event dispatcher (future)
+
+            # Priority 3: Timers (future)
+
+            # Priority 4: CONFIG web interface
+            config_mode = CONFIG_MODE_ENABLED
+
+            if config_mode and not web_running:
+                web.start()
+                web_running = True
+                logger.info("CONFIG mode enabled")
+
+            elif not config_mode and web_running:
+                web.stop()
+                web_running = False
+                logger.info("RUN mode enabled")
+
+            if web_running:
+                now = time.monotonic()
+
+                if now >= next_web_poll:
+                    web.poll()
+                    next_web_poll = time.monotonic() + WEB_POLL_INTERVAL
+
+    finally:
+        if web_running:
+            web.stop()
