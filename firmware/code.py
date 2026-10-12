@@ -1,9 +1,10 @@
 print("Hello World!")
 
-# Auto-start REPL cmd
-
-#
 # The Clonker 10000
+# code.py
 #
-# from clonker.main import main
-# main()
+# CircuitPython application entry point.
+
+from clonker.main import main
+
+main()
