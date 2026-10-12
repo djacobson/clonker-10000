@@ -4,6 +4,9 @@ print("Hello World!")
 # code.py
 #
 # CircuitPython application entry point.
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 from clonker.main import main
 

@@ -9,6 +9,9 @@
 # Port 80: CircuitPython Web Workflow
 #
 # No external libraries required.
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 import wifi
 import socketpool

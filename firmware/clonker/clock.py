@@ -4,6 +4,9 @@
 # Central time service for Clonker.
 # DEFAULTTIME requires no network connection.
 # Future browser/NTP updates can supply UTC time.
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 # Test
 # from clonker import clock

@@ -6,6 +6,9 @@
 #
 # The board will deep-sleep for 5 seconds,
 # then reboot into code.py.
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 import time
 import alarm

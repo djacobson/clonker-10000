@@ -1,5 +1,8 @@
 # The Clonker 10000
 # Physical switches and simulated switch states.
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 from clonker.controls import pins
 

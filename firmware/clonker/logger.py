@@ -3,6 +3,9 @@
 #
 # Lightweight serial logger.
 # No flash writes, network dependencies, or background tasks.
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 from clonker import clock
 

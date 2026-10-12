@@ -1,5 +1,8 @@
 # Clonker hardware pin assignments
 # Developer configuration, not user-editable.
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 CONFIG_SWITCH_PIN = None  # TBD
 ROOM_SELECTOR_A_PIN = None

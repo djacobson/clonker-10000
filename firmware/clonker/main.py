@@ -1,5 +1,8 @@
 # The Clonker 10000
 # clonker/main.py
+#
+# Clonker Designed by David Jacobson
+# GitHub: https://github.com/djacobson/clonker-10000
 
 import time
 
