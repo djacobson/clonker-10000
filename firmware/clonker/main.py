@@ -9,7 +9,7 @@ import time
 from clonker import logger
 from clonker import web
 from clonker.controls import switches
-
+from clonker import device_config
 
 # Management HTTP service is low priority.
 WEB_POLL_INTERVAL = 0.05
@@ -18,6 +18,13 @@ WEB_POLL_INTERVAL = 0.05
 def main():
     logger.info("THE CLONKER 10000")
     logger.info("Application started")
+
+    settings = device_config.load()
+
+    logger.info("Configuration loaded from XML")
+    logger.info("TV IP: {}".format(settings["tv_ip"]))
+    logger.info("AVR IP: {}".format(settings["avr_ip"]))
+    logger.info("Volume device: {}".format(settings["volume_device"]))
 
     web_running = False
     next_web_poll = time.monotonic()

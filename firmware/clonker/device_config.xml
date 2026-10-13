@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<clonker version="1">
+    <devices>
+        <tv ip="192.168.50.20" />
+        <avr ip="192.168.50.30" />
+    </devices>
+
+    <preferences>
+        <volume_device>avr</volume_device>
+    </preferences>
+</clonker>
