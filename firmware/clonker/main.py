@@ -19,12 +19,22 @@ def main():
     logger.info("THE CLONKER 10000")
     logger.info("Application started")
 
+
     settings = device_config.load()
 
-    logger.info("Configuration loaded from XML")
-    logger.info("TV IP: {}".format(settings["tv_ip"]))
-    logger.info("AVR IP: {}".format(settings["avr_ip"]))
-    logger.info("Volume device: {}".format(settings["volume_device"]))
+    logger.info("Three-room configuration loaded from XML")
+
+    for room_id in device_config.ROOM_IDS:
+        room = settings["rooms"][room_id]
+
+        logger.info("{}: {}".format(
+            room_id, room["name"]
+        ))
+        logger.info("  TV IP: {}".format(room["tv_ip"]))
+        logger.info("  AVR IP: {}".format(room["avr_ip"]))
+        logger.info("  Volume: {}".format(
+            room["volume_device"]
+        ))
 
     web_running = False
     next_web_poll = time.monotonic()

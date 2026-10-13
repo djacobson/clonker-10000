@@ -1,11 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <clonker version="1">
-    <devices>
-        <tv ip="192.168.50.20" />
-        <avr ip="192.168.50.30" />
-    </devices>
+    <rooms>
+        <room id="room-1" name="Den">
+            <devices>
+                <tv ip="192.168.50.20" />
+                <avr ip="192.168.50.30" />
+            </devices>
+            <preferences>
+                <volume_device>avr</volume_device>
+            </preferences>
+        </room>
 
-    <preferences>
-        <volume_device>avr</volume_device>
-    </preferences>
+        <room id="room-2" name="Sunroom">
+            <devices>
+                <tv ip="192.168.50.21" />
+                <avr ip="192.168.50.31" />
+            </devices>
+            <preferences>
+                <volume_device>avr</volume_device>
+            </preferences>
+        </room>
+
+        <room id="room-3" name="Third Room">
+            <devices>
+                <tv ip="" />
+                <avr ip="" />
+            </devices>
+            <preferences>
+                <volume_device>tv</volume_device>
+            </preferences>
+        </room>
+    </rooms>
 </clonker>
