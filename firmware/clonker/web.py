@@ -150,6 +150,7 @@ def poll():
             "HTTP/1.1 {}\r\n"
             "Content-Type: {}\r\n"
             "Content-Length: {}\r\n"
+            "Cache-Control: no-store\r\n"
             "Connection: close\r\n"
             "\r\n"
         ).format(
