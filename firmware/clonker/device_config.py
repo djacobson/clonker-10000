@@ -89,7 +89,7 @@ def _validate_ip(value, field_name):
         raise ValueError("Invalid {} address".format(field_name))
 
     for part in parts:
-        if not part or not part.isascii() or not part.isdigit():
+        if not part or any(ch not in "0123456789" for ch in part): 
             raise ValueError(
                 "Invalid {} address".format(field_name)
             )
