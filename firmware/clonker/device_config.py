@@ -9,6 +9,7 @@
 
 CONFIG_FILE = "/clonker/device_config.xml"
 MAX_CONFIG_BYTES = 8192
+MAX_ROOM_NAME_LENGTH = 40
 
 
 # Developer-defined number of supported rooms.
@@ -74,21 +75,52 @@ def _device_ip(room_xml, tag):
     return _attribute(room_xml[start:end + 1], "ip")
 
 
+def _validate_ip(value, field_name):
+    """Validate an optional IPv4 address."""
+    value = value.strip()
+
+    # Empty means the device is not configured.
+    if not value:
+        return ""
+
+    parts = value.split(".")
+
+    if len(parts) != 4:
+        raise ValueError("Invalid {} address".format(field_name))
+
+    for part in parts:
+        if not part or not part.isascii() or not part.isdigit():
+            raise ValueError(
+                "Invalid {} address".format(field_name)
+            )
+
+        if len(part) > 3 or int(part) > 255:
+            raise ValueError(
+                "Invalid {} address".format(field_name)
+            )
+
+    return value
+
+
 def _parse_room(room_xml):
     """Parse one room's name, devices and preferences."""
     opening, contents = _element(room_xml, "room")
 
     room_id = _attribute(opening, "id")
-    name = _attribute(opening, "name")
+    name = _attribute(opening, "name").strip()
 
-    tv_ip = _device_ip(contents, "tv")
-    avr_ip = _device_ip(contents, "avr")
+    if not name or len(name) > MAX_ROOM_NAME_LENGTH:
+        raise ValueError("Invalid room name: " + room_id)
+
+    tv_ip = _validate_ip(
+        _device_ip(contents, "tv"), "TV"
+    )
+    avr_ip = _validate_ip(
+        _device_ip(contents, "avr"), "AVR"
+    )
 
     _, volume_text = _element(contents, "volume_device")
     volume_device = volume_text.strip().lower()
-
-    if not name:
-        raise ValueError("Room name cannot be empty")
 
     if volume_device not in ("tv", "avr"):
         raise ValueError("Invalid volume device")
