@@ -32,7 +32,7 @@ def set_utc(unix_seconds, source_name="BROWSER"):
     if source_name not in ("BROWSER", "NTP"):
         raise ValueError("Invalid clock source")
 
-    unix_seconds = float(unix_seconds)
+    unix_seconds = int(unix_seconds)
 
     if not (946684800 <= unix_seconds <= 4102444800):
         raise ValueError("UTC timestamp out of range")
@@ -50,7 +50,7 @@ def timestamp():
         )
 
     elapsed = time.monotonic() - _reference_monotonic
-    current_utc = _reference_utc + elapsed
+    current_utc = _reference_utc + int(elapsed)
 
     t = time.localtime(current_utc)
 
