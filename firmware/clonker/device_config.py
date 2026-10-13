@@ -121,7 +121,7 @@ def _validate_room_elements(contents):
 
 
 def _parse_room(room_xml):
-    """Parse one room's name, devices and preferences."""
+    """Parse and validate one room's structure."""
     opening, contents = _element(room_xml, "room")
     _validate_room_elements(contents)
 
@@ -131,14 +131,33 @@ def _parse_room(room_xml):
     if not name or len(name) > MAX_ROOM_NAME_LENGTH:
         raise ValueError("Invalid room name: " + room_id)
 
+    # Devices must be inside <devices>.
+    _, devices_xml = _element(contents, "devices")
+
+    for tag in ("tv", "avr"):
+        if devices_xml.count("<" + tag + " ") != 1:
+            raise ValueError(
+                "{} must be inside devices".format(tag)
+            )
+
+    # Volume preference must be inside <preferences>.
+    _, preferences_xml = _element(contents, "preferences")
+
+    if preferences_xml.count("<volume_device>") != 1:
+        raise ValueError(
+            "volume_device must be inside preferences"
+        )
+
     tv_ip = _validate_ip(
-        _device_ip(contents, "tv"), "TV"
+        _device_ip(devices_xml, "tv"), "TV"
     )
     avr_ip = _validate_ip(
-        _device_ip(contents, "avr"), "AVR"
+        _device_ip(devices_xml, "avr"), "AVR"
     )
 
-    _, volume_text = _element(contents, "volume_device")
+    _, volume_text = _element(
+        preferences_xml, "volume_device"
+    )
     volume_device = volume_text.strip().lower()
 
     if volume_device not in ("tv", "avr"):
