@@ -9,7 +9,14 @@
 
 CONFIG_FILE = "/clonker/device_config.xml"
 
-ROOM_IDS = ("room-1", "room-2", "room-3")
+
+# Developer-defined number of supported rooms.
+ROOM_COUNT = 3
+
+ROOM_IDS = tuple(
+    "room-{}".format(n)
+    for n in range(1, ROOM_COUNT + 1)
+)
 
 _current = None
 
@@ -94,7 +101,7 @@ def _parse_room(room_xml):
 
 
 def load():
-    """Load all three rooms from XML into memory."""
+    """Load all configured rooms from XML into memory."""
     global _current
 
     with open(CONFIG_FILE, "r") as file:
@@ -124,7 +131,7 @@ def load():
         position = end + len("</room>")
 
     if xml.find("<room ", position) >= 0:
-        raise ValueError("More than three rooms")
+        raise ValueError("More rooms than ROOM_COUNT allows")
 
     # Publish only after all three rooms validate.
     _current = {"rooms": rooms}
