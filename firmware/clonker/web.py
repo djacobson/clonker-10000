@@ -19,6 +19,7 @@ import json
 
 from clonker import clock
 from clonker import logger
+from clonker import device_config
 
 
 WEB_ROOT = "/clonker/www"
@@ -104,6 +105,11 @@ def poll():
 
         elif first_line.startswith(b"GET /api/clock "):
             body = json.dumps(clock_status())
+            status = "200 OK"
+            content_type = "application/json"
+
+        elif first_line.startswith(b"GET /api/config "):
+            body = json.dumps(device_config.current())
             status = "200 OK"
             content_type = "application/json"
 
