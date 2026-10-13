@@ -102,7 +102,7 @@ def _parse_room(room_xml):
 
 
 def load():
-    """Load all configured rooms from XML into memory."""
+    """Load configured rooms from XML, in any order."""
     global _current
 
     with open(CONFIG_FILE, "r") as file:
@@ -113,19 +113,21 @@ def load():
 
     rooms = {}
     position = 0
+    closing_tag = "</room>"
 
-    for expected_id in ROOM_IDS:
+    while True:
         start = xml.find("<room ", position)
 
         if start < 0:
-            raise ValueError("Missing room: " + expected_id)
+            break
 
-        end = xml.find("</room>", start)
+        end = xml.find(closing_tag, start)
 
         if end < 0:
-            raise ValueError("Unclosed room: " + expected_id)
+            raise ValueError("Unclosed room element")
 
-        room_xml = xml[start:end + len("</room>")]
+        end += len(closing_tag)
+        room_xml = xml[start:end]
 
         room_id, room_settings = _parse_room(room_xml)
 
@@ -135,17 +137,14 @@ def load():
         if room_id in rooms:
             raise ValueError("Duplicate room ID: " + room_id)
 
-        if room_id != expected_id:
-            raise ValueError("Unexpected room ID: " + room_id)
-
         rooms[room_id] = room_settings
+        position = end
 
-        position = end + len("</room>")
+    for room_id in ROOM_IDS:
+        if room_id not in rooms:
+            raise ValueError("Missing room: " + room_id)
 
-    if xml.find("<room ", position) >= 0:
-        raise ValueError("More rooms than ROOM_COUNT allows")
-
-    # Publish only after all three rooms validate.
+    # Publish only after all rooms pass validation.
     _current = {"rooms": rooms}
 
     return _current
