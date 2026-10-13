@@ -83,6 +83,34 @@
             font-size: 15px;
         }
  
+        .room {
+            border-top: 1px solid #555;
+            padding-top: 12px;
+            margin-top: 20px;
+        }
+
+        .room h3 {
+            color: #e6b85c;
+            margin-bottom: 14px;
+        }
+
+        .room label {
+            display: block;
+            margin-top: 12px;
+            margin-bottom: 6px;
+        }
+
+        .room input {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #666;
+            border-radius: 6px;
+            background: #20242a;
+            color: #f0f0f0;
+            font-size: 15px;
+        }
+
     </style>
 </head>
 
@@ -118,29 +146,23 @@
         </button>
     </section>
 
+
     <section class="panel device-panel">
         <h2>Device Configuration</h2>
 
-        <p>
-            <label for="tv-ip">TV IP Address</label>
-            <input id="tv-ip" type="text" readonly>
-        </p>
+        <div id="rooms-container">
+            Loading room configuration...
+        </div>
+    </section>
 
-        <p>
-            <label for="avr-ip">AVR IP Address</label>
-            <input id="avr-ip" type="text" readonly>
-        </p>
-
-        <p>
-            <label for="volume-device">Volume Control</label>
-            <input id="volume-device" type="text" readonly>
-        </p>
-    </section> 
 </main>
 
 
 <script>
     async function loadDeviceConfig() {
+        const container =
+            document.getElementById("rooms-container");
+
         try {
             const response = await fetch("/api/config", {
                 cache: "no-store"
@@ -152,17 +174,55 @@
 
             const config = await response.json();
 
-            document.getElementById("tv-ip").value =
-                config.tv_ip;
+            // Sort by numeric room position.
+            const roomIds = Object.keys(config.rooms).sort(
+                (a, b) => {
+                    const aNum = Number(a.split("-")[1]);
+                    const bNum = Number(b.split("-")[1]);
+                    return aNum - bNum;
+                }
+            );
 
-            document.getElementById("avr-ip").value =
-                config.avr_ip;
+            container.replaceChildren();
 
-            document.getElementById("volume-device").value =
-                config.volume_device;
+            for (const roomId of roomIds) {
+                const room = config.rooms[roomId];
+
+                const section = document.createElement("div");
+                section.className = "room";
+
+                const heading = document.createElement("h3");
+                heading.textContent =
+                    roomId.toUpperCase() + " -- " + room.name;
+                section.appendChild(heading);
+
+                const fields = [
+                    ["Room Name", room.name],
+                    ["TV IP Address", room.tv_ip],
+                    ["AVR IP Address", room.avr_ip],
+                    ["Volume Control", room.volume_device]
+                ];
+
+                for (const [labelText, value] of fields) {
+                    const label = document.createElement("label");
+                    label.textContent = labelText;
+
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.value = value;
+                    input.readOnly = true;
+
+                    section.appendChild(label);
+                    section.appendChild(input);
+                }
+
+                container.appendChild(section);
+            }
 
         } catch (error) {
             console.error("Configuration load failed:", error);
+            container.textContent =
+                "Unable to load device configuration.";
         }
     }
 
