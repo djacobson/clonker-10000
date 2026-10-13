@@ -62,6 +62,27 @@
             color: inherit;
             text-decoration: underline;
         }
+
+        .device-panel {
+            margin-top: 16px;
+        }
+
+        .device-panel label {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .device-panel input {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #666;
+            border-radius: 6px;
+            background: #20242a;
+            color: #f0f0f0;
+            font-size: 15px;
+        }
+ 
     </style>
 </head>
 
@@ -96,10 +117,55 @@
             Synchronize with Browser
         </button>
     </section>
+
+    <section class="panel device-panel">
+        <h2>Device Configuration</h2>
+
+        <p>
+            <label for="tv-ip">TV IP Address</label>
+            <input id="tv-ip" type="text" readonly>
+        </p>
+
+        <p>
+            <label for="avr-ip">AVR IP Address</label>
+            <input id="avr-ip" type="text" readonly>
+        </p>
+
+        <p>
+            <label for="volume-device">Volume Control</label>
+            <input id="volume-device" type="text" readonly>
+        </p>
+    </section> 
 </main>
 
 
 <script>
+    async function loadDeviceConfig() {
+        try {
+            const response = await fetch("/api/config", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+
+            const config = await response.json();
+
+            document.getElementById("tv-ip").value =
+                config.tv_ip;
+
+            document.getElementById("avr-ip").value =
+                config.avr_ip;
+
+            document.getElementById("volume-device").value =
+                config.volume_device;
+
+        } catch (error) {
+            console.error("Configuration load failed:", error);
+        }
+    }
+
     async function updateClock() {
         try {
             const response = await fetch("/api/clock", {
@@ -162,6 +228,9 @@
 
     // Read clock status when the page opens.
     updateClock();
+
+    // Read device configuration when the page opens.
+    loadDeviceConfig();
 
     // Refresh the display every 5 seconds.
     setInterval(updateClock, 5000);
