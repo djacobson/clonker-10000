@@ -103,9 +103,27 @@ def _validate_ip(value, field_name):
     return value
 
 
+def _validate_room_elements(contents):
+    """Reject duplicate expected elements within one room."""
+    for tag in ("devices", "preferences", "volume_device"):
+        opening = "<" + tag + ">"
+        if contents.count(opening) != 1:
+            raise ValueError(
+                "Expected exactly one " + tag + " element"
+            )
+
+    for tag in ("tv", "avr"):
+        opening = "<" + tag + " "
+        if contents.count(opening) != 1:
+            raise ValueError(
+                "Expected exactly one " + tag + " device"
+            )
+
+
 def _parse_room(room_xml):
     """Parse one room's name, devices and preferences."""
     opening, contents = _element(room_xml, "room")
+    _validate_room_elements(contents)
 
     room_id = _attribute(opening, "id")
     name = _attribute(opening, "name").strip()
