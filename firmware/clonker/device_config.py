@@ -8,6 +8,7 @@
 # GitHub: https://github.com/djacobson/clonker-10000
 
 CONFIG_FILE = "/clonker/device_config.xml"
+MAX_CONFIG_BYTES = 8192
 
 
 # Developer-defined number of supported rooms.
@@ -105,7 +106,10 @@ def load():
     global _current
 
     with open(CONFIG_FILE, "r") as file:
-        xml = file.read()
+        xml = file.read(MAX_CONFIG_BYTES + 1)
+
+    if len(xml.encode("utf-8")) > MAX_CONFIG_BYTES:
+        raise ValueError("Configuration XML exceeds size limit")
 
     rooms = {}
     position = 0
@@ -122,12 +126,20 @@ def load():
             raise ValueError("Unclosed room: " + expected_id)
 
         room_xml = xml[start:end + len("</room>")]
+
         room_id, room_settings = _parse_room(room_xml)
+
+        if room_id not in ROOM_IDS:
+            raise ValueError("Unsupported room ID: " + room_id)
+
+        if room_id in rooms:
+            raise ValueError("Duplicate room ID: " + room_id)
 
         if room_id != expected_id:
             raise ValueError("Unexpected room ID: " + room_id)
 
         rooms[room_id] = room_settings
+
         position = end + len("</room>")
 
     if xml.find("<room ", position) >= 0:
