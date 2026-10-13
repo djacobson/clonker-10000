@@ -8,6 +8,7 @@
 # GitHub: https://github.com/djacobson/clonker-10000
 
 CONFIG_FILE = "/clonker/device_config.xml"
+CONFIG_VERSION = "1"
 MAX_CONFIG_BYTES = 8192
 MAX_ROOM_NAME_LENGTH = 40
 
@@ -133,6 +134,34 @@ def _parse_room(room_xml):
     }
 
 
+def _validate_document(xml):
+    """Validate the Clonker XML document wrapper."""
+    text = xml.strip()
+
+    # Allow the standard XML declaration.
+    if text.startswith("<?xml"):
+        declaration_end = text.find("?>")
+        if declaration_end < 0:
+            raise ValueError("Invalid XML declaration")
+        text = text[declaration_end + 2:].strip()
+
+    opening = '<clonker version="{}">'.format(CONFIG_VERSION)
+
+    if not text.startswith(opening):
+        raise ValueError("Invalid Clonker root or version")
+
+    if not text.endswith("</clonker>"):
+        raise ValueError("Missing Clonker closing tag")
+
+    contents = text[len(opening):-len("</clonker>")].strip()
+
+    if not contents.startswith("<rooms>"):
+        raise ValueError("Missing rooms container")
+
+    if not contents.endswith("</rooms>"):
+        raise ValueError("Missing rooms closing tag")
+
+
 def load():
     """Load configured rooms from XML, in any order."""
     global _current
@@ -142,6 +171,7 @@ def load():
 
     if len(xml.encode("utf-8")) > MAX_CONFIG_BYTES:
         raise ValueError("Configuration XML exceeds size limit")
+    _validate_document(xml)
 
     rooms = {}
     position = 0
