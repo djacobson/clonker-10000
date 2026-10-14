@@ -32,6 +32,12 @@ their versions and installation locations.
 | web.py | clonker.clock, clonker.logger, os |
 | main.py | time |
 
+## CircuitPython Development Notes
+
+**Web Workflow conflict:** CircuitPython’s built-in Web Workflow appeared to interfere with Clonker’s HTTP server, causing intermittent hangs and crashes. Disabling Web Workflow with `CIRCUITPY_WEB_API_PORT = 0` in `settings.toml` and running Clonker on port `9090` resolved the crashes observed during testing. The exact underlying conflict remains unconfirmed.
+
+**USB serial console:** Connecting the CircuitPython Web Editor’s serial console appears to interrupt an already-running Clonker (similar to Ctrl+C). Clonker auto-starts normally on cold boot. After connecting the console, press **Ctrl+D** to soft-reboot and restart Clonker with serial logging enabled.
+
 ## Deployment notes
 
 Application modules live under /clonker/.
