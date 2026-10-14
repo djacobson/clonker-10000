@@ -153,7 +153,12 @@
 
 
 <script>
+    const MAX_CONFIG_ATTEMPTS = 5;
+    let configAttempts = 0;
+
     async function loadDeviceConfig() {
+        configAttempts++;
+ 
         const container =
             document.getElementById("rooms-container");
 
@@ -236,12 +241,17 @@
 
                 container.appendChild(section);
             }
-
         } catch (error) {
-            console.warn("Configuration load failed; retrying:", error);
-            container.textContent =
-                "Loading room configuration...";
-            setTimeout(loadDeviceConfig, 1500);
+            console.warn("Configuration load failed:", error);
+
+            if (configAttempts < MAX_CONFIG_ATTEMPTS) {
+                container.textContent =
+                    "Loading room configuration...";
+                setTimeout(loadDeviceConfig, 1500);
+            } else {
+                container.textContent =
+                    "Unable to load configuration. Refresh the page to retry.";
+            }
         }
 
     }
