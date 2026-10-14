@@ -18,6 +18,7 @@ import time
 import wifi
 import socketpool
 import json
+import errno
 
 from clonker import clock, logger, device_config
 
@@ -43,6 +44,14 @@ def http_trace(message):
     if HTTP_DIAGNOSTICS:
         logger.info("HTTP TRACE: {}".format(message))
 
+
+def _socket_would_block(error):
+    """Return True for a temporary nonblocking socket condition."""
+    return error.errno in (
+        errno.EAGAIN,
+        errno.EWOULDBLOCK,
+    )
+ 
 
 def clock_page():
     with open(WEB_ROOT + "/index.html", "r") as file:
@@ -144,10 +153,15 @@ def poll():
 
     now = time.monotonic()
     if _client is None:
+
+        # accept Handler
         try:
             client, address = _listener.accept()
-        except OSError:
-            return  # No connection pending.
+        except OSError as error:
+            if not _socket_would_block(error):
+                logger.warning("HTTP accept error: {}".format(error))
+            return
+
         try:
             client.settimeout(0)
         except OSError:
@@ -169,10 +183,16 @@ def poll():
     if _response is None:
         # Receive at most one bounded chunk; never wait for a slow client.
         buf = bytearray(IO_CHUNK_BYTES)
+        
+        # recv_into Handler
         try:
             count = _client.recv_into(buf)
-        except OSError:
-            return  # Nonblocking socket: no data available yet.
+        except OSError as error:
+            if not _socket_would_block(error):
+                logger.warning("HTTP receive error: {}".format(error))
+                _close_client()
+            return
+
         if count == 0:
             _close_client()
             return
@@ -194,10 +214,16 @@ def poll():
 
     # Send at most one chunk; partial sends are resumed next poll.
     chunk = memoryview(_response)[_sent:_sent + IO_CHUNK_BYTES]
+
+    # send Handler
     try:
         count = _client.send(chunk)
-    except OSError:
-        return  # Socket not writable yet; idle timeout handles stalled clients.
+    except OSError as error:
+        if not _socket_would_block(error):
+            logger.warning("HTTP send error: {}".format(error))
+            _close_client()
+        return
+
     if count is None or count <= 0:
         return
     _sent += count
