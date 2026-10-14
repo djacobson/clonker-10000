@@ -45,6 +45,10 @@
             opacity: 0.5;
         }
 
+        #save-config {
+            margin-top: 20px;
+        }
+ 
         .value {
             font-family: monospace;
         }
@@ -193,6 +197,7 @@
 
                 const section = document.createElement("div");
                 section.className = "room";
+                section.dataset.roomId = roomId;
 
                 const heading = document.createElement("h3");
                 heading.textContent =
@@ -200,17 +205,18 @@
                 section.appendChild(heading);
 
                 const fields = [
-                    ["Room Name", room.name],
-                    ["TV IP Address", room.tv_ip],
-                    ["AVR IP Address", room.avr_ip]
+                    ["Room Name", room.name, "name"],
+                    ["TV IP Address", room.tv_ip, "tv_ip"],
+                    ["AVR IP Address", room.avr_ip, "avr_ip"]
                 ];
 
-                for (const [labelText, value] of fields) {
+                for (const [labelText, value, fieldName] of fields) {
                     const label = document.createElement("label");
                     label.textContent = labelText;
 
                     const input = document.createElement("input");
                     input.type = "text";
+                    input.dataset.field = fieldName;
                     input.value = value;
                     input.readOnly = false;
 
@@ -238,6 +244,7 @@
                 }
 
                 volumeSelect.value = room.volume_device;
+                volumeSelect.dataset.field = "volume_device";
                 volumeSelect.disabled = false;
 
                 section.appendChild(volumeLabel);
@@ -258,6 +265,23 @@
             }
         }
 
+    }
+
+    function collectDeviceConfig() {
+        const rooms = {};
+
+        document.querySelectorAll(".room").forEach(section => {
+            const roomId = section.dataset.roomId;
+            const room = {};
+
+            section.querySelectorAll("[data-field]").forEach(field => {
+                room[field.dataset.field] = field.value.trim();
+            });
+
+            rooms[roomId] = room;
+        });
+
+        return { rooms };
     }
 
     async function updateClock() {
