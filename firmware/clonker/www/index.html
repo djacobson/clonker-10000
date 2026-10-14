@@ -208,7 +208,7 @@
                     const input = document.createElement("input");
                     input.type = "text";
                     input.value = value;
-                    input.readOnly = true;
+                    input.readOnly = false;
 
                     section.appendChild(label);
                     section.appendChild(input);
@@ -234,7 +234,7 @@
                 }
 
                 volumeSelect.value = room.volume_device;
-                volumeSelect.disabled = true;
+                volumeSelect.disabled = false;
 
                 section.appendChild(volumeLabel);
                 section.appendChild(volumeSelect);
