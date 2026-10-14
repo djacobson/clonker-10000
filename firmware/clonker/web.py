@@ -1,200 +1,214 @@
-
 # The Clonker 10000
 # clonker/web.py
 #
-# Cooperative HTTP server experiment.
-# CircuitPython 10.x / Raspberry Pi Pico 2 W.
+# Cooperative HTTP server for CircuitPython 10.x / Raspberry Pi Pico 2 W.
 #
-# Port 8080: Clonker application
-# Port 80: CircuitPython Web Workflow
+# Port 8080: Clonker; port 80: CircuitPython Web Workflow.
 #
 # No external libraries required.
 #
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
 
+import time
 import wifi
 import socketpool
 import json
 
-from clonker import clock
-from clonker import logger
-from clonker import device_config
-
+from clonker import clock, logger, device_config
 
 WEB_ROOT = "/clonker/www"
 PORT = 8080
-
-# Temporary HTTP diagnostics.
 HTTP_DIAGNOSTICS = True
+
+# Tunable limits. One client at a time; no socket call waits for network data.
+MAX_REQUEST_BYTES = 2048
+IO_CHUNK_BYTES = 512
+CLIENT_TIMEOUT_SECONDS = 4.0
+
+_pool = None
+_listener = None
+_client = None
+_request = None
+_response = None
+_sent = 0
+_last_activity = 0.0
+
 
 def http_trace(message):
     if HTTP_DIAGNOSTICS:
         logger.info("HTTP TRACE: {}".format(message))
-_pool = None
-_listener = None
 
 
 def clock_page():
-    """Load the Clonker home page."""
     with open(WEB_ROOT + "/index.html", "r") as file:
         return file.read()
 
 
 def clock_status():
-    """Return current clock information."""
-    return {
-        "source": clock.source(),
-        "timestamp": clock.timestamp(),
-    }
+    return {"source": clock.source(), "timestamp": clock.timestamp()}
+
+
+def _close_client():
+    global _client, _request, _response, _sent, _last_activity
+    if _client is not None:
+        try:
+            _client.close()
+        except OSError:
+            pass
+        http_trace("Client closed")
+    _client = None
+    _request = None
+    _response = None
+    _sent = 0
+    _last_activity = 0.0
 
 
 def start():
-    """Start the HTTP listener."""
     global _pool, _listener
-
     if _listener is not None:
         return
-
     if not wifi.radio.connected:
         raise RuntimeError("Wi-Fi is not connected")
-
     _pool = socketpool.SocketPool(wifi.radio)
-    _listener = _pool.socket(
-        _pool.AF_INET,
-        _pool.SOCK_STREAM
-    )
-
+    listener = _pool.socket(_pool.AF_INET, _pool.SOCK_STREAM)
     try:
-        _listener.setsockopt(
-            _pool.SOL_SOCKET,
-            _pool.SO_REUSEADDR,
-            1
-        )
-    except (AttributeError, OSError):
-        pass
-
-    _listener.bind(("0.0.0.0", PORT))
-    _listener.listen(1)
-    _listener.settimeout(0)
-
+        try:
+            listener.setsockopt(_pool.SOL_SOCKET, _pool.SO_REUSEADDR, 1)
+        except (AttributeError, OSError):
+            pass
+        listener.bind(("0.0.0.0", PORT))
+        listener.listen(2)
+        listener.settimeout(0)
+    except Exception:
+        listener.close()
+        _pool = None
+        raise
+    _listener = listener
     logger.info("Clonker HTTP listening on port {}".format(PORT))
 
 
+def _build_response(first_line):
+    logger.debug("HTTP request: {}".format(first_line))
+    if first_line.startswith(b"GET / "):
+        body = clock_page()
+        status = "200 OK"
+        content_type = "text/html; charset=utf-8"
+    elif first_line.startswith(b"GET /api/clock "):
+        body = json.dumps(clock_status())
+        status = "200 OK"
+        content_type = "application/json"
+    elif first_line.startswith(b"GET /api/config "):
+        body = json.dumps(device_config.current())
+        status = "200 OK"
+        content_type = "application/json"
+    elif first_line.startswith(b"POST /api/clock?utc="):
+        content_type = "application/json"
+        try:
+            path = first_line.split(b" ", 2)[1]
+            value = path.split(b"utc=", 1)[1]
+            if not value.isdigit():
+                raise ValueError("Invalid timestamp")
+            clock.set_utc(int(value), "BROWSER")
+            logger.info("Clock synchronized from browser")
+            body = json.dumps(clock_status())
+            status = "200 OK"
+        except (ValueError, OverflowError):
+            body = '{"error":"Invalid UTC timestamp"}'
+            status = "400 Bad Request"
+    else:
+        body = "Not Found"
+        status = "404 Not Found"
+        content_type = "text/plain"
+
+    payload = body.encode("utf-8")
+    header = (
+        "HTTP/1.1 {}\r\n"
+        "Content-Type: {}\r\n"
+        "Content-Length: {}\r\n"
+        "Cache-Control: no-store\r\n"
+        "Connection: close\r\n\r\n"
+    ).format(status, content_type, len(payload))
+    return header.encode("utf-8") + payload
+
+
 def poll():
-    """Handle at most one incoming HTTP request."""
+    """Advance at most one accept, receive, or send operation per call."""
+    global _client, _request, _response, _sent, _last_activity
     if _listener is None:
         return
 
-    try:
-        client, address = _listener.accept()
-    except OSError:
-        # No incoming connection.
+    now = time.monotonic()
+    if _client is None:
+        try:
+            client, address = _listener.accept()
+        except OSError:
+            return  # No connection pending.
+        try:
+            client.settimeout(0)
+        except OSError:
+            client.close()
+            return
+        _client = client
+        _request = bytearray()
+        _response = None
+        _sent = 0
+        _last_activity = now
+        http_trace("ACCEPTED connection")
         return
 
-    http_trace("ACCEPTED connection") 
+    if now - _last_activity > CLIENT_TIMEOUT_SECONDS:
+        logger.warning("HTTP client timed out")
+        _close_client()
+        return
 
-    try:
-        client.settimeout(1)
-
-        http_trace("RECV starting") 
-
-        request = bytearray(1024)
-        count = client.recv_into(request)
-
-        http_trace("RECV completed: {} bytes".format(count))
-
-        if count <= 0:
+    if _response is None:
+        # Receive at most one bounded chunk; never wait for a slow client.
+        buf = bytearray(IO_CHUNK_BYTES)
+        try:
+            count = _client.recv_into(buf)
+        except OSError:
+            return  # Nonblocking socket: no data available yet.
+        if count == 0:
+            _close_client()
             return
+        _last_activity = now
+        _request.extend(memoryview(buf)[:count])
+        if len(_request) > MAX_REQUEST_BYTES:
+            logger.warning("HTTP request exceeded size limit")
+            _close_client()
+            return
+        # Wait for complete headers, including split TCP packets.
+        if b"\r\n\r\n" not in _request:
+            return
+        first_line = bytes(_request).split(b"\r\n", 1)[0]
+        http_trace("RECV completed: {} bytes".format(len(_request)))
+        _response = _build_response(first_line)
+        _request = None
+        http_trace("Response prepared: {} bytes".format(len(_response)))
+        return
 
-        first_line = bytes(request[:count]).split(b"\r\n", 1)[0]
-        logger.debug("HTTP request: {}".format(first_line))
-
-        if first_line.startswith(b"GET / "):
-            body = clock_page()
-            status = "200 OK"
-            content_type = "text/html; charset=utf-8"
-
-        elif first_line.startswith(b"GET /api/clock "):
-            body = json.dumps(clock_status())
-            status = "200 OK"
-            content_type = "application/json"
-
-        elif first_line.startswith(b"GET /api/config "):
-            body = json.dumps(device_config.current())
-            status = "200 OK"
-            content_type = "application/json"
-
-        elif first_line.startswith(b"POST /api/clock?utc="):
-            content_type = "application/json"
-
-            try:
-                # Extract UTC seconds from the URL.
-                path = first_line.split(b" ", 2)[1]
-                value = path.split(b"utc=", 1)[1]
-
-                # Ensure the query contains only a timestamp.
-                if not value.isdigit():
-                    raise ValueError("Invalid timestamp")
-
-                utc_seconds = int(value)
-
-                # clock.py validates the timestamp range.
-                clock.set_utc(utc_seconds, "BROWSER")
-
-                logger.info("Clock synchronized from browser")
-
-                body = json.dumps(clock_status())
-                status = "200 OK"
-
-            except (ValueError, OverflowError):
-                body = '{"error":"Invalid UTC timestamp"}'
-                status = "400 Bad Request"
-
-        else:
-            body = "Not Found"
-            status = "404 Not Found"
-            content_type = "text/plain"
-
-        payload = body.encode("utf-8")
-
-        header = (
-            "HTTP/1.1 {}\r\n"
-            "Content-Type: {}\r\n"
-            "Content-Length: {}\r\n"
-            "Cache-Control: no-store\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-        ).format(
-            status,
-            content_type,
-            len(payload)
-        )
-
-        http_trace("SEND header starting")
-        client.sendall(header.encode("utf-8"))
-        http_trace("SEND header completed")
-
-        http_trace("SEND body starting: {} bytes".format(len(payload)))
-        client.sendall(payload)
-        http_trace("SEND body completed")
-
-    except OSError as error:
-        logger.warning("HTTP connection error: {}".format(error))
-
-    finally:
-        http_trace("CLOSE starting")
-        client.close()
-        http_trace("CLOSE completed")
+    # Send at most one chunk; partial sends are resumed next poll.
+    chunk = memoryview(_response)[_sent:_sent + IO_CHUNK_BYTES]
+    try:
+        count = _client.send(chunk)
+    except OSError:
+        return  # Socket not writable yet; idle timeout handles stalled clients.
+    if count is None or count <= 0:
+        return
+    _sent += count
+    _last_activity = now
+    if _sent >= len(_response):
+        http_trace("SEND completed: {} bytes".format(_sent))
+        _close_client()
 
 
 def stop():
-    """Stop the HTTP listener."""
     global _listener, _pool
-
+    _close_client()
     if _listener is not None:
         _listener.close()
         _listener = None
-
     _pool = None
     logger.info("Clonker HTTP stopped")
+ 
