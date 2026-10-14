@@ -238,10 +238,12 @@
             }
 
         } catch (error) {
-            console.error("Configuration load failed:", error);
+            console.warn("Configuration load failed; retrying:", error);
             container.textContent =
-                "Unable to load device configuration.";
+                "Loading room configuration...";
+            setTimeout(loadDeviceConfig, 1500);
         }
+
     }
 
     async function updateClock() {
