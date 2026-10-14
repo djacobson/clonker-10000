@@ -3,3 +3,7 @@ CIRCUITPY_WIFI_SSID = "jrtr"
 CIRCUITPY_WIFI_PASSWORD = "..."
 CIRCUITPY_WEB_API_PASSWORD = "..."
 CIRCUITPY_WEB_INSTANCE_NAME = "clonker"
+
+# Disable CircuitPython Web Workflow.
+# Avoids suspected socket conflicts with Clonker HTTP.
+CIRCUITPY_WEB_API_PORT = 0
