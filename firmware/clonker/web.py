@@ -3,7 +3,11 @@
 #
 # Cooperative HTTP server for CircuitPython 10.x / Raspberry Pi Pico 2 W.
 #
-# Port 8080: Clonker; port 80: CircuitPython Web Workflow.
+# Port 9090: Clonker; port 80: CircuitPython Web Workflow.
+#
+# NOTE: Port 8080 caused repeatable crashes with Chrome on
+# Pico 2 W / CircuitPython 10.3.1. Switching to 9090
+# appears to resolve the issue. Root cause unknown.
 #
 # No external libraries required.
 #
@@ -18,8 +22,8 @@ import json
 from clonker import clock, logger, device_config
 
 WEB_ROOT = "/clonker/www"
-PORT = 8080
-HTTP_DIAGNOSTICS = True
+PORT = 9090
+HTTP_DIAGNOSTICS = False
 
 # Tunable limits. One client at a time; no socket call waits for network data.
 MAX_REQUEST_BYTES = 2048
