@@ -25,6 +25,12 @@ from clonker import device_config
 WEB_ROOT = "/clonker/www"
 PORT = 8080
 
+# Temporary HTTP diagnostics.
+HTTP_DIAGNOSTICS = True
+
+def http_trace(message):
+    if HTTP_DIAGNOSTICS:
+        logger.info("HTTP TRACE: {}".format(message))
 _pool = None
 _listener = None
 
@@ -86,11 +92,17 @@ def poll():
         # No incoming connection.
         return
 
+    http_trace("ACCEPTED connection") 
+
     try:
         client.settimeout(1)
 
+        http_trace("RECV starting") 
+
         request = bytearray(1024)
         count = client.recv_into(request)
+
+        http_trace("RECV completed: {} bytes".format(count))
 
         if count <= 0:
             return
@@ -159,14 +171,21 @@ def poll():
             len(payload)
         )
 
+        http_trace("SEND header starting")
         client.sendall(header.encode("utf-8"))
+        http_trace("SEND header completed")
+
+        http_trace("SEND body starting: {} bytes".format(len(payload)))
         client.sendall(payload)
+        http_trace("SEND body completed")
 
     except OSError as error:
         logger.warning("HTTP connection error: {}".format(error))
 
     finally:
+        http_trace("CLOSE starting")
         client.close()
+        http_trace("CLOSE completed")
 
 
 def stop():
