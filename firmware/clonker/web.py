@@ -133,7 +133,7 @@ def _request_complete(request):
     return len(request) >= total_length
 
 
-def _build_response(first_line):
+def _build_response(first_line, request=None):
     logger.debug("HTTP request: {}".format(first_line))
     if first_line.startswith(b"GET / "):
         body = clock_page()
@@ -178,10 +178,40 @@ def _build_response(first_line):
                 "error": "Filesystem is read-only"
             })
         else:
-            status = "501 Not Implemented"
-            body = json.dumps({
-                "error": "Configuration saving not implemented yet"
-            })
+            try:
+                header_end = request.find(b"\r\n\r\n")
+                headers = bytes(request[:header_end]).split(b"\r\n")
+
+                content_length = None
+                for header in headers[1:]:
+                    if header.lower().startswith(b"content-length:"):
+                        content_length = int(
+                            header.split(b":", 1)[1].strip()
+                        )
+                        break
+
+                if content_length is None:
+                    raise ValueError("Missing Content-Length")
+
+                body_start = header_end + 4
+                body_bytes = bytes(
+                    request[body_start:body_start + content_length]
+                )
+
+                submitted = json.loads(body_bytes.decode("utf-8"))
+                validated = device_config.validate_config(submitted)
+
+                status = "200 OK"
+                body = json.dumps({
+                    "message": "Configuration validated; not saved",
+                    "rooms": len(validated["rooms"])
+                })
+
+            except (ValueError, TypeError, UnicodeError) as error:
+                status = "400 Bad Request"
+                body = json.dumps({
+                    "error": str(error)
+                })
 
     else:
         body = "Not Found"
@@ -268,7 +298,7 @@ def poll():
 
         first_line = bytes(_request).split(b"\r\n", 1)[0]
         http_trace("RECV completed: {} bytes".format(len(_request)))
-        _response = _build_response(first_line)
+        _response = _build_response(first_line, _request)
         _request = None
         http_trace("Response prepared: {} bytes".format(len(_response)))
 
