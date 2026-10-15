@@ -443,11 +443,8 @@ def _replace_with_backup(path, contents):
             raise
 
     # Preserve the current configuration as the new backup.
-    try:
-        os.rename(path, backup_path)
-    except OSError as error:
-        if error.errno != 2:
-            raise
+    # A missing primary is an error, not a fresh installation.
+    os.rename(path, backup_path)
 
     # Install the verified replacement.
     os.rename(temp_path, path)
