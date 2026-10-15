@@ -428,6 +428,9 @@ def _replace_with_backup(path, contents):
 
     # Preserve the previous backup until the new one is ready.
     previous_backup = backup_path + ".old"
+ 
+    # Confirm the primary exists before changing any backups.
+    os.stat(path)
 
     # Move the existing backup aside, if present.
     try:
