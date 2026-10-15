@@ -418,3 +418,26 @@ def _replace_with_backup(path, contents):
             raise OSError("Installed file verification failed")
 
     return path
+
+
+def _recover_missing_file(path):
+    """Restore backup if an interrupted save left no primary file."""
+    try:
+        os.stat(path)
+        return False  # Primary file exists; nothing to recover.
+    except OSError as error:
+        if error.errno != 2:
+            raise
+
+    backup_path = path + ".bak"
+
+    # Only restore if a backup actually exists.
+    try:
+        os.stat(backup_path)
+    except OSError as error:
+        if error.errno == 2:
+            return False
+        raise
+
+    os.rename(backup_path, path)
+    return True
