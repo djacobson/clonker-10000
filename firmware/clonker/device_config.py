@@ -436,14 +436,23 @@ def _replace_with_backup(path, contents):
     temp_path = _write_verified_temp(path, contents)
     backup_path = path + ".bak"
 
-    # Remove an older backup, if one exists.
+    # Preserve the previous backup until the new one is ready.
+    previous_backup = backup_path + ".old"
+
     try:
-        os.remove(backup_path)
+        os.remove(previous_backup)
     except OSError as error:
         if error.errno != 2:
             raise
 
-    # Move the current file to the backup.
+    # Move the existing backup aside, if present.
+    try:
+        os.rename(backup_path, previous_backup)
+    except OSError as error:
+        if error.errno != 2:
+            raise
+
+    # Preserve the current configuration as the new backup.
     try:
         os.rename(path, backup_path)
     except OSError as error:
