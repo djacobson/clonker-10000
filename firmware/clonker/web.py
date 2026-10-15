@@ -150,6 +150,7 @@ def _build_response(first_line, request=None):
     elif first_line.startswith(b"GET /api/config "):
         config = device_config.current().copy()
         config["filesystem_writable"] = not storage.getmount("/").readonly
+        config["revision"] = device_config.revision()
         body = json.dumps(config)
         status = "200 OK"
         content_type = "application/json"

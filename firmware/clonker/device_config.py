@@ -335,6 +335,17 @@ def current():
     return _current
 
 
+def revision():
+    """Return a stable identifier for the loaded configuration."""
+    xml = to_xml(current())
+    value = 2166136261
+
+    for byte in xml.encode("utf-8"):
+        value = ((value ^ byte) * 16777619) & 0xFFFFFFFF
+
+    return "{:08x}".format(value)
+
+
 def room(room_id):
     """Return settings for one room."""
     if _current is None:
