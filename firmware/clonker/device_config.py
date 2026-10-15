@@ -252,28 +252,37 @@ def validate_config(config):
 
 
 def load():
+    """Load primary configuration, falling back to backup if invalid."""
+    try:
+        return _load_existing()
+    except ValueError as error:
+        print("CLONKER CONFIG: Primary invalid:", error)
+        print("CLONKER CONFIG: Trying backup")
+        return _load_existing(CONFIG_FILE + ".bak")
+
+
+def _load_existing(config_path=CONFIG_FILE):
     """Load configuration, recovering an interrupted save if needed."""
     global _current
 
-    config_path = CONFIG_FILE
+    if config_path == CONFIG_FILE:
+        try:
+            os.stat(CONFIG_FILE)
+        except OSError as error:
+            if error.errno != 2:
+                raise
 
-    try:
-        os.stat(CONFIG_FILE)
-    except OSError as error:
-        if error.errno != 2:
-            raise
+            backup_path = CONFIG_FILE + ".bak"
 
-        backup_path = CONFIG_FILE + ".bak"
+            # Confirm that a backup exists.
+            os.stat(backup_path)
 
-        # Confirm that a backup exists.
-        os.stat(backup_path)
-
-        if storage.getmount("/").readonly:
-            # USB mode: read the backup without changing files.
-            config_path = backup_path
-        else:
-            # DEVICE mode: restore the backup to its normal name.
-            _recover_missing_file(CONFIG_FILE)
+            if storage.getmount("/").readonly:
+                # USB mode: read the backup without changing files.
+                config_path = backup_path
+            else:
+                # DEVICE mode: restore the backup to its normal name.
+                _recover_missing_file(CONFIG_FILE)
 
     with open(config_path, "r") as file:
         xml = file.read(MAX_CONFIG_BYTES + 1)
