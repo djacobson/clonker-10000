@@ -429,12 +429,6 @@ def _replace_with_backup(path, contents):
     # Preserve the previous backup until the new one is ready.
     previous_backup = backup_path + ".old"
 
-    try:
-        os.remove(previous_backup)
-    except OSError as error:
-        if error.errno != 2:
-            raise
-
     # Move the existing backup aside, if present.
     try:
         os.rename(backup_path, previous_backup)
