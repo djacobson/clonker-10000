@@ -6,6 +6,7 @@
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
 import os
+import storage
 
 CONFIG_FILE = "/clonker/device_config.xml"
 CONFIG_VERSION = "1"
@@ -251,10 +252,30 @@ def validate_config(config):
 
 
 def load():
-    """Load configured rooms from XML, in any order."""
+    """Load configuration, recovering an interrupted save if needed."""
     global _current
 
-    with open(CONFIG_FILE, "r") as file:
+    config_path = CONFIG_FILE
+
+    try:
+        os.stat(CONFIG_FILE)
+    except OSError as error:
+        if error.errno != 2:
+            raise
+
+        backup_path = CONFIG_FILE + ".bak"
+
+        # Confirm that a backup exists.
+        os.stat(backup_path)
+
+        if storage.getmount("/").readonly:
+            # USB mode: read the backup without changing files.
+            config_path = backup_path
+        else:
+            # DEVICE mode: restore the backup to its normal name.
+            _recover_missing_file(CONFIG_FILE)
+
+    with open(config_path, "r") as file:
         xml = file.read(MAX_CONFIG_BYTES + 1)
 
     if len(xml.encode("utf-8")) > MAX_CONFIG_BYTES:
