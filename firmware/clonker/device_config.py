@@ -1,4 +1,3 @@
-
 # The Clonker 10000
 # clonker/device_config.py
 #
@@ -6,6 +5,7 @@
 #
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
+import os
 
 CONFIG_FILE = "/clonker/device_config.xml"
 CONFIG_VERSION = "1"
@@ -371,3 +371,20 @@ def to_xml(config):
         raise ValueError("Configuration XML exceeds size limit")
 
     return xml
+
+
+def _write_verified_temp(path, contents):
+    """Write a temporary file and verify its contents."""
+    temp_path = path + ".tmp"
+
+    with open(temp_path, "w") as file:
+        file.write(contents)
+        file.flush()
+
+    with open(temp_path, "r") as file:
+        verified = file.read()
+
+    if verified != contents:
+        raise OSError("Temporary file verification failed")
+
+    return temp_path
