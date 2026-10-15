@@ -154,7 +154,12 @@
 
         <button id="save-config" disabled>
             Save Configuration
-        </button> 
+        </button>
+
+        <p id="save-status">
+            Checking filesystem status...
+        </p>
+
     </section>
 
 </main>
@@ -183,6 +188,11 @@
 
             const saveButton = document.getElementById("save-config");
             saveButton.disabled = !config.filesystem_writable;
+            const saveStatus = document.getElementById("save-status");
+
+            saveStatus.textContent = config.filesystem_writable
+                ? "DEVICE mode -- filesystem writable. Configuration saving available."
+                : "USB mode -- filesystem read-only. Configuration saving unavailable.";
 
             // Sort by numeric room position.
             const roomIds = Object.keys(config.rooms).sort(
