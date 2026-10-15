@@ -126,7 +126,7 @@ def _parse_room(room_xml):
     _validate_room_elements(contents)
 
     room_id = _attribute(opening, "id")
-    name = _attribute(opening, "name").strip()
+    name = _unescape_xml(_attribute(opening, "name")).strip()
 
     if not name or len(name) > MAX_ROOM_NAME_LENGTH:
         raise ValueError("Invalid room name: " + room_id)
@@ -320,6 +320,15 @@ def _escape_xml(value):
                  .replace(">", "&gt;")
                  .replace('"', "&quot;")
                  .replace("'", "&apos;"))
+
+
+def _unescape_xml(value):
+    """Decode the XML entities used by our serializer."""
+    return (value.replace("&quot;", '"')
+                 .replace("&apos;", "'")
+                 .replace("&lt;", "<")
+                 .replace("&gt;", ">")
+                 .replace("&amp;", "&"))
 
 
 def to_xml(config):
