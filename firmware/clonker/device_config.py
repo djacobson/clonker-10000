@@ -252,37 +252,27 @@ def validate_config(config):
 
 
 def load():
-    """Load primary configuration, falling back to backup if invalid."""
-    try:
-        return _load_existing()
-    except ValueError as error:
-        print("CLONKER CONFIG: Primary invalid:", error)
-        print("CLONKER CONFIG: Trying backup")
-        return _load_existing(CONFIG_FILE + ".bak")
+    """Load configuration, trying backups if primary is invalid."""
+    for path in (
+        CONFIG_FILE,
+        CONFIG_FILE + ".bak",
+        CONFIG_FILE + ".bak.old",
+    ):
+        try:
+            return _load_existing(path)
+        except (ValueError, OSError) as error:
+            print(
+                "CLONKER CONFIG: Cannot load {}: {}".format(
+                    path, error
+                )
+            )
+
+    raise RuntimeError("No valid Clonker configuration found")
 
 
 def _load_existing(config_path=CONFIG_FILE):
     """Load configuration, recovering an interrupted save if needed."""
     global _current
-
-    if config_path == CONFIG_FILE:
-        try:
-            os.stat(CONFIG_FILE)
-        except OSError as error:
-            if error.errno != 2:
-                raise
-
-            backup_path = CONFIG_FILE + ".bak"
-
-            # Confirm that a backup exists.
-            os.stat(backup_path)
-
-            if storage.getmount("/").readonly:
-                # USB mode: read the backup without changing files.
-                config_path = backup_path
-            else:
-                # DEVICE mode: restore the backup to its normal name.
-                _recover_missing_file(CONFIG_FILE)
 
     with open(config_path, "r") as file:
         xml = file.read(MAX_CONFIG_BYTES + 1)
@@ -470,24 +460,73 @@ def _replace_with_backup(path, contents):
     return path
 
 
+def _backup_looks_valid(path):
+    """Check basic XML integrity before restoring a backup."""
+    try:
+        with open(path, "r") as file:
+            xml = file.read(MAX_CONFIG_BYTES + 1)
+
+        if len(xml.encode("utf-8")) > MAX_CONFIG_BYTES:
+            return False
+
+        _validate_document(xml)
+
+        rooms = {}
+        position = 0
+
+        while True:
+            start = xml.find("<room ", position)
+            if start < 0:
+                break
+
+            end = xml.find("</room>", start)
+            if end < 0:
+                return False
+
+            end += len("</room>")
+            room_id, settings = _parse_room(xml[start:end])
+
+            if room_id not in ROOM_IDS or room_id in rooms:
+                return False
+
+            rooms[room_id] = settings
+            position = end
+
+        if set(rooms) != set(ROOM_IDS):
+            return False
+
+        return True
+
+    except (OSError, ValueError):
+        return False
+
+
 def _recover_missing_file(path):
-    """Restore backup if an interrupted save left no primary file."""
+    """Restore a missing primary from an available backup."""
     try:
         os.stat(path)
-        return False  # Primary file exists; nothing to recover.
+        return False
     except OSError as error:
         if error.errno != 2:
             raise
 
     backup_path = path + ".bak"
+    old_backup_path = backup_path + ".old"
 
-    # Only restore if a backup actually exists.
-    try:
-        os.stat(backup_path)
-    except OSError as error:
-        if error.errno == 2:
-            return False
-        raise
+    for candidate in (backup_path, old_backup_path):
+        try:
+            os.stat(candidate)
+        except OSError as error:
+            if error.errno == 2:
+                continue
+            raise
 
-    os.rename(backup_path, path)
-    return True
+        # Never restore a backup that fails validation.
+        if not _backup_looks_valid(candidate):
+            print("CLONKER CONFIG: Invalid backup:", candidate)
+            continue
+
+        os.rename(candidate, path)
+        return True
+
+    return False
