@@ -136,6 +136,20 @@ def _build_response(first_line):
             body = '{"error":"Invalid UTC timestamp"}'
             status = "400 Bad Request"
 
+    elif first_line.startswith(b"POST /api/config "):
+        content_type = "application/json"
+
+        if storage.getmount("/").readonly:
+            status = "403 Forbidden"
+            body = json.dumps({
+                "error": "Filesystem is read-only"
+            })
+        else:
+            status = "501 Not Implemented"
+            body = json.dumps({
+                "error": "Configuration saving not implemented yet"
+            })
+
     else:
         body = "Not Found"
         status = "404 Not Found"
