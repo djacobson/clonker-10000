@@ -12,7 +12,7 @@ from clonker.controls import switches
 from clonker import device_config
 
 # Management HTTP service is low priority.
-WEB_POLL_INTERVAL = 0.05
+WEB_POLL_INTERVAL = 0.01
 
 
 def main():
