@@ -199,6 +199,57 @@ def _validate_document(xml):
         raise ValueError("Missing rooms closing tag")
 
 
+def validate_config(config):
+    """Validate browser-submitted settings without saving."""
+    if not isinstance(config, dict):
+        raise ValueError("Configuration must be an object")
+
+    rooms = config.get("rooms")
+    if not isinstance(rooms, dict):
+        raise ValueError("Missing rooms object")
+
+    if set(rooms) != set(ROOM_IDS):
+        raise ValueError("Incorrect room IDs")
+
+    validated = {}
+
+    for room_id in ROOM_IDS:
+        room = rooms[room_id]
+
+        if not isinstance(room, dict):
+            raise ValueError("Invalid room: " + room_id)
+
+        required = (
+            "name", "tv_ip", "avr_ip", "volume_device"
+        )
+
+        if set(room) != set(required):
+            raise ValueError("Invalid fields: " + room_id)
+
+        if not all(isinstance(room[key], str)
+                   for key in required):
+            raise ValueError("Invalid field type: " + room_id)
+
+        name = room["name"].strip()
+
+        if not name or len(name) > MAX_ROOM_NAME_LENGTH:
+            raise ValueError("Invalid room name: " + room_id)
+
+        volume = room["volume_device"].strip().lower()
+
+        if volume not in ("tv", "avr"):
+            raise ValueError("Invalid volume device: " + room_id)
+
+        validated[room_id] = {
+            "name": name,
+            "tv_ip": _validate_ip(room["tv_ip"], "TV"),
+            "avr_ip": _validate_ip(room["avr_ip"], "AVR"),
+            "volume_device": volume,
+        }
+
+    return {"rooms": validated}
+
+
 def load():
     """Load configured rooms from XML, in any order."""
     global _current
