@@ -311,3 +311,54 @@ def room(room_id):
         raise RuntimeError("Configuration not loaded")
 
     return _current["rooms"][room_id]
+
+
+def _escape_xml(value):
+    """Escape text for use in XML attributes or elements."""
+    return (value.replace("&", "&amp;")
+                 .replace("<", "&lt;")
+                 .replace(">", "&gt;")
+                 .replace('"', "&quot;")
+                 .replace("'", "&apos;"))
+
+
+def to_xml(config):
+    """Validate and serialize configuration to XML in memory."""
+    validated = validate_config(config)
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<clonker version="{}">'.format(CONFIG_VERSION),
+        '    <rooms>',
+    ]
+
+    for room_id in ROOM_IDS:
+        room = validated["rooms"][room_id]
+
+        lines.extend([
+            '        <room id="{}" name="{}">'.format(
+                room_id, _escape_xml(room["name"])
+            ),
+            '            <devices>',
+            '                <tv ip="{}" />'.format(room["tv_ip"]),
+            '                <avr ip="{}" />'.format(room["avr_ip"]),
+            '            </devices>',
+            '            <preferences>',
+            '                <volume_device>{}</volume_device>'.format(
+                room["volume_device"]
+            ),
+            '            </preferences>',
+            '        </room>',
+        ])
+
+    lines.extend([
+        '    </rooms>',
+        '</clonker>',
+    ])
+
+    xml = "\n".join(lines) + "\n"
+
+    if len(xml.encode("utf-8")) > MAX_CONFIG_BYTES:
+        raise ValueError("Configuration XML exceeds size limit")
+
+    return xml
