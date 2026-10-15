@@ -100,6 +100,39 @@ def start():
     logger.info("Clonker HTTP listening on port {}".format(PORT))
 
 
+def _request_complete(request):
+    """Check whether headers and any required POST body have arrived."""
+    header_end = request.find(b"\r\n\r\n")
+    if header_end < 0:
+        return False
+
+    headers = bytes(request[:header_end]).split(b"\r\n")
+    first_line = headers[0]
+
+    # Existing GET and clock requests need no body.
+    if not first_line.startswith(b"POST /api/config "):
+        return True
+
+    content_length = None
+
+    for header in headers[1:]:
+        if header.lower().startswith(b"content-length:"):
+            try:
+                content_length = int(header.split(b":", 1)[1].strip())
+            except ValueError:
+                raise ValueError("Invalid Content-Length")
+
+    if content_length is None or content_length < 0:
+        raise ValueError("Missing or invalid Content-Length")
+
+    total_length = header_end + 4 + content_length
+
+    if total_length > MAX_REQUEST_BYTES:
+        raise ValueError("Configuration request too large")
+
+    return len(request) >= total_length
+
+
 def _build_response(first_line):
     logger.debug("HTTP request: {}".format(first_line))
     if first_line.startswith(b"GET / "):
@@ -223,14 +256,22 @@ def poll():
             logger.warning("HTTP request exceeded size limit")
             _close_client()
             return
-        # Wait for complete headers, including split TCP packets.
-        if b"\r\n\r\n" not in _request:
+
+        # Wait for complete headers and, for config POSTs, the body.
+        try:
+            if not _request_complete(_request):
+                return
+        except ValueError as error:
+            logger.warning("HTTP invalid request: {}".format(error))
+            _close_client()
             return
+
         first_line = bytes(_request).split(b"\r\n", 1)[0]
         http_trace("RECV completed: {} bytes".format(len(_request)))
         _response = _build_response(first_line)
         _request = None
         http_trace("Response prepared: {} bytes".format(len(_response)))
+
         return
 
     # Send at most one chunk; partial sends are resumed next poll.
