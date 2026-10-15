@@ -388,3 +388,33 @@ def _write_verified_temp(path, contents):
         raise OSError("Temporary file verification failed")
 
     return temp_path
+
+
+def _replace_with_backup(path, contents):
+    """Replace a file while retaining the previous version."""
+    temp_path = _write_verified_temp(path, contents)
+    backup_path = path + ".bak"
+
+    # Remove an older backup, if one exists.
+    try:
+        os.remove(backup_path)
+    except OSError as error:
+        if error.errno != 2:
+            raise
+
+    # Move the current file to the backup.
+    try:
+        os.rename(path, backup_path)
+    except OSError as error:
+        if error.errno != 2:
+            raise
+
+    # Install the verified replacement.
+    os.rename(temp_path, path)
+
+    # Verify the installed contents.
+    with open(path, "r") as file:
+        if file.read() != contents:
+            raise OSError("Installed file verification failed")
+
+    return path
