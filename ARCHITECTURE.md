@@ -68,6 +68,40 @@ STATUS       INFO
 
 Physical input becomes an action before mapping to a device. Actions may be unmapped for a given room. The guarded POWER control is a logical action, not a physical battery disconnect.
 
+### Operating Modes
+
+Clonker has two independent operating-mode controls: one for developer access and one for everyday use.
+
+| | USB / DEVICE | CONFIG / RUN |
+|—|—|—|
+| **Controlled by** | Developer | End user |
+| **Purpose** | Filesystem write ownership | Remote-control behavior |
+| **Hardware** | Internal GPIO jumper | External toggle switch |
+| **Evaluated** | At boot | During operation |
+| **Reboot required** | Yes | No |
+| **Managed by** | `boot.py` | Clonker application |
+
+### USB / DEVICE — Developer Control
+
+- **USB mode:** Windows can deploy firmware files; Clonker cannot write configuration files.
+- **DEVICE mode:** Clonker can save configuration files; Windows has read-only filesystem access.
+- An internal GPIO jumper selects the mode at boot, allowing developer access for servicing and firmware updates.
+
+### CONFIG / RUN — User Control
+
+- **CONFIG mode:** Enables the configuration interface for editing device and room settings.
+- **RUN mode:** Normal remote-control operation.
+- The user can switch modes without rebooting Clonker.
+
+### Configuration Saving
+
+- The web interface automatically disables **Save Configuration** when filesystem write access is unavailable (USB mode).
+- Saving is permitted only in DEVICE mode while CONFIG mode is active.
+- The web API reports actual filesystem write availability to the browser.
+- The backend independently enforces write restrictions, regardless of the browser button state.
+
+**Design principle:** Developer filesystem access and user configuration control are separate responsibilities.
+
 ## 5. Device Commands and Routing
 
 A room/action mapping may specify HTTP method, endpoint, path, and optional body. Examples below are **illustrative**, not confirmed equipment URLs:
