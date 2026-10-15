@@ -20,6 +20,7 @@ import wifi
 import socketpool
 import json
 import errno
+import storage
 
 from clonker import clock, logger, device_config
 
@@ -105,14 +106,21 @@ def _build_response(first_line):
         body = clock_page()
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
+
+    # HTTP Routes
+
     elif first_line.startswith(b"GET /api/clock "):
         body = json.dumps(clock_status())
         status = "200 OK"
         content_type = "application/json"
+
     elif first_line.startswith(b"GET /api/config "):
-        body = json.dumps(device_config.current())
+        config = device_config.current().copy()
+        config["filesystem_writable"] = not storage.getmount("/").readonly
+        body = json.dumps(config)
         status = "200 OK"
         content_type = "application/json"
+
     elif first_line.startswith(b"POST /api/clock?utc="):
         content_type = "application/json"
         try:
@@ -127,6 +135,7 @@ def _build_response(first_line):
         except (ValueError, OverflowError):
             body = '{"error":"Invalid UTC timestamp"}'
             status = "400 Bad Request"
+
     else:
         body = "Not Found"
         status = "404 Not Found"
