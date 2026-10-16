@@ -40,13 +40,13 @@ AND I want my tactile controls to please my aging ears with accompanying **audio
 
 ## Technical Details
 
-This Beta version of The Clonker will be a Wi-Fi-only device, containing an easily programmable FeatherS3[D] ESP32-S3 controller running CircuitPython. It will first be tested against my own equipment: Roku Ultra streaming devices, Denon AV receivers, and possibly LG TVs. I definitely plan to test it against Apple TVs and Amazon Fire TV Sticks shortly after the initial birth. I have no plans on adding IR to it at this time.
+This Beta version of The Clonker will be a Wi-Fi-only device, containing an easily programmable Raspberry Pi Pico 2 W (RP2350) controller running CircuitPython 10.3.1. It will first be tested against my own equipment: Roku Ultra streaming devices, Denon AV receivers, and possibly LG TVs. I definitely plan to test it against Apple TVs and Amazon Fire TV Sticks shortly after the initial birth. I have no plans on adding IR to it at this time.
 
 ## Current Hardware
 
 Note: Just some high-lights for now…
 
-FeatherS3[D] ESP32-S3 · Grayhill optical VOLUME encoder · Bourns SELECT encoder · Kilo metal knobs · metal navigation buttons · tiny OLED · I²S amp + speaker · illuminated SYSTEM MASTER
+Raspberry Pi Pico 2 W · Grayhill · Grayhill optical VOLUME encoder · Bourns SELECT encoder · Kilo metal knobs · metal navigation buttons · tiny OLED · I²S amp + speaker · illuminated SYSTEM MASTER
 
 ## Sample Software Functionality
 
