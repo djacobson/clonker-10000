@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,11 +18,12 @@
         }
 
         main {
-            max-width: 600px;
+            max-width: 760px;
             margin: 0 auto;
         }
 
-        h1 {
+        h1,
+        .room h3 {
             color: #e6b85c;
         }
 
@@ -29,6 +31,7 @@
             background: #30363e;
             padding: 20px;
             border-radius: 10px;
+            margin-bottom: 18px;
         }
 
         button {
@@ -43,12 +46,13 @@
 
         button:disabled {
             opacity: 0.5;
+            cursor: default;
         }
 
         #save-config {
             margin-top: 20px;
         }
- 
+
         .value {
             font-family: monospace;
         }
@@ -70,20 +74,10 @@
             margin-top: 16px;
         }
 
-        .device-panel label {
-            display: block;
-            margin-bottom: 6px;
-        }
- 
         .room {
             border-top: 1px solid #555;
             padding-top: 12px;
             margin-top: 20px;
-        }
-
-        .room h3 {
-            color: #e6b85c;
-            margin-bottom: 14px;
         }
 
         .room label {
@@ -104,11 +98,71 @@
             font-size: 15px;
         }
 
-        .room select:disabled {
-            opacity: 1;
-            -webkit-text-fill-color: #f0f0f0;
-        } 
+        .device-fields {
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
 
+        .action-editor {
+            margin: 8px 0;
+            padding: 12px;
+            background: #252a30;
+            border-radius: 6px;
+        }
+
+        .action-editor strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .action-fields {
+            display: grid;
+            grid-template-columns:
+                minmax(90px, 1fr)
+                minmax(85px, 1fr)
+                minmax(160px, 3fr);
+            gap: 10px;
+        }
+
+        .action-fields label {
+            margin: 0;
+            font-size: 12px;
+            color: #bbb;
+        }
+
+        .action-fields input,
+        .action-fields select {
+            margin-top: 5px;
+        }
+
+        details {
+            margin-top: 16px;
+        }
+
+        summary {
+            cursor: pointer;
+            color: #e6b85c;
+            font-weight: bold;
+        }
+
+        .note {
+            font-size: 13px;
+            color: #bbb;
+        }
+
+        /* Narrow screens: place the action path
+           below the target and method controls. */
+        @media (max-width: 520px) {
+            .action-fields {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .action-path {
+                grid-column: 1 / -1;
+            }
+        }
     </style>
 </head>
 
@@ -117,11 +171,16 @@
     <h1>THE CLONKER 10000</h1>
 
     <div class="attribution">
-      Designed by David Jacobson ·
-      <a href="https://github.com/djacobson/clonker-10000"
-        target="_blank" rel="noopener noreferrer">GitHub</a>
+        Designed by David Jacobson ·
+        <a href="https://github.com/djacobson/clonker-10000"
+           target="_blank" rel="noopener noreferrer">
+            GitHub
+        </a>
     </div>
- 
+
+
+    <!-- System Clock -->
+
     <section class="panel">
         <h2>System Clock</h2>
 
@@ -145,8 +204,16 @@
     </section>
 
 
+    <!-- JSON v2 Device Configuration -->
+
     <section class="panel device-panel">
-        <h2>Device Configuration</h2>
+        <h2>Device Configuration -- JSON v2</h2>
+
+        <p class="note">
+            Blank device IP addresses and action paths
+            are valid. An action with no path or no
+            target device IP does nothing.
+        </p>
 
         <div id="rooms-container">
             Loading room configuration...
@@ -159,21 +226,228 @@
         <p id="save-status">
             Checking filesystem status...
         </p>
-
     </section>
 
 </main>
 
 
 <script>
+    // JSON v2 configuration constants.
     const MAX_CONFIG_ATTEMPTS = 5;
+
+    const ROOM_IDS = [
+        "room-1",
+        "room-2",
+        "room-3"
+    ];
+
+    const DEVICE_IDS = [
+        "tv",
+        "avr",
+        "streaming"
+    ];
+
+    const ACTION_IDS = [
+        "volume-up",
+        "volume-down",
+        "mute-toggle",
+        "nav-up",
+        "nav-down",
+        "nav-left",
+        "nav-right",
+        "select",
+        "back",
+        "home",
+        "play-pause",
+        "skip-back",
+        "skip-forward",
+        "power-toggle"
+    ];
+
     let configAttempts = 0;
     let configRevision = null;
     let configWritable = false;
- 
+
+
+    // Create a labeled text field or dropdown.
+    //
+    // The data-field attribute identifies the
+    // configuration property represented by the control.
+
+    function createField(parent, labelText, value,
+                         fieldName, choices = null) {
+
+        const label = document.createElement("label");
+        label.textContent = labelText;
+
+        let control;
+
+        if (choices) {
+            control = document.createElement("select");
+
+            for (const choice of choices) {
+                const option = document.createElement("option");
+
+                option.value = choice;
+                option.textContent = choice.toUpperCase();
+
+                control.appendChild(option);
+            }
+
+        } else {
+            control = document.createElement("input");
+            control.type = "text";
+        }
+
+        control.value = value;
+        control.dataset.field = fieldName;
+
+        label.appendChild(control);
+        parent.appendChild(label);
+
+        return control;
+    }
+
+
+    // Render the three fixed rooms from JSON v2.
+    //
+    // Each room contains its name, three optional
+    // device IP addresses, and fourteen fundamental
+    // HTTP action definitions.
+
+    function renderDeviceConfig(config) {
+        const container =
+            document.getElementById("rooms-container");
+
+        container.replaceChildren();
+
+        for (const roomId of ROOM_IDS) {
+            const room = config.rooms[roomId];
+
+            const section = document.createElement("section");
+            section.className = "room";
+            section.dataset.roomId = roomId;
+
+            const heading = document.createElement("h3");
+            heading.textContent =
+                roomId.toUpperCase() + " -- " + room.name;
+
+            section.appendChild(heading);
+
+
+            // Room name.
+
+            createField(
+                section,
+                "Room Name",
+                room.name,
+                "name"
+            );
+
+
+            // Optional device IP addresses.
+
+            const deviceFields = document.createElement("div");
+            deviceFields.className = "device-fields";
+
+            for (const deviceId of DEVICE_IDS) {
+                const control = createField(
+                    deviceFields,
+                    deviceId.toUpperCase() + " IP Address",
+                    room.devices[deviceId],
+                    deviceId
+                );
+
+                control.dataset.device = deviceId;
+            }
+
+            section.appendChild(deviceFields);
+
+
+            // Fundamental HTTP actions.
+            //
+            // The expandable section keeps the main
+            // configuration page manageable.
+            //
+            // Blank paths are intentional no-ops.
+
+            const details = document.createElement("details");
+
+            const summary = document.createElement("summary");
+            summary.textContent = "Fundamental actions (14)";
+
+            details.appendChild(summary);
+
+            for (const actionId of ACTION_IDS) {
+                const action = room.actions[actionId];
+
+                const editor = document.createElement("div");
+                editor.className = "action-editor";
+                editor.dataset.actionId = actionId;
+
+                const actionName = document.createElement("strong");
+                actionName.textContent = actionId;
+
+                editor.appendChild(actionName);
+
+                const fields = document.createElement("div");
+                fields.className = "action-fields";
+
+
+                // Target device.
+
+                createField(
+                    fields,
+                    "Target",
+                    action.target,
+                    "target",
+                    DEVICE_IDS
+                );
+
+
+                // HTTP method.
+
+                createField(
+                    fields,
+                    "Method",
+                    action.method,
+                    "method",
+                    ["GET", "POST"]
+                );
+
+
+                // HTTP path.
+
+                const pathControl = createField(
+                    fields,
+                    "Path (blank = no-op)",
+                    action.path,
+                    "path"
+                );
+
+                pathControl.parentElement.className =
+                    "action-path";
+
+                editor.appendChild(fields);
+                details.appendChild(editor);
+            }
+
+            section.appendChild(details);
+            container.appendChild(section);
+        }
+    }
+
+
+    // Load configuration from the Pico.
+    //
+    // GET /api/config returns JSON v2 configuration
+    // plus the current revision and filesystem status.
+    //
+    // Retry briefly during initial page loading.
+
     async function loadDeviceConfig() {
         configAttempts++;
- 
+
         const container =
             document.getElementById("rooms-container");
 
@@ -187,131 +461,149 @@
             }
 
             const config = await response.json();
-            configRevision = config.revision;
-            configWritable = config.filesystem_writable;
- 
-            const saveButton = document.getElementById("save-config");
-            saveButton.disabled = !config.filesystem_writable;
-            const saveStatus = document.getElementById("save-status");
 
-            saveStatus.textContent = config.filesystem_writable
+            if (config.version !== 2) {
+                throw new Error(
+                    "Expected JSON configuration version 2"
+                );
+            }
+
+            configRevision = config.revision;
+            configWritable =
+                config.filesystem_writable === true;
+
+            renderDeviceConfig(config);
+
+            const saveButton =
+                document.getElementById("save-config");
+
+            saveButton.disabled = !configWritable;
+
+            const saveStatus =
+                document.getElementById("save-status");
+
+            saveStatus.textContent = configWritable
                 ? "DEVICE mode -- filesystem writable. Configuration saving available."
                 : "SERVICE (USB) mode -- filesystem read-only. Configuration saving unavailable.";
 
-            // Sort by numeric room position.
-            const roomIds = Object.keys(config.rooms).sort(
-                (a, b) => {
-                    const aNum = Number(a.split("-")[1]);
-                    const bNum = Number(b.split("-")[1]);
-                    return aNum - bNum;
-                }
-            );
-
-            container.replaceChildren();
-
-            for (const roomId of roomIds) {
-                const room = config.rooms[roomId];
-
-                const section = document.createElement("div");
-                section.className = "room";
-                section.dataset.roomId = roomId;
-
-                const heading = document.createElement("h3");
-                heading.textContent =
-                    roomId.toUpperCase() + " -- " + room.name;
-                section.appendChild(heading);
-
-                const fields = [
-                    ["Room Name", room.name, "name"],
-                    ["TV IP Address", room.tv_ip, "tv_ip"],
-                    ["AVR IP Address", room.avr_ip, "avr_ip"]
-                ];
-
-                for (const [labelText, value, fieldName] of fields) {
-                    const label = document.createElement("label");
-                    label.textContent = labelText;
-
-                    const input = document.createElement("input");
-                    input.type = "text";
-                    input.dataset.field = fieldName;
-                    input.value = value;
-                    input.readOnly = false;
-
-                    section.appendChild(label);
-                    section.appendChild(input);
-                }
-
-                // Volume Control uses a fixed-choice dropdown.
-                const volumeLabel =
-                    document.createElement("label");
-                volumeLabel.textContent = "Volume Control";
-
-                const volumeSelect =
-                    document.createElement("select");
-
-                for (const [value, text] of [
-                    ["tv", "TV"],
-                    ["avr", "AVR"]
-                ]) {
-                    const option =
-                        document.createElement("option");
-                    option.value = value;
-                    option.textContent = text;
-                    volumeSelect.appendChild(option);
-                }
-
-                volumeSelect.value = room.volume_device;
-                volumeSelect.dataset.field = "volume_device";
-                volumeSelect.disabled = false;
-
-                section.appendChild(volumeLabel);
-                section.appendChild(volumeSelect);
-
-                container.appendChild(section);
-            }
+            configAttempts = 0;
 
             return true;
-  
+
         } catch (error) {
-            console.warn("Configuration load failed:", error);
+            console.warn(
+                "Configuration load failed:",
+                error
+            );
+
+            configRevision = null;
+            configWritable = false;
+
+            document.getElementById("save-config").disabled =
+                true;
 
             if (configAttempts < MAX_CONFIG_ATTEMPTS) {
                 container.textContent =
                     "Loading room configuration...";
+
                 setTimeout(loadDeviceConfig, 1500);
+
             } else {
                 container.textContent =
                     "Unable to load configuration. Refresh the page to retry.";
             }
 
-            return false; 
+            return false;
         }
-
     }
+
+
+    // Collect the edited configuration from the page.
+    //
+    // The resulting object matches the JSON v2 schema.
+    // Custom actions remain an empty array until that
+    // feature is implemented.
 
     function collectDeviceConfig() {
         const rooms = {};
 
         document.querySelectorAll(".room").forEach(section => {
             const roomId = section.dataset.roomId;
-            const room = {};
 
-            section.querySelectorAll("[data-field]").forEach(field => {
-                room[field.dataset.field] = field.value.trim();
-            });
+            const room = {
+                name: "",
+                devices: {},
+                actions: {},
+                custom_actions: []
+            };
+
+
+            // Room name.
+
+            room.name = section.querySelector(
+                '[data-field="name"]'
+            ).value.trim();
+
+
+            // Device IP addresses.
+
+            for (const deviceId of DEVICE_IDS) {
+                room.devices[deviceId] = section.querySelector(
+                    '[data-device="' + deviceId + '"]'
+                ).value.trim();
+            }
+
+
+            // Fundamental actions.
+
+            section.querySelectorAll(".action-editor")
+                .forEach(editor => {
+
+                    const action = {};
+
+                    for (const fieldName of [
+                        "target",
+                        "method",
+                        "path"
+                    ]) {
+                        action[fieldName] = editor.querySelector(
+                            '[data-field="' + fieldName + '"]'
+                        ).value;
+                    }
+
+                    room.actions[editor.dataset.actionId] =
+                        action;
+                });
 
             rooms[roomId] = room;
         });
 
-        return { rooms };
+        return {
+            version: 2,
+            rooms: rooms
+        };
     }
 
-    async function saveDeviceConfig() {
-        const button = document.getElementById("save-config");
-        const status = document.getElementById("save-status");
 
-        if (!configRevision) {
-            status.textContent = "Configuration revision unavailable.";
+    // Save configuration to Pico flash.
+    //
+    // POST /api/config includes the revision obtained
+    // during loading, allowing the firmware to reject
+    // stale edits.
+    //
+    // After saving, reload from the Pico so the page
+    // reflects the actual active configuration.
+
+    async function saveDeviceConfig() {
+        const button =
+            document.getElementById("save-config");
+
+        const status =
+            document.getElementById("save-status");
+
+        if (!configRevision || !configWritable) {
+            status.textContent =
+                "Configuration saving is unavailable.";
             return;
         }
 
@@ -320,6 +612,7 @@
 
         try {
             const submitted = collectDeviceConfig();
+
             submitted.revision = configRevision;
 
             const response = await fetch("/api/config", {
@@ -339,7 +632,6 @@
                 );
             }
 
-            // Refresh fields and revision from the Pico.
             const refreshed = await loadDeviceConfig();
 
             if (!refreshed) {
@@ -353,13 +645,22 @@
                 : "No changes to save.";
 
         } catch (error) {
-            console.error("Configuration save failed:", error);
-            status.textContent = "Save failed: " + error.message;
+            console.error(
+                "Configuration save failed:",
+                error
+            );
+
+            status.textContent =
+                "Save failed: " + error.message;
 
         } finally {
-            button.disabled = !configRevision || !configWritable;
+            button.disabled =
+                !configRevision || !configWritable;
         }
     }
+
+
+    // Read the Pico's system clock.
 
     async function updateClock() {
         try {
@@ -380,15 +681,23 @@
                 .textContent = clock.timestamp;
 
         } catch (error) {
-            console.error("Clock update failed:", error);
+            console.error(
+                "Clock update failed:",
+                error
+            );
 
             document.getElementById("clock-source")
                 .textContent = "Connection error";
         }
     }
 
+
+    // Synchronize the Pico clock from the browser.
+
     async function synchronizeClock() {
-        const button = document.getElementById("sync-clock");
+        const button =
+            document.getElementById("sync-clock");
+
         button.disabled = true;
 
         try {
@@ -403,35 +712,54 @@
             );
 
             if (!response.ok) {
-                throw new Error("HTTP " + response.status);
+                throw new Error(
+                    "HTTP " + response.status
+                );
             }
 
             await updateClock();
 
         } catch (error) {
-            console.error("Clock sync failed:", error);
-            alert("Clock synchronization failed: " + error.message);
+            console.error(
+                "Clock synchronization failed:",
+                error
+            );
+
+            alert(
+                "Clock synchronization failed: " +
+                error.message
+            );
 
         } finally {
             button.disabled = false;
         }
     }
 
-    // Connect the button to its handler.
+
+    // Connect buttons to their event handlers.
+
     document.getElementById("sync-clock")
-        .addEventListener("click", synchronizeClock);
+        .addEventListener(
+            "click",
+            synchronizeClock
+        );
 
     document.getElementById("save-config")
-        .addEventListener("click", saveDeviceConfig);
- 
+        .addEventListener(
+            "click",
+            saveDeviceConfig
+        );
+
+
     // Read clock status when the page opens.
+
     updateClock();
 
+
     // Read device configuration when the page opens.
+
     loadDeviceConfig();
 
-    // Refresh the display every 5 seconds.
-    // setInterval(updateClock, 5000);
 </script>
 
 </body>

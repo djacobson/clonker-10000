@@ -1,17 +1,5 @@
 # The Clonker 10000
-# clonker/web.py
-#
-# Cooperative HTTP server for CircuitPython 10.x / Raspberry Pi Pico 2 W.
-#
-# Port 9090: Clonker config
-#
-# Note:
-# Disable CircuitPython Web Workflow (Port 80)
-# Avoids suspected socket conflicts with Clonker HTTP.
-# settings.toml: CIRCUITPY_WEB_API_PORT = 0
-#
-# No external libraries required.
-#
+# clonker/web.py -- JSON v2 configuration HTTP service
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
 
@@ -22,14 +10,15 @@ import json
 import errno
 import storage
 
-from clonker import clock, logger, device_config
+from clonker import clock, logger
+from clonker import device_config_v2 as device_config
 
 WEB_ROOT = "/clonker/www"
 PORT = 9090
 HTTP_DIAGNOSTICS = False
-
-# Tunable limits. One client at a time; no socket call waits for network data.
-MAX_REQUEST_BYTES = 2048
+# 8192-byte maximum config plus HTTP headers and revision metadata.
+MAX_REQUEST_BYTES = 10240
+MAX_HEADER_BYTES = 2048
 IO_CHUNK_BYTES = 512
 CLIENT_TIMEOUT_SECONDS = 4.0
 
@@ -48,8 +37,7 @@ def http_trace(message):
 
 
 def _socket_would_block(error):
-    """Return True for a temporary nonblocking socket condition."""
-    return error.errno == errno.EAGAIN
+    return error.errno in (errno.EAGAIN, errno.EWOULDBLOCK)
 
 
 def clock_page():
@@ -68,7 +56,6 @@ def _close_client():
             _client.close()
         except OSError:
             pass
-        http_trace("Client closed")
     _client = None
     _request = None
     _response = None
@@ -101,62 +88,53 @@ def start():
 
 
 def _request_complete(request):
-    """Check whether headers and any required POST body have arrived."""
     header_end = request.find(b"\r\n\r\n")
     if header_end < 0:
+        if len(request) > MAX_HEADER_BYTES:
+            raise ValueError("HTTP headers too large")
         return False
-
+    if header_end + 4 > MAX_HEADER_BYTES:
+        raise ValueError("HTTP headers too large")
     headers = bytes(request[:header_end]).split(b"\r\n")
-    first_line = headers[0]
-
-    # Existing GET and clock requests need no body.
-    if not first_line.startswith(b"POST /api/config "):
+    if not headers[0].startswith(b"POST /api/config "):
         return True
-
-    content_length = None
-
+    lengths = []
     for header in headers[1:]:
         if header.lower().startswith(b"content-length:"):
             try:
-                content_length = int(header.split(b":", 1)[1].strip())
+                lengths.append(int(header.split(b":", 1)[1].strip()))
             except ValueError:
                 raise ValueError("Invalid Content-Length")
-
-    if content_length is None or content_length < 0:
+    if len(lengths) != 1 or lengths[0] < 0:
         raise ValueError("Missing or invalid Content-Length")
-
-    total_length = header_end + 4 + content_length
-
-    if total_length > MAX_REQUEST_BYTES:
+    if lengths[0] > device_config.MAX_CONFIG_BYTES + 256:
+        raise ValueError("Configuration body too large")
+    if header_end + 4 + lengths[0] > MAX_REQUEST_BYTES:
         raise ValueError("Configuration request too large")
+    return len(request) >= header_end + 4 + lengths[0]
 
-    return len(request) >= total_length
+
+def _json_error(message, status="400 Bad Request"):
+    return json.dumps({"error": str(message)}), status
 
 
 def _build_response(first_line, request=None):
     logger.debug("HTTP request: {}".format(first_line))
+    content_type = "application/json"
     if first_line.startswith(b"GET / "):
         body = clock_page()
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
-
-    # HTTP Routes and handlers
-
     elif first_line.startswith(b"GET /api/clock "):
         body = json.dumps(clock_status())
         status = "200 OK"
-        content_type = "application/json"
-
     elif first_line.startswith(b"GET /api/config "):
-        config = device_config.current().copy()
+        config = device_config.current()
         config["filesystem_writable"] = not storage.getmount("/").readonly
         config["revision"] = device_config.revision()
         body = json.dumps(config)
         status = "200 OK"
-        content_type = "application/json"
-
     elif first_line.startswith(b"POST /api/clock?utc="):
-        content_type = "application/json"
         try:
             path = first_line.split(b" ", 2)[1]
             value = path.split(b"utc=", 1)[1]
@@ -167,70 +145,43 @@ def _build_response(first_line, request=None):
             body = json.dumps(clock_status())
             status = "200 OK"
         except (ValueError, OverflowError):
-            body = '{"error":"Invalid UTC timestamp"}'
-            status = "400 Bad Request"
-
+            body, status = _json_error("Invalid UTC timestamp")
     elif first_line.startswith(b"POST /api/config "):
-        content_type = "application/json"
-
         if storage.getmount("/").readonly:
-            status = "403 Forbidden"
-            body = json.dumps({
-                "error": "Filesystem is read-only"
-            })
+            body, status = _json_error("Filesystem is read-only", "403 Forbidden")
         else:
             try:
                 header_end = request.find(b"\r\n\r\n")
                 headers = bytes(request[:header_end]).split(b"\r\n")
-
-                content_length = None
+                length = None
                 for header in headers[1:]:
                     if header.lower().startswith(b"content-length:"):
-                        content_length = int(
-                            header.split(b":", 1)[1].strip()
-                        )
+                        length = int(header.split(b":", 1)[1].strip())
                         break
-
-                if content_length is None:
+                if length is None or length < 0:
                     raise ValueError("Missing Content-Length")
-
                 body_start = header_end + 4
-                body_bytes = bytes(
-                    request[body_start:body_start + content_length]
-                )
-
+                body_bytes = bytes(request[body_start:body_start + length])
                 submitted = json.loads(body_bytes.decode("utf-8"))
                 if not isinstance(submitted, dict):
                     raise ValueError("Configuration must be a JSON object")
-
                 expected_revision = submitted.pop("revision", None)
-
-                changed = device_config.save(
-                    submitted,
-                    expected_revision
-                )
-
-                status = "200 OK"
+                changed = device_config.save(submitted, expected_revision)
                 body = json.dumps({
-                    "message": (
-                        "Configuration saved"
-                        if changed else "Configuration unchanged"
-                    ),
+                    "message": "Configuration saved" if changed else "Configuration unchanged",
                     "saved": changed,
                     "revision": device_config.revision()
                 })
-
+                status = "200 OK"
             except (ValueError, TypeError, UnicodeError) as error:
-                status = "400 Bad Request"
-                body = json.dumps({
-                    "error": str(error)
-                })
-
+                body, status = _json_error(error)
+            except OSError as error:
+                logger.warning("Configuration persistence error: {}".format(error))
+                body, status = _json_error("Configuration storage failed", "500 Internal Server Error")
     else:
         body = "Not Found"
         status = "404 Not Found"
         content_type = "text/plain"
-
     payload = body.encode("utf-8")
     header = (
         "HTTP/1.1 {}\r\n"
@@ -247,18 +198,14 @@ def poll():
     global _client, _request, _response, _sent, _last_activity
     if _listener is None:
         return
-
     now = time.monotonic()
     if _client is None:
-
-        # accept Handler
         try:
             client, address = _listener.accept()
         except OSError as error:
             if not _socket_would_block(error):
                 logger.warning("HTTP accept error: {}".format(error))
             return
-
         try:
             client.settimeout(0)
         except OSError:
@@ -271,17 +218,12 @@ def poll():
         _last_activity = now
         http_trace("ACCEPTED connection")
         return
-
     if now - _last_activity > CLIENT_TIMEOUT_SECONDS:
         logger.warning("HTTP client timed out")
         _close_client()
         return
-
     if _response is None:
-        # Receive at most one bounded chunk; never wait for a slow client.
         buf = bytearray(IO_CHUNK_BYTES)
-        
-        # recv_into Handler
         try:
             count = _client.recv_into(buf)
         except OSError as error:
@@ -289,7 +231,6 @@ def poll():
                 logger.warning("HTTP receive error: {}".format(error))
                 _close_client()
             return
-
         if count == 0:
             _close_client()
             return
@@ -299,8 +240,6 @@ def poll():
             logger.warning("HTTP request exceeded size limit")
             _close_client()
             return
-
-        # Wait for complete headers and, for config POSTs, the body.
         try:
             if not _request_complete(_request):
                 return
@@ -308,19 +247,11 @@ def poll():
             logger.warning("HTTP invalid request: {}".format(error))
             _close_client()
             return
-
         first_line = bytes(_request).split(b"\r\n", 1)[0]
-        http_trace("RECV completed: {} bytes".format(len(_request)))
         _response = _build_response(first_line, _request)
         _request = None
-        http_trace("Response prepared: {} bytes".format(len(_response)))
-
         return
-
-    # Send at most one chunk; partial sends are resumed next poll.
     chunk = memoryview(_response)[_sent:_sent + IO_CHUNK_BYTES]
-
-    # send Handler
     try:
         count = _client.send(chunk)
     except OSError as error:
@@ -328,13 +259,11 @@ def poll():
             logger.warning("HTTP send error: {}".format(error))
             _close_client()
         return
-
     if count is None or count <= 0:
         return
     _sent += count
     _last_activity = now
     if _sent >= len(_response):
-        http_trace("SEND completed: {} bytes".format(_sent))
         _close_client()
 
 
@@ -346,4 +275,3 @@ def stop():
         _listener = None
     _pool = None
     logger.info("Clonker HTTP stopped")
- 
