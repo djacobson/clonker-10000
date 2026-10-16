@@ -52,3 +52,93 @@ The Save Configuration control and API are **not yet wired to persistence**. Do 
 ## XML and parser constraints
 
 The current parser is deliberately lightweight rather than a general XML library. It validates expected wrappers and room fields and escapes/unescapes names. Do not assume arbitrary XML documents or action maps are supported. Device command/action mappings are **future schema work**.
+
+---
+
+## Configuration v2 — Approved Design (Not Yet Implemented)
+
+**Decision date:** October 16, 2026
+
+Configuration v2 will replace the v1 XML schema while retaining the
+proven configuration validation, persistence, revision checking,
+backup rotation, and browser editing mechanisms.
+
+### Scope
+
+- Exactly three rooms with fixed room IDs.
+- Exactly three device endpoints per room: `tv`, `avr`, `streaming`.
+- All device IPv4 addresses are optional; empty addresses are valid.
+- Exactly five fundamental actions per room:
+  - `volume-up`
+  - `volume-down`
+  - `mute-toggle`
+  - `home`
+  - `back`
+- Every fundamental action has an editable `target`, `method`, and `path`.
+- Valid targets: `tv`, `avr`, `streaming`.
+- Valid HTTP methods: `GET`, `POST`.
+- Empty command paths are valid and disable the corresponding action.
+- Action IDs are fixed and cannot be renamed or deleted.
+- Unknown or duplicate fundamental action IDs are rejected.
+- Action targets are independent of action IDs.
+- A missing target IP address prevents command execution.
+- No HTTP command execution is included in the initial v2 milestone.
+
+### Reserved Custom Actions
+
+Each room will contain an empty `<custom-actions />` element.
+
+User-defined names, command sequences, waits, token substitution,
+and macro parsing are deferred to a later milestone.
+
+The v2 parser will recognize the empty placeholder but will not
+accept arbitrary custom-action contents.
+
+### Removed v1 Preference
+
+The `volume_device` preference will be removed.
+
+Volume Up, Volume Down, and Mute Toggle will each have their own
+configurable destination. This avoids conflicting configuration rules.
+
+### Validation and Limits
+
+- Fundamental action structure is strict.
+- Command paths may be empty.
+- Command path maximum length will be controlled by a single constant
+  near the top of `device_config.py`.
+- XML size limits will be centralized in `device_config.py`.
+- HTTP request size limits will remain separately configurable
+  in `web.py`.
+- Request limits will be measured and adjusted for the expanded
+  three-room configuration.
+
+### Schema Versioning
+
+- New XML schema version: `2`.
+- No automatic v1-to-v2 migration framework at this stage.
+- Firmware, browser editor, and XML will be upgraded together.
+- Existing v1 backups will be handled during the controlled upgrade.
+- Backward compatibility can be introduced later if needed.
+
+### Planned Implementation Sequence
+
+1. Finalize and review complete v2 XML.
+2. Update Python parsing, validation, and serialization.
+3. Update browser configuration fields and save payload.
+4. Adjust HTTP request size limits.
+5. Deploy matching firmware, HTML, and XML together.
+6. Verify loading, browser saves, backup rotation, and persistence.
+7. Implement HTTP action execution in a subsequent milestone.
+
+### Design Principle
+
+Fundamental action IDs describe what the user wants to accomplish.
+Configurable destinations, HTTP methods, and paths describe how
+Clonker accomplishes it.
+
+No fixed assumption that volume requires an AVR or navigation
+requires a separate streaming device.
+
+**Status: Design approved; implementation pending.**
+
