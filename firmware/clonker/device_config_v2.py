@@ -88,7 +88,7 @@ def validate_config(config):
 def to_json(config):
     """Canonical compact JSON; deterministic regardless of input key order."""
     validated = validate_config(config)
-    result = json.dumps(validated, separators=(",", ":"), ensure_ascii=True)
+    result = json.dumps(validated, separators=(",", ":"))
     if len(result.encode("utf-8")) > MAX_CONFIG_BYTES:
         raise ValueError("Configuration exceeds byte limit")
     return result
