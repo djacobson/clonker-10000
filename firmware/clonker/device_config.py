@@ -336,6 +336,46 @@ def revision():
     return "{:08x}".format(value)
 
 
+def save(config, expected_revision):
+    """Validate and persist configuration if its revision matches."""
+    global _current
+
+    if not isinstance(expected_revision, str):
+        raise ValueError("Missing configuration revision")
+
+    if _current is None:
+        raise RuntimeError("Configuration not loaded")
+
+    # Reject stale browser submissions.
+    if expected_revision != revision():
+        raise ValueError("Configuration revision mismatch")
+
+    validated = validate_config(config)
+    xml = to_xml(validated)
+
+    # Do not write flash when nothing has changed.
+    if xml == to_xml(_current):
+        return False
+
+    # Never overwrite a missing or invalid primary configuration.
+    if not _backup_looks_valid(CONFIG_FILE):
+        raise ValueError("Primary configuration is missing or invalid")
+
+    # Confirm the file still matches the active configuration.
+    with open(CONFIG_FILE, "r") as file:
+        existing_xml = file.read(MAX_CONFIG_BYTES + 1)
+
+    if existing_xml != to_xml(_current):
+        raise ValueError("Configuration changed on disk; reload required")
+
+    # Rotate backups and install the verified replacement.
+    _replace_with_backup(CONFIG_FILE, xml)
+
+    # Publish the new configuration only after successful persistence.
+    _current = validated
+    return True
+
+
 def room(room_id):
     """Return settings for one room."""
     if _current is None:
