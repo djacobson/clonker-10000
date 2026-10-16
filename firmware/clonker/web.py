@@ -37,7 +37,8 @@ def http_trace(message):
 
 
 def _socket_would_block(error):
-    return error.errno in (errno.EAGAIN, errno.EWOULDBLOCK)
+    """Return True for a temporary nonblocking socket condition."""
+    return error.errno == errno.EAGAIN
 
 
 def clock_page():
