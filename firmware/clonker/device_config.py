@@ -357,11 +357,16 @@ def save(config, expected_revision):
     if not _backup_looks_valid(CONFIG_FILE):
         raise ValueError("Primary configuration is missing or invalid")
 
-    # Confirm the file still matches the active configuration.
-    with open(CONFIG_FILE, "r") as file:
-        existing_xml = file.read(MAX_CONFIG_BYTES + 1)
+    # Compare configuration data, not XML formatting.
+    # Reject external changes without altering the active configuration.
+    previous_current = _current
 
-    if existing_xml != to_xml(_current):
+    try:
+        disk_config = _load_existing(CONFIG_FILE)
+    finally:
+        _current = previous_current
+
+    if disk_config != previous_current:
         raise ValueError("Configuration changed on disk; reload required")
 
     # Do not write flash when nothing has changed.
