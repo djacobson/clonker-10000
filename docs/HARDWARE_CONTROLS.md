@@ -16,13 +16,11 @@
 
 ## Physical design direction (not yet integrated)
 
-- Large Grayhill optical **VOLUME** encoder and silver Kilo knob.
-- Smaller Bourns **SELECT** encoder and black Kilo knob.
-- Metal tactile/navigation buttons; guarded momentary **SYSTEM MASTER** power action.
-- Three-position maintained room selector, with configurable logical room names; `BOTH`/group fan-out remains TBD.
-- Separate maintained **CONFIG / RUN** switch; pin and polarity TBD.
-- Tiny OLED status display, piezo / I²S audio feedback, and speaker are planned.
-- A 12/24 V-rated illuminated button ring must not be connected directly to a 3.3 V GPIO as though it were a 3.3 V LED.
+- Dedicated physical pushbutton for the configurable
+  `power-toggle` fundamental action.
+- Guarded race-car-style switch for internal CONFIG/RUN mode.
+  This switch changes firmware state and does not send HTTP commands.
+- CONFIG/RUN GPIO pin and polarity remain TBD.
 
 ## Action vocabulary (proposed)
 
