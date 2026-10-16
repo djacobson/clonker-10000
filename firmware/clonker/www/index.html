@@ -299,6 +299,53 @@
         return { rooms };
     }
 
+    async function saveDeviceConfig() {
+        const button = document.getElementById("save-config");
+        const status = document.getElementById("save-status");
+
+        if (!configRevision) {
+            status.textContent = "Configuration revision unavailable.";
+            return;
+        }
+
+        button.disabled = true;
+        status.textContent = "Saving configuration...";
+
+        try {
+            const submitted = collectDeviceConfig();
+            submitted.revision = configRevision;
+
+            const response = await fetch("/api/config", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(submitted),
+                cache: "no-store"
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.error || "HTTP " + response.status
+                );
+            }
+
+            status.textContent = "Configuration saved successfully.";
+
+            // Refresh fields and revision from the Pico.
+            await loadDeviceConfig();
+
+        } catch (error) {
+            console.error("Configuration save failed:", error);
+            status.textContent = "Save failed: " + error.message;
+
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     async function updateClock() {
         try {
             const response = await fetch("/api/clock", {
@@ -359,6 +406,9 @@
     document.getElementById("sync-clock")
         .addEventListener("click", synchronizeClock);
 
+    document.getElementById("save-config")
+        .addEventListener("click", saveDeviceConfig);
+ 
     // Read clock status when the page opens.
     updateClock();
 
