@@ -332,10 +332,12 @@
                 );
             }
 
-            status.textContent = "Configuration saved successfully.";
-
             // Refresh fields and revision from the Pico.
             await loadDeviceConfig();
+
+            status.textContent = result.saved
+                ? "Configuration saved successfully."
+                : "No changes to save.";
 
         } catch (error) {
             console.error("Configuration save failed:", error);
