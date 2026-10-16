@@ -432,6 +432,10 @@ def _replace_with_backup(path, contents):
     # Confirm the primary exists before changing any backups.
     os.stat(path)
 
+    # Never rotate an invalid primary into the backup chain.
+    if not _backup_looks_valid(path):
+        raise ValueError("Primary configuration is invalid")
+
     # Move the existing backup aside, if present.
     try:
         os.rename(backup_path, previous_backup)
