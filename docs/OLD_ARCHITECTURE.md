@@ -73,7 +73,7 @@ Physical input becomes an action before mapping to a device. Actions may be unma
 Clonker has two independent operating-mode controls: one for developer access and one for everyday use.
 
 | | USB / DEVICE | CONFIG / RUN |
-|—|—|—|
+|---|---|---|
 | **Controlled by** | Developer | End user |
 | **Purpose** | Filesystem write ownership | Remote-control behavior |
 | **Hardware** | Internal GPIO jumper | External toggle switch |
