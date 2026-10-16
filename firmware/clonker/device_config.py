@@ -271,8 +271,7 @@ def load():
 
 
 def _load_existing(config_path=CONFIG_FILE):
-    """Load configuration, recovering an interrupted save if needed."""
-    global _current
+    """Read and validate configuration without changing active state."""
 
     with open(config_path, "r") as file:
         xml = file.read(MAX_CONFIG_BYTES + 1)
@@ -314,10 +313,7 @@ def _load_existing(config_path=CONFIG_FILE):
         if room_id not in rooms:
             raise ValueError("Missing room: " + room_id)
 
-    # Publish only after all rooms pass validation.
-    _current = {"rooms": rooms}
-
-    return _current
+    return {"rooms": rooms}
 
 
 def current():
