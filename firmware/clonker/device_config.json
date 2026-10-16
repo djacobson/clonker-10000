@@ -1,0 +1,248 @@
+{
+  "version": 2,
+  "rooms": {
+    "room-1": {
+      "name": "Den",
+      "devices": {
+        "tv": "",
+        "avr": "",
+        "streaming": ""
+      },
+      "actions": {
+        "volume-up": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "volume-down": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "mute-toggle": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-up": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-down": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-left": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-right": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "select": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "back": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "home": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "play-pause": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "skip-back": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "skip-forward": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "power-toggle": {
+          "target": "tv",
+          "method": "GET",
+          "path": ""
+        }
+      },
+      "custom_actions": []
+    },
+    "room-2": {
+      "name": "Sunroom",
+      "devices": {
+        "tv": "",
+        "avr": "",
+        "streaming": ""
+      },
+      "actions": {
+        "volume-up": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "volume-down": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "mute-toggle": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-up": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-down": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-left": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-right": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "select": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "back": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "home": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "play-pause": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "skip-back": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "skip-forward": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "power-toggle": {
+          "target": "tv",
+          "method": "GET",
+          "path": ""
+        }
+      },
+      "custom_actions": []
+    },
+    "room-3": {
+      "name": "Room 3",
+      "devices": {
+        "tv": "",
+        "avr": "",
+        "streaming": ""
+      },
+      "actions": {
+        "volume-up": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "volume-down": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "mute-toggle": {
+          "target": "avr",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-up": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-down": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-left": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-right": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "select": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "back": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "home": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "play-pause": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "skip-back": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "skip-forward": {
+          "target": "streaming",
+          "method": "GET",
+          "path": ""
+        },
+        "power-toggle": {
+          "target": "tv",
+          "method": "GET",
+          "path": ""
+        }
+      },
+      "custom_actions": []
+    }
+  }
+}
