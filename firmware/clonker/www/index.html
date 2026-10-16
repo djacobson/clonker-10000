@@ -192,7 +192,7 @@
 
             saveStatus.textContent = config.filesystem_writable
                 ? "DEVICE mode -- filesystem writable. Configuration saving available."
-                : "USB mode -- filesystem read-only. Configuration saving unavailable.";
+                : "SERVICE (USB) mode -- filesystem read-only. Configuration saving unavailable.";
 
             // Sort by numeric room position.
             const roomIds = Object.keys(config.rooms).sort(
