@@ -267,6 +267,9 @@
 
                 container.appendChild(section);
             }
+
+            return true;
+  
         } catch (error) {
             console.warn("Configuration load failed:", error);
 
@@ -278,6 +281,8 @@
                 container.textContent =
                     "Unable to load configuration. Refresh the page to retry.";
             }
+
+            return false; 
         }
 
     }
@@ -333,7 +338,13 @@
             }
 
             // Refresh fields and revision from the Pico.
-            await loadDeviceConfig();
+            const refreshed = await loadDeviceConfig();
+
+            if (!refreshed) {
+                status.textContent =
+                    "Save accepted, but refresh failed. Reload the page to verify.";
+                return;
+            }
 
             status.textContent = result.saved
                 ? "Configuration saved successfully."
@@ -344,7 +355,7 @@
             status.textContent = "Save failed: " + error.message;
 
         } finally {
-            button.disabled = false;
+            button.disabled = !configRevision;
         }
     }
 
