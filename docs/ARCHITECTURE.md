@@ -71,9 +71,9 @@ Wi-Fi management is trusted-LAN-only, not authenticated application security. Do
 
 ## Reference documents
 
-- [Operating Modes](docs/OPERATING_MODES.md) — SERVICE (USB), DEVICE, CONFIG, RUN
-- [Configuration & Recovery](docs/CONFIGURATION.md) — XML, API, backup safety
-- [Firmware & Network](docs/FIRMWARE_NETWORK.md) — cooperative loop, HTTP, clock, logging
-- [Hardware & Controls](docs/HARDWARE_CONTROLS.md) — physical design and action model
-- [Development & Deployment](docs/DEVELOPMENT.md) — iPad/Windows/Pico workflow and test plan
-- [Terminology Audit](docs/TERMINOLOGY_AUDIT.md) — existing USB-mode references to update
+- [Operating Modes](OPERATING_MODES.md) — SERVICE (USB), DEVICE, CONFIG, RUN
+- [Configuration & Recovery](CONFIGURATION.md) — XML, API, backup safety
+- [Firmware & Network](FIRMWARE_NETWORK.md) — cooperative loop, HTTP, clock, logging
+- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and action model
+- [Development & Deployment](DEVELOPMENT.md) — iPad/Windows/Pico workflow and test plan
+- [Terminology Audit](TERMINOLOGY_AUDIT.md) — existing USB-mode references to update
