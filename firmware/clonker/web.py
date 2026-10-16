@@ -140,7 +140,7 @@ def _build_response(first_line, request=None):
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
 
-    # HTTP Routes
+    # HTTP Routes and handlers
 
     elif first_line.startswith(b"GET /api/clock "):
         body = json.dumps(clock_status())
@@ -200,12 +200,22 @@ def _build_response(first_line, request=None):
                 )
 
                 submitted = json.loads(body_bytes.decode("utf-8"))
-                validated = device_config.validate_config(submitted)
+
+                expected_revision = submitted.pop("revision", None)
+
+                changed = device_config.save(
+                    submitted,
+                    expected_revision
+                )
 
                 status = "200 OK"
                 body = json.dumps({
-                    "message": "Configuration validated; not saved",
-                    "rooms": len(validated["rooms"])
+                    "message": (
+                        "Configuration saved"
+                        if changed else "Configuration unchanged"
+                    ),
+                    "saved": changed,
+                    "revision": device_config.revision()
                 })
 
             except (ValueError, TypeError, UnicodeError) as error:
