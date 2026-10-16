@@ -200,6 +200,8 @@ def _build_response(first_line, request=None):
                 )
 
                 submitted = json.loads(body_bytes.decode("utf-8"))
+                if not isinstance(submitted, dict):
+                    raise ValueError("Configuration must be a JSON object")
 
                 expected_revision = submitted.pop("revision", None)
 
