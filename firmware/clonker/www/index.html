@@ -169,7 +169,8 @@
     const MAX_CONFIG_ATTEMPTS = 5;
     let configAttempts = 0;
     let configRevision = null;
-
+    let configWritable = false;
+ 
     async function loadDeviceConfig() {
         configAttempts++;
  
@@ -187,7 +188,8 @@
 
             const config = await response.json();
             configRevision = config.revision;
-
+            configWritable = config.filesystem_writable;
+ 
             const saveButton = document.getElementById("save-config");
             saveButton.disabled = !config.filesystem_writable;
             const saveStatus = document.getElementById("save-status");
@@ -355,7 +357,7 @@
             status.textContent = "Save failed: " + error.message;
 
         } finally {
-            button.disabled = !configRevision;
+            button.disabled = !configRevision || !configWritable;
         }
     }
 
