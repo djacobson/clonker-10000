@@ -22,9 +22,17 @@ A Ctrl+D reload is **not** a substitute for power cycling when switching filesys
 
 ## Current testing checkpoint
 
-**Completed previously:** rename-over-existing behavior, three-generation backup rotation using disposable text files, and basic missing-primary rename recovery. **Not yet completed with latest firmware:** full XML-aware fallback and recovery tests, corrupted-backup scenarios, unexpected reset/power loss, and actual HTTP persistence.
+**Verified on Pico — October 16, 2026:** Configuration v1 XML loading, browser editing, persistent saves, no-change detection, backup rotation, active-memory updates, and persistence after soft reboot.
 
-**Next:** use disposable valid XML files in DEVICE mode; inspect each resulting file. Keep `/clonker/device_config.xml` and its backups untouched. Test the current backup logic, then verify `load()` fallback with safely controlled test paths or dedicated fixture functions. Only afterward integrate POST persistence.
+The original Den configuration was restored after testing.
+
+**Implemented; additional testing pending:** Stale revision rejection, malformed configuration rejection through HTTP, read-only filesystem save protection, and recovery from interrupted writes.
+
+**Next development milestone:** Implement and test the JSON v2 configuration engine while preserving the working XML v1 firmware as a rollback point. Validate the JSON schema and serialization before integrating persistence and browser editing.
+
+The JSON v2 fixture is committed at `firmware/clonker/device_config.json`, but the running firmware does not yet consume it.
+
+See [Configuration & Recovery](CONFIGURATION.md) and [Configuration Test Record](configuration-testing.md).
 
 ## Status language
 
@@ -34,4 +42,8 @@ A Ctrl+D reload is **not** a substitute for power cycling when switching filesys
 
 ## Debugging principles
 
-One small edit or test at a time. Capture REPL output. Prefer bounded, disposable tests. `KeyboardInterrupt` after manually stopping the app is expected. Avoid interpreting an HTTP 200 `Configuration validated; not saved` as persistence. Record findings in docs after each verified milestone.
+One small edit or test at a time. Capture REPL output. Prefer bounded, disposable tests. `KeyboardInterrupt` after manually stopping the app is expected.
+
+Avoid confusing successful validation with successful persistence. A successful configuration save must be verified in flash, reflected in active memory, and retained after reboot. Record actual test results in `configuration-testing.md`.
+
+Prefer reasonable validation that protects normal operation and persistent data. The browser is the intended user configuration interface; raw JSON editing is primarily a developer activity. Do not build a general-purpose JSON editor or elaborate compatibility framework.

@@ -31,22 +31,27 @@ Separate low-priority service:
   CONFIG mode -> HTTP :9090 -> clock + room editor
 ```
 
-**State ownership:** Physical selector and maintained switches are read from GPIO; room names/IPs/preferences come from versioned XML; actual AV state belongs to each device; debounce/queues/clock reference live in RAM. Do not write flash for switch changes or idle status.
+**State ownership:** Physical selectors and maintained switches are read from GPIO; room names, device endpoints, and action mappings come from persistent configuration. Configuration v1 uses XML and is operational. Configuration v2 uses JSON and is the next implementation milestone. Actual AV state belongs to the controlled devices; debounce, queues, and clock reference live in RAM. Do not write flash for switch changes or idle status.
 
 ## Two independent mode dimensions
 
 - **SERVICE (USB) / DEVICE:** developer filesystem ownership, selected by GP17 jumper **at power-on**; power cycle required.
 - **CONFIG / RUN:** user application behavior, eventually controlled by a physical maintained switch **during runtime**; no reboot intended. Currently simulated CONFIG is enabled.
 
-See [Operating Modes](docs/OPERATING_MODES.md) and [Development & Deployment](docs/DEVELOPMENT.md).
+See [Operating Modes](OPERATING_MODES.md) and [Development & Deployment](DEVELOPMENT.md).
+
 
 ## Implemented vs planned
 
-**Verified on Pico:** Wi-Fi connectivity, serial REPL, GP17 filesystem ownership modes, read-only XML configuration loading, browser clock synchronization, HTTP management server on **9090**, configuration GET and POST validation, file rename replacement, disposable-file backup rotation and missing-primary recovery.
+**Verified on Pico (configuration v1):** Wi-Fi connectivity, serial REPL, GP17 filesystem ownership modes, three-room XML loading, browser clock synchronization, HTTP management server on port 9090, browser configuration editing, persistent XML saves, no-change detection, backup rotation, active-memory updates, and persistence across soft reboot.
 
-**Implemented but not fully qualified:** `.tmp` / `.bak` / `.bak.old` routines, backup validation, startup fallback to valid backup. Newly edited recovery code requires fresh on-device tests. Power-loss durability is **not guaranteed**.
+**Implemented; additional defensive testing pending:** Revision-conflict rejection, malformed configuration rejection through HTTP, read-only filesystem save protection, and interrupted-write recovery under simulated failures. Power-loss durability is not guaranteed.
 
-**Not yet implemented:** persistent HTTP Save Configuration, physical CONFIG switch, room selector GPIO, encoder/button events, dispatcher, real AV network commands, OLED, audio, and battery management.
+**Designed and committed, not operational:** Configuration v2 JSON schema with three fixed rooms, three device endpoints per room, fourteen fundamental actions per room, and reserved user-defined actions. The JSON configuration file is in GitHub; the running firmware still uses XML.
+
+**Not yet implemented:** JSON v2 firmware and browser integration, physical CONFIG switch, room selector GPIO, encoder/button events, action dispatcher, real AV network commands, OLED, audio, and battery management.
+
+Fundamental commands have fixed identities but configurable HTTP targets, methods, and paths. Blank paths or unconfigured device endpoints are valid and result in no action. The physical CONFIG/RUN switch changes Clonker's internal operating mode; it is not an HTTP command.
 
 ## Current firmware map
 
@@ -71,8 +76,8 @@ Wi-Fi management is trusted-LAN-only, not authenticated application security. Do
 
 ## Reference documents
 
-- [Operating Modes](OPERATING_MODES.md) — SERVICE (USB), DEVICE, CONFIG, RUN
-- [Configuration & Recovery](CONFIGURATION.md) — XML, API, backup safety
+- [Operating Modes](OPERATING_MODES.md) — SERVICE (USB), DEVICE, CONFIG, RUN 
+- [Configuration & Recovery](CONFIGURATION.md) — operational XML v1, planned JSON v2, command model, validation, and backup safety
 - [Firmware & Network](FIRMWARE_NETWORK.md) — cooperative loop, HTTP, clock, logging
 - [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and action model
 - [Development & Deployment](DEVELOPMENT.md) — iPad/Windows/Pico workflow and test plan

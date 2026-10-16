@@ -367,7 +367,8 @@ The example is intentionally incomplete and must not be deployed as the active c
 
 The complete file will contain `room-1`, `room-2`, and `room-3`.
 
-## 8. Reserved Custom Actions
+
+## 8. Reserved User-Defined Commands
 
 Each room contains:
 
@@ -375,20 +376,17 @@ Each room contains:
 "custom_actions": []
 ```
 
-Configuration v2 requires this array to remain empty.
+Configuration v2 requires this array to remain empty until user-defined commands are implemented.
 
-Future user-defined actions may support:
+Fundamental commands have fixed developer-defined identities. User-defined commands will have user-supplied identities and names.
 
-- Editable action names.
-- Multiple device commands.
-- Sequential execution.
-- Wait intervals.
-- Named macros.
-- Token substitution.
+Both categories are intended to remain simple. The basic command model is an HTTP target, method, and path.
 
-These features are reserved for later development.
+We are not building a scripting language, automation programming environment, or graphical shortcut editor.
 
-The initial v2 validator will reject nonempty `custom_actions` arrays.
+Compound commands or sequencing may be considered later if a practical use case justifies them. They are not requirements of the initial command model.
+
+The initial v2 validator rejects nonempty `custom_actions` arrays.
 
 ## 9. Physical Control Separation
 
@@ -430,6 +428,10 @@ JSON parsing alone does not provide these guarantees.
 In particular, standard `json.loads()` does not reject duplicate object keys.
 
 Duplicate-key handling must be explicitly resolved during implementation if strict rejection is required.
+
+Validation should be practical and proportional to the application. Normal users configure Clonker through the browser; direct JSON editing is primarily a developer activity. Validate the structure and values needed for safe, predictable operation without attempting to detect every conceivable hand-edited JSON discrepancy.
+
+Standard JSON parsing is sufficient for the initial implementation. A custom duplicate-key parser is not required.
 
 ### Configuration Limits
 

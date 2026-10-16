@@ -30,15 +30,32 @@ The two mode dimensions are independent. **SERVICE (USB) / DEVICE** decides who 
 
 ## CONFIG mode — simulated today
 
-`controls/switches.py` currently returns simulated `True` while `CONFIG_SWITCH_PIN` is unset. `main.py` starts Clonker HTTP on **port 9090**, allowing clock synchronization and configuration inspection/validation. CONFIG is **not** equivalent to DEVICE: CONFIG may be active while the filesystem is read-only in SERVICE (USB).
+`controls/switches.py` currently returns simulated `True` while `CONFIG_SWITCH_PIN` is unset. `main.py` starts Clonker HTTP on **port 9090**, allowing clock synchronization and configuration inspection, editing, and saving when the filesystem is writable. CONFIG is **not** equivalent to DEVICE: CONFIG may be active while the filesystem is read-only in SERVICE (USB).
 
 ## RUN mode — planned physical behavior
 
 When the simulated or future physical switch returns false, `main.py` calls `web.stop()` and closes the listener; Wi-Fi remains available for eventual theater commands. Input handling must remain active in either mode. A physical CONFIG/RUN switch has not yet been wired or validated.
 
-## Intended save gate
+## Configuration saving
 
-Persistent configuration saves should require **DEVICE + CONFIG** and server-side validation, not merely an enabled browser button. Currently POST `/api/config` **validates but does not persist**. The backend currently checks filesystem writability; full save authorization and revision conflict behavior must be verified during integration.
+Persistent configuration saves require a writable filesystem and a valid submitted configuration.
+
+In the current v1 implementation:
+
+- DEVICE mode permits firmware filesystem writes.
+- SERVICE (USB) mode rejects configuration saves with HTTP 403.
+- CONFIG mode enables the browser management service.
+- RUN mode disables the browser management service.
+
+Configuration v1 browser saves have been successfully tested on the Pico, including backup rotation and persistence after reboot.
+
+The intended operational combination for browser configuration saves is DEVICE + CONFIG.
+
+The CONFIG/RUN switch is an internal application control. Moving it does not send an HTTP request to any television, receiver, or streaming device.
+
+The separate `power-toggle` fundamental command controls external equipment through its configured HTTP action.
+
+Configuration v2 will preserve this operating-mode separation.
 
 ## Boot / deployment cautions
 

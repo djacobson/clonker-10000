@@ -20,7 +20,13 @@ Application server: **`http://192.168.50.12:9090/`** on trusted LAN. CircuitPyth
 | `GET /api/clock` | Clock source and timestamp JSON |
 | `POST /api/clock?utc=...` | Browser UTC synchronization, RAM only |
 | `GET /api/config` | Current rooms, revision, filesystem writable flag |
-| `POST /api/config` | DEVICE: validate only; SERVICE (USB): 403 |
+| `POST /api/config` | DEVICE: validate and persist XML v1 configuration; SERVICE (USB): HTTP 403 |
+
+Configuration v1 browser saving has been verified on the Pico. The backend checks filesystem writability, validates submitted configuration, checks the expected revision, and uses verified file replacement with backups.
+
+Configuration v2 will use JSON with three fixed rooms and fourteen fundamental commands per room. The current 2048-byte HTTP request limit must be increased before v2 browser integration.
+
+The management server is a configuration service, not the eventual device-command dispatcher. The CONFIG/RUN switch enables or disables that service internally and does not issue an HTTP action.
 
 A client timeout/stall has been observed during tests; HTTP tracing is available with `HTTP_DIAGNOSTICS` and normally disabled. Keep web service low priority when physical input code arrives.
 
@@ -30,4 +36,10 @@ Clock fallback: monotonic `DEFAULTTIME` uptime. Browser button sets UTC referenc
 
 ## Planned control pipeline
 
-GPIO sampling and debounce → generic input events → dispatcher → room/action lookup → bounded device adapter commands. Prefer Denon for AVR speaker volume, Roku for navigation, LG for TV-specific commands. Controlled devices remain authoritative; a successful network send does not prove the action occurred. Group/BOTH semantics remain unfinalized.
+GPIO sampling and debounce → generic input events → dispatcher → room/action lookup → bounded device adapter commands. Prefer Denon for AVR speaker volume, Roku for navigation, LG for TV-specific commands. Controlled devices remain authoritative; a successful network send does not prove the action occurred.
+
+GPIO sampling and debounce → generic input events → action dispatcher → selected room's fundamental or user-defined command → bounded HTTP request to the configured target device.
+
+A fundamental command has a fixed action ID and configurable target, HTTP method, and path. An empty path or unconfigured target IP produces a valid no-op. User-defined commands will extend this simple command model without requiring a scripting language or graphical shortcut editor.
+
+Controlled devices remain authoritative for their actual state. A successful network request does not prove the requested action occurred. Group/BOTH semantics remain unfinalized.
