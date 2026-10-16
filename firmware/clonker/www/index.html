@@ -168,6 +168,7 @@
 <script>
     const MAX_CONFIG_ATTEMPTS = 5;
     let configAttempts = 0;
+    let configRevision = null;
 
     async function loadDeviceConfig() {
         configAttempts++;
@@ -185,6 +186,7 @@
             }
 
             const config = await response.json();
+            configRevision = config.revision;
 
             const saveButton = document.getElementById("save-config");
             saveButton.disabled = !config.filesystem_writable;
