@@ -9,7 +9,7 @@
 ## Verified Capabilities
 
 | Capability | Status |
-|—|—|
+|---|---|
 | Three-room XML configuration loading | PASS |
 | Browser configuration display and editing | PASS |
 | Browser POST saves XML to flash | PASS |
@@ -28,7 +28,7 @@ Following two consecutive browser saves:
 The following values were verified directly in the CircuitPython REPL:
 
 | File / State | Room 1 Name |
-|—|—|
+|---|---|
 | Primary XML | Den |
 | `.bak` | Den Test |
 | `.bak.old` | Den |
@@ -60,7 +60,7 @@ These should be included in a future configuration hardening pass.
 ### Filesystem Modes
 
 | Mode | GP17 Jumper | Pico Filesystem |
-|—|—|—|
+|---|---|---|
 | DEVICE | Installed (GP17 to GND) | Writable by Pico |
 | SERVICE (USB) | Removed | Writable by USB host |
 
