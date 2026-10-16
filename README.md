@@ -59,4 +59,16 @@ Volume (ofc), Power ON / OFF, Navigation arrows and Select, and some audio / vid
        style="vertical-align: top;">
 </p>
 
+## Project Status
+
+### Configuration System — v1 Operational ✅
+
+The Clonker 10000’s browser-based XML configuration system has passed
+its initial hardware tests on the Raspberry Pi Pico 2 W.
+
+Features verified include browser saving, no-change detection,
+two-generation backups, and persistence across reboot.
+
+📋 [Configuration Test Results](docs/configuration-testing.md)
+
 More awesome stuff to come…
