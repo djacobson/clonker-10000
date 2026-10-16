@@ -21,6 +21,7 @@ ACTION_IDS = (
 )
 
 _current = None
+_current_path = None
 
 
 def _keys(obj, expected, location):
@@ -118,13 +119,16 @@ def _load_existing(path):
         return from_json(file.read(MAX_CONFIG_BYTES + 1))
 
 
-def load(path=CONFIG_FILE):
-    """Load primary, then backups. Never silently rewrite disk."""
-    global _current
+def load(path=None):
+    """Load primary or backups and bind subsequent saves to this path."""
+    global _current, _current_path
+    if path is None:
+        path = CONFIG_FILE
     for candidate in (path, path + ".bak", path + ".bak.old"):
         try:
             loaded = _load_existing(candidate)
             _current = loaded
+            _current_path = path
             return loaded
         except (OSError, ValueError) as error:
             print("CLONKER JSON: Cannot load {}: {}".format(candidate, error))
@@ -198,11 +202,15 @@ def _replace_with_backup(path, contents):
     _load_existing(path)
 
 
-def save(config, expected_revision, path=CONFIG_FILE):
-    """Persist a changed config only if RAM and disk revisions agree."""
+def save(config, expected_revision, path=None):
+    """Save only to the primary path selected by the last successful load."""
     global _current
-    if _current is None:
+    if _current is None or _current_path is None:
         raise RuntimeError("Configuration not loaded")
+    if path is None:
+        path = _current_path
+    if path != _current_path:
+        raise ValueError("Save path differs from loaded configuration")
     if not isinstance(expected_revision, str) or expected_revision != revision():
         raise ValueError("Configuration revision mismatch")
     validated = validate_config(config)
