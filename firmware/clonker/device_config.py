@@ -253,13 +253,17 @@ def validate_config(config):
 
 def load():
     """Load configuration, trying backups if primary is invalid."""
+    global _current
+
     for path in (
         CONFIG_FILE,
         CONFIG_FILE + ".bak",
         CONFIG_FILE + ".bak.old",
     ):
         try:
-            return _load_existing(path)
+            config = _load_existing(path)
+            _current = config
+            return config
         except (ValueError, OSError) as error:
             print(
                 "CLONKER CONFIG: Cannot load {}: {}".format(
