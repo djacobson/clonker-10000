@@ -353,10 +353,6 @@ def save(config, expected_revision):
     validated = validate_config(config)
     xml = to_xml(validated)
 
-    # Do not write flash when nothing has changed.
-    if xml == to_xml(_current):
-        return False
-
     # Never overwrite a missing or invalid primary configuration.
     if not _backup_looks_valid(CONFIG_FILE):
         raise ValueError("Primary configuration is missing or invalid")
@@ -367,6 +363,10 @@ def save(config, expected_revision):
 
     if existing_xml != to_xml(_current):
         raise ValueError("Configuration changed on disk; reload required")
+
+    # Do not write flash when nothing has changed.
+    if xml == to_xml(_current):
+        return False
 
     # Rotate backups and install the verified replacement.
     _replace_with_backup(CONFIG_FILE, xml)
