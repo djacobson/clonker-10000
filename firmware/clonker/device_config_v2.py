@@ -247,7 +247,7 @@ def save(config, expected_revision, path=None):
     if path != _current_path:
         raise ValueError("Save path differs from loaded configuration")
     if not isinstance(expected_revision, str) or expected_revision != revision():
-        raise ValueError("Configuration revision mismatch")
+        raise ValueError("Configuration revision mismatch. Changes not saved. Refresh page.")
 
     validated = validate_config(config)
     serialized = to_json(validated)

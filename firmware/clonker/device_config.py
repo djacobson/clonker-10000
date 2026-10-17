@@ -348,7 +348,7 @@ def save(config, expected_revision):
 
     # Reject stale browser submissions.
     if expected_revision != revision():
-        raise ValueError("Configuration revision mismatch")
+        raise ValueError("Configuration revision mismatch.")
 
     validated = validate_config(config)
     xml = to_xml(validated)
