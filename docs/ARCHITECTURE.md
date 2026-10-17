@@ -47,7 +47,6 @@ or idle status.
 
 See [Operating Modes](OPERATING_MODES.md) and [Development & Deployment](DEVELOPMENT.md).
 
-
 ## Implemented vs planned
 
 **Verified on Pico:** Wi-Fi connectivity, serial REPL, GP17 filesystem
@@ -108,6 +107,49 @@ Wi-Fi management is trusted-LAN-only, not authenticated application security. Do
 - [Terminology Audit](TERMINOLOGY_AUDIT.md) — existing USB-mode references to update
 
 ---
+
+### Active Configuration in RAM — Existing Implementation
+
+**Status:** IMPLEMENTED IN JSON v2 — ACTION DISPATCH NOT YET TESTED
+
+The existing `device_config_v2.py` module already maintains
+one authoritative, validated configuration snapshot in RAM
+through its private `_current` dictionary.
+
+No additional key-value table, configuration cache, or
+synchronization manager is required for V1.
+
+Existing behavior:
+
+- `load()` initializes the active configuration at startup.
+- `current()` returns a validated copy of the active configuration.
+- `room(room_id)` returns the requested room configuration.
+- `save()` validates and persists changes before publishing
+  the new configuration into `_current`.
+- A failed save does not publish the proposed configuration.
+- A successful no-change save leaves the existing configuration intact.
+
+The future dispatcher should use `room()` or `current()`
+when resolving actions rather than retaining the startup
+configuration reference from `main.py`.
+
+This allows a successful browser configuration save to become
+available to subsequent action lookups without restarting
+the Pico or reloading the JSON file.
+
+CONFIG-to-RUN transitions do not require a configuration reload.
+The active configuration remains in RAM when the management
+HTTP service is stopped.
+
+Manual filesystem changes outside the configuration engine
+are not automatically detected or adopted.
+
+For V1, retain the existing validated-copy behavior.
+Optimize configuration lookup performance only if actual
+encoder testing demonstrates a need.
+
+Do not modify the existing JSON v2 persistence engine
+solely to support action dispatch.
 
 ### CONFIG/RUN Development and Testing
 
