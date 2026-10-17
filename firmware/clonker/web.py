@@ -1,7 +1,15 @@
 # The Clonker 10000
 # clonker/web.py -- JSON v2 configuration HTTP service
+#
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
+
+"""Small, cooperative HTTP server for CONFIG mode.
+
+Only one client is serviced at a time. poll() advances one accept, receive,
+or send operation so the main loop can service physical controls later.
+Configuration saves use the JSON v2 engine's revision and path safeguards.
+"""
 
 import time
 import wifi
@@ -13,6 +21,8 @@ import storage
 from clonker import clock, logger
 from clonker import device_config_v2 as device_config
 
+
+# HTTP service and request limits. JSON v2 is larger than the XML v1 payload.
 WEB_ROOT = "/clonker/www"
 PORT = 9090
 HTTP_DIAGNOSTICS = False
@@ -22,6 +32,7 @@ MAX_HEADER_BYTES = 2048
 IO_CHUNK_BYTES = 512
 CLIENT_TIMEOUT_SECONDS = 4.0
 
+# Connection state is kept across poll() calls rather than blocking on I/O.
 _pool = None
 _listener = None
 _client = None
@@ -37,7 +48,7 @@ def http_trace(message):
 
 
 def _socket_would_block(error):
-    """Return True for a temporary nonblocking socket condition."""
+    """CircuitPython uses EAGAIN; EWOULDBLOCK is not always defined."""
     return error.errno == errno.EAGAIN
 
 
@@ -51,6 +62,7 @@ def clock_status():
 
 
 def _close_client():
+    """Reset the entire current connection after completion or failure."""
     global _client, _request, _response, _sent, _last_activity
     if _client is not None:
         try:
@@ -65,6 +77,7 @@ def _close_client():
 
 
 def start():
+    """Open a nonblocking listener only when CONFIG mode is enabled."""
     global _pool, _listener
     if _listener is not None:
         return
@@ -89,6 +102,11 @@ def start():
 
 
 def _request_complete(request):
+    """Wait for a complete POST body before attempting JSON decoding.
+
+    GET and clock-sync requests need only their headers; configuration POSTs
+    additionally require one valid Content-Length and the entire body.
+    """
     header_end = request.find(b"\r\n\r\n")
     if header_end < 0:
         if len(request) > MAX_HEADER_BYTES:
@@ -120,21 +138,29 @@ def _json_error(message, status="400 Bad Request"):
 
 
 def _build_response(first_line, request=None):
+    """Route a completed request and return an entire HTTP response as bytes."""
     logger.debug("HTTP request: {}".format(first_line))
     content_type = "application/json"
+
+    # Serve the browser interface from Pico flash.
     if first_line.startswith(b"GET / "):
         body = clock_page()
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
+
     elif first_line.startswith(b"GET /api/clock "):
         body = json.dumps(clock_status())
         status = "200 OK"
+
+    # Include the active revision and filesystem ownership state.
+    # current() returns a copy, so these response-only fields are not saved.
     elif first_line.startswith(b"GET /api/config "):
         config = device_config.current()
         config["filesystem_writable"] = not storage.getmount("/").readonly
         config["revision"] = device_config.revision()
         body = json.dumps(config)
         status = "200 OK"
+
     elif first_line.startswith(b"POST /api/clock?utc="):
         try:
             path = first_line.split(b" ", 2)[1]
@@ -147,6 +173,9 @@ def _build_response(first_line, request=None):
             status = "200 OK"
         except (ValueError, OverflowError):
             body, status = _json_error("Invalid UTC timestamp")
+
+    # Save only in DEVICE mode. The engine checks schema, expected revision,
+    # disk-vs-RAM consistency, and the path bound by the initial load().
     elif first_line.startswith(b"POST /api/config "):
         if storage.getmount("/").readonly:
             body, status = _json_error("Filesystem is read-only", "403 Forbidden")
@@ -179,10 +208,13 @@ def _build_response(first_line, request=None):
             except OSError as error:
                 logger.warning("Configuration persistence error: {}".format(error))
                 body, status = _json_error("Configuration storage failed", "500 Internal Server Error")
+
     else:
         body = "Not Found"
         status = "404 Not Found"
         content_type = "text/plain"
+
+    # Send a complete Content-Length so the browser knows when to stop reading.
     payload = body.encode("utf-8")
     header = (
         "HTTP/1.1 {}\r\n"
@@ -200,6 +232,8 @@ def poll():
     if _listener is None:
         return
     now = time.monotonic()
+
+    # Accept a new client if the server is idle.
     if _client is None:
         try:
             client, address = _listener.accept()
@@ -219,10 +253,14 @@ def poll():
         _last_activity = now
         http_trace("ACCEPTED connection")
         return
+
+    # Discard clients that stop making progress.
     if now - _last_activity > CLIENT_TIMEOUT_SECONDS:
         logger.warning("HTTP client timed out")
         _close_client()
         return
+
+    # Read a bounded chunk, accumulating until the request is complete.
     if _response is None:
         buf = bytearray(IO_CHUNK_BYTES)
         try:
@@ -252,6 +290,8 @@ def poll():
         _response = _build_response(first_line, _request)
         _request = None
         return
+
+    # Send the prepared response incrementally, then release the client.
     chunk = memoryview(_response)[_sent:_sent + IO_CHUNK_BYTES]
     try:
         count = _client.send(chunk)
@@ -269,6 +309,7 @@ def poll():
 
 
 def stop():
+    """Close the HTTP service when leaving CONFIG mode."""
     global _listener, _pool
     _close_client()
     if _listener is not None:
