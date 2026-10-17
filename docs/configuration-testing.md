@@ -297,3 +297,189 @@ The implementation is ready to proceed toward firmware and browser integration, 
 **Milestone: JSON v2 persistence baseline verified.**
 
 **CLONK!**
+
+
+---
+
+## JSON v2 Browser Integration — Hardware Test Record
+
+**Date:** October 16, 2026  
+**Hardware:** Raspberry Pi Pico 2 W (RP2350)  
+**Runtime:** CircuitPython 10.3.1  
+**Browser clients:** Chrome on Windows; Safari on iPad  
+**Status:** Browser integration and basic persistence PASSED
+
+### 1. Scope
+
+Tested the integration of the previously verified JSON v2 configuration engine with the Clonker's HTTP server and browser configuration interface.
+
+Files involved:
+
+- `firmware/clonker/main.py`
+- `firmware/clonker/web.py`
+- `firmware/clonker/www/index.html`
+- `firmware/clonker/device_config_v2.py`
+
+The integration replaces the operational configuration interface's XML v1 dependency with JSON v2 while retaining the original XML v1 configuration engine and files for rollback.
+
+The HTTP request size limit was increased from 2,048 bytes to 10,240 bytes to accommodate the larger JSON configuration.
+
+### 2. Initial Startup and Socket Compatibility
+
+The first hardware startup successfully loaded the JSON v2 configuration and started the HTTP server on port 9090.
+
+However, the HTTP polling loop crashed with:
+
+`AttributeError: 'module' object has no attribute 'EWOULDBLOCK'`
+
+CircuitPython 10.3.1 does not expose `errno.EWOULDBLOCK`.
+
+The socket error handler was corrected to check `errno.EAGAIN`, matching the previously working XML v1 implementation.
+
+After this correction, the application started and served the browser interface successfully.
+
+**Result: PASS after compatibility correction**
+
+### 3. JSON v2 Browser Rendering
+
+Verified that the browser retrieved and displayed the JSON v2 configuration through `GET /api/config`.
+
+| Test | Result |
+|---|---|
+| Application starts with JSON v2 | PASS |
+| HTTP server listens on port 9090 | PASS |
+| Browser loads configuration | PASS |
+| Three fixed rooms displayed | PASS |
+| Room names displayed correctly | PASS |
+| TV, AVR, and streaming IP fields displayed | PASS |
+| Expandable fundamental-action sections displayed | PASS |
+| Room 1 fundamental-action editors expanded | PASS |
+| Target, Method, and Path controls rendered | PASS |
+| SERVICE mode disables saving | PASS |
+| DEVICE mode enables saving | PASS |
+| Clock status displayed | PASS |
+
+The Room 1 editor displayed all 14 fundamental actions.
+
+The initial action assignments were also displayed correctly, including AVR targets for volume and mute, streaming targets for navigation and playback, and TV as the power-toggle target.
+
+Blank device IP addresses and action paths remained valid in the browser interface.
+
+**Result: PASS**
+
+### 4. Disposable Configuration Isolation
+
+To avoid modifying the production JSON configuration during initial browser persistence testing, the Pico's local `main.py` was temporarily changed to load:
+
+`/clonker/test_config_v2.json`
+
+This was a local hardware-testing change only, not a permanent GitHub change.
+
+After restarting the application, the browser displayed:
+
+`ROOM-1 — Den Test 2`
+
+This matched the existing disposable configuration rather than the production configuration, whose Room 1 name was `Den`.
+
+The test confirmed that the browser was reading the intended disposable configuration.
+
+**Result: PASS**
+
+### 5. Browser-to-Flash Save
+
+With the Pico in DEVICE mode and its filesystem writable, changed the Room 1 name in the browser:
+
+`Den Test 2` → `Den Test 3`
+
+Left all other configuration fields unchanged.
+
+Clicked **Save Configuration**.
+
+The browser displayed:
+
+`Configuration saved successfully.`
+
+The browser also completed its post-save configuration refresh.
+
+**Result: PASS**
+
+### 6. Flash Persistence and Backup Verification
+
+Inspected the disposable configuration files directly through the CircuitPython REPL.
+
+Observed:
+
+| File | Room 1 name |
+|---|---|
+| `test_config_v2.json` | Den Test 3 |
+| `test_config_v2.json.bak` | Den Test 2 |
+
+This verified that the browser save installed the new primary configuration and preserved the previous configuration in the backup.
+
+**Result: PASS**
+
+### 7. Configuration Reload and Revision
+
+Entering the REPL restarted the Python runtime, clearing the configuration engine's in-memory state.
+
+An initial call to `cfg.current()` therefore reported:
+
+`RuntimeError: Configuration not loaded`
+
+This was not a persistence failure.
+
+Explicitly loaded the disposable configuration again:
+
+`cfg.load("/clonker/test_config_v2.json")`
+
+Observed:
+
+- **Loaded Room 1:** `Den Test 3`
+- **Revision:** `9f3890e8`
+
+The saved configuration successfully reloaded into RAM with a valid revision.
+
+**Result: PASS**
+
+### 8. Production Configuration Protection
+
+All browser persistence writes in this test were directed to the disposable configuration file through the temporary `main.py` configuration path.
+
+No intentional browser save was performed against the production JSON configuration.
+
+The original XML v1 configuration files were not modified as part of this test.
+
+The temporary configuration-path override must be removed after testing to restore normal production operation.
+
+### 9. Not Yet Verified
+
+The following remain outside this browser integration milestone:
+
+- Browser rejection of stale configuration revisions.
+- Browser no-change save behavior.
+- Browser handling of invalid configuration values.
+- Browser recovery after a failed or interrupted save.
+- Browser save rejection in SERVICE/read-only mode beyond the disabled-button behavior.
+- Browser editing and saving of nonempty HTTP action paths.
+- Browser editing and saving of device IP addresses.
+- Browser clock synchronization after the JSON v2 integration.
+- Complete inspection of all action editors in Rooms 2 and 3.
+- Full power-cycle persistence test after browser saving.
+- Final production-path restoration and verification.
+- Physical control dispatch of configured HTTP actions.
+
+These items should be tested separately rather than assumed to work from the successful basic save.
+
+### 10. Conclusion
+
+The Clonker 10000 successfully completed its first end-to-end JSON v2 browser configuration persistence test on actual Raspberry Pi Pico 2 W hardware.
+
+The verified path was:
+
+**Browser → HTTP server → JSON v2 validation and persistence → Pico flash → backup → reload into RAM**
+
+The disposable primary and backup contained the expected configuration generations, and the reloaded configuration produced a valid revision.
+
+**Milestone: JSON v2 browser integration and basic flash persistence verified.**
+
+**CLONK! The monster remembers.**
