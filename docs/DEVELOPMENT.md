@@ -22,17 +22,43 @@ A Ctrl+D reload is **not** a substitute for power cycling when switching filesys
 
 ## Current testing checkpoint
 
-**Verified on Pico — October 16, 2026:** Configuration v1 XML loading, browser editing, persistent saves, no-change detection, backup rotation, active-memory updates, and persistence after soft reboot.
+**Active baseline — October 16, 2026:** Raspberry Pi Pico 2 W,
+CircuitPython 10.3.1, with JSON v2 configuration loaded from
+`/clonker/device_config.json`.
 
-The original Den configuration was restored after testing.
+**Verified on Pico:** JSON v2 configuration loading and validation,
+canonical serialization and revision behavior, disposable-file
+persistence tests, backup rotation, fallback from damaged or missing
+primary files, browser configuration loading and editing, successful
+DEVICE-mode browser saves, no-change detection, SERVICE-mode
+read-only browser behavior, and stale-revision conflict rejection
+using two browser tabs.
 
-**Implemented; additional testing pending:** Stale revision rejection, malformed configuration rejection through HTTP, read-only filesystem save protection, and recovery from interrupted writes.
+The browser and firmware are now integrated with JSON v2.
+The XML v1 implementation remains in the repository as a rollback
+reference, but the active firmware does not use it.
 
-**Next development milestone:** Implement and test the JSON v2 configuration engine while preserving the working XML v1 firmware as a rollback point. Validate the JSON schema and serialization before integrating persistence and browser editing.
+**Partially verified:** Persistence and recovery safeguards have
+passed selected on-device tests, but not every possible failure
+scenario has been exercised.
 
-The JSON v2 fixture is committed at `firmware/clonker/device_config.json`, but the running firmware does not yet consume it.
+**Not yet tested or not fully verified:** Interrupted writes and
+power-loss recovery, comprehensive malformed HTTP request handling,
+some HTTP-level read-only rejection cases, and complete cold
+power-cycle persistence verification.
 
-See [Configuration & Recovery](CONFIGURATION.md) and [Configuration Test Record](configuration-testing.md).
+**Production-path checkpoint:** The temporary configuration test
+override was removed, and the production JSON configuration path
+was restored. The final quick check confirmed the Den room was
+visible. Do not treat this as proof that all remaining persistence
+tests have passed.
+
+**Next development milestone:** Agree on the physical control and
+device-command architecture, then implement and test it incrementally.
+Keep JSON v2 configuration and persistence as the working baseline.
+
+See [Configuration & Recovery](CONFIGURATION.md) and
+[Configuration Test Record](configuration-testing.md).
 
 ## Status language
 

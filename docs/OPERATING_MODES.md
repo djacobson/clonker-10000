@@ -14,11 +14,10 @@ The two mode dimensions are independent. **SERVICE (USB) / DEVICE** decides who 
 
 ## SERVICE (USB) mode — jumper open
 
-- GP17 pulled HIGH internally; boot message should read `CLONKER BOOT: SERVICE (USB) mode (jumper OPEN)` **after the planned string update**.
+- GP17 is pulled HIGH internally; the current `boot.py` prints `CLONKER BOOT: SERVICE (USB) mode (jumper OPEN)`
 - Host Windows can write to `CIRCUITPY` for firmware deployment.
 - CircuitPython application filesystem is read-only; configuration POST is rejected with HTTP **403**.
 - USB serial REPL remains available.
-- **Current source still prints `USB mode`**; see terminology audit. The proposed name is a documentation convention until code strings are changed.
 
 ## DEVICE mode — jumper grounded
 
@@ -40,22 +39,28 @@ When the simulated or future physical switch returns false, `main.py` calls `web
 
 Persistent configuration saves require a writable filesystem and a valid submitted configuration.
 
-In the current v1 implementation:
+In the active JSON v2 implementation:
 
 - DEVICE mode permits firmware filesystem writes.
 - SERVICE (USB) mode rejects configuration saves with HTTP 403.
 - CONFIG mode enables the browser management service.
 - RUN mode disables the browser management service.
+- JSON v2 browser saves, backup rotation, no-change detection, and
+  stale-revision handling have passed initial on-device tests.
 
-Configuration v1 browser saves have been successfully tested on the Pico, including backup rotation and persistence after reboot.
+The intended operational combination for browser configuration
+saves is **DEVICE + CONFIG**.
 
-The intended operational combination for browser configuration saves is DEVICE + CONFIG.
+The CONFIG/RUN switch is an internal application control. Moving it
+does not send an HTTP request to any television, receiver, or
+streaming device.
 
-The CONFIG/RUN switch is an internal application control. Moving it does not send an HTTP request to any television, receiver, or streaming device.
+The separate `power-toggle` fundamental action is reserved for
+controlling external equipment through its configured command.
+Actual device-command execution has not yet been implemented.
 
-The separate `power-toggle` fundamental command controls external equipment through its configured HTTP action.
-
-Configuration v2 will preserve this operating-mode separation.
+The physical CONFIG/RUN switch has not yet been installed or tested;
+the current runtime mode is simulated.
 
 ## Boot / deployment cautions
 

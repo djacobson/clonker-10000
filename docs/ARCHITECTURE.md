@@ -31,7 +31,14 @@ Separate low-priority service:
   CONFIG mode -> HTTP :9090 -> clock + room editor
 ```
 
-**State ownership:** Physical selectors and maintained switches are read from GPIO; room names, device endpoints, and action mappings come from persistent configuration. Configuration v1 uses XML and is operational. Configuration v2 uses JSON and is the next implementation milestone. Actual AV state belongs to the controlled devices; debounce, queues, and clock reference live in RAM. Do not write flash for switch changes or idle status.
+**State ownership:** Physical selectors and maintained switches will be
+read from GPIO; room names, device endpoints, and action mappings come
+from persistent JSON v2 configuration. The active firmware loads
+`/clonker/device_config.json` through `device_config_v2.py`.
+The previous XML v1 engine remains available as a rollback reference.
+Actual AV state belongs to the controlled devices; debounce, queues,
+and clock reference live in RAM. Do not write flash for switch changes
+or idle status.
 
 ## Two independent mode dimensions
 
@@ -43,15 +50,31 @@ See [Operating Modes](OPERATING_MODES.md) and [Development & Deployment](DEVELOP
 
 ## Implemented vs planned
 
-**Verified on Pico (configuration v1):** Wi-Fi connectivity, serial REPL, GP17 filesystem ownership modes, three-room XML loading, browser clock synchronization, HTTP management server on port 9090, browser configuration editing, persistent XML saves, no-change detection, backup rotation, active-memory updates, and persistence across soft reboot.
+**Verified on Pico:** Wi-Fi connectivity, serial REPL, GP17 filesystem
+ownership modes, JSON v2 three-room loading, browser clock
+synchronization, HTTP management server on port 9090, browser
+configuration editing, persistent JSON saves, no-change detection,
+backup rotation, and stale-revision conflict rejection.
 
-**Implemented; additional defensive testing pending:** Revision-conflict rejection, malformed configuration rejection through HTTP, read-only filesystem save protection, and interrupted-write recovery under simulated failures. Power-loss durability is not guaranteed.
+**Implemented and partially verified:** Strict JSON v2 validation,
+revision-protected persistence, detection of out-of-band configuration
+changes, verified temporary writes, and startup fallback to validated
+backups. The on-device test record documents which cases have been
+exercised successfully and which remain untested.
 
-**Designed and committed, not operational:** Configuration v2 JSON schema with three fixed rooms, three device endpoints per room, fourteen fundamental actions per room, and reserved user-defined actions. The JSON configuration file is in GitHub; the running firmware still uses XML.
+**Additional testing pending:** Interrupted-write and power-loss
+scenarios, comprehensive malformed HTTP requests, complete power-cycle
+persistence verification, and remaining HTTP-level error cases.
+Power-loss durability is not guaranteed.
 
-**Not yet implemented:** JSON v2 firmware and browser integration, physical CONFIG switch, room selector GPIO, encoder/button events, action dispatcher, real AV network commands, OLED, audio, and battery management.
+**Active configuration:** JSON v2 with three fixed rooms, three device
+endpoints per room, fourteen fundamental actions per room, and an empty
+reserved `custom_actions` array. The browser and firmware both use
+JSON v2. The XML v1 implementation is retained for rollback.
 
-Fundamental commands have fixed identities but configurable HTTP targets, methods, and paths. Blank paths or unconfigured device endpoints are valid and result in no action. The physical CONFIG/RUN switch changes Clonker's internal operating mode; it is not an HTTP command.
+**Not yet implemented:** Physical CONFIG/RUN switch, room selector
+GPIO, encoder/button event capture, action dispatcher, real AV network
+commands, OLED functionality, audio feedback, and battery management.
 
 ## Current firmware map
 
@@ -62,7 +85,8 @@ Fundamental commands have fixed identities but configurable HTTP targets, method
 | `firmware/clonker/main.py` | Loads config, starts/stops web service, cooperative loop |
 | `firmware/clonker/controls/switches.py` | Simulated CONFIG switch; GPIO path future |
 | `firmware/clonker/controls/pins.py` | Switch pin configuration |
-| `firmware/clonker/device_config.py` | XML parser, validator, serializer, revision, backup helpers |
+| `firmware/clonker/device_config_v2.py` | Active JSON v2 validation, serialization, revision protection, persistence, and backup recovery |
+| `firmware/clonker/device_config.py` | Retained XML v1 configuration engine for rollback |
 | `firmware/clonker/web.py` | Bounded cooperative HTTP service, port 9090 |
 | `firmware/clonker/www/index.html` | Browser clock/config editor |
 | `firmware/clonker/clock.py` | Monotonic and browser-synchronized clock |
@@ -76,8 +100,8 @@ Wi-Fi management is trusted-LAN-only, not authenticated application security. Do
 
 ## Reference documents
 
-- [Operating Modes](OPERATING_MODES.md) — SERVICE (USB), DEVICE, CONFIG, RUN 
-- [Configuration & Recovery](CONFIGURATION.md) — operational XML v1, planned JSON v2, command model, validation, and backup safety
+- [Operating Modes](OPERATING_MODES.md) — SERVICE (USB), DEVICE, CONFIG, RUN
+- [Configuration & Recovery](CONFIGURATION.md) — active JSON v2 configuration, legacy XML v1, command model, validation, and backup safety 
 - [Firmware & Network](FIRMWARE_NETWORK.md) — cooperative loop, HTTP, clock, logging
 - [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and action model
 - [Development & Deployment](DEVELOPMENT.md) — iPad/Windows/Pico workflow and test plan

@@ -2,20 +2,33 @@
 
 **Design reference:** October 16, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
-**Runtime:** CircuitPython 10.3.1  
-**Status:** Configuration v1 operational; Configuration v2 JSON design approved, implementation pending.
+**Runtime:** CircuitPython 10.3.1 
+**Status:** JSON v2 operational in firmware and browser; initial on-device tests passed; additional failure testing pending. XML v1 retained for rollback.
 
 ## 1. Overview
 
-The Clonker 10000 uses a persistent configuration file to define rooms, devices, and remote-control actions.
+The Clonker 10000 uses a persistent configuration file to define
+rooms, device endpoints, and remote-control actions.
 
-Configuration v1 uses XML and has been successfully tested on real hardware.
+**JSON v2 is the active configuration format.** The firmware loads
+`/clonker/device_config.json` through
+`firmware/clonker/device_config_v2.py`. The browser configuration
+editor and management HTTP endpoints also use JSON v2.
 
-Configuration v2 will use JSON to simplify CircuitPython parsing, validation, serialization, and browser integration.
+The previous XML v1 implementation remains in the repository as a
+rollback reference. The XML configuration engine is not used by the
+active firmware or browser configuration endpoints.
 
-The transition to JSON is primarily an architectural simplification, not a storage optimization.
+The transition to JSON was primarily an architectural simplification,
+not a storage optimization.
 
-The existing revision checking, verified writes, backup rotation, and recovery protections must be preserved.
+JSON v2 preserves revision checking, validated configuration data,
+verified writes, backup rotation, and startup recovery safeguards.
+Initial on-device tests have passed, but the complete failure and
+power-loss test matrix is not finished.
+
+See [Configuration Test Record](configuration-testing.md) for
+observed test results.
 
 ## 2. Configuration v1 — Verified Implementation
 
@@ -588,6 +601,132 @@ The initial Configuration v2 milestone establishes the configuration data model,
 
 It does not implement the action dispatcher or device HTTP command execution.
 
+## Current JSON v2 Implementation Status — October 17, 2026
+
+This section records the implemented configuration baseline.
+Earlier sections preserve the design and implementation plan,
+including historical references to work that was pending when
+those sections were written.
+
+### Active Files
+
+| File | Purpose |
+|---|---|
+| `/clonker/device_config.json` | Active JSON v2 configuration on the Pico |
+| `firmware/clonker/device_config_v2.py` | Active JSON validator, serializer, revision, persistence, and recovery engine |
+| `firmware/clonker/web.py` | JSON v2 configuration HTTP endpoints |
+| `firmware/clonker/www/index.html` | Browser JSON v2 configuration editor |
+| `firmware/clonker/main.py` | Application startup and configuration loading |
+| `firmware/clonker/device_config.py` | Legacy XML v1 engine retained for rollback |
+
+### Implemented Configuration Model
+
+- Schema version `2`.
+- Exactly three rooms: `room-1`, `room-2`, and `room-3`.
+- Editable room names, maximum 40 characters.
+- Three optional IPv4 endpoints per room: `tv`, `avr`, and `streaming`.
+- Fourteen fixed fundamental actions per room.
+- Configurable action target, HTTP method (`GET` or `POST`),
+  and command path.
+- Maximum command path length of 512 characters.
+- Empty IP addresses and command paths are valid.
+- `custom_actions` is reserved and must remain an empty array.
+- Maximum JSON configuration size of 8,192 UTF-8 bytes.
+
+The initial production configuration includes a Den room, a
+Sunroom, and a third room placeholder. Device addresses and
+command paths may remain blank until device-command execution
+is implemented.
+
+### Validation and Serialization
+
+The active engine validates the complete configuration structure,
+including required and unknown fields, room identities, device
+addresses, fundamental action identities, action properties,
+and supported value types.
+
+It creates a consistently ordered configuration representation
+and compact JSON serialization. Revisions are calculated using
+a deterministic 32-bit FNV-1a hash of canonical serialized data.
+
+The browser receives the revision separately from the persisted
+configuration. Browser-only metadata is not stored in the JSON file.
+
+Standard JSON parsing is used. A custom duplicate-object-key
+parser has not been implemented.
+
+### Persistence and Recovery
+
+The active JSON v2 engine implements:
+
+1. Validation before persistence.
+2. Expected-revision checking.
+3. Verification that the primary file has not changed outside
+   the active configuration engine.
+4. Binding of saves to the configuration path selected by load.
+5. No-change detection to avoid unnecessary flash writes.
+6. Temporary-file writing, flushing, and read-back verification.
+7. Rotation of `.bak` and `.bak.old` backups.
+8. Installation and verification of the new primary file.
+9. Publication of successfully saved configuration into memory.
+10. Startup fallback to validated backups when the primary
+    cannot be loaded.
+
+Loading a backup does not silently overwrite or repair the
+primary configuration.
+
+The multi-file rename sequence is not fully atomic. These
+protections reduce risk but do not guarantee durability through
+an unexpected power interruption.
+
+### Browser and HTTP Integration
+
+The active browser provides room, device, and fundamental-action
+editing through the management server on port 9090.
+
+`GET /api/config` returns the current JSON v2 configuration,
+revision, and filesystem writable status.
+
+`POST /api/config` validates and attempts to save the submitted
+JSON v2 configuration. The endpoint rejects writes when the
+filesystem is read-only.
+
+The HTTP implementation uses a 10,240-byte total request limit,
+a 2,048-byte header limit, and 512-byte I/O chunks.
+
+### Verification Status
+
+**PASS — observed on Pico:** Initial JSON v2 loading and
+validation tests, disposable-file save and backup tests, browser
+configuration loading, DEVICE-mode browser saves, no-change
+handling, and stale-revision rejection using two browser tabs.
+
+**PASS — selected recovery tests:** Fallback from corrupted or
+missing primary configuration files without automatic primary
+repair.
+
+**PARTIALLY VERIFIED:** Overall persistence and recovery
+resilience. Selected tests have passed, but the complete
+failure matrix has not been exercised.
+
+**NOT TESTED or not fully verified:** Unexpected power loss during
+writes, comprehensive malformed HTTP requests, remaining HTTP
+error cases, and complete cold power-cycle persistence testing.
+
+These status labels describe observations, not merely intended
+behavior. See the detailed
+[Configuration Test Record](configuration-testing.md).
+
+### Next Development Boundary
+
+The JSON v2 configuration system is the current working
+foundation. Actual physical input handling, action dispatch,
+and HTTP commands to AV equipment remain separate future
+milestones.
+
+The existence of a configured action does not mean that the
+action can already be executed against a device.
+
 ## 14. Design Principles
 
 **Clonker controls actions, not brands.**
@@ -604,4 +743,4 @@ Configuration data must be strictly validated before persistence.
 
 Proven recovery protections must be retained throughout development.
 
-**Configuration v1 remains the operational baseline until Configuration v2 has been implemented and successfully tested.**
+**JSON v2 is the active operational configuration baseline. XML v1 is retained for rollback. Additional persistence and failure testing remains outstanding.**

@@ -61,14 +61,41 @@ Volume (ofc), Power ON / OFF, Navigation arrows and Select, and some audio / vid
 
 ## Project Status
 
-### Configuration System — v1 Operational ✅
+### Configuration System — JSON v2 Operational ✅
 
-The Clonker 10000’s browser-based XML configuration system has passed
-its initial hardware tests on the Raspberry Pi Pico 2 W.
+The Clonker 10000 now runs its JSON v2 configuration system on the
+Raspberry Pi Pico 2 W with CircuitPython 10.3.1.
 
-Features verified include browser saving, no-change detection,
-two-generation backups, and persistence across reboot.
+The configuration system provides:
+
+- Three fixed rooms, each with an editable name.
+- TV, AVR, and streaming-device IPv4 endpoints for each room.
+- Fourteen configurable fundamental actions per room.
+- Browser editing through the Clonker management interface on port 9090.
+- Validated JSON configuration loading and saving.
+- Revision checking and stale-edit protection.
+- No-change detection to avoid unnecessary flash writes.
+- Verified file writes and rotating configuration backups.
+- Startup fallback to validated backups without silently repairing the primary file.
+- Filesystem write protection in SERVICE (USB) mode.
+
+The JSON v2 configuration engine and browser interface have passed
+initial on-device tests, including successful saves, backup rotation,
+no-change detection, and stale-revision conflict handling.
+
+Additional failure-injection and persistence testing remains outstanding.
+See the test record for the distinction between verified and pending behavior.
+
+The previous XML v1 implementation remains in the repository as a
+rollback reference; JSON v2 is the active configuration format.
+
+**Next major milestone:** Connect the physical controls and action
+dispatcher to actual home theater device commands.
 
 📋 [Configuration Test Results](docs/configuration-testing.md)
 
+📐 [Architecture](docs/ARCHITECTURE.md)
+
 More awesome stuff to come…
+
+**CLONK!** ⚡🔩

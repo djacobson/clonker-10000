@@ -6,25 +6,52 @@
 
 Raspberry Pi Pico 2 W, CircuitPython 10.3.1, dedicated 2.4 GHz Wi-Fi SSID `jrtr`, reserved IP **192.168.50.12**, hostname configuration in `settings.toml`. The observed standalone connectivity test is encouraging but not a reliability guarantee.
 
-`code.py` starts `clonker.main.main()`. `main.py` loads XML, logs three rooms, then repeatedly checks the simulated CONFIG switch and services HTTP when enabled. Priority placeholders exist for GPIO, dispatcher, and timers; these are **not implemented control paths**.
+`code.py` starts `clonker.main.main()`. `main.py` loads the active
+JSON v2 configuration from `/clonker/device_config.json`, logs the
+three rooms and their device endpoints, then repeatedly checks the
+simulated CONFIG switch and services HTTP when enabled.
+
+Priority placeholders exist for GPIO, dispatcher, and timers; these
+are **not yet implemented control paths**.
 
 ## Management HTTP server
 
 Application server: **`http://192.168.50.12:9090/`** on trusted LAN. CircuitPython Web Workflow (port 80) is **disabled** with `CIRCUITPY_WEB_API_PORT = 0` due to suspected socket conflicts. Do not expose management port through router port forwarding.
 
-`web.py` uses `wifi`, `socketpool`, and `json`, with one client at a time, nonblocking socket attempts, bounded request buffer (**2048 bytes**), I/O chunk (**512 bytes**), and idle client timeout (**4 seconds**). `main.py` schedules web polls at **0.01 seconds** when CONFIG is active. These settings are implementation facts, **not latency guarantees**.
+`web.py` uses `wifi`, `socketpool`, and `json`, with one client at a
+time, nonblocking socket operations, a bounded total request buffer
+(**10,240 bytes**), a maximum HTTP header size (**2,048 bytes**),
+an I/O chunk size (**512 bytes**), and an idle client timeout
+(**4 seconds**). Configuration POST bodies are separately limited
+relative to the JSON v2 configuration maximum of **8,192 bytes**.
+
+`main.py` schedules web polls approximately every **0.01 seconds**
+when CONFIG is active. These settings are implementation facts,
+**not latency guarantees**.
+
+CircuitPython's `errno.EAGAIN` is used for nonblocking socket
+operations; `errno.EWOULDBLOCK` is not available in the tested runtime.
 
 | Route | Current behavior |
 |---|---|
-| `GET /` | HTML/JS UI from `/clonker/www/index.html` |
+| `GET /` | HTML/JavaScript UI from `/clonker/www/index.html` |
 | `GET /api/clock` | Clock source and timestamp JSON |
 | `POST /api/clock?utc=...` | Browser UTC synchronization, RAM only |
-| `GET /api/config` | Current rooms, revision, filesystem writable flag |
-| `POST /api/config` | DEVICE: validate and persist XML v1 configuration; SERVICE (USB): HTTP 403 |
+| `GET /api/config` | Active JSON v2 configuration, revision, and filesystem writable flag |
+| `POST /api/config` | DEVICE: validate and persist JSON v2 configuration; SERVICE (USB): HTTP 403 |
 
-Configuration v1 browser saving has been verified on the Pico. The backend checks filesystem writability, validates submitted configuration, checks the expected revision, and uses verified file replacement with backups.
+JSON v2 browser loading, editing, saving, no-change detection, and
+stale-revision conflict handling have been tested on the Pico.
+The backend checks filesystem writability, validates the submitted
+configuration, checks its expected revision and the active configuration
+file path, detects out-of-band disk changes, and performs verified
+replacement with rotating backups.
 
-Configuration v2 will use JSON with three fixed rooms and fourteen fundamental commands per room. The current 2048-byte HTTP request limit must be increased before v2 browser integration.
+The JSON v2 browser integration and expanded HTTP request limits are
+implemented. Additional malformed-request and power-interruption
+testing remains pending. The older XML v1 configuration engine remains
+in the repository for rollback but is not used by the active HTTP
+configuration endpoints.
 
 The management server is a configuration service, not the eventual device-command dispatcher. The CONFIG/RUN switch enables or disables that service internally and does not issue an HTTP action.
 
