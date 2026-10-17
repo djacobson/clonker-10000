@@ -2,7 +2,7 @@
 
 **Design reference:** October 16, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
-**Runtime:** CircuitPython 10.3.1 
+**Runtime:** CircuitPython 10.3.1  
 **Status:** JSON v2 operational in firmware and browser; initial on-device tests passed; additional failure testing pending. XML v1 retained for rollback.
 
 ## 1. Overview
@@ -459,7 +459,7 @@ These include:
 
 The HTTP request limit remains independently configurable in `web.py`.
 
-The current `MAX_REQUEST_BYTES = 2048` is insufficient for the proposed full three-room configuration and must be increased based on measured request sizes.
+The active JSON v2 HTTP server uses `MAX_REQUEST_BYTES = 10240`, with a separate maximum header size of 2,048 bytes. These limits accommodate the JSON v2 configuration editor while bounding incoming requests.
 
 Incoming requests must be bounded before parsing.
 
