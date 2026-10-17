@@ -106,3 +106,208 @@ Wi-Fi management is trusted-LAN-only, not authenticated application security. Do
 - [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and action model
 - [Development & Deployment](DEVELOPMENT.md) — iPad/Windows/Pico workflow and test plan
 - [Terminology Audit](TERMINOLOGY_AUDIT.md) — existing USB-mode references to update
+
+---
+
+### CONFIG/RUN Development and Testing
+
+The JSON v2 browser editor will be used to configure real
+device IP addresses and HTTP commands before action testing.
+
+Initial action testing should run with CONFIG mode disabled
+to eliminate the management HTTP listener and its polling
+overhead.
+
+RUN mode must retain the loaded JSON v2 configuration and
+support outbound device commands without the management
+HTTP server running.
+
+The CONFIG/RUN switch is currently simulated in firmware.
+A temporary development mechanism may be used to select
+RUN mode until the physical switch is implemented.
+
+Initial testing should verify:
+
+- JSON v2 configuration survives the CONFIG-to-RUN transition.
+- Outbound HTTP commands work with CONFIG mode disabled.
+- Management HTTP polling stops in RUN mode.
+- Wi-Fi remains available for outbound commands.
+- Physical input responsiveness is evaluated without
+  management HTTP polling overhead.
+
+Later, CONFIG-enabled and RUN-only responsiveness may be
+compared if useful.
+
+### Design Evolution
+
+This section records the initial V1 implementation strategy,
+not a permanent architectural requirement.
+
+As hardware testing reveals actual behavior, the design
+may be revised, simplified, or completely replaced.
+
+Git history preserves earlier decisions; current documentation
+should describe the best-known design rather than retain
+obsolete implementation assumptions.
+
+## Action Dispatch and Outbound HTTP — V1 Design Decisions
+
+**Design agreed:** October 17, 2026  
+**Status:** APPROVED DESIGN — NOT YET IMPLEMENTED
+
+### Guiding Principle
+
+Implement the simplest reliable action execution path first.
+
+Do not introduce event accumulation, acceleration, sophisticated
+queueing, persistent TCP connections, or other optimizations
+until actual hardware testing demonstrates a need.
+
+The initial goal is to make physical controls operate real AV
+devices through the existing JSON v2 configuration system.
+
+### Basic Action Pipeline
+
+All physical controls will generate generic action events.
+
+The action execution path is:
+
+1. Physical control generates an event.
+2. Event identifies a generic action.
+3. Dispatcher resolves the selected room.
+4. Dispatcher looks up the action in JSON v2 configuration.
+5. Outbound transport sends the configured HTTP command.
+6. Transport releases the request's network resources.
+7. Main loop continues processing controls.
+
+The physical control modules must not know device IP addresses,
+HTTP methods, URL paths, or device-specific protocols.
+
+Those details belong to configuration, dispatch, and transport.
+
+### Shared Network Resources
+
+The outbound HTTP implementation should use shared networking
+resources rather than independently initializing networking
+for every action.
+
+Initial design:
+
+- Wi-Fi connectivity is initialized and managed centrally.
+- A socket pool is created once and reused while valid.
+- Action execution uses a common outbound transport module.
+- Each HTTP request may open and close its own TCP connection.
+- Persistent TCP connection caching is NOT required for V1.
+- Failed requests must release resources.
+- Network operations must have bounded timeouts.
+- Subsequent actions should remain possible after failures.
+
+The existing `web.py` is an inbound HTTP management server.
+Outbound AV commands are a separate responsibility.
+
+These components may share the Wi-Fi radio but should not
+share active client-connection state.
+
+### Buttons and Encoders
+
+For the initial implementation, all controls use the same
+basic action execution mechanism.
+
+Examples:
+
+- Button press -> `select`
+- Button press -> `mute-toggle`
+- Button press -> `home`
+- Volume encoder clockwise detent -> `volume-up`
+- Volume encoder counterclockwise detent -> `volume-down`
+
+Each generated action initially results in one configured
+HTTP request.
+
+Volume events do not receive special treatment in V1.
+
+This deliberately allows the volume encoder implementation
+to be replaced or optimized later without changing the
+basic HTTP transport or JSON v2 action mappings.
+
+### Volume Encoder — Initial Behavior
+
+The Grayhill volume encoder is a relative control, not an
+absolute positional volume control.
+
+For V1:
+
+- One recognized detent generates one volume action.
+- No accumulation of pending volume movement.
+- No acceleration based on rotation speed.
+- No command batching.
+- No persistent TCP connection optimization.
+- No special volume retry or replay mechanism.
+- No separate volume-specific networking implementation.
+
+The first goal is to observe real responsiveness and
+behavior when controlling the Denon receiver.
+
+A small amount of lag during network trouble is acceptable.
+
+If network communication fails, failed volume commands
+do not need to be replayed after connectivity returns.
+The next physical movement can generate fresh actions.
+
+The controlled receiver remains the authority for
+its actual volume level.
+
+### Future Optimization — Only If Needed
+
+Potential future improvements include:
+
+- Small bounded event queues.
+- Encoder movement accumulation.
+- Rotation-speed-based volume acceleration.
+- Command batching where supported by a device.
+- Outbound HTTP connection reuse.
+- Improved scheduling under network congestion.
+
+Accumulation and acceleration are separate concepts and
+do not have to be implemented together.
+
+These are possibilities, not V1 requirements.
+
+Do not add complexity without observing an actual problem
+or identifying a clear user-experience improvement.
+
+### Implementation Order
+
+1. Implement one manually triggered JSON v2 action.
+2. Verify one real HTTP command reaches the Denon AVR.
+3. Establish shared outbound networking infrastructure.
+4. Implement a physical pushbutton action.
+5. Implement basic button debounce.
+6. Implement the Grayhill volume encoder using repeated
+   ordinary `volume-up` and `volume-down` actions.
+7. Observe rapid rotation, latency, and error behavior.
+8. Consider optimizations only after testing.
+
+### Architectural Boundary
+
+Keep these responsibilities separate:
+
+- `controls/` — read physical inputs and generate events.
+- Dispatcher — resolve room and configured action.
+- Outbound transport — perform HTTP requests and handle
+  networking resources and errors.
+- `device_config_v2.py` — configuration validation,
+  persistence, and action mappings.
+- `web.py` — inbound CONFIG-mode HTTP management.
+
+Module names and exact interfaces for the dispatcher and
+outbound transport remain to be determined during
+implementation.
+
+Avoid unnecessary frameworks, class hierarchies, and
+general-purpose abstractions.
+
+**V1 rule: One control event, one generic action,
+one configured HTTP request.**
+
+CLONK!
