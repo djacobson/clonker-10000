@@ -483,3 +483,103 @@ The disposable primary and backup contained the expected configuration generatio
 **Milestone: JSON v2 browser integration and basic flash persistence verified.**
 
 **CLONK! The monster remembers.**
+
+---
+
+## JSON v2 Browser Defensive Tests — October 16, 2026
+
+### Test Environment
+
+- Hardware: Raspberry Pi Pico 2 W
+- Firmware: CircuitPython 10.3.1
+- Configuration engine: `device_config_v2.py`
+- Browser interface: `www/index.html`
+- HTTP server: `web.py`, port 9090
+- Filesystem: DEVICE mode, writable by CircuitPython
+- Configuration file: `/clonker/test_config_v2.json`
+
+The firmware was temporarily configured to load the disposable test configuration instead of the production JSON file.
+
+No intentional writes were made to the production configuration.
+
+### 1. Browser Stale-Revision Protection
+
+**Result: PASS**
+
+Procedure:
+
+1. Opened two browser tabs connected to the Clonker configuration interface.
+2. Loaded the same configuration in both tabs while the Pico was in DEVICE mode.
+3. In Tab 1, changed Room 1 to `Den Test 5`.
+4. Saved successfully.
+5. In Tab 2, retained the older configuration revision.
+6. Changed Room 1 to `Den Test STALE`.
+7. Attempted to save without refreshing Tab 2.
+
+Observed response:
+
+`Save failed: Configuration revision mismatch`
+
+The browser correctly reported the rejected save.
+
+After refreshing Tab 2, Room 1 displayed `Den Test 5`, confirming that the newer saved configuration survived the stale-save attempt.
+
+**Conclusion:** Browser revision protection successfully prevents an outdated browser tab from overwriting a newer configuration through the normal save operation.
+
+### 2. Browser No-Change Save
+
+**Result: PASS — browser behavior**
+
+Procedure:
+
+1. Refreshed the browser to load the current disposable configuration.
+2. Confirmed DEVICE mode allowed configuration saving.
+3. Made no configuration changes.
+4. Clicked `Save Configuration`.
+
+Observed response:
+
+`No changes to save.`
+
+The browser correctly recognized the unchanged configuration.
+
+The JSON v2 persistence engine is designed to return `False` before backup rotation when the serialized configuration is unchanged.
+
+Backup-file contents were not independently inspected after this particular browser test.
+
+**Conclusion:** The browser correctly handles a no-change save without reporting a new configuration write.
+
+### 3. Error Message Improvement
+
+Following the stale-revision test, the configuration engine's revision-mismatch error was updated to provide more useful instructions:
+
+`Configuration revision mismatch. Changes not saved. Refresh page.`
+
+The improved text was confirmed in the GitHub source.
+
+The revised message has not yet been independently verified through another stale-save browser test.
+
+### 4. Remaining Tests
+
+The following tests remain pending:
+
+- Invalid configuration rejection through the browser.
+- Verification of backup preservation after a no-change save.
+- HTTP-level rejection of saves in SERVICE mode.
+- Editing and saving device IP addresses.
+- Editing and saving nonempty HTTP action paths.
+- Browser clock synchronization.
+- Full power-cycle persistence verification.
+- Final restoration and verification of the production configuration path.
+- Physical control dispatch of configured HTTP actions.
+
+### Conclusion
+
+The Clonker 10000 successfully passed two additional defensive browser tests:
+
+- Stale-revision rejection with preservation of the newer configuration.
+- Correct browser handling of an unchanged configuration.
+
+These results extend the previously verified JSON v2 persistence and backup tests.
+
+**CLONK! The monster refuses stale instructions and unnecessary saves.**
