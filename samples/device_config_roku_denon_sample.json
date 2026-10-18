@@ -84,9 +84,9 @@
     "room-2": {
       "actions": {
         "back": {
-          "path": "",
+          "path": "/keypress/Back",
           "target": "streaming",
-          "method": "GET"
+          "method": "POST"
         },
         "mute-toggle": {
           "path": "",
@@ -99,9 +99,9 @@
           "method": "POST"
         },
         "home": {
-          "path": "",
+          "path": "/keypress/Home",
           "target": "streaming",
-          "method": "GET"
+          "method": "POST"
         },
         "select": {
           "path": "",
@@ -119,7 +119,7 @@
           "method": "GET"
         },
         "volume-down": {
-          "path": "",
+          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN",
           "target": "avr",
           "method": "GET"
         },
@@ -134,12 +134,12 @@
           "method": "GET"
         },
         "play-pause": {
-          "path": "/keypress/Home",
+          "path": "/keypress/Play",
           "target": "streaming",
           "method": "POST"
         },
         "volume-up": {
-          "path": "",
+          "path": "/goform/formiPhoneAppDirect.xml?MVUP",
           "target": "avr",
           "method": "GET"
         },
@@ -157,17 +157,17 @@
       "custom_actions": [],
       "name": "Sunroom",
       "devices": {
-        "avr": "192.168.50.40",
-        "streaming": "192.168.50.28",
+        "avr": "192.168.50.40:8080",
+        "streaming": "192.168.50.28:8060",
         "tv": ""
       }
     },
     "room-1": {
       "actions": {
         "back": {
-          "path": "",
+          "path": "/keypress/Back",
           "target": "streaming",
-          "method": "GET"
+          "method": "POST"
         },
         "mute-toggle": {
           "path": "",
@@ -200,7 +200,7 @@
           "method": "GET"
         },
         "volume-down": {
-          "path": "",
+          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN",
           "target": "avr",
           "method": "GET"
         },
@@ -215,12 +215,12 @@
           "method": "GET"
         },
         "play-pause": {
-          "path": "",
+          "path": "/keypress/Play",
           "target": "streaming",
-          "method": "GET"
+          "method": "POST"
         },
         "volume-up": {
-          "path": "",
+          "path": "/goform/formiPhoneAppDirect.xml?MVUP",
           "target": "avr",
           "method": "GET"
         },
@@ -238,12 +238,11 @@
       "custom_actions": [],
       "name": "Den",
       "devices": {
-        "avr": "192.168.50.44",
-        "streaming": "192.168.50.43",
+        "avr": "192.168.50.44:8080",
+        "streaming": "192.168.50.43:8060",
         "tv": ""
       }
     }
   },
   "version": 2
 }
- 
