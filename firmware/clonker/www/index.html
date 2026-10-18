@@ -105,6 +105,16 @@
             gap: 12px;
         }
 
+        .device-fields label {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .device-fields input {
+            margin-top: auto;
+        }
+
         .action-editor {
             margin: 8px 0;
             padding: 12px;
@@ -354,7 +364,7 @@
             for (const deviceId of DEVICE_IDS) {
                 const control = createField(
                     deviceFields,
-                    deviceId.toUpperCase() + " IP Address (:port optional)",
+                    deviceId.toUpperCase() + " Address",
                     room.devices[deviceId],
                     deviceId
                 );
