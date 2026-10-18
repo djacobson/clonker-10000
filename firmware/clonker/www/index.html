@@ -210,9 +210,10 @@
         <h2>Device Configuration -- JSON v2</h2>
 
         <p class="note">
-            Blank device IP addresses and action paths
-            are valid. An action with no path or no
-            target device IP does nothing.
+            Blank device addresses and action paths
+            are valid. Device addresses may be IPv4
+            or IPv4:port. An action with no path or
+            no target device address does nothing.
         </p>
 
         <div id="rooms-container">
@@ -312,7 +313,7 @@
     // Render the three fixed rooms from JSON v2.
     //
     // Each room contains its name, three optional
-    // device IP addresses, and fourteen fundamental
+    // device addresses, and fourteen fundamental
     // HTTP action definitions.
 
     function renderDeviceConfig(config) {
@@ -345,7 +346,7 @@
             );
 
 
-            // Optional device IP addresses.
+            // Optional device addresses.
 
             const deviceFields = document.createElement("div");
             deviceFields.className = "device-fields";
@@ -353,7 +354,7 @@
             for (const deviceId of DEVICE_IDS) {
                 const control = createField(
                     deviceFields,
-                    deviceId.toUpperCase() + " IP Address",
+                    deviceId.toUpperCase() + " IP Address (:port optional)",
                     room.devices[deviceId],
                     deviceId
                 );
@@ -545,7 +546,7 @@
             ).value.trim();
 
 
-            // Device IP addresses.
+            // Device addresses (IPv4 or IPv4:port).
 
             for (const deviceId of DEVICE_IDS) {
                 room.devices[deviceId] = section.querySelector(

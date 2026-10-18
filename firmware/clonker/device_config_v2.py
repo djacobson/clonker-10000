@@ -45,19 +45,39 @@ def _keys(obj, expected, location):
 
 
 def _ip(value, location):
-    """Accept an empty endpoint or a dotted IPv4 address."""
+    """Accept a blank endpoint, IPv4, or IPv4:port."""
     if not isinstance(value, str):
         raise ValueError("Invalid IP type: " + location)
+
     if value == "":
         return value
-    parts = value.split(".")
+
+    # A port is optional, but must be 1-65535 when supplied.
+    endpoint = value.split(":")
+    if len(endpoint) > 2:
+        raise ValueError("Invalid IP port: " + location)
+
+    address = endpoint[0]
+
+    if len(endpoint) == 2:
+        port = endpoint[1]
+
+        if (not port or
+                any(ch not in "0123456789" for ch in port) or
+                not 1 <= int(port) <= 65535):
+            raise ValueError("Invalid IP port: " + location)
+
+    # Preserve existing strict dotted-IPv4 validation.
+    parts = address.split(".")
     if len(parts) != 4:
         raise ValueError("Invalid IPv4: " + location)
+
     for part in parts:
         if (not part or len(part) > 3 or
                 any(ch not in "0123456789" for ch in part) or
                 int(part) > 255):
             raise ValueError("Invalid IPv4: " + location)
+
     return value
 
 
