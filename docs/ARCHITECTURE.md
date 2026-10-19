@@ -1,522 +1,333 @@
+
 # The Clonker 10000 — Architecture
 
-**Design reference · 15 October 2026**  
+**Design reference · updated 19 October 2026**  
 **Active target:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)
+**Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
+**Milestone:** Browser Test Remote and logging-only dispatcher tested; real outbound device control is next.
 
 > **Clonker controls actions, not brands. Controlled devices own their own state.**
 
 ## Mission
 
-A tactile, Wi-Fi-first home theater remote with real knobs, switches, satisfying buttons, and eventually an audible **CLONK!** Physical controls produce generic actions; room configuration and device adapters resolve those actions to commands. Controlled devices remain authoritative for their actual state.
-Clonker does not maintain a speculative model of equipment power, volume, or input status.
+The Clonker 10000 is a tactile, Wi-Fi-first home theater remote with physical knobs, switches, satisfying buttons, and eventually an audible **CLONK!** Its controls express generic actions; room configuration maps those actions to devices and commands. The design is intentionally small and understandable on a microcontroller.
 
-A narrow V1 exception exists for the two fundamental toggle
-actions: Clonker remembers the last successfully submitted
-ON/OFF command for each room and toggle action. This is command
-history, not an assertion about the device's actual state.
+The receiver, television, and streaming device remain authoritative for their actual state. Clonker must not invent an equipment-state model. One deliberately limited V1 feature is planned: **RAM history of the last successfully sent ON/OFF command** for each room's mute and power actions. That history is *not* a measurement of actual device state.
 
-**Priority:** responsive physical inputs → reliable device commands → maintained room selector → configuration interface → diagnostics/time → OLED and sound → battery optimization.
+**Design priority:** responsive physical controls → reliable device commands → maintained room selection → configuration interface → diagnostics/time → OLED and sound → battery optimization. The browser configuration interface was implemented early to establish and test the action model before hardware controls.
 
 ## Architecture at a glance
 
 ```text
-Physical inputs / room selector / CONFIG switch
-                  |
-          Generic input events        [PLANNED]
-                  |
-          Action dispatcher           [PLANNED]
-                  |
-      Room configuration / mappings
-                  |
-      Network device adapters         [PLANNED]
-                  |
-          Roku / Denon / LG / ...
+       BROWSER TEST REMOTE             PHYSICAL CONTROLS
+       [IMPLEMENTED / TESTED]               [PLANNED]
+                 |                              |
+                 v                              v
+          HTTP /api/action                GPIO EVENTS
+                 |                              |
+                 +--------------+---------------+
+                                |
+                                v
+                     GENERIC ROOM / ACTION
+                                |
+                                v
+                       actions.dispatch()
+                       [LOGGING STUB TESTED]
+                                |
+                                v
+                      JSON v2 CONFIGURATION
+                          [IMPLEMENTED]
+                                |
+                                v
+                      OUTBOUND HTTP TRANSPORT
+                            [PLANNED]
+                                |
+                                v
+                       DENON / ROKU / LG
 
-Separate low-priority service:
-  CONFIG mode -> HTTP :9090 -> clock + room editor
+
+       CONFIG MANAGEMENT SERVICES [IMPLEMENTED]
+       ----------------------------------------
+       HTTP :9090
+         |-- Configuration editor
+         |-- Clock status / synchronization
+         |-- Browser Test Remote
+         +-- JSON configuration persistence
 ```
 
-**State ownership:** Physical selectors and maintained switches will be
-read from GPIO; room names, device endpoints, and action mappings come
-from persistent JSON v2 configuration. The active firmware loads
-`/clonker/device_config.json` through `device_config_v2.py`.
-The previous XML v1 engine remains available as a rollback reference.
-Actual AV state belongs to the controlled devices; debounce, queues,
-and clock reference live in RAM. Do not write flash for switch changes
-or idle status.
+The browser and eventual physical controls must use **the same dispatcher**, not separate device-control implementations. Device-specific IP addresses, methods, and command paths belong in JSON v2 configuration. The transport handles networking, not room policy or toggle direction.
 
-## Two independent mode dimensions
+## Implementation status — October 19, 2026
 
-- **SERVICE (USB) / DEVICE:** developer filesystem ownership, selected by GP17 jumper **at power-on**; power cycle required.
-- **CONFIG / RUN:** user application behavior, eventually controlled by a physical maintained switch **during runtime**; no reboot intended. Currently simulated CONFIG is enabled.
+### Implemented and verified on the physical Pico
 
-See [Operating Modes](OPERATING_MODES.md) and [Development & Deployment](DEVELOPMENT.md).
+- Pico 2 W boot and Wi-Fi connectivity, serial diagnostics, and GP17 filesystem ownership modes.
+- JSON v2 three-room configuration loaded into validated RAM state.
+- Configuration editor and browser clock synchronization via HTTP port 9090.
+- Revision-aware JSON saves, no-change handling, backup rotation, and stale-tab revision conflict rejection in the exercised scenarios.
+- Browser Test Remote at `/remote.html` with the fourteen fundamental action buttons.
+- POST `/api/action?room=room-1&action=volume-up` (and other valid room/action combinations) routed to `actions.dispatch()`.
+- Dispatcher room/action validation, current-config lookup, and **logging-only** JSON response. User exercised the fourteen fundamental button actions; **no outbound AV command was sent**.
+- Side-by-side clock and Test Remote panels on the configuration page, matching attribution, and responsive browser presentation.
 
-## Implemented vs planned
+### Implemented, with remaining edge-case verification
 
-**Verified on Pico:** Wi-Fi connectivity, serial REPL, GP17 filesystem
-ownership modes, JSON v2 three-room loading, browser clock
-synchronization, HTTP management server on port 9090, browser
-configuration editing, persistent JSON saves, no-change detection,
-backup rotation, and stale-revision conflict rejection.
+- Strict JSON v2 validation, expected-revision persistence, disk-vs-RAM change detection, verified temporary writes, and startup loading from validated backup generations.
+- Bounded cooperative inbound HTTP service. Its implementation limits request size and handles one client at a time, but real-world scheduling guarantees have not been established.
 
-**Implemented and partially verified:** Strict JSON v2 validation,
-revision-protected persistence, detection of out-of-band configuration
-changes, verified temporary writes, and startup fallback to validated
-backups. The on-device test record documents which cases have been
-exercised successfully and which remain untested.
+Consult [configuration-testing.md](configuration-testing.md) for the dated, specific tests. Interrupted writes, power-loss behavior, malformed HTTP coverage, and remaining failure-injection cases must **not** be described as passed without new evidence. Backup rotation is not a power-loss-atomic transaction.
 
-**Additional testing pending:** Interrupted-write and power-loss
-scenarios, comprehensive malformed HTTP requests, complete power-cycle
-persistence verification, and remaining HTTP-level error cases.
-Power-loss durability is not guaranteed.
+### Not yet implemented
 
-**Active configuration:** JSON v2 with three fixed rooms, three device
-endpoints per room, fourteen fundamental actions per room, and an empty
-reserved `custom_actions` array. The browser and firmware both use
-JSON v2. The XML v1 implementation is retained for rollback.
+- Real outbound HTTP GET/POST commands to Denon, Roku, or LG.
+- RAM toggle-command history and ON/OFF selection in `actions.py`.
+- Physical CONFIG/RUN switch, room selector, buttons, and encoders.
+- GPIO debounce, event handling, physical-control latency measurements.
+- User-defined custom action execution, macros, equipment-state queries.
+- OLED, audible feedback, battery management, and enclosure integration.
 
-**Not yet implemented:** Physical CONFIG/RUN switch, room selector
-GPIO, encoder/button event capture, action dispatcher, real AV network
-commands, OLED functionality, audio feedback, and battery management.
+**Next development milestone:** Make one safe, configured HTTP command work from the existing browser Test Remote, then expand ordinary actions and add the agreed toggle behavior. Physical controls follow once the command path is reliable.
 
 ## Current firmware map
 
-| File | Role |
+| File | Responsibility |
 |---|---|
-| `firmware/boot.py` | GP17 filesystem ownership at cold boot |
-| `firmware/code.py` | CircuitPython entry point |
-| `firmware/clonker/main.py` | Loads config, starts/stops web service, cooperative loop |
-| `firmware/clonker/controls/switches.py` | Simulated CONFIG switch; GPIO path future |
-| `firmware/clonker/controls/pins.py` | Switch pin configuration |
-| `firmware/clonker/device_config_v2.py` | Active JSON v2 validation, serialization, revision protection, persistence, and backup recovery |
-| `firmware/clonker/device_config.py` | Retained XML v1 configuration engine for rollback |
-| `firmware/clonker/web.py` | Bounded cooperative HTTP service, port 9090 |
-| `firmware/clonker/www/index.html` | Browser clock/config editor |
+| `firmware/boot.py` | GP17-selected USB/Pico filesystem ownership at boot |
+| `firmware/code.py` | CircuitPython application entry point |
+| `firmware/clonker/main.py` | Startup configuration, Wi-Fi/runtime initialization, cooperative loop |
+| `firmware/clonker/controls/switches.py` | Simulated CONFIG switch; future GPIO switch handling |
+| `firmware/clonker/controls/pins.py` | Physical switch pin definitions |
+| `firmware/clonker/device_config_v2.py` | Active JSON v2 schema, validation, RAM snapshot, revisions, persistence and backup loading |
+| `firmware/clonker/device_config.json` | Example/checked-in compact JSON v2 configuration; deployed Pico data may differ |
+| `firmware/clonker/actions.py` | Shared fundamental action dispatcher, currently logging-only |
+| `firmware/clonker/web.py` | Cooperative inbound CONFIG HTTP service on port 9090 |
+| `firmware/clonker/www/index.html` | Browser configuration and clock interface |
+| `firmware/clonker/www/remote.html` | Browser Test Remote, fundamental action requests |
 | `firmware/clonker/clock.py` | Monotonic and browser-synchronized clock |
 | `firmware/clonker/logger.py` | Serial logging |
+| `firmware/clonker/legacy/device_config.py` | Historical XML v1 configuration engine; not active |
+| `firmware/clonker/legacy/device_config.xml` | Historical XML v1 configuration example |
 
-## Design constraints
+An outbound transport module has **not** been selected or implemented. Do not document a proposed filename as if it already exists.
 
-GPIO sampling and device command responsiveness outrank HTTP management. Network work must be bounded; slow clients or devices must not stall control capture. `web.poll()` handles a limited unit of work per call; the main loop schedules it about every 10 ms when CONFIG is active. This is **not** a proven encoder-latency guarantee.
+## Two independent mode dimensions
 
-Wi-Fi management is trusted-LAN-only, not authenticated application security. Do not expose port 9090 to the internet. CircuitPython Web Workflow on port 80 is disabled in private `settings.toml` to avoid suspected socket conflicts.
+### SERVICE (USB) / DEVICE — filesystem ownership
 
-## Reference documents
+Selected at **boot** by GP17, not by the browser or the future CONFIG switch:
 
-- [Operating Modes](OPERATING_MODES.md) — SERVICE (USB), DEVICE, CONFIG, RUN
-- [Configuration & Recovery](CONFIGURATION.md) — active JSON v2 configuration, legacy XML v1, command model, validation, and backup safety 
-- [Firmware & Network](FIRMWARE_NETWORK.md) — cooperative loop, HTTP, clock, logging
-- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and action model
-- [Development & Deployment](DEVELOPMENT.md) — iPad/Windows/Pico workflow and test plan
-- [Terminology Audit](TERMINOLOGY_AUDIT.md) — existing USB-mode references to update
+- **SERVICE:** GP17 open; host computer can write CIRCUITPY, firmware cannot persist configuration to the filesystem.
+- **DEVICE:** GP17 grounded; Pico can persist configuration, USB host sees the drive read-only.
+- Changing this mode requires a **full power cycle**.
 
----
+### CONFIG / RUN — application behavior
 
-### Active Configuration in RAM — Existing Implementation
+This is an independent runtime switch concept:
 
-**Status:** IMPLEMENTED IN JSON v2 — ACTION DISPATCH NOT YET TESTED
+- **CONFIG:** management HTTP listener and browser tools available.
+- **RUN:** management listener stopped; device actions must continue to operate.
+- Physical maintained CONFIG/RUN switch is **not yet wired**; firmware currently simulates CONFIG enabled.
+- A future CONFIG/RUN transition should not require a reboot or reload of the validated configuration.
 
-The existing `device_config_v2.py` module already maintains
-one authoritative, validated configuration snapshot in RAM
-through its private `_current` dictionary.
+Do not confuse **DEVICE** (filesystem-writable Pico mode) with **RUN** (normal remote-control application behavior). See [OPERATING_MODES.md](OPERATING_MODES.md) and [DEVELOPMENT.md](DEVELOPMENT.md).
 
-No additional key-value table, configuration cache, or
-synchronization manager is required for V1.
+## State ownership and active configuration
 
-Existing behavior:
+The active firmware uses `/clonker/device_config.json` and `device_config_v2.py`, not XML v1. JSON v2 defines three fixed room IDs (`room-1`, `room-2`, `room-3`), three optional endpoints per room (`tv`, `avr`, `streaming`), and fourteen fundamental action IDs per room. A reserved `custom_actions` list is currently empty and unsupported for execution.
 
-- `load()` initializes the active configuration at startup.
-- `current()` returns a validated copy of the active configuration.
-- `room(room_id)` returns the requested room configuration.
-- `save()` validates and persists changes before publishing
-  the new configuration into `_current`.
+The configuration module maintains one authoritative validated snapshot in its private `_current` dictionary:
+
+- `load()` selects the primary or a validated backup at startup.
+- `current()` returns a validated copy.
+- `room(room_id)` returns a current room configuration.
+- `save()` validates and persists before publishing the new `_current` value.
 - A failed save does not publish the proposed configuration.
-- A successful no-change save leaves the existing configuration intact.
+- An unchanged save does not rotate files.
+- The dispatcher already uses `device_config.room(room_id)` to resolve actions, so it sees successful browser edits without restarting.
 
-The future dispatcher should use `room()` or `current()`
-when resolving actions rather than retaining the startup
-configuration reference from `main.py`.
+A second configuration cache or synchronization manager is unnecessary for V1. `room()` currently copies/validates through `current()`; optimize only if encoder measurements justify a narrower read-only lookup. Do not weaken persistence safeguards just to improve dispatch speed.
 
-This allows a successful browser configuration save to become
-available to subsequent action lookups without restarting
-the Pico or reloading the JSON file.
+Manual edits to Pico files outside the configuration engine are not automatically adopted into RAM. CONFIG-to-RUN transitions should preserve the loaded configuration.
 
-CONFIG-to-RUN transitions do not require a configuration reload.
-The active configuration remains in RAM when the management
-HTTP service is stopped.
+### Device endpoints and action mappings
 
-Manual filesystem changes outside the configuration engine
-are not automatically detected or adopted.
+Each action selects a target device category and HTTP method. Twelve ordinary actions use a single `path`; `mute-toggle` and `power-toggle` use `on_path` and `off_path` with one common target and method. Blank endpoint or command means no outbound request. The configuration schema already supports both toggle paths; **choosing between them is still planned**.
 
-For V1, retain the existing validated-copy behavior.
-Optimize configuration lookup performance only if actual
-encoder testing demonstrates a need.
+The fourteen fixed IDs are:
 
-Do not modify the existing JSON v2 persistence engine
-solely to support action dispatch.
+```text
+volume-up       volume-down      mute-toggle
+nav-up          nav-down         nav-left
+nav-right       select           back
+home            play-pause       skip-back
+skip-forward    power-toggle
+```
 
-### CONFIG/RUN Development and Testing
+Current development endpoints and example command patterns are described in [CHAPTER_2_HANDOFF.md](CHAPTER_2_HANDOFF.md). Verify the deployed Pico configuration before sending real commands; GitHub sample values are not proof of the active device state.
 
-The JSON v2 browser editor will be used to configure real
-device IP addresses and HTTP commands before action testing.
+## Design constraints and scheduling
 
-Initial action testing should run with CONFIG mode disabled
-to eliminate the management HTTP listener and its polling
-overhead.
+GPIO capture and command responsiveness must eventually outrank management HTTP traffic. The existing `web.poll()` processes bounded pieces of inbound work in the cooperative loop, approximately every 10 ms when CONFIG is enabled. **This is not a proven encoder-latency guarantee.**
 
-RUN mode must retain the loaded JSON v2 configuration and
-support outbound device commands without the management
-HTTP server running.
+Network operations must have bounded timeouts and release sockets on failures. A stalled receiver must not permanently prevent subsequent actions or hang the management interface. The precise outbound scheduling behavior is a design/testing decision for the next milestone; synchronous network work may still impose measurable latency even with a cooperative inbound server.
 
-The CONFIG/RUN switch is currently simulated in firmware.
-A temporary development mechanism may be used to select
-RUN mode until the physical switch is implemented.
+Management access is **trusted-LAN-only**, with no application authentication. Never expose port 9090 through internet port forwarding. CircuitPython Web Workflow is disabled in private `settings.toml` because of suspected socket conflicts; this is distinct from Clonker's own management server.
 
-Initial testing should verify:
-
-- JSON v2 configuration survives the CONFIG-to-RUN transition.
-- Outbound HTTP commands work with CONFIG mode disabled.
-- Management HTTP polling stops in RUN mode.
-- Wi-Fi remains available for outbound commands.
-- Physical input responsiveness is evaluated without
-  management HTTP polling overhead.
-
-Later, CONFIG-enabled and RUN-only responsiveness may be
-compared if useful.
-
-### Design Evolution
-
-This section records the initial V1 implementation strategy,
-not a permanent architectural requirement.
-
-As hardware testing reveals actual behavior, the design
-may be revised, simplified, or completely replaced.
-
-Git history preserves earlier decisions; current documentation
-should describe the best-known design rather than retain
-obsolete implementation assumptions.
-
-## Action Dispatch and Outbound HTTP — V1 Design Decisions
+## Action dispatch and outbound HTTP — V1 design
 
 **Design agreed:** October 17, 2026  
-**Status:** APPROVED DESIGN — NOT YET IMPLEMENTED
+**Current status:** Room/action validation and logging stub implemented; outbound transport **not implemented**.
 
-### Guiding Principle
+### Guiding principle
 
-Implement the simplest reliable action execution path first.
+Start with the simplest reliable execution path. Avoid event accumulation, acceleration, elaborate queues, connection pooling, and general-purpose device frameworks until measurements reveal a need.
 
-Do not introduce event accumulation, acceleration, sophisticated
-queueing, persistent TCP connections, or other optimizations
-until actual hardware testing demonstrates a need.
+### Shared action pipeline
 
-The initial goal is to make physical controls operate real AV
-devices through the existing JSON v2 configuration system.
+1. Browser remote (implemented) or physical input (future) produces a generic room/action request.
+2. Shared dispatcher validates the room and action IDs.
+3. Dispatcher reads the latest validated room configuration.
+4. Dispatcher resolves target endpoint, HTTP method, and selected path.
+5. Outbound transport sends one configured HTTP request (future).
+6. Transport reports a bounded result and releases network resources.
+7. Dispatcher returns status to the browser or future physical-input caller.
 
-### Basic Action Pipeline
+The first three steps are represented by the current logging-only stub. The stub's `ok: true` and `status: "stub"` mean **dispatch accepted**, not **AV command succeeded**.
 
-All physical controls will generate generic action events.
+### Inbound and outbound networking are separate
 
-The action execution path is:
+`web.py` is the inbound HTTP management server. Outbound AV commands are a separate responsibility. Both can use the same Wi-Fi radio, but must not share active client connection state.
 
-1. Physical control generates an event.
-2. Event identifies a generic action.
-3. Dispatcher resolves the selected room.
-4. Dispatcher looks up the action in JSON v2 configuration.
-5. Outbound transport sends the configured HTTP command.
-6. Transport releases the request's network resources.
-7. Main loop continues processing controls.
+Initial outbound design:
 
-The physical control modules must not know device IP addresses,
-HTTP methods, URL paths, or device-specific protocols.
+- Initialize and manage Wi-Fi centrally.
+- Reuse a valid socket pool or equivalent shared networking resources where practical.
+- Allow one TCP connection per command; persistent TCP connections are not required for V1.
+- Support the configured GET and POST methods.
+- Bound connection, send, and response-reading operations.
+- Distinguish no-op, transport error, HTTP error, and success in results/logging.
+- Close resources after success or failure; later actions must still be possible.
+- Do not add automatic retries that could duplicate state-changing commands.
 
-Those details belong to configuration, dispatch, and transport.
+Exact module names and transport interfaces remain open pending source/library review and on-device testing.
 
-### Shared Network Resources
+### First real-command test sequence
 
-The outbound HTTP implementation should use shared networking
-resources rather than independently initializing networking
-for every action.
+1. Inspect `actions.py`, `web.py`, `main.py`, `device_config_v2.py`, and installed CircuitPython networking capabilities.
+2. Agree on the minimal transport interface and error handling.
+3. From the **working browser Test Remote in CONFIG mode**, trigger one low-risk Denon or Roku action; avoid power at first.
+4. Confirm serial output, HTTP result, and observed equipment response.
+5. Extend ordinary action dispatch; test missing endpoint/path as safe no-op.
+6. Implement and test RAM toggle history only after ordinary commands work.
+7. Later test outbound commands in RUN mode without the management listener, then integrate physical GPIO controls and measure responsiveness.
 
-Initial design:
+The earlier recommendation to begin with CONFIG disabled applied to future physical-control latency isolation. It is **not** the first real-command test procedure now that the browser Test Remote exists.
 
-- Wi-Fi connectivity is initialized and managed centrally.
-- A socket pool is created once and reused while valid.
-- Action execution uses a common outbound transport module.
-- Each HTTP request may open and close its own TCP connection.
-- Persistent TCP connection caching is NOT required for V1.
-- Failed requests must release resources.
-- Network operations must have bounded timeouts.
-- Subsequent actions should remain possible after failures.
+### Buttons and encoders
 
-The existing `web.py` is an inbound HTTP management server.
-Outbound AV commands are a separate responsibility.
+Physical controls must emit generic actions, never embed IP addresses or vendor command syntax:
 
-These components may share the Wi-Fi radio but should not
-share active client-connection state.
+- Button press → `select`, `home`, or `mute-toggle`.
+- Grayhill volume encoder clockwise detent → `volume-up`.
+- Grayhill volume encoder counterclockwise detent → `volume-down`.
 
-### Buttons and Encoders
+For initial V1 behavior, one recognized event yields one action and (when configured) one HTTP request. No volume-specific transport, accumulation, acceleration, batching, retries, or persistent-connection optimization. This keeps encoder hardware and HTTP transport independently replaceable.
 
-For the initial implementation, all controls use the same
-basic action execution mechanism.
+A small amount of lag during network trouble may be tolerable, but failed volume commands should **not** be replayed after connectivity returns. Fresh movement produces fresh actions. The Denon remains the authority for its volume level.
 
-Examples:
+### Possible future optimization — only if measured
 
-- Button press -> `select`
-- Button press -> `mute-toggle`
-- Button press -> `home`
-- Volume encoder clockwise detent -> `volume-up`
-- Volume encoder counterclockwise detent -> `volume-down`
-
-Each generated action initially results in one configured
-HTTP request.
-
-Volume events do not receive special treatment in V1.
-
-This deliberately allows the volume encoder implementation
-to be replaced or optimized later without changing the
-basic HTTP transport or JSON v2 action mappings.
-
-### Volume Encoder — Initial Behavior
-
-The Grayhill volume encoder is a relative control, not an
-absolute positional volume control.
-
-For V1:
-
-- One recognized detent generates one volume action.
-- No accumulation of pending volume movement.
-- No acceleration based on rotation speed.
-- No command batching.
-- No persistent TCP connection optimization.
-- No special volume retry or replay mechanism.
-- No separate volume-specific networking implementation.
-
-The first goal is to observe real responsiveness and
-behavior when controlling the Denon receiver.
-
-A small amount of lag during network trouble is acceptable.
-
-If network communication fails, failed volume commands
-do not need to be replayed after connectivity returns.
-The next physical movement can generate fresh actions.
-
-The controlled receiver remains the authority for
-its actual volume level.
-
-### Future Optimization — Only If Needed
-
-Potential future improvements include:
-
-- Small bounded event queues.
+- Bounded event queue for short bursts.
 - Encoder movement accumulation.
-- Rotation-speed-based volume acceleration.
-- Command batching where supported by a device.
+- Rotation-speed-dependent volume acceleration.
+- Device-supported batching.
 - Outbound HTTP connection reuse.
-- Improved scheduling under network congestion.
+- Scheduling improvements under congestion.
 
-Accumulation and acceleration are separate concepts and
-do not have to be implemented together.
+Accumulation and acceleration are different features; neither is a V1 requirement. Avoid speculative complexity.
 
-These are possibilities, not V1 requirements.
+### Architectural boundaries
 
-Do not add complexity without observing an actual problem
-or identifying a clear user-experience improvement.
+- `controls/`: read physical inputs and generate generic events.
+- `actions.py`: resolve current room/action mapping, choose toggle direction, interpret transport result.
+- Outbound transport (future): perform HTTP requests, manage sockets/timeouts/errors; no equipment-state assumptions.
+- `device_config_v2.py`: schema, active validated config, revision control, persistence, recovery.
+- `web.py`: inbound CONFIG-mode HTTP service and browser request routing.
 
-### Implementation Order
+**Ordinary V1 rule:** One control event → one generic action → at most one configured HTTP request.
 
-1. Implement one manually triggered JSON v2 action.
-2. Verify one real HTTP command reaches the Denon AVR.
-3. Establish shared outbound networking infrastructure.
-4. Implement a physical pushbutton action.
-5. Implement basic button debounce.
-6. Implement the Grayhill volume encoder using repeated
-   ordinary `volume-up` and `volume-down` actions.
-7. Observe rapid rotation, latency, and error behavior.
-8. Consider optimizations only after testing.
-
-### Architectural Boundary
-
-Keep these responsibilities separate:
-
-- `controls/` — read physical inputs and generate events.
-- Dispatcher — resolve room and configured action.
-- Outbound transport — perform HTTP requests and handle
-  networking resources and errors.
-- `device_config_v2.py` — configuration validation,
-  persistence, and action mappings.
-- `web.py` — inbound CONFIG-mode HTTP management.
-
-Module names and exact interfaces for the dispatcher and
-outbound transport remain to be determined during
-implementation.
-
-Avoid unnecessary frameworks, class hierarchies, and
-general-purpose abstractions.
-
-**V1 rule: One control event, one generic action,
-one configured HTTP request.**
-
-CLONK!
-
----
-
-## Fundamental Toggle Actions — V1 Design
+## Fundamental toggle actions — V1 agreed design
 
 **Design agreed:** October 18, 2026  
-**Status:** APPROVED DESIGN — NOT YET IMPLEMENTED
+**Current status:** ON/OFF JSON fields implemented; direction-selection and command-history behavior **not implemented**.
 
-### Scope
+### Scope and configuration
 
-The fourteen fundamental action IDs remain unchanged.
-
-Twelve actions use a single configured HTTP command.
-
-Two actions use paired ON/OFF commands:
+The fourteen fundamental action IDs do not change. Twelve actions have a single `path`. Two actions have paired paths:
 
 - `power-toggle`
 - `mute-toggle`
 
-Each toggle action has one target device, one HTTP method,
-and two paths: `on_path` and `off_path`.
+Each toggle has one target, one HTTP method, and both `on_path` and `off_path`. Identical paths are valid for a device with its own native toggle command.
 
-These paths may be identical when the device implements
-native toggle behavior.
+### Per-room, per-action RAM command history
 
-### RAM State
-
-The dispatcher will maintain independent toggle history
-for each room and each toggle action.
-
-Conceptually:
+Conceptual startup state:
 
 ```text
-room-1:
-    power-toggle: unknown
-    mute-toggle: unknown
-
-room-2:
-    power-toggle: unknown
-    mute-toggle: unknown
-
-room-3:
-    power-toggle: unknown
-    mute-toggle: unknown
+room-1: power-toggle=unknown, mute-toggle=unknown
+room-2: power-toggle=unknown, mute-toggle=unknown
+room-3: power-toggle=unknown, mute-toggle=unknown
 ```
 
-This state is initialized at boot and never written to flash.
+- On first press, attempt **ON**.
+- After successful ON, the next press attempts OFF; after successful OFF, the next attempts ON.
+- Missing endpoint, blank *selected* path, or failed request **does not advance** remembered direction.
+- History is independent for every `(room_id, action_id)` pair.
+- History is initialized in RAM and never written to flash.
+- A successful HTTP exchange may justify recording the command sent; it does **not** prove the equipment actually changed state.
 
-The first press selects ON.
+For native toggles, identical ON/OFF paths result in the same HTTP command on every press, while Clonker's internal direction still alternates after successful sends.
 
-Subsequent successful presses alternate ON and OFF.
-
-A missing endpoint, blank selected path, or failed request
-does not advance the remembered direction.
-
-A successful HTTP response permits advancing the direction,
-although HTTP success does not guarantee device-state change.
-
-### Dispatcher Behavior
-
-Ordinary action:
+### Toggle dispatch sequence
 
 ```text
-Control event
-    -> Resolve room and action
-    -> Resolve target endpoint
-    -> Send configured HTTP request
+Generic room/action event
+    -> validate and resolve current configuration
+    -> read last successful command direction from RAM
+    -> select next on_path or off_path
+    -> if endpoint/path missing: no-op; history unchanged
+    -> send exactly one HTTP request
+    -> if successful: remember selected direction
+    -> otherwise: retain previous history
 ```
 
-Toggle action:
+The outbound transport does not own toggle state and must not include Denon/Roku-specific power logic. The physical controls remain unaware of toggle semantics beyond emitting `power-toggle` or `mute-toggle`.
 
-```text
-Control event
-    -> Resolve room and toggle action
-    -> Determine next ON/OFF direction from RAM
-    -> Select on_path or off_path
-    -> Resolve target endpoint
-    -> Send configured HTTP request
-    -> On success, remember selected direction
-```
+### Accepted limitation: no equipment-state polling
 
-Only the dispatcher needs to understand the distinction
-between ordinary and toggle actions.
+V1 deliberately does not query real power or mute state before choosing ON/OFF. Other remotes, HDMI-CEC, and apps can change equipment state without Clonker knowing. A second press may be needed to recover from divergence. State-aware adapters or queries may be considered later, only if real use justifies them.
 
-The outbound HTTP transport should not maintain toggle
-state or contain device-specific power logic.
+### Configuration access and scope discipline
 
-Physical controls continue to generate generic action IDs.
+The dispatcher must use the current validated configuration, not a stale copy captured at startup. A targeted immutable read-only lookup can be considered if performance measurements justify it; that would not be a second cache.
 
-### Native Toggle Commands
+Do **not** add a general macro engine, sequence framework, persistent state model, polling parser, retry queue, or complex device-specific power framework for V1.
 
-If `on_path` and `off_path` are identical, the same
-command is sent on every press.
+**Toggle V1 rule:** One event → choose one ON/OFF path → at most one HTTP request → update RAM history only on success.
 
-This supports devices that already provide a native
-toggle operation without introducing another action type.
+## Reference documents
 
-### No State Queries for V1
+- [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — verified milestone and next steps.
+- [Operating Modes](OPERATING_MODES.md) — SERVICE/DEVICE and CONFIG/RUN.
+- [Configuration & Recovery](CONFIGURATION.md) — JSON v2 schema and persistence safeguards.
+- [Firmware & Network](FIRMWARE_NETWORK.md) — cooperative loop, inbound HTTP, clock and logging.
+- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and input plans.
+- [Development & Deployment](DEVELOPMENT.md) — iPad/Windows/Pico workflow.
+- [Configuration Testing](configuration-testing.md) — dated verification record.
+- [Terminology Audit](TERMINOLOGY_AUDIT.md) — historical terminology reconciliation.
+- [Old Architecture](OLD_ARCHITECTURE.md) — historical reference, not active implementation.
 
-V1 deliberately does not query actual equipment power
-or mute state before choosing a command.
+---
 
-External remotes, HDMI-CEC, and other applications may
-change device state without Clonker knowing.
-
-The user may need to press the toggle again to recover
-from a mismatch.
-
-This is an accepted V1 limitation.
-
-### Future Device Adapters
-
-Device-specific adapters may eventually implement
-state-aware toggles, authenticated protocols, or command
-sequences.
-
-Such adapters must preserve the generic action interface.
-
-Do not introduce these features until real device testing
-demonstrates a need.
-
-### Updated Action Execution Rule
-
-For ordinary actions:
-
-**One event -> one action -> one HTTP request.**
-
-For V1 toggle actions:
-
-**One event -> choose one ON/OFF path -> one HTTP request.**
-
-The existing simple outbound transport design remains valid.
-
-### Configuration Performance
-
-`device_config_v2.py` already maintains the active
-configuration in RAM through `_current`.
-
-The dispatcher must use the current active configuration,
-not a stale startup copy.
-
-A small direct read-only action lookup may be added for
-frequently generated events such as volume encoder detents.
-
-Such a lookup should return immutable configuration values
-without copying or revalidating the entire configuration.
-
-This is an optimization of access to existing RAM data,
-not a second configuration cache.
-
-### Scope Discipline
-
-No general-purpose macros, sequence engine, state-query
-parser, retry queue, or device-specific power framework
-is required for V1.
-
-First make the simple controls work reliably.
-
-Then let actual testing tell us what needs improvement.
-
-CLONK!
+**CLONK! ⚡🔩**
