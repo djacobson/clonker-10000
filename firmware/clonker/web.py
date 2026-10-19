@@ -139,22 +139,29 @@ def _json_error(message, status="400 Bad Request"):
 
 
 def _action_request(first_line):
-    """Parse a fixed room/action request; never accept arbitrary URLs."""
-    from urllib.parse import parse_qs
+    """Parse a fixed room/action request without urllib.parse.
 
-    path = first_line.split(b" ", 2)[1].decode("ascii")
-    query = path.split("?", 1)[1]
-    params = parse_qs(query)
+    The browser sends ASCII IDs such as:
+        /api/action?room=room-1&action=volume-up
 
-    if set(params) != {"room", "action"}:
+    Reject unexpected query parameters and malformed requests.
+    The dispatcher independently validates both identifiers.
+    """
+    path = first_line.split(b" ", 2)[1]
+    prefix = b"/api/action?"
+
+    if not path.startswith(prefix):
+        raise ValueError("Invalid action URL")
+
+    parameters = path[len(prefix):].split(b"&")
+
+    if (len(parameters) != 2 or
+            not parameters[0].startswith(b"room=") or
+            not parameters[1].startswith(b"action=")):
         raise ValueError("Invalid action parameters")
 
-    room_id = params["room"][0]
-    action_id = params["action"][0]
-
-    if (len(params["room"]) != 1 or
-            len(params["action"]) != 1):
-        raise ValueError("Duplicate action parameters")
+    room_id = parameters[0][5:].decode("ascii")
+    action_id = parameters[1][7:].decode("ascii")
 
     return actions.dispatch(room_id, action_id)
 
