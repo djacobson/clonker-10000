@@ -379,7 +379,7 @@ The project is being documented as it develops, including decisions, testing, an
 | [Firmware & Network](docs/FIRMWARE_NETWORK.md) | HTTP API, networking, and clock behavior |
 | [Operating Modes](docs/OPERATING_MODES.md) | SERVICE/DEVICE and CONFIG/RUN |
 | [Development](docs/DEVELOPMENT.md) | Development and deployment workflow |
-| [Configuration Testing](docs/configuration-testing.md) | Recorded tests and outstanding verification |
+| [Development History](docs/DEVELOPMENT_HISTORY.md) | Major Milestones in Clonker development |
 | [Chapter 2 Handoff](docs/CHAPTER_2_HANDOFF.md) | Current implementation snapshot and next development milestone |
 
 This is a personal, experimental maker project, not a finished commercial product.

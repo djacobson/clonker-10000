@@ -54,7 +54,7 @@ See:
 
 - [Architecture](ARCHITECTURE.md)
 - [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md)
-- [Configuration Test Record](configuration-testing.md)
+- [Development History](DEVELOPMENT_HISTORY.md)
 
 ## 2. Active Files and Responsibilities
 
@@ -1022,7 +1022,7 @@ Those paths are **not** the active JSON v2 configuration paths.
 
 The original browser API used the same general GET/POST configuration pattern, but the current firmware uses the JSON v2 engine.
 
-See [Configuration Test Record](configuration-testing.md) for dated observations.
+See [Development History](DEVELOPMENT_HISTORY.md) for dated observations.
 
 ### Why JSON replaced XML
 
@@ -1138,7 +1138,7 @@ The detailed dated record remains authoritative for individual test cases.
 
 Do not conflate implementation, a successful isolated test, and complete reliability verification.
 
-See [Configuration Test Record](configuration-testing.md).
+See [Development History](DEVELOPMENT_HISTORY.md).
 
 ## 23. Next Development Boundary
 

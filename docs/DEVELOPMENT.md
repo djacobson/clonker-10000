@@ -32,7 +32,7 @@ This is a working development guide, not a record that every planned feature has
 
 For the current architecture, see [Architecture](ARCHITECTURE.md).
 
-For dated test evidence, see [Configuration Testing](configuration-testing.md).
+For dated test evidence, see [Development History](DEVELOPMENT_HISTORY.md).
 
 ---
 
@@ -873,7 +873,7 @@ These distinctions should be preserved in documentation and development discussi
 - Audible feedback.
 - Final enclosure and power design.
 
-Historical tests and dated results are maintained in `configuration-testing.md`.
+Historical tests and dated results are maintained in `DEVELOPMENT_HISTORY.md`.
 
 ---
 
@@ -979,7 +979,7 @@ After each meaningful milestone:
 - [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md)
 - [Operating Modes](OPERATING_MODES.md)
 - [Hardware & Physical Controls](HARDWARE_CONTROLS.md)
-- [Configuration Testing](configuration-testing.md)
+- [Development History](DEVELOPMENT_HISTORY.md)
 - [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md)
 
 ### Documentation philosophy

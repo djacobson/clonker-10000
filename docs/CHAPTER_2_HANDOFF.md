@@ -19,7 +19,7 @@ Useful documents:
 - `docs/OPERATING_MODES.md` — SERVICE/DEVICE versus CONFIG/RUN.
 - `docs/DEVELOPMENT.md` — deployment workflow.
 - `docs/HARDWARE_CONTROLS.md` — eventual physical inputs.
-- `docs/configuration-testing.md` — dated tests; do not mistake older pending lists for current status.
+- `docs/DEVELOPMENT_HISTORY.md` — development milestones and dated tests; do not mistake older pending lists for current status.
 
 ## Platform and workflow
 
@@ -112,8 +112,8 @@ Do not duplicate the entire config in a second cache unless measurement justifie
 - Real commands can change AVR volume or power equipment. Start at a safe listening level and test one action at a time.
 - Use source-controlled sample data for documentation, but do not assume production Pico configuration exactly matches a GitHub fixture without checking.
 - Preserve tested configuration persistence, revision protection, backup rotation and read-only SERVICE behavior.
-- Historical `configuration-testing.md` entries include old statuses; append dated test results rather than rewriting history.
-
+- Historical `DEVELOPMENT_HISTORY.md` entries include old statuses; append dated test results rather than rewriting history.
+ 
 ## Collaboration preferences
 
 - User works **iPad-first**, uses Working Copy, and prefers minimal Windows work.
@@ -128,6 +128,6 @@ Do not duplicate the entire config in a second cache unless measurement justifie
 - `README.md`: remove duplicate 'fourteen fundamental actions' bullet; update toggle wording to distinguish configured ON/OFF fields from future execution; add October 19 stub dispatcher milestone and current next milestone.
 - `docs/ARCHITECTURE.md`: mark dispatcher **stub implemented and on-device browser tested**; mark real HTTP transport and physical event capture as planned; add `actions.py` and `www/remote.html` to firmware map; update stale `firmware/clonker/device_config.py` path to `firmware/clonker/legacy/device_config.py`.
 - `docs/FIRMWARE_NETWORK.md`: add GET `/remote.html` and POST `/api/action?...` with stub response semantics and request parser compatibility note.
-- `docs/configuration-testing.md`: append October 19 browser-remote tests as a new dated section; preserve older historical results.
+- `docs/DEVELOPMENT_HISTORY.md`: append October 19 browser-remote tests as a new dated section; preserve older historical results.
 - `docs/DEVELOPMENT.md`: note deployment of `actions.py`, `web.py`, `index.html`, `remote.html` and SERVICE/DEVICE power-cycle requirement.
 - Do not erase older test results or call incomplete failure-injection tests passed.

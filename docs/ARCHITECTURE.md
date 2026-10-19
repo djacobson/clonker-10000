@@ -75,7 +75,7 @@ The browser and eventual physical controls must use **the same dispatcher**, not
 - Strict JSON v2 validation, expected-revision persistence, disk-vs-RAM change detection, verified temporary writes, and startup loading from validated backup generations.
 - Bounded cooperative inbound HTTP service. Its implementation limits request size and handles one client at a time, but real-world scheduling guarantees have not been established.
 
-Consult [configuration-testing.md](configuration-testing.md) for the dated, specific tests. Interrupted writes, power-loss behavior, malformed HTTP coverage, and remaining failure-injection cases must **not** be described as passed without new evidence. Backup rotation is not a power-loss-atomic transaction.
+Consult [Development History](DEVELOPMENT_HISTORY.md) for the dated, specific tests. Interrupted writes, power-loss behavior, malformed HTTP coverage, and remaining failure-injection cases must **not** be described as passed without new evidence. Backup rotation is not a power-loss-atomic transaction.
 
 ### Not yet implemented
 
@@ -324,7 +324,7 @@ Do **not** add a general macro engine, sequence framework, persistent state mode
 - [Firmware & Network](FIRMWARE_NETWORK.md) — cooperative loop, inbound HTTP, clock and logging.
 - [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and input plans.
 - [Development & Deployment](DEVELOPMENT.md) — iPad/Windows/Pico workflow.
-- [Configuration Testing](configuration-testing.md) — dated verification record.
+- [Development History](DEVELOPMENT_HISTORY.md) — development milestones.
 - [Terminology Audit](TERMINOLOGY_AUDIT.md) — historical terminology reconciliation.
 - [Old Architecture](OLD_ARCHITECTURE.md) — historical reference, not active implementation.
 

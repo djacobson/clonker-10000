@@ -1136,7 +1136,7 @@ The new switch inventory may change priorities.
 - [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md)
 - [Operating Modes](OPERATING_MODES.md)
 - [Development & Deployment](DEVELOPMENT.md)
-- [Configuration Testing](configuration-testing.md)
+- [Development History](DEVELOPMENT_HISTORY.md)
 - [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md)
 
 ---

@@ -596,7 +596,7 @@ Do not expose it through router port forwarding.
 - [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) — main loop, management HTTP, and clock.
 - [Hardware & Controls](HARDWARE_CONTROLS.md) — physical control design.
 - [Development & Deployment](DEVELOPMENT.md) — firmware deployment workflow.
-- [Configuration Testing](configuration-testing.md) — dated verification record.
+- [Development History](DEVELOPMENT_HISTORY.md) - development milestones.
 - [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — current milestone and next phase.
 
 ---

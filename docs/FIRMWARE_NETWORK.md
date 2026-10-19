@@ -832,7 +832,7 @@ These distinctions should remain explicit in future implementation and documenta
 - [Operating Modes](OPERATING_MODES.md) — SERVICE/DEVICE and CONFIG/RUN.
 - [Hardware & Controls](HARDWARE_CONTROLS.md) — physical input plans.
 - [Development & Deployment](DEVELOPMENT.md) — repository, Pico, and iPad workflow.
-- [Configuration Testing](configuration-testing.md) — dated test evidence.
+- [Development History](DEVELOPMENT_HISTORY.md) - development milestones.
 - [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — current milestone and next development phase.
 
 ---
