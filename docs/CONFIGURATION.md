@@ -744,3 +744,270 @@ Configuration data must be strictly validated before persistence.
 Proven recovery protections must be retained throughout development.
 
 **JSON v2 is the active operational configuration baseline. XML v1 is retained for rollback. Additional persistence and failure testing remains outstanding.**
+
+---
+
+## October 18, 2026 — Device Endpoints and Fundamental Toggle Actions
+
+**Status: APPROVED DESIGN — TOGGLE SCHEMA AND RUNTIME NOT YET IMPLEMENTED**
+
+This section records the latest configuration decisions for
+The Clonker 10000.
+
+The project is still in active development. Backward compatibility
+with earlier experimental JSON configuration files is not required.
+Existing configurations may be replaced deliberately when the
+firmware and browser editor are updated together.
+
+### Device Endpoints — Optional HTTP Ports
+
+Each room continues to define three device endpoints:
+
+- `tv`
+- `avr`
+- `streaming`
+
+Each endpoint is a string containing either:
+
+- An empty string, indicating an unconfigured device.
+- A dotted IPv4 address, implying HTTP port 80.
+- A dotted IPv4 address followed by `:port`.
+
+Examples:
+
+```json
+{
+  "tv": "",
+  "avr": "192.168.50.44:8080",
+  "streaming": "192.168.50.43:8060"
+}
+```
+
+The port suffix is optional. When supplied, it must be a decimal
+integer between 1 and 65535.
+
+The existing JSON v2 configuration structure is unchanged.
+
+**Implementation status:** The updated Python validator and browser
+address labels are implemented. The browser changes have been
+observed on the Pico. Actual outbound HTTP connection handling
+has not yet been implemented.
+
+The outbound transport will split the endpoint into its IPv4
+address and port, using port 80 when no port is specified.
+
+### Fundamental Action Categories
+
+Clonker retains fourteen fundamental action IDs.
+
+Twelve ordinary actions continue using:
+
+- `target`
+- `method`
+- `path`
+
+Two actions have special toggle semantics:
+
+- `power-toggle`
+- `mute-toggle`
+
+These two actions will instead use:
+
+- `target`
+- `method`
+- `on_path`
+- `off_path`
+
+The target device and HTTP method are shared between the ON and
+OFF directions.
+
+No additional fundamental action IDs are introduced.
+
+### Toggle Configuration Example
+
+A Denon mute toggle:
+
+```json
+"mute-toggle": {
+  "target": "avr",
+  "method": "GET",
+  "on_path": "/goform/formiPhoneAppDirect.xml?MUON",
+  "off_path": "/goform/formiPhoneAppDirect.xml?MUOFF"
+}
+```
+
+The corresponding Denon power commands, if chosen as the target:
+
+```json
+"power-toggle": {
+  "target": "avr",
+  "method": "GET",
+  "on_path": "/goform/formiPhoneAppDirect.xml?PWON",
+  "off_path": "/goform/formiPhoneAppDirect.xml?PWSTANDBY"
+}
+```
+
+These are configuration examples, not proof that Denon power
+commands will control the entire HDMI-CEC system.
+
+### Devices With Native Toggle Commands
+
+Some devices implement a toggle operation themselves.
+
+For these devices, `on_path` and `off_path` may contain the
+same command.
+
+Example:
+
+```json
+"power-toggle": {
+  "target": "tv",
+  "method": "POST",
+  "on_path": "/example/native-toggle",
+  "off_path": "/example/native-toggle"
+}
+```
+
+The example path is illustrative, not a verified device API.
+
+Clonker will send the configured command on every press.
+No special native-toggle flag or checkbox is required.
+
+### Toggle Runtime Behavior — V1
+
+Toggle state is maintained in RAM.
+
+Each room has independent state for each toggle action.
+
+The initial state is unknown.
+
+On the first press:
+
+- `power-toggle` selects ON.
+- `mute-toggle` selects ON.
+
+On subsequent presses, the selected direction alternates
+between ON and OFF.
+
+The remembered state represents the last successfully
+submitted command, not the actual device state.
+
+The controlled equipment remains authoritative for its
+real power and mute status.
+
+The initial implementation will not query device state,
+parse XML status responses, or synchronize with other
+remotes or HDMI-CEC activity.
+
+If a network request fails, Clonker should not advance
+its remembered toggle state.
+
+A successful HTTP response does not guarantee the device
+actually performed the command.
+
+Toggle state is not persisted to flash. A reboot resets
+the remembered state to unknown.
+
+### Blank Paths and Unconfigured Devices
+
+Blank device endpoints remain valid.
+
+For ordinary actions, a blank `path` remains a no-op.
+
+For toggle actions, the selected ON or OFF path may also
+be blank. A blank selected path is a no-op.
+
+A toggle no-op must not advance the remembered state.
+
+A configured action targeting a blank device endpoint
+must not open a network connection or advance toggle state.
+
+### Browser Configuration Editor
+
+The existing browser editor will retain:
+
+- Room names.
+- Three device address fields.
+- Fundamental action editors.
+- Target selection.
+- GET/POST method selection.
+
+For ordinary actions, the editor will display one Path field.
+
+For `power-toggle` and `mute-toggle`, it will display:
+
+- ON Path
+- OFF Path
+
+No state-query field, native-toggle checkbox, macro editor,
+or additional configuration mode is required for V1.
+
+### Configuration Cutover
+
+The toggle schema is an intentional breaking change to the
+current experimental JSON v2 format.
+
+No automatic migration from the old toggle `path` field
+is required.
+
+The strict validator will reject obsolete toggle entries.
+
+Before deploying the updated validator:
+
+1. Preserve a copy of the current configuration.
+2. Prepare a replacement JSON file using the new toggle fields.
+3. Coordinate deployment of the firmware, browser editor,
+   and configuration file.
+4. Verify configuration loading and saving on the Pico.
+5. Verify backup behavior and active RAM publication.
+
+The JSON version number remains `2` for this development-stage
+schema refinement.
+
+### Real Device Testing
+
+Initial configured devices:
+
+- Den Roku Ultra: `192.168.50.43:8060`
+- Den Denon AVR-X3700H: `192.168.50.44:8080`
+- Sunroom Roku Ultra: `192.168.50.28:8060`
+- Sunroom Denon AVR-X1800H: `192.168.50.40:8080`
+
+These endpoint values were supplied and tested independently
+using iOS Shortcuts. They are local environment examples.
+
+Initial command paths include:
+
+- Roku Home: `POST /keypress/Home`
+- Roku Back: `POST /keypress/Back`
+- Roku Play/Pause: `POST /keypress/Play`
+- Denon Volume Up: `GET /goform/formiPhoneAppDirect.xml?MVUP`
+- Denon Volume Down: `GET /goform/formiPhoneAppDirect.xml?MVDOWN`
+
+Roku's Play command provides native play/pause behavior.
+
+The Roku power-off command remains a provisional configuration.
+The final system-power strategy has not been verified.
+
+For V1, Roku POST requests may use the form-style convention
+already tested with iOS Shortcuts. Exact Pico request framing
+and compatibility must be verified during outbound HTTP testing.
+
+### Future Possibilities
+
+If simple remembered-command toggles prove inadequate, future
+device adapters may support:
+
+- Reading actual device power or mute state.
+- Choosing discrete commands based on that state.
+- Device-specific authentication.
+- HDMI-CEC-related behavior where available.
+- Compound command sequences.
+
+None of these capabilities is required for the initial
+toggle implementation.
+
+Keep the first implementation small.
+
+CLONK!
+

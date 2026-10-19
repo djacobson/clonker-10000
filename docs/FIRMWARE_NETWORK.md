@@ -70,3 +70,82 @@ GPIO sampling and debounce → generic input events → action dispatcher → se
 A fundamental command has a fixed action ID and configurable target, HTTP method, and path. An empty path or unconfigured target IP produces a valid no-op. User-defined commands will extend this simple command model without requiring a scripting language or graphical shortcut editor.
 
 Controlled devices remain authoritative for their actual state. A successful network request does not prove the requested action occurred. Group/BOTH semantics remain unfinalized.
+
+---
+
+## Outbound Device HTTP — October 18, 2026 Design
+
+**Status:** APPROVED DESIGN — OUTBOUND TRANSPORT NOT YET IMPLEMENTED
+
+The inbound management server on port 9090 and outbound
+device HTTP requests have separate responsibilities.
+
+Outbound HTTP will use the existing Wi-Fi connection and
+shared networking resources.
+
+Device endpoints are configured as optional IPv4:port
+strings. An omitted port implies HTTP port 80.
+
+The transport will support:
+
+- HTTP GET.
+- HTTP POST.
+- Configured request paths.
+- Configured device endpoints.
+- Bounded network timeouts.
+- Cleanup after successful or failed requests.
+
+The initial Roku POST implementation may use the
+form-style request convention tested in iOS Shortcuts.
+The actual Pico request headers and body handling
+must be tested against the Roku API.
+
+### Toggle Requests
+
+The dispatcher selects the ON or OFF path before calling
+the transport.
+
+The transport sends one HTTP request and returns a
+success/failure result.
+
+It does not know whether an action represents power,
+mute, navigation, or volume.
+
+The dispatcher owns per-room toggle command history.
+
+No actual device-state query is required for V1.
+
+### Verified Command Examples
+
+Denon AVR commands:
+
+```text
+GET /goform/formiPhoneAppDirect.xml?MVUP
+GET /goform/formiPhoneAppDirect.xml?MVDOWN
+```
+
+Roku commands:
+
+```text
+POST /keypress/Home
+POST /keypress/Back
+POST /keypress/Play
+```
+
+These are configured command examples; execution by the
+Clonker firmware remains to be implemented and tested.
+
+### Initial Test Order
+
+1. Validate the updated toggle configuration schema.
+2. Verify browser editing and persistence.
+3. Implement one outbound GET command to the Denon.
+4. Implement one outbound POST command to the Roku.
+5. Verify error handling and blank-endpoint no-ops.
+6. Add ordinary physical button dispatch.
+7. Add toggle state handling.
+8. Add volume encoder dispatch.
+
+Keep requests bounded and the transport reusable.
+
+CLONK!

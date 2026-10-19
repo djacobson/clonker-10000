@@ -69,7 +69,13 @@ Raspberry Pi Pico 2 W with CircuitPython 10.3.1.
 The configuration system provides:
 
 - Three fixed rooms, each with an editable name.
-- TV, AVR, and streaming-device IPv4 endpoints for each room.
+- TV, AVR, and streaming-device endpoints for each room,
+  supporting IPv4 addresses with optional HTTP ports.
+- Fourteen configurable fundamental actions per room.
+- A planned V1 enhancement giving `power-toggle` and
+  `mute-toggle` separate ON/OFF command paths.
+- Simple per-room RAM command history for toggle actions,
+  without requiring device-state queries.
 - Fourteen configurable fundamental actions per room.
 - Browser editing through the Clonker management interface on port 9090.
 - Validated JSON configuration loading and saving.

@@ -8,7 +8,13 @@
 
 ## Mission
 
-A tactile, Wi-Fi-first home theater remote with real knobs, switches, satisfying buttons, and eventually an audible **CLONK!** Physical controls produce generic actions; room configuration and device adapters resolve those actions to commands. No speculative shadow copy of TV/AVR power, volume, or input state.
+A tactile, Wi-Fi-first home theater remote with real knobs, switches, satisfying buttons, and eventually an audible **CLONK!** Physical controls produce generic actions; room configuration and device adapters resolve those actions to commands. Controlled devices remain authoritative for their actual state.
+Clonker does not maintain a speculative model of equipment power, volume, or input status.
+
+A narrow V1 exception exists for the two fundamental toggle
+actions: Clonker remembers the last successfully submitted
+ON/OFF command for each room and toggle action. This is command
+history, not an assertion about the device's actual state.
 
 **Priority:** responsive physical inputs → reliable device commands → maintained room selector → configuration interface → diagnostics/time → OLED and sound → battery optimization.
 
@@ -351,5 +357,166 @@ general-purpose abstractions.
 
 **V1 rule: One control event, one generic action,
 one configured HTTP request.**
+
+CLONK!
+
+---
+
+## Fundamental Toggle Actions — V1 Design
+
+**Design agreed:** October 18, 2026  
+**Status:** APPROVED DESIGN — NOT YET IMPLEMENTED
+
+### Scope
+
+The fourteen fundamental action IDs remain unchanged.
+
+Twelve actions use a single configured HTTP command.
+
+Two actions use paired ON/OFF commands:
+
+- `power-toggle`
+- `mute-toggle`
+
+Each toggle action has one target device, one HTTP method,
+and two paths: `on_path` and `off_path`.
+
+These paths may be identical when the device implements
+native toggle behavior.
+
+### RAM State
+
+The dispatcher will maintain independent toggle history
+for each room and each toggle action.
+
+Conceptually:
+
+```text
+room-1:
+    power-toggle: unknown
+    mute-toggle: unknown
+
+room-2:
+    power-toggle: unknown
+    mute-toggle: unknown
+
+room-3:
+    power-toggle: unknown
+    mute-toggle: unknown
+```
+
+This state is initialized at boot and never written to flash.
+
+The first press selects ON.
+
+Subsequent successful presses alternate ON and OFF.
+
+A missing endpoint, blank selected path, or failed request
+does not advance the remembered direction.
+
+A successful HTTP response permits advancing the direction,
+although HTTP success does not guarantee device-state change.
+
+### Dispatcher Behavior
+
+Ordinary action:
+
+```text
+Control event
+    -> Resolve room and action
+    -> Resolve target endpoint
+    -> Send configured HTTP request
+```
+
+Toggle action:
+
+```text
+Control event
+    -> Resolve room and toggle action
+    -> Determine next ON/OFF direction from RAM
+    -> Select on_path or off_path
+    -> Resolve target endpoint
+    -> Send configured HTTP request
+    -> On success, remember selected direction
+```
+
+Only the dispatcher needs to understand the distinction
+between ordinary and toggle actions.
+
+The outbound HTTP transport should not maintain toggle
+state or contain device-specific power logic.
+
+Physical controls continue to generate generic action IDs.
+
+### Native Toggle Commands
+
+If `on_path` and `off_path` are identical, the same
+command is sent on every press.
+
+This supports devices that already provide a native
+toggle operation without introducing another action type.
+
+### No State Queries for V1
+
+V1 deliberately does not query actual equipment power
+or mute state before choosing a command.
+
+External remotes, HDMI-CEC, and other applications may
+change device state without Clonker knowing.
+
+The user may need to press the toggle again to recover
+from a mismatch.
+
+This is an accepted V1 limitation.
+
+### Future Device Adapters
+
+Device-specific adapters may eventually implement
+state-aware toggles, authenticated protocols, or command
+sequences.
+
+Such adapters must preserve the generic action interface.
+
+Do not introduce these features until real device testing
+demonstrates a need.
+
+### Updated Action Execution Rule
+
+For ordinary actions:
+
+**One event -> one action -> one HTTP request.**
+
+For V1 toggle actions:
+
+**One event -> choose one ON/OFF path -> one HTTP request.**
+
+The existing simple outbound transport design remains valid.
+
+### Configuration Performance
+
+`device_config_v2.py` already maintains the active
+configuration in RAM through `_current`.
+
+The dispatcher must use the current active configuration,
+not a stale startup copy.
+
+A small direct read-only action lookup may be added for
+frequently generated events such as volume encoder detents.
+
+Such a lookup should return immutable configuration values
+without copying or revalidating the entire configuration.
+
+This is an optimization of access to existing RAM data,
+not a second configuration cache.
+
+### Scope Discipline
+
+No general-purpose macros, sequence engine, state-query
+parser, retry queue, or device-specific power framework
+is required for V1.
+
+First make the simple controls work reliably.
+
+Then let actual testing tell us what needs improvement.
 
 CLONK!

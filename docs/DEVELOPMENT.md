@@ -73,3 +73,36 @@ One small edit or test at a time. Capture REPL output. Prefer bounded, disposabl
 Avoid confusing successful validation with successful persistence. A successful configuration save must be verified in flash, reflected in active memory, and retained after reboot. Record actual test results in `configuration-testing.md`.
 
 Prefer reasonable validation that protects normal operation and persistent data. The browser is the intended user configuration interface; raw JSON editing is primarily a developer activity. Do not build a general-purpose JSON editor or elaborate compatibility framework.
+
+---
+
+## October 18, 2026 — Next Configuration Cutover
+
+The next planned firmware enhancement changes the JSON v2
+schema for two fundamental actions:
+
+- `power-toggle`
+- `mute-toggle`
+
+Each will replace the existing `path` field with
+`on_path` and `off_path`.
+
+The browser editor must be updated at the same time.
+
+Backward compatibility with previous experimental toggle
+entries is not required.
+
+Before deployment:
+
+1. Preserve the existing working configuration.
+2. Prepare a replacement configuration using the new schema.
+3. Update the Python validator and browser editor.
+4. Deploy the compatible firmware and configuration together.
+5. Verify loading, saving, revision handling, and persistence.
+6. Record observed results in `configuration-testing.md`.
+
+Do not describe the new toggle behavior as operational until
+the updated firmware has passed on-device tests.
+
+The initial outbound HTTP implementation will follow
+successful configuration cutover testing.
