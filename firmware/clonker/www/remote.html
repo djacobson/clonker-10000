@@ -1,0 +1,457 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>Clonker 10000 -- Test Remote</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #20242a;
+            color: #f0f0f0;
+        }
+
+        main {
+            max-width: 370px;
+            margin: auto;
+        }
+
+        h1 {
+            font-size: 23px;
+            color: #e6b85c;
+            margin-bottom: 4px;
+        }
+
+        .note {
+            color: #aaa;
+            font-size: 13px;
+        }
+
+        .panel {
+            background: #30363e;
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 15px;
+        }
+
+        button,
+        select {
+            box-sizing: border-box;
+            border: 0;
+            border-radius: 7px;
+            font-size: 15px;
+            padding: 13px 7px;
+        }
+
+        button {
+            background: #e6b85c;
+            color: #20242a;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:disabled {
+            opacity: 0.55;
+        }
+
+        select {
+            width: 100%;
+            background: #20242a;
+            color: #fff;
+            border: 1px solid #777;
+            margin-top: 7px;
+        }
+
+        /* Shared border around control groups. */
+
+        .control-box {
+            border: 1px solid #777;
+            border-radius: 9px;
+            padding: 10px;
+        }
+
+        /* Volume and Mute: compact, right-aligned. */
+
+        .volume-wrap {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .volume-group {
+            width: 68%;
+        }
+
+        .volume-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 9px;
+        }
+
+        .mute-button {
+            width: 100%;
+            margin-top: 9px;
+        }
+
+        /* Horizontal dividers between major groups. */
+
+        .section-divider {
+            border: 0;
+            border-top: 1px solid #555;
+            margin: 24px 0;
+        }
+
+        /* Back and Home: prominent, left-aligned. */
+
+        .navigation-shortcuts {
+            display: flex;
+            justify-content: flex-start;
+            gap: 10px;
+        }
+
+        .navigation-shortcuts button {
+            min-width: 90px;
+        }
+
+        /* Directional navigation. */
+
+        .nav-box {
+            margin: 14px 0;
+        }
+
+        .navigation {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 9px;
+        }
+
+        .navigation .empty {
+            min-height: 1px;
+        }
+
+        .navigation button {
+            min-height: 49px;
+            font-size: 19px;
+        }
+
+        /* Playback controls. */
+
+        .playback {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 9px;
+        }
+
+        .playback button {
+            font-size: 13px;
+            min-height: 49px;
+        }
+
+        /* Big, isolated POWER button. */
+
+        .power-wrap {
+            display: flex;
+            justify-content: center;
+            margin-top: 26px;
+            padding: 18px 0 10px;
+            border-top: 1px solid #555;
+        }
+
+        .power-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            font-size: 18px;
+            border: 3px solid #f0cf8b;
+            box-shadow: 0 0 0 4px #20242a;
+        }
+
+        /* Future user-defined actions.
+           Selectable placeholder; no execution. */
+
+        .custom-action {
+            margin-top: 24px;
+        }
+
+        .custom-action label {
+            display: block;
+            font-size: 14px;
+        }
+
+        /* Action feedback. */
+
+        #status {
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font-size: 12px;
+            min-height: 44px;
+            margin-top: 12px;
+        }
+
+        a {
+            color: #e6b85c;
+        }
+    </style>
+</head>
+
+<body>
+<main>
+
+    <h1>THE CLONKER 10000</h1>
+
+    <div class="note">
+        Test remote · logging only · no device commands
+    </div>
+
+    <div class="panel">
+
+        <!-- Room selection -->
+
+        <label for="room">Room</label>
+
+        <select id="room">
+            <option value="room-1">Den</option>
+            <option value="room-2">Sunroom</option>
+            <option value="room-3">Room 3</option>
+        </select>
+
+
+        <!-- Volume and Mute: right-aligned bordered group -->
+
+        <div class="volume-wrap">
+            <div class="control-box volume-group">
+
+                <div class="volume-buttons">
+                    <button data-action="volume-down">
+                        Vol −
+                    </button>
+
+                    <button data-action="volume-up">
+                        Vol +
+                    </button>
+                </div>
+
+                <button class="mute-button"
+                        data-action="mute-toggle">
+                    Mute
+                </button>
+
+            </div>
+        </div>
+
+
+        <hr class="section-divider">
+
+
+        <!-- Back and Home: left-aligned bordered group -->
+
+        <div class="control-box">
+            <div class="navigation-shortcuts">
+                <button data-action="back">
+                    Back
+                </button>
+
+                <button data-action="home">
+                    Home
+                </button>
+            </div>
+        </div>
+
+
+        <!-- Directional navigation: bordered,
+             with 14px whitespace above and below -->
+
+        <div class="control-box nav-box">
+            <div class="navigation">
+
+                <div class="empty"></div>
+                <button data-action="nav-up">▲</button>
+                <div class="empty"></div>
+
+                <button data-action="nav-left">◀</button>
+                <button data-action="select">OK</button>
+                <button data-action="nav-right">▶</button>
+
+                <div class="empty"></div>
+                <button data-action="nav-down">▼</button>
+                <div class="empty"></div>
+
+            </div>
+        </div>
+
+
+        <!-- Playback: bordered group -->
+
+        <div class="control-box">
+            <div class="playback">
+
+                <button data-action="skip-back">
+                    Skip Back
+                </button>
+
+                <button data-action="play-pause">
+                    Play/Pause
+                </button>
+
+                <button data-action="skip-forward">
+                    Skip Fwd
+                </button>
+
+            </div>
+        </div>
+
+
+        <!-- Big honk'n POWER button -->
+
+        <div class="power-wrap">
+            <button class="power-button"
+                    data-action="power-toggle">
+                POWER
+            </button>
+        </div>
+
+
+        <!-- Future user-defined actions.
+             Dropdown is selectable but executes nothing. -->
+
+        <div class="custom-action">
+
+            <label for="custom-action">
+                Custom Action (coming later)
+            </label>
+
+            <select id="custom-action">
+
+                <option value="" selected>
+                    Choose custom action…
+                </option>
+
+                <option value="movie-mode">
+                    Movie Mode
+                </option>
+
+                <option value="stereo-mode">
+                    Stereo Mode
+                </option>
+
+                <option value="next-audio-mode">
+                    Next Audio Mode
+                </option>
+
+            </select>
+
+            <div class="note">
+                Illustrative choices only -- no action is sent.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Last action / feedback -->
+
+    <div class="panel">
+
+        <strong>Last action</strong>
+
+        <div id="status"
+             role="status"
+             aria-live="polite">
+            Ready.
+        </div>
+
+        <p>
+            <a href="/">← Configuration</a>
+        </p>
+
+    </div>
+
+</main>
+
+
+<script>
+    // Test remote: submit only room and fundamental action IDs.
+    // Pico determines the configured action details.
+    //
+    // Phase 1: logging only. No outbound device commands.
+
+    const status = document.getElementById("status");
+    const room = document.getElementById("room");
+
+    let busy = false;
+
+
+    async function sendAction(action) {
+        if (busy) {
+            return;
+        }
+
+        busy = true;
+
+        const buttons =
+            document.querySelectorAll("button[data-action]");
+
+        buttons.forEach(button => button.disabled = true);
+
+        status.textContent =
+            "Sending " + room.value + " / " + action + "...";
+
+        try {
+            const url =
+                "/api/action?room=" +
+                encodeURIComponent(room.value) +
+                "&action=" +
+                encodeURIComponent(action);
+
+            const response = await fetch(url, {
+                method: "POST",
+                cache: "no-store"
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.error || "HTTP " + response.status
+                );
+            }
+
+            status.textContent = result.message;
+
+        } catch (error) {
+            status.textContent =
+                "ERROR: " + error.message;
+
+        } finally {
+            busy = false;
+
+            buttons.forEach(
+                button => button.disabled = false
+            );
+        }
+    }
+
+
+    // Wire up the 14 fundamental action buttons.
+
+    document.querySelectorAll("button[data-action]")
+        .forEach(button => {
+            button.addEventListener("click", () => {
+                sendAction(button.dataset.action);
+            });
+        });
+
+    // Custom Action dropdown intentionally has no
+    // change handler until that feature is implemented.
+</script>
+
+</body>
+</html>

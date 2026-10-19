@@ -20,6 +20,7 @@ import storage
 
 from clonker import clock, logger
 from clonker import device_config_v2 as device_config
+from clonker import actions
 
 
 # HTTP service and request limits. JSON v2 is larger than the XML v1 payload.
@@ -137,6 +138,27 @@ def _json_error(message, status="400 Bad Request"):
     return json.dumps({"error": str(message)}), status
 
 
+def _action_request(first_line):
+    """Parse a fixed room/action request; never accept arbitrary URLs."""
+    from urllib.parse import parse_qs
+
+    path = first_line.split(b" ", 2)[1].decode("ascii")
+    query = path.split("?", 1)[1]
+    params = parse_qs(query)
+
+    if set(params) != {"room", "action"}:
+        raise ValueError("Invalid action parameters")
+
+    room_id = params["room"][0]
+    action_id = params["action"][0]
+
+    if (len(params["room"]) != 1 or
+            len(params["action"]) != 1):
+        raise ValueError("Duplicate action parameters")
+
+    return actions.dispatch(room_id, action_id)
+
+
 def _build_response(first_line, request=None):
     """Route a completed request and return an entire HTTP response as bytes."""
     logger.debug("HTTP request: {}".format(first_line))
@@ -208,6 +230,20 @@ def _build_response(first_line, request=None):
             except OSError as error:
                 logger.warning("Configuration persistence error: {}".format(error))
                 body, status = _json_error("Configuration storage failed", "500 Internal Server Error")
+
+    elif first_line.startswith(b"GET /remote.html "):
+        with open(WEB_ROOT + "/remote.html", "r") as file:
+            body = file.read()
+        status = "200 OK"
+        content_type = "text/html; charset=utf-8"
+
+    elif first_line.startswith(b"POST /api/action?"):
+        try:
+            result = _action_request(first_line)
+            body = json.dumps(result)
+            status = "200 OK"
+        except (ValueError, IndexError, UnicodeError) as error:
+            body, status = _json_error(str(error))
 
     else:
         body = "Not Found"
