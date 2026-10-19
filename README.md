@@ -53,9 +53,9 @@ Raspberry Pi Pico 2 W · Grayhill · Grayhill optical VOLUME encoder · Bourns S
 Volume (ofc), Power ON / OFF, Navigation arrows and Select, and some audio / video selections like below… Also, see the [Architecture Document](docs/ARCHITECTURE.md) 
 
 <p align="left">
-  <img src="images/IMG_4742.png"
+  <img src="images/clonker_config_sample.png"
        height="300"
-       alt="Sample Functions"
+       alt="Sample Actions"
        style="vertical-align: top;">
 </p>
 
