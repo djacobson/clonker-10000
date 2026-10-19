@@ -219,6 +219,19 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Align utility panel buttons along the bottom. */
+
+        .utility-panels .panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .utility-panels .panel > button,
+        .utility-panels .panel > .button-link {
+            align-self: flex-start;
+            margin-top: auto;
+        }
     </style>
 </head>
 
