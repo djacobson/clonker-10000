@@ -176,7 +176,49 @@
 
         .toggle-fields .action-path {
             grid-column: 1 / -1;
-        } 
+        }
+
+        /* Clock and Test Remote: matching side-by-side panels. */
+
+        .utility-panels {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .utility-panels .panel {
+            margin-bottom: 0;
+        }
+
+        .utility-panels h2 {
+            margin-top: 0;
+        }
+
+        /* Give the remote link the same appearance as
+           the Synchronize with Browser button. */
+
+        .button-link {
+            display: inline-block;
+            background: #e6b85c;
+            color: #20242a;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 18px;
+            font-size: 16px;
+            font-family: Arial, sans-serif;
+            text-decoration: none;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        /* Stack panels when the screen is narrow. */
+
+        @media (max-width: 600px) {
+            .utility-panels {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -193,45 +235,51 @@
     </div>
 
 
-    <!-- Test Remote -->
+    <!-- Clock and Test Remote utility panels -->
 
-    <section class="panel">
-        <h2>Test Remote</h2>
+    <div class="utility-panels">
 
-        <p class="note">
-            Exercise Clonker actions from the browser.
-            Logging-only prototype; no device commands sent.
-        </p>
+        <!-- System Clock: left panel -->
 
-        <a href="/remote.html">
-            Open Test Remote
-        </a>
-    </section>
+        <section class="panel">
+            <h2>System Clock</h2>
+
+            <p>
+                Clock source:
+                <span class="value" id="clock-source">
+                    Not connected
+                </span>
+            </p>
+
+            <p>
+                Current time:
+                <span class="value" id="clock-time">
+                    Not available
+                </span>
+            </p>
+
+            <button id="sync-clock">
+                Synchronize with Browser
+            </button>
+        </section>
 
 
-    <!-- System Clock -->
+        <!-- Test Remote: right panel -->
 
-    <section class="panel">
-        <h2>System Clock</h2>
+        <section class="panel">
+            <h2>Test Remote</h2>
 
-        <p>
-            Clock source:
-            <span class="value" id="clock-source">
-                Not connected
-            </span>
-        </p>
+            <p class="note">
+                Exercise Clonker actions from the browser.
+                Logging-only prototype; no device commands sent.
+            </p>
 
-        <p>
-            Current time:
-            <span class="value" id="clock-time">
-                Not available
-            </span>
-        </p>
+            <a href="/remote.html" class="button-link">
+                Open Test Remote
+            </a>
+        </section>
 
-        <button id="sync-clock">
-            Synchronize with Browser
-        </button>
-    </section>
+    </div>
 
 
     <!-- JSON v2 Device Configuration -->
