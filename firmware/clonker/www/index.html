@@ -173,6 +173,10 @@
                 grid-column: 1 / -1;
             }
         }
+
+        .toggle-fields .action-path {
+            grid-column: 1 / -1;
+        } 
     </style>
 </head>
 
@@ -427,17 +431,42 @@
                 );
 
 
-                // HTTP path.
 
-                const pathControl = createField(
-                    fields,
-                    "Path (blank = no-op)",
-                    action.path,
-                    "path"
-                );
+                // HTTP paths.
+                //
+                // Power and mute toggles have separate
+                // ON and OFF paths. Ordinary actions
+                // retain a single path.
 
-                pathControl.parentElement.className =
-                    "action-path";
+                const isToggle =
+                    actionId === "power-toggle" ||
+                    actionId === "mute-toggle";
+
+                if (isToggle) {
+                    fields.classList.add("toggle-fields");
+                }
+ 
+                const pathFields = isToggle
+                    ? [
+                        ["ON Path (blank = no-op)", "on_path"],
+                        ["OFF Path (blank = no-op)", "off_path"]
+                    ]
+                    : [
+                        ["Path (blank = no-op)", "path"]
+                    ];
+
+                for (const [label, fieldName] of pathFields) {
+                    const pathControl = createField(
+                        fields,
+                        label,
+                        action[fieldName],
+                        fieldName
+                    );
+
+                    pathControl.parentElement.className =
+                        "action-path";
+                }
+
 
                 editor.appendChild(fields);
                 details.appendChild(editor);
@@ -572,11 +601,26 @@
 
                     const action = {};
 
-                    for (const fieldName of [
-                        "target",
-                        "method",
-                        "path"
-                    ]) {
+
+                    // Toggle actions have two paths;
+                    // ordinary actions have one.
+
+                    const actionId = editor.dataset.actionId;
+
+                    const isToggle =
+                        actionId === "power-toggle" ||
+                        actionId === "mute-toggle";
+
+                    const fieldNames = isToggle
+                        ? [
+                            "target", "method",
+                            "on_path", "off_path"
+                        ]
+                        : [
+                            "target", "method", "path"
+                        ];
+
+                    for (const fieldName of fieldNames) {
                         action[fieldName] = editor.querySelector(
                             '[data-field="' + fieldName + '"]'
                         ).value;

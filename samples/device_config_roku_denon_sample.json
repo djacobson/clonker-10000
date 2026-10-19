@@ -8,14 +8,16 @@
           "method": "GET"
         },
         "mute-toggle": {
-          "path": "",
           "target": "avr",
-          "method": "GET"
+          "method": "GET",
+          "on_path": "",
+          "off_path": ""
         },
         "power-toggle": {
-          "path": "",
           "target": "tv",
-          "method": "GET"
+          "method": "GET",
+          "on_path": "",
+          "off_path": ""
         },
         "home": {
           "path": "",
@@ -89,14 +91,16 @@
           "method": "POST"
         },
         "mute-toggle": {
-          "path": "",
           "target": "avr",
-          "method": "GET"
+          "method": "GET",
+          "on_path": "",
+          "off_path": ""
         },
         "power-toggle": {
-          "path": "/keypress/PowerOff",
           "target": "streaming",
-          "method": "POST"
+          "method": "POST",
+          "on_path": "",
+          "off_path": "/keypress/PowerOff"
         },
         "home": {
           "path": "/keypress/Home",
@@ -170,14 +174,16 @@
           "method": "POST"
         },
         "mute-toggle": {
-          "path": "",
           "target": "avr",
-          "method": "GET"
+          "method": "GET",
+          "on_path": "",
+          "off_path": ""
         },
         "power-toggle": {
-          "path": "/keypress/PowerOff",
           "target": "streaming",
-          "method": "POST"
+          "method": "POST",
+          "on_path": "",
+          "off_path": "/keypress/PowerOff"
         },
         "home": {
           "path": "/keypress/Home",

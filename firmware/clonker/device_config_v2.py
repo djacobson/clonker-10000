@@ -109,18 +109,50 @@ def validate_config(config):
         for action_id in ACTION_IDS:
             action = room["actions"][action_id]
             where = room_id + "." + action_id
-            _keys(action, ("target", "method", "path"), where)
-            if not isinstance(action["target"], str) or action["target"] not in DEVICE_IDS:
+
+            # Toggle actions have separate ON and OFF paths.
+            # All other fundamental actions retain one path.
+            is_toggle = action_id in ("power-toggle", "mute-toggle")
+
+            if is_toggle:
+                expected_fields = (
+                    "target", "method", "on_path", "off_path"
+                )
+            else:
+                expected_fields = ("target", "method", "path")
+
+            _keys(action, expected_fields, where)
+
+            if (not isinstance(action["target"], str) or
+                    action["target"] not in DEVICE_IDS):
                 raise ValueError("Invalid target: " + where)
-            if not isinstance(action["method"], str) or action["method"] not in ("GET", "POST"):
+
+            if (not isinstance(action["method"], str) or
+                    action["method"] not in ("GET", "POST")):
                 raise ValueError("Invalid method: " + where)
-            if not isinstance(action["path"], str) or len(action["path"]) > MAX_PATH_LENGTH:
-                raise ValueError("Invalid path: " + where)
-            actions[action_id] = {
+
+            validated_action = {
                 "target": action["target"],
                 "method": action["method"],
-                "path": action["path"],
             }
+
+            if is_toggle:
+                for field in ("on_path", "off_path"):
+                    path = action[field]
+                    if (not isinstance(path, str) or
+                            len(path) > MAX_PATH_LENGTH):
+                        raise ValueError(
+                            "Invalid " + field + ": " + where
+                        )
+                    validated_action[field] = path
+            else:
+                path = action["path"]
+                if (not isinstance(path, str) or
+                        len(path) > MAX_PATH_LENGTH):
+                    raise ValueError("Invalid path: " + where)
+                validated_action["path"] = path
+
+            actions[action_id] = validated_action
 
         # Placeholder for later user-defined HTTP actions; not implemented yet.
         if not isinstance(room["custom_actions"], list) or room["custom_actions"]:
