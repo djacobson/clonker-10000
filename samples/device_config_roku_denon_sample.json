@@ -1,3 +1,4 @@
+{
   "rooms": {
     "room-3": {
       "actions": {
@@ -99,7 +100,7 @@
           "target": "streaming",
           "off_path": "/keypress/PowerOff",
           "method": "POST",
-          "on_path": "/keypress/PowerOn"
+          "on_path": "/keypress/Home"
         },
         "home": {
           "target": "streaming",
@@ -108,18 +109,18 @@
         },
         "select": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Select",
+          "method": "POST"
         },
         "nav-up": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Up",
+          "method": "POST"
         },
         "skip-forward": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Fwd",
+          "method": "POST"
         },
         "volume-down": {
           "target": "avr",
@@ -128,13 +129,13 @@
         },
         "skip-back": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/InstantReplay",
+          "method": "POST"
         },
         "nav-left": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Left",
+          "method": "POST"
         },
         "play-pause": {
           "target": "streaming",
@@ -148,13 +149,13 @@
         },
         "nav-down": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Down",
+          "method": "POST"
         },
         "nav-right": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Right",
+          "method": "POST"
         }
       },
       "custom_actions": [],
@@ -182,7 +183,7 @@
           "target": "streaming",
           "off_path": "/keypress/PowerOff",
           "method": "POST",
-          "on_path": "/keypress/PowerOn"
+          "on_path": "/keypress/Home"
         },
         "home": {
           "target": "streaming",
@@ -191,18 +192,18 @@
         },
         "select": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Select",
+          "method": "POST"
         },
         "nav-up": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Up",
+          "method": "POST"
         },
         "skip-forward": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Fwd",
+          "method": "POST"
         },
         "volume-down": {
           "target": "avr",
@@ -211,13 +212,13 @@
         },
         "skip-back": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/InstantReplay",
+          "method": "POST"
         },
         "nav-left": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Left",
+          "method": "POST"
         },
         "play-pause": {
           "target": "streaming",
@@ -231,13 +232,13 @@
         },
         "nav-down": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Down",
+          "method": "POST"
         },
         "nav-right": {
           "target": "streaming",
-          "path": "",
-          "method": "GET"
+          "path": "/keypress/Right",
+          "method": "POST"
         }
       },
       "custom_actions": [],
