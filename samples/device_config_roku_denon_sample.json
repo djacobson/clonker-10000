@@ -1,77 +1,76 @@
-{
   "rooms": {
     "room-3": {
       "actions": {
         "back": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "mute-toggle": {
           "target": "avr",
+          "off_path": "",
           "method": "GET",
-          "on_path": "",
-          "off_path": ""
+          "on_path": ""
         },
         "power-toggle": {
           "target": "tv",
+          "off_path": "",
           "method": "GET",
-          "on_path": "",
-          "off_path": ""
+          "on_path": ""
         },
         "home": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "select": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-up": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "skip-forward": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "volume-down": {
-          "path": "",
           "target": "avr",
+          "path": "",
           "method": "GET"
         },
         "skip-back": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-left": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "play-pause": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "volume-up": {
-          "path": "",
           "target": "avr",
+          "path": "",
           "method": "GET"
         },
         "nav-down": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-right": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         }
       },
@@ -86,75 +85,75 @@
     "room-2": {
       "actions": {
         "back": {
-          "path": "/keypress/Back",
           "target": "streaming",
+          "path": "/keypress/Back",
           "method": "POST"
         },
         "mute-toggle": {
           "target": "avr",
+          "off_path": "/goform/formiPhoneAppDirect.xml?MUOFF",
           "method": "GET",
-          "on_path": "",
-          "off_path": ""
+          "on_path": "/goform/formiPhoneAppDirect.xml?MUON"
         },
         "power-toggle": {
           "target": "streaming",
+          "off_path": "/keypress/PowerOff",
           "method": "POST",
-          "on_path": "",
-          "off_path": "/keypress/PowerOff"
+          "on_path": "/keypress/PowerOn"
         },
         "home": {
-          "path": "/keypress/Home",
           "target": "streaming",
+          "path": "/keypress/Home",
           "method": "POST"
         },
         "select": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-up": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "skip-forward": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "volume-down": {
-          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN",
           "target": "avr",
+          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN",
           "method": "GET"
         },
         "skip-back": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-left": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "play-pause": {
-          "path": "/keypress/Play",
           "target": "streaming",
+          "path": "/keypress/Play",
           "method": "POST"
         },
         "volume-up": {
-          "path": "/goform/formiPhoneAppDirect.xml?MVUP",
           "target": "avr",
+          "path": "/goform/formiPhoneAppDirect.xml?MVUP",
           "method": "GET"
         },
         "nav-down": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-right": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         }
       },
@@ -169,75 +168,75 @@
     "room-1": {
       "actions": {
         "back": {
-          "path": "/keypress/Back",
           "target": "streaming",
+          "path": "/keypress/Back",
           "method": "POST"
         },
         "mute-toggle": {
           "target": "avr",
+          "off_path": "/goform/formiPhoneAppDirect.xml?MUOFF",
           "method": "GET",
-          "on_path": "",
-          "off_path": ""
+          "on_path": "/goform/formiPhoneAppDirect.xml?MUON"
         },
         "power-toggle": {
           "target": "streaming",
+          "off_path": "/keypress/PowerOff",
           "method": "POST",
-          "on_path": "",
-          "off_path": "/keypress/PowerOff"
+          "on_path": "/keypress/PowerOn"
         },
         "home": {
-          "path": "/keypress/Home",
           "target": "streaming",
+          "path": "/keypress/Home",
           "method": "POST"
         },
         "select": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-up": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "skip-forward": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "volume-down": {
-          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN",
           "target": "avr",
+          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN",
           "method": "GET"
         },
         "skip-back": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-left": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "play-pause": {
-          "path": "/keypress/Play",
           "target": "streaming",
+          "path": "/keypress/Play",
           "method": "POST"
         },
         "volume-up": {
-          "path": "/goform/formiPhoneAppDirect.xml?MVUP",
           "target": "avr",
+          "path": "/goform/formiPhoneAppDirect.xml?MVUP",
           "method": "GET"
         },
         "nav-down": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         },
         "nav-right": {
-          "path": "",
           "target": "streaming",
+          "path": "",
           "method": "GET"
         }
       },
