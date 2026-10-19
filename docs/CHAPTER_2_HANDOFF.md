@@ -128,6 +128,6 @@ Do not duplicate the entire config in a second cache unless measurement justifie
 - `README.md`: remove duplicate 'fourteen fundamental actions' bullet; update toggle wording to distinguish configured ON/OFF fields from future execution; add October 19 stub dispatcher milestone and current next milestone.
 - `docs/ARCHITECTURE.md`: mark dispatcher **stub implemented and on-device browser tested**; mark real HTTP transport and physical event capture as planned; add `actions.py` and `www/remote.html` to firmware map; update stale `firmware/clonker/device_config.py` path to `firmware/clonker/legacy/device_config.py`.
 - `docs/FIRMWARE_NETWORK.md`: add GET `/remote.html` and POST `/api/action?...` with stub response semantics and request parser compatibility note.
-- `docs/DEVELOPMENT_HISTORY.md`: append October 19 browser-remote tests as a new dated section; preserve older historical results.
+- `docs/DEVELOPMENT_HISTORY.md`: chronological engineering history through October 19, including the browser-remote milestone; append future milestones without rewriting earlier evidence.
 - `docs/DEVELOPMENT.md`: note deployment of `actions.py`, `web.py`, `index.html`, `remote.html` and SERVICE/DEVICE power-cycle requirement.
 - Do not erase older test results or call incomplete failure-injection tests passed.
