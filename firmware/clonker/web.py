@@ -246,6 +246,41 @@ def _build_response(first_line, request=None):
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
 
+    # --------------------------------------------------------
+    # TEMPORARY TEST ENDPOINT -- REMOVE BEFORE OUTBOUND HTTP
+    #
+    # CONFIG-mode bench testing only. No actual AV commands
+    # are sent by the current logging-only action dispatcher.
+    # --------------------------------------------------------
+    elif first_line.startswith(b"POST /api/test/queue?"):
+        try:
+            path = first_line.split(b" ", 2)[1]
+            command = path.split(b"?", 1)[1]
+
+            if command == b"run=delayed":
+                result = actions.test_delayed_bypass()
+
+            elif command == b"run=failure":
+                result = actions.test_failure_clears_queue()
+
+            elif command == b"run=capacity":
+                result = actions.test_fill_queue()
+
+            elif command == b"run=status":
+                result = actions.test_queue_status()
+
+            elif command == b"run=clear":
+                result = actions.test_clear_queue()
+
+            else:
+                raise ValueError("Unknown queue test")
+
+            body = json.dumps(result)
+            status = "200 OK"
+
+        except (ValueError, IndexError) as error:
+            body, status = _json_error(str(error))
+
     elif first_line.startswith(b"POST /api/action?"):
         try:
             result = _action_request(first_line)
