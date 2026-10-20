@@ -157,30 +157,13 @@ The marketing department has been disbanded.
 
 Unfortunately, nobody told them to stop submitting slogans.
 
-Current candidates:
+The current finalists:
 
-- **The Clonker 10000 — Less sleek. More CLONK.**
-- The Clonker 10000 — Fewer buttons. Bigger switches. Zero focus groups.
-- The Clonker 10000 — Designed by an engineer. Not a marketing department. You can tell because the buttons are big enough to find.
-- The Clonker 10000 — If you need reading glasses to find the volume button, somebody failed.
-- The Clonker 10000 — Big metal switches. Real mechanical feedback. No advertising space available.
-- The Clonker 10000 — Finally, a remote designed for human thumbs instead of product photography.
-- The Clonker 10000 — No rubber chiclets. No hidden screws. No marketing department.
-- The Clonker 10000 — Designed to be operated in the dark, repaired in the light, and admired from across the room.
-- The Clonker 10000 — The only remote that might require a lunchbox latch inspection before servicing.
-- The Clonker 10000 — Built for people who believe a button should announce that it's been pressed.
-- The Clonker 10000 — Our buttons are so big, the marketing department called them a safety hazard.
-- The Clonker 10000 — Not your grandfather's 117-button remote. Not your grandson's rubber chiclet, either.
-- The Clonker 10000 — Six power buttons were five too many. Sponsored buttons are one too many.
-- The Clonker 10000 — All the good stuff from yesterday. All the useful stuff from today. None of the crap.
-- The Clonker 10000 — The only remote whose service manual might include lunchbox latch adjustment.
-- The Clonker 10000 — Because programming a remote shouldn't require programming three other remotes first.
-- The Clonker 10000 — No infrared archaeology. No activity wizardry. Just CLONK.
-- The Clonker 10000 — We kept the universal remote. We fired the universal remote programming experience.
-- The Clonker 10000 — The only activity you'll need to configure is enjoying the movie.
-- The Clonker 10000 — Your home theater has an IP address. It's time your remote noticed.
-- The Clonker 10000 — Big buttons aren't just for seniors. They're for people with thumbs.
-- The Clonker 10000 — No IR codes. No programming rituals. No HELP button to help the HELP button.
+- **Less sleek. More CLONK.**
+- **Six power buttons were five too many. Sponsored buttons are one too many.**
+- **Our buttons are so big, the marketing department called them a safety hazard.**
+- **No IR codes. No programming rituals. No HELP button to help the HELP button.**
+- **[The Complete List](docs/TAGLINE_COMPETITION.md)** — Because apparently the disbanded marketing department didn't get the memo.
 
 **Winner:** TBD. The selection committee is still arguing.
 
