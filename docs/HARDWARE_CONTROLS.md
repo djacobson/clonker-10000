@@ -541,6 +541,167 @@ The future dispatcher will select ON or OFF according to independent RAM command
 
 The toggle-state algorithm is not yet implemented.
 
+### SYSTEM MASTER Ignition and Sleep/Wake Design
+
+**Design status: PROVISIONALLY AGREED — NOT IMPLEMENTED OR TESTED**
+
+**Decision date:** October 20, 2026
+
+The guarded SYSTEM MASTER momentary button has two responsibilities:
+
+1. Operate the configured home theater `power-toggle` action.
+2. Wake the Clonker itself when it is in deep sleep.
+
+These responsibilities are logically separate, even though they share
+one physical control.
+
+The preferred user experience is a single, deliberate button press.
+Holding the button down or pressing it twice should not be necessary
+for normal operation.
+
+#### Normal operation — Clonker awake
+
+When the Clonker is awake, pressing SYSTEM MASTER invokes the normal
+configured `power-toggle` action for the selected room.
+
+This is the same fundamental action available through the browser
+Test Remote.
+
+The physical button must not contain hardcoded Roku or Denon commands.
+
+The eventual dispatcher will determine the appropriate ON/OFF
+command using its normal toggle-state logic.
+
+#### Deep-sleep wake — ignition sequence
+
+The preferred behavior after a SYSTEM MASTER wake is:
+
+1. The user lifts the protective ignition guard.
+2. The user presses SYSTEM MASTER once.
+3. The Pico wakes and reboots, if required.
+4. The Clonker plays a short engine-starting sound.
+5. Wi-Fi reconnects and the runtime configuration becomes available.
+6. The Clonker invokes the configured `power-toggle` ON command.
+7. Normal remote operation resumes.
+
+**Provisional rule: Assume ON after deep sleep.**
+
+The Clonker does not need to remember the theater's previous power
+state across deep sleep.
+
+For the initial implementation, the wake-triggered action should
+select the configured `on_path`, rather than attempting to reconstruct
+the previous toggle state.
+
+This assumes the configured ON command has the intended behavior.
+A native toggle command may turn off equipment that is already on,
+so device-specific behavior must be tested.
+
+The ignition sound is intended to play only during a deep-sleep
+ignition sequence, not on every ordinary power-button press.
+
+#### Wake-event identification and fallback
+
+The Pico must reliably identify a SYSTEM MASTER wake before
+automatically sending a theater power command.
+
+If the firmware or hardware cannot reliably distinguish that wake
+event from an ordinary reboot, reset, or power restoration, the
+acceptable fallback is:
+
+- Wake or reboot the Clonker.
+- Restore normal operation.
+- Do not automatically send a theater power command.
+- Let the next SYSTEM MASTER press operate the configured action.
+
+A single press-and-release cycle must never produce duplicate
+theater power commands.
+
+Button debounce and release detection must account for startup
+and reboot behavior.
+
+#### Light sleep
+
+Light sleep is an optional, automatic power-saving optimization.
+
+It is not a separate user-facing operating mode.
+
+If implemented, the intended behavior is:
+
+- Enter light sleep after an inactivity period.
+- Wake transparently when a physical control is used.
+- Process that control's normal action.
+- Avoid unnecessary user-visible startup rituals.
+
+Light sleep may be omitted entirely if its power savings are
+insufficient or its interaction with Wi-Fi and input handling
+adds unnecessary complexity.
+
+The simpler AWAKE / DEEP SLEEP design remains acceptable.
+
+#### Battery and power architecture
+
+The preferred direction is rechargeable battery operation.
+
+A small regulated USB power bank is a candidate for early
+prototyping, but the final battery and charging architecture
+have not been selected.
+
+Battery sizing must consider:
+
+- Pico 2 W consumption during Wi-Fi operation.
+- Sleep and wake current.
+- Wi-Fi reconnect time and energy.
+- OLED power consumption.
+- Audio amplifier and speaker usage.
+- Optical encoder power requirements.
+- Power-bank low-current auto-shutdown behavior.
+- Safe charging and service access.
+
+Mechanical switches without illumination should contribute
+negligible steady-state power consumption.
+
+Actual measurements should determine battery capacity and
+whether additional power-switching hardware is needed.
+
+#### Required future experiments
+
+Before implementing this design:
+
+1. Verify CircuitPython sleep and wake support on the Pico 2 W.
+2. Determine whether a momentary GPIO input can wake the Pico
+   from the selected low-power state.
+3. Verify that a brief press is sufficient without holding
+   the button throughout boot.
+4. Determine how wake cause can be identified reliably.
+5. Measure awake, idle, and sleep current.
+6. Measure Wi-Fi reconnection time.
+7. Test exactly-once handling of the wake-triggered action.
+8. Test the configured ON command with the actual theater equipment.
+9. Evaluate audio playback during startup.
+10. Decide whether light sleep provides worthwhile benefits.
+
+Earlier sleep experiments on the ESP32-S3 Feather may provide
+useful historical context, but their hardware and API behavior
+must not be assumed to apply to the Pico 2 W.
+
+#### Implementation boundary
+
+This section records intended future behavior only.
+
+No GPIO wake source, sleep state machine, ignition sound,
+battery-management logic, or wake-triggered theater command
+has been implemented.
+
+The current development priority remains outbound HTTP action
+execution through the browser Test Remote.
+
+**Design philosophy:** One guarded button. One deliberate press.
+The Clonker handles the rest.
+
+*Because apparently turning on the television now requires
+starting an engine.*
+
 ### Guarded momentary concept
 
 The preferred direction has included:
@@ -1051,8 +1212,9 @@ For each new component, record:
 - Room selector location.
 - OLED mounting.
 - Speaker grille or sound opening.
-- Battery versus external power architecture.
-- Charging and power management.
+- Rechargeable battery selection and physical mounting.
+- Charging, current measurement, and sleep/wake power management.
+- SYSTEM MASTER wake-capable GPIO and ignition-guard clearance.
 - USB maintenance access.
 
 No final enclosure or PCB design is implied by this document.
