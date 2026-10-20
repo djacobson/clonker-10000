@@ -20,8 +20,8 @@ def dispatch(room_id, action_id):
     if action_id not in device_config.ACTION_IDS:
         raise ValueError("Unknown action")
 
-    room = device_config.room(room_id)
-    action = room["actions"][action_id]
+    room, action = device_config.action_details(room_id, action_id)
+
     target = action["target"]
     endpoint = room["devices"][target]
     is_toggle = action_id in ("mute-toggle", "power-toggle")
@@ -48,3 +48,4 @@ def dispatch(room_id, action_id):
         "configured": configured,
         "message": message,
     }
+ 

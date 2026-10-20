@@ -226,6 +226,23 @@ def room(room_id):
     return current()["rooms"][room_id]
 
 
+def action_details(room_id, action_id):
+    """Fast internal access to an already-validated fundamental action.
+
+    Returns references to the active configuration, not copies.
+    Callers MUST treat these dictionaries as read-only.
+
+    Only this module may publish or modify configuration data.
+    """
+    if _current is None:
+        raise RuntimeError("Configuration not loaded")
+
+    room = _current["rooms"][room_id]
+    action = room["actions"][action_id]
+
+    return room, action
+
+
 def revision(config=None):
     """Stable 32-bit FNV-1a revision over canonical UTF-8 JSON."""
     if config is None:
