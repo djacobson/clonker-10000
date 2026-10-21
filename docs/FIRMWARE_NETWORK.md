@@ -454,7 +454,7 @@ The dispatcher does not:
 - Parse device responses.
 - Maintain toggle command history.
 - Query actual device state.
-- Queue or retry failed commands.
+- Retry failed commands automatically (intentionally excluded from V1).
 
 These capabilities must not be inferred from the presence of configured command paths.
 

@@ -1105,9 +1105,11 @@ This journal preserves the engineering reasoning and test evidence that commit m
 
 # Where the Story Stands
 
-**As of October 19, 2026:**
+**As of October 20, 2026:**
 
-The Clonker has a working JSON v2 configuration system, browser management interface, persistent storage safeguards, and a Test Remote that exercises fourteen fundamental actions through a shared logging-only dispatcher.
+The Clonker has a working JSON v2 configuration system, browser management interface, persistent storage safeguards, and a validated logging-only Dumb Queue supporting fourteen fundamental actions per room.
+
+Chapter 3, Phase A is complete. Cooperative scheduling and HTTP responsiveness have been improved through measured bench testing, with remaining limitations documented in Milestone 7.
 
 The next major chapter is real outbound HTTP device control.
 

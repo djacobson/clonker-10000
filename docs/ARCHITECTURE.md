@@ -552,7 +552,7 @@ Physical controls must not embed vendor-specific HTTP paths or IP addresses.
 
 **Design agreed:** October 20, 2026  
 
-**Implementation status:** PLANNED — NOT IMPLEMENTED OR TESTED
+**Implementation status:** IMPLEMENTED AND BENCH-TESTED — logging-only Phase A complete; outbound HTTP pending.
 
 ### Purpose
 
@@ -1200,11 +1200,11 @@ actions.dispatch(room_id, action_id)
 
 The dispatcher validates the request and returns a logging-only result.
 
-### Planned queue integration
+### Implemented queue integration
 
-The browser request will submit an action to the queue.
+The browser request submits an action to the Dumb Queue.
 
-The API response will indicate whether the request was accepted for scheduling.
+The API response indicates whether the request was accepted for scheduling.
 
 **Queued does not mean executed.**
 
@@ -1230,7 +1230,7 @@ The firmware uses a cooperative main loop.
 
 Existing services include Wi-Fi operation, configuration handling, clock services, and inbound HTTP polling.
 
-The future action scheduler becomes another polled service.
+The action scheduler is an implemented polled service, active in both CONFIG and RUN modes.
 
 Conceptually:
 
