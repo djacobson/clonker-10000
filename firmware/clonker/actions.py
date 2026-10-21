@@ -29,9 +29,6 @@ _last_result = None
 _last_error = None
 _peak_depth = 0
 
-# Manual failure injection for bench testing only.
-_fail_next = False
-
 
 def dispatch(room_id, action_id, delay_seconds=0):
     """Validate and enqueue one fundamental action.
@@ -100,7 +97,7 @@ def dispatch(room_id, action_id, delay_seconds=0):
 
 def poll():
     """Execute at most one eligible task; never wait for a deadline."""
-    global _last_result, _last_error, _fail_next
+    global _last_result, _last_error
 
     if not _queue:
         return False
@@ -123,10 +120,6 @@ def poll():
     action_id = task["action"]
 
     try:
-        if _fail_next:
-            _fail_next = False
-            raise RuntimeError("Simulated outbound command failure")
-
         # Resolve the CURRENT configuration at execution time.
         room, action = device_config.action_details(room_id, action_id)
         target = action["target"]
@@ -193,82 +186,3 @@ def status():
         "last_result": _last_result,
         "last_error": _last_error,
     }
-
-
-# ------------------------------------------------------------
-# TEST SUPPORT -- logging-only queue validation
-#
-# Temporary functions. Remove before enabling outbound HTTP.
-# ------------------------------------------------------------
-
-def test_inject_failure_once():
-    """Make the next eligible task fail during simulated execution."""
-    global _fail_next
-    _fail_next = True
-    logger.warning("TEST: Next queued execution will fail")
-
-
-def test_delayed_bypass():
-    """Schedule a delayed Home, followed by immediate Volume Up."""
-    clear("Starting delayed-bypass test")
-
-    dispatch("room-1", "home", delay_seconds=3)
-    dispatch("room-1", "volume-up")
-
-    logger.info(
-        "TEST: Expect Volume Up immediately, Home after 3 seconds"
-    )
-    return status()
-
-
-def test_failure_clears_queue():
-    """Fail an immediate action and discard two delayed actions."""
-    clear("Starting failure-clear test")
-
-    dispatch("room-1", "home", delay_seconds=10)
-    dispatch("room-1", "nav-up", delay_seconds=10)
-    dispatch("room-1", "volume-up")
-
-    test_inject_failure_once()
-
-    logger.info(
-        "TEST: Expect Volume Up failure and 2 discarded tasks"
-    )
-    return status()
-
-
-def test_fill_queue():
-    """Fill all 128 slots with delayed tasks, then test overflow."""
-    clear("Starting queue-capacity test")
-
-    for index in range(QUEUE_CAPACITY):
-        dispatch("room-1", "volume-up", delay_seconds=30)
-
-    try:
-        dispatch("room-1", "volume-up", delay_seconds=30)
-        overflow_rejected = False
-    except ValueError:
-        overflow_rejected = True
-
-    logger.info(
-        "TEST: Queue full; overflow rejected={}".format(
-            overflow_rejected
-        )
-    )
-
-    result = status()
-    result["overflow_rejected"] = overflow_rejected
-    return result
-
-
-def test_queue_status():
-    """Return current queue diagnostics without changing the queue."""
-    return status()
-
-
-def test_clear_queue():
-    """Discard pending tasks after a diagnostic test."""
-    discarded = clear("Diagnostic test cleanup")
-    result = status()
-    result["discarded"] = discarded
-    return result
