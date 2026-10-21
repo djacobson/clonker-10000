@@ -26,7 +26,7 @@ from clonker import actions
 # HTTP service and request limits. JSON v2 is larger than the XML v1 payload.
 WEB_ROOT = "/clonker/www"
 PORT = 9090
-HTTP_DIAGNOSTICS = False
+HTTP_DIAGNOSTICS = True
 # 8192-byte maximum config plus HTTP headers and revision metadata.
 MAX_REQUEST_BYTES = 10240
 MAX_HEADER_BYTES = 2048
@@ -396,6 +396,9 @@ def poll():
             _close_client()
             return
         first_line = bytes(_request).split(b"\r\n", 1)[0]
+
+        http_trace("REQUEST: {}".format(first_line))
+
         _response = _build_response(first_line, _request)
         _request = None
         return
