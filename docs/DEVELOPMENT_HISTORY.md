@@ -51,6 +51,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 16, 2026 | 4. Defensive browser tests | Stale-revision and no-change behavior verified |
 | Oct 16–19, 2026 | 5. Production JSON and toggle schema | Active JSON v2 configuration established |
 | Oct 19, 2026 | 6. Browser Test Remote | Fourteen logging-only actions verified |
+| Oct 20, 2026 | 7. Dumb Queue and HTTP responsiveness | Logging-only queue validated; HTTP recovery improved |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -858,6 +859,187 @@ It is not a substitute for current firmware inspection or newly recorded tests.
 Some SERVICE-mode write protection and browser behaviors were reported as tested in later project documentation. A more precise HTTP-level test trace can be recorded if needed.
 
 Do not mark a test PASS merely because a feature is present in source code.
+
+
+---
+
+# Milestone 7 — The Dumb Queue Comes Alive
+
+**Date:** October 20, 2026  
+**Status:** PASS — logging-only action engine; outbound HTTP pending
+
+### Goal
+
+Replace the immediate logging-only action dispatcher with a bounded, cooperative action queue that supports scheduling, failure cancellation, and eventual outbound device commands.
+
+Verify that the queue operates alongside Clonker's existing browser management interface without compromising responsiveness.
+
+### Implementation
+
+Implemented `firmware/clonker/actions.py` as the shared Dumb Queue engine.
+
+The engine provides:
+
+- `dispatch(room_id, action_id, delay_seconds=0)` for validated action submission.
+- `poll()` for execution of at most one eligible task per invocation.
+- `clear(reason)` for cancellation of pending work.
+- `status()` for lightweight diagnostics.
+- A fixed queue capacity of 128 tasks.
+- Immediate and delayed task scheduling using `time.monotonic()`.
+- Current configuration resolution at execution time.
+- Safe no-op behavior for unconfigured commands.
+- Rejection of invalid action identifiers and queue overflow.
+- Failure handling that discards remaining pending tasks without disabling future dispatch.
+
+Queued tasks retain only room ID, action ID, and due time. They do not retain stale references to configuration objects.
+
+An immediate task may bypass an earlier delayed task. Among eligible tasks, insertion order is preserved.
+
+The browser Test Remote submits actions through the existing `/api/action` endpoint.
+
+A successful browser response means the action was queued, not that an external device executed it.
+
+During this milestone, execution remained logging-only. No actual Denon, Roku, or television commands were transmitted.
+
+### Test evidence
+
+| Test | Result |
+|---|---|
+| Browser Volume Up submission | PASS |
+| Queued action executes through `actions.poll()` | PASS |
+| Delayed Home followed by immediate Volume Up | PASS |
+| Immediate action bypasses delayed action | PASS |
+| Simulated execution failure | PASS |
+| Failure discards two pending tasks | PASS |
+| Queue fills to 128 tasks | PASS |
+| 129th task rejected | PASS |
+| Queued tasks drain after deadlines | PASS |
+| Browser actions after test-code cleanup | PASS |
+| Actual outbound HTTP commands | PENDING |
+| Real network failure and timeout handling | PENDING |
+| Toggle direction history | PENDING |
+
+The failure test produced the expected cancellation message:
+
+`DUMB QUEUE: FAILED; 2 pending tasks discarded`
+
+The capacity test reported:
+
+`DUMB QUEUE: Full; action rejected`
+
+and confirmed:
+
+`overflow_rejected=True`
+
+The delayed-bypass test demonstrated that Volume Up executed before the earlier-enqueued, future-dated Home command.
+
+### Scheduler responsiveness investigation
+
+Initial integration placed `actions.poll()` inside the unrestricted main loop.
+
+The application subsequently exhibited intermittent management-page delays and difficulty reconnecting the CircuitPython serial console.
+
+Temporarily disabling action polling substantially improved responsiveness.
+
+The scheduler was then changed to use a 10 ms polling interval, improving behavior further.
+
+A 1 ms sleep was added at the end of each main-loop iteration to yield execution time to the CircuitPython runtime.
+
+The resulting development baseline is:
+
+| Setting | Value |
+|---|---|
+| Action polling interval | 10 ms |
+| Management HTTP polling interval | 10 ms |
+| Main-loop sleep | 1 ms |
+
+These settings improved observed responsiveness. The tests did not isolate a single definitive cause for the original serial-console instability.
+
+The queue's empty-state poll is inexpensive, so the result should not be interpreted as proof that queue processing itself was computationally expensive.
+
+### HTTP responsiveness investigation
+
+A separate intermittent delay remained when navigating between the browser Configuration and Test Remote pages.
+
+The existing inbound HTTP server handles one active client at a time.
+
+Additional diagnostics identified accepted connections that transmitted no request data before timing out:
+
+`HTTP client timed out: phase=RECEIVING, request_bytes=0`
+
+These connections temporarily occupied the server's only active client slot.
+
+The original four-second client timeout was replaced with separate limits:
+
+| Connection condition | Timeout |
+|---|---|
+| No request bytes received | 0.5 seconds |
+| Active receive or send operation | 4.0 seconds |
+
+The shorter silent-client timeout substantially reduced navigation pauses.
+
+The behavior was observed with Chrome on Windows and Safari on iPad.
+
+Additional request tracing confirmed successful handling of:
+
+- `GET /`
+- `GET /remote.html`
+- `GET /api/clock`
+- `GET /api/config`
+- `POST /api/action`
+
+Some idle connections continued to time out, but recovery was much faster.
+
+The evidence is consistent with idle or abandoned browser connections. Their precise origin was not conclusively established.
+
+### Cleanup and final validation
+
+After successful queue testing:
+
+- Removed temporary queue-test helper functions.
+- Removed simulated failure injection.
+- Removed the temporary `/api/test/queue` diagnostic endpoint.
+- Preserved production queue failure handling.
+- Preserved the browser `/api/action` endpoint.
+- Disabled verbose HTTP tracing with `HTTP_DIAGNOSTICS = False`.
+- Retained useful timeout warnings.
+
+A final browser Volume Up test confirmed the normal sequence:
+
+`QUEUED: Den / volume-up (depth 1)`
+
+followed by:
+
+`SIMULATED: Den / volume-up -> avr 192.168.50.44:8080 (no HTTP sent)`
+
+The queue continued operating after diagnostic cleanup.
+
+### Remaining limitations
+
+- Outbound HTTP transport has not been implemented.
+- No actual equipment command was transmitted.
+- HTTP response handling and real network failure recovery remain untested.
+- Toggle ON/OFF history is not implemented.
+- Physical GPIO input is not connected.
+- Long-duration responsiveness and memory stability have not been characterized.
+- A nonempty queue-clear operation after a configuration change was not separately demonstrated during this milestone.
+- The exact cause of idle browser connections remains unconfirmed.
+
+### Outcome
+
+**Chapter 3, Phase A completed successfully within its logging-only test scope.**
+
+Clonker now has one shared, bounded action queue with cooperative scheduling and explicit failure policy.
+
+The browser management interface remains usable with the revised scheduler and HTTP timeout settings.
+
+The next milestone is real outbound HTTP transport.
+
+The Dumb Queue has learned to take orders, wait its turn, and cancel everybody's plans when something goes wrong.
+
+It has not yet learned to boss around the Denon.
+
+**CLONK! ⚡🔩**
 
 ---
 

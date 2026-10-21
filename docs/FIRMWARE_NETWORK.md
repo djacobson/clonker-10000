@@ -3,7 +3,7 @@
 **Design reference:** Updated October 19, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
 **Runtime:** CircuitPython 10.3.1  
-**Status:** Wi-Fi, CONFIG HTTP service, JSON v2 configuration, browser clock, and logging-only action dispatch operational. Outbound device HTTP pending.
+**Status:** Wi-Fi, CONFIG HTTP service, JSON v2 configuration, browser clock, and logging-only Dumb Queue operational. Outbound device HTTP pending.
 
 > **One monster, two directions of HTTP traffic: inbound management and outbound equipment control.**
 
@@ -71,26 +71,62 @@ The dispatcher reads current configuration through `device_config.room()` rather
 
 ### Cooperative scheduling
 
-The main loop currently uses:
+**Implementation baseline:** October 20, 2026
+
+The application uses a cooperative main loop with independently scheduled action and management HTTP polling.
+
+Current timing constants:
 
 ```python
 WEB_POLL_INTERVAL = 0.01
+ACTION_POLL_INTERVAL = 0.01
 ```
 
-When CONFIG is enabled, the loop attempts to poll the management HTTP service approximately every 10 milliseconds.
+The main loop also yields briefly:
 
-This is a scheduling interval, **not a guaranteed response time**.
+```python
+time.sleep(0.001)
+```
 
-The intended future priority order is:
+The intended execution priority is:
 
-1. Physical GPIO input capture.
-2. Generic action/event dispatch.
-3. Timers and periodic tasks.
+1. Physical GPIO input handling (future).
+2. One eligible queued action.
+3. CONFIG/RUN mode evaluation.
 4. CONFIG management HTTP polling.
+5. Brief idle sleep.
 
-The main loop contains placeholders for these future priorities.
+`actions.poll()` executes at most one eligible task per invocation.
 
-The browser dispatcher is already callable through `web.py`, but it is not yet a physical-input event loop.
+A future-dated task does not block a later immediate task.
+
+Action polling remains enabled in both CONFIG and RUN modes.
+
+The inbound management HTTP listener runs only in CONFIG mode.
+
+The 10 ms polling intervals are scheduling targets, not guaranteed response latencies.
+
+#### Responsiveness findings
+
+During October 20 bench testing, unrestricted action polling coincided with intermittent serial-console connection difficulty and slow browser page loading.
+
+Limiting action polling to approximately 100 Hz improved responsiveness.
+
+Adding a 1 ms main-loop sleep improved responsiveness further.
+
+These changes were retained as the development baseline.
+
+The investigation did not conclusively establish whether the original behavior resulted from CPU scheduling, USB servicing, Wi-Fi interaction, or another runtime effect.
+
+Further tuning should be driven by measured behavior under actual outbound HTTP and physical input workloads.
+
+#### GPIO implications
+
+A 1 ms main-loop sleep is a reasonable initial setting for ordinary momentary buttons.
+
+It is not yet a validated sampling strategy for the Grayhill optical volume encoder.
+
+Encoder pulse rates, decoding reliability, and possible interrupt-driven handling must be evaluated during physical hardware integration.
 
 ### CONFIG/RUN transitions
 
@@ -755,6 +791,88 @@ Roku POST requests may initially follow the form-style convention previously exe
 Actual request framing and device response handling must be verified on the Pico.
 
 The final system-power strategy remains unverified.
+
+
+## HTTP Responsiveness and Connection Lifecycle — October 20, 2026
+
+### Observed behavior
+
+The CONFIG management server uses a cooperative, single-active-client HTTP implementation.
+
+Browser navigation occasionally paused while the server waited for an accepted TCP connection that transmitted no request data.
+
+The behavior was observed in:
+
+- Chrome on a Windows Lenovo laptop.
+- Safari on an iPad.
+
+The browser-specific cause was not conclusively established.
+
+### Diagnostic evidence
+
+Temporary HTTP tracing showed accepted connections followed by zero-byte receive timeouts:
+
+```text
+HTTP client timed out: phase=RECEIVING,
+request_bytes=0, sent_bytes=0, response_bytes=0
+```
+
+Other connections successfully processed ordinary browser requests.
+
+The traces confirmed successful routing of the configuration page, Test Remote page, clock API, configuration API, and action API.
+
+No corresponding application crash was observed during the final tests.
+
+### Timeout policy
+
+The HTTP server now distinguishes silent connections from active transfers.
+
+```python
+IDLE_CLIENT_TIMEOUT_SECONDS = 0.5
+CLIENT_TIMEOUT_SECONDS = 4.0
+```
+
+A connection that has not provided any request bytes is abandoned after approximately half a second.
+
+Connections that have begun receiving request data, or are sending a response, retain the four-second inactivity timeout.
+
+This prevents an idle connection from occupying the single active-client slot for the full four seconds.
+
+### Diagnostics
+
+The server retains:
+
+```python
+HTTP_DIAGNOSTICS = False
+```
+
+When enabled, the diagnostic trace reports accepted connections and parsed request lines.
+
+Normal operation leaves verbose tracing disabled.
+
+Timeout warnings remain available without verbose tracing.
+
+### Remaining limitations
+
+- Only one inbound client is serviced at a time.
+- Browser-created idle connections can still cause brief pauses.
+- The exact origin of those connections has not been established.
+- A short idle timeout is a mitigation, not a multi-client architecture.
+- Real outbound device communication has not yet been tested alongside the inbound management server.
+
+The current behavior is acceptable for initial single-user CONFIG-mode development.
+
+Do not introduce multi-client complexity without evidence that it is necessary.
+
+### Outbound HTTP considerations
+
+The planned outbound transport will share the Pico's Wi-Fi radio with the management interface.
+
+Outbound operations must use bounded network timeouts and release their sockets.
+
+The action engine remains responsible for queue cancellation and failure policy.
+
+The transport must not alter inbound HTTP connection state or own the Dumb Queue.
 
 ## 13. Next Development and Test Sequence
 
