@@ -336,7 +336,18 @@ def poll():
 
     # Discard clients that stop making progress.
     if now - _last_activity > CLIENT_TIMEOUT_SECONDS:
-        logger.warning("HTTP client timed out")
+        phase = "RECEIVING" if _response is None else "SENDING"
+
+        logger.warning(
+            "HTTP client timed out: phase={}, "
+            "request_bytes={}, sent_bytes={}, response_bytes={}".format(
+                phase,
+                len(_request) if _request is not None else 0,
+                _sent,
+                len(_response) if _response is not None else 0
+            )
+        )
+
         _close_client()
         return
 
