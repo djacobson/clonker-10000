@@ -31,6 +31,11 @@ HTTP_DIAGNOSTICS = False
 MAX_REQUEST_BYTES = 10240
 MAX_HEADER_BYTES = 2048
 IO_CHUNK_BYTES = 512
+
+# Abandon silent browser connections quickly.
+IDLE_CLIENT_TIMEOUT_SECONDS = 0.5
+
+# Allow active requests and responses more time.
 CLIENT_TIMEOUT_SECONDS = 4.0
 
 # Connection state is kept across poll() calls rather than blocking on I/O.
@@ -335,7 +340,20 @@ def poll():
         return
 
     # Discard clients that stop making progress.
-    if now - _last_activity > CLIENT_TIMEOUT_SECONDS:
+    # A connection that has sent no request data gets a short grace
+    # period. Active requests and responses retain the full timeout.
+    silent_client = (
+        _response is None
+        and _request is not None
+        and len(_request) == 0
+    )
+
+    timeout = (
+        IDLE_CLIENT_TIMEOUT_SECONDS
+        if silent_client else CLIENT_TIMEOUT_SECONDS
+    )
+
+    if now - _last_activity > timeout:
         phase = "RECEIVING" if _response is None else "SENDING"
 
         logger.warning(
