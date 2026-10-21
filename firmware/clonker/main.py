@@ -88,6 +88,10 @@ def main():
                         time.monotonic() + WEB_POLL_INTERVAL
                     )
 
+            # Yield briefly to the CircuitPython runtime.
+            # Keep this INSIDE the while True loop.
+            time.sleep(0.001)
+
     finally:
         if web_running:
             web.stop()
