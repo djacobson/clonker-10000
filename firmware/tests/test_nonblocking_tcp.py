@@ -27,15 +27,27 @@ import socketpool
 import errno
 
 
-HOST = "192.168.50.40"
-PORT = 8080
-
+# Denon
+# HOST = "192.168.50.40"
+# PORT = 8080
+#
 # Test several delays between connect() and send().
-DELAYS = (0.0, 0.05, 0.25, 1.0)
+# DELAYS = (0.0, 0.05, 0.25, 1.0)
+#
+# REQUEST = (
+#    "GET / HTTP/1.1\r\n"
+#    "Host: 192.168.50.40:8080\r\n"
+#    "Connection: close\r\n"
+#    "\r\n"
+# ).encode()
+
+# Roku
+HOST = "192.168.50.28"
+PORT = 8060
 
 REQUEST = (
-    "GET / HTTP/1.1\r\n"
-    "Host: 192.168.50.40:8080\r\n"
+    "GET /query/device-info HTTP/1.1\r\n"
+    "Host: 192.168.50.28:8060\r\n"
     "Connection: close\r\n"
     "\r\n"
 ).encode()
