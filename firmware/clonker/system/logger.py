@@ -7,7 +7,7 @@
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
 
-from clonker import clock
+from clonker.system import clock
 
 DEBUG = 10
 INFO = 20
