@@ -288,23 +288,24 @@ After successful queue testing, introduce outbound HTTP transport and perform th
 
 | `firmware/clonker/actions.py` | Shared fundamental dispatcher; future queue and toggle history |
 
-| `firmware/clonker/web.py` | Inbound CONFIG-mode HTTP service |
+| `firmware/clonker/net/web.py` | Inbound CONFIG-mode HTTP service |
 
 | `firmware/clonker/www/index.html` | Browser configuration and clock interface |
 
 | `firmware/clonker/www/remote.html` | Browser Test Remote |
 
-| `firmware/clonker/clock.py` | Monotonic and browser-synchronized time services |
+| `firmware/clonker/system/clock.py` | Monotonic and browser-synchronized time services |
 
-| `firmware/clonker/logger.py` | Serial diagnostics |
+| `firmware/clonker/system/logger.py` | Serial diagnostics |
 
 | `firmware/clonker/legacy/device_config.py` | Historical XML v1 engine |
 
 | `firmware/clonker/legacy/device_config.xml` | Historical XML v1 example |
 
-An outbound HTTP transport module has not yet been implemented.
 
-Its final filename and interface will be established during development.
+The outbound HTTP transport is planned for `firmware/clonker/net/http_transport.py` during Chapter 3, Phase B. It is not yet implemented.
+
+The `net/` package owns networking services; the `system/` package owns shared clock and logging services.
 
 The deployed Pico configuration may differ from the JSON example committed to GitHub.
 

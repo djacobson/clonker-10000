@@ -186,7 +186,7 @@ See [Operating Modes](OPERATING_MODES.md).
 
 The inbound HTTP server is implemented in:
 
-`firmware/clonker/web.py`
+`firmware/clonker/net/web.py`
 
 It listens on TCP port:
 
@@ -589,7 +589,7 @@ See [Configuration & Recovery](CONFIGURATION.md) for full details.
 
 The central clock service is:
 
-`firmware/clonker/clock.py`
+`firmware/clonker/system/clock.py`
 
 It supports two current behaviors:
 
@@ -654,7 +654,7 @@ The clock is primarily a diagnostic timestamp service.
 
 The logging module is:
 
-`firmware/clonker/logger.py`
+`firmware/clonker/system/logger.py`
 
 It supports four severity levels:
 

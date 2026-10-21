@@ -165,12 +165,16 @@ firmware/
 ├── DEPENDENCIES.md
 └── clonker/
     ├── main.py
-    ├── web.py
     ├── actions.py
     ├── device_config_v2.py
     ├── device_config.json
-    ├── clock.py
-    ├── logger.py
+    ├── net/
+    │   ├── __init__.py
+    │   └── web.py
+    ├── system/
+    │   ├── __init__.py
+    │   ├── clock.py
+    │   └── logger.py
     ├── controls/
     │   ├── pins.py
     │   └── switches.py
@@ -191,12 +195,12 @@ This is a functional map, not necessarily a complete listing of every file in th
 | `boot.py` | SERVICE/DEVICE filesystem selection |
 | `code.py` | CircuitPython application entry point |
 | `clonker/main.py` | Main loop and CONFIG server lifecycle |
-| `clonker/web.py` | Browser HTTP server and API routing |
 | `clonker/actions.py` | Shared fundamental action dispatcher |
 | `clonker/device_config_v2.py` | JSON schema, validation, persistence, recovery |
 | `clonker/device_config.json` | Configured rooms, endpoints, and actions |
-| `clonker/clock.py` | Clock state and synchronization support |
-| `clonker/logger.py` | Diagnostic logging |
+| `clonker/net/web.py` | Browser HTTP server and API routing |
+| `clonker/system/clock.py` | Clock state and synchronization support |
+| `clonker/system/logger.py` | Diagnostic logging |
 | `clonker/controls/pins.py` | Developer-defined GPIO placeholders |
 | `clonker/controls/switches.py` | CONFIG switch state abstraction |
 | `clonker/www/index.html` | Configuration and management interface |
@@ -427,11 +431,17 @@ Examples:
 | `firmware/boot.py` | `/boot.py` |
 | `firmware/code.py` | `/code.py` |
 | `firmware/clonker/main.py` | `/clonker/main.py` |
-| `firmware/clonker/web.py` | `/clonker/web.py` |
+| `firmware/clonker/net/web.py` | `/clonker/net/web.py` |
+| `firmware/clonker/system/clock.py` | `/clonker/system/clock.py` |
+| `firmware/clonker/system/logger.py` | `/clonker/system/logger.py` |
 | `firmware/clonker/actions.py` | `/clonker/actions.py` |
 | `firmware/clonker/device_config_v2.py` | `/clonker/device_config_v2.py` |
 | `firmware/clonker/www/index.html` | `/clonker/www/index.html` |
 | `firmware/clonker/www/remote.html` | `/clonker/www/remote.html` |
+
+The `net/` and `system/` directories are Python packages and include `__init__.py` files. Preserve these files during deployment. Imports use explicit package paths such as `from clonker.net import web` and `from clonker.system import logger`.
+
+When reorganizing modules, remove obsolete files from their previous Pico locations to avoid stale copies.
 
 Preserve the directory structure.
 
