@@ -1198,7 +1198,7 @@ actions.dispatch(room_id, action_id)
 
 ```
 
-The dispatcher validates the request and returns a logging-only result.
+The dispatcher validates the request, enqueues the action, and returns a queue-acceptance acknowledgment. Actual execution remains logging-only during Phase A.
 
 ### Implemented queue integration
 
@@ -1436,6 +1436,69 @@ Some broader checks listed above, including wall-clock independence and clearing
 
 See [Development History](DEVELOPMENT_HISTORY.md), Milestone 7, for test evidence and the scheduler/HTTP responsiveness investigation.
 
+### Phase A implementation baseline — October 20, 2026
+
+The logging-only Dumb Queue is implemented and bench-tested.
+
+The current action engine:
+
+- Accepts fundamental actions through `dispatch()`.
+- Maintains a bounded 128-task queue.
+- Stores room ID, action ID, and monotonic due time.
+- Executes at most one eligible task per `poll()`.
+- Allows immediate actions to bypass future-dated tasks.
+- Resolves current configuration when executing.
+- Logs simulated execution without transmitting HTTP.
+- Treats blank commands and endpoints as safe no-ops.
+- Clears pending tasks after execution failure.
+- Rejects overflow rather than discarding existing work.
+
+The temporary diagnostic test functions and HTTP test endpoint were removed after validation.
+
+#### Cooperative scheduling baseline
+
+The current development settings are:
+
+| Parameter | Value |
+|---|---|
+| Action poll interval | 0.01 seconds |
+| Management HTTP poll interval | 0.01 seconds |
+| Main-loop idle sleep | 0.001 seconds |
+| Silent inbound HTTP client timeout | 0.5 seconds |
+| Active inbound HTTP client timeout | 4.0 seconds |
+
+These values improved observed responsiveness during bench testing.
+
+They are implementation settings, not guaranteed real-time performance limits.
+
+#### Inbound HTTP behavior
+
+The CONFIG management server currently supports one active client connection.
+
+Some browsers establish connections that send no HTTP request bytes. Such connections can temporarily prevent another request from being accepted.
+
+A short silent-client timeout limits the resulting delay without imposing the same deadline on active transfers.
+
+Occasional zero-byte timeout warnings may remain during browser navigation.
+
+The management server and outbound equipment transport have separate responsibilities and must remain architecturally independent.
+
+#### Phase B readiness
+
+The queue is ready for initial integration with a minimal outbound HTTP transport.
+
+The following remain pending:
+
+- Actual GET and POST transmission.
+- Bounded outbound socket operations.
+- HTTP response validation.
+- Network failure and timeout tests.
+- Toggle history and direction selection.
+- RUN-mode execution with physical inputs.
+- Measured throughput under real device traffic.
+
+Do not interpret successful queue simulation as proof of outbound networking reliability.
+
 ### Phase B — First real outbound command
 
 After logging-only queue validation:
@@ -1507,69 +1570,6 @@ After logging-only queue validation:
 This development sequence is deliberately incremental.
 
 Do not introduce untested complexity merely because a future feature might eventually need it.
-
-### Phase A implementation baseline — October 20, 2026
-
-The logging-only Dumb Queue is implemented and bench-tested.
-
-The current action engine:
-
-- Accepts fundamental actions through `dispatch()`.
-- Maintains a bounded 128-task queue.
-- Stores room ID, action ID, and monotonic due time.
-- Executes at most one eligible task per `poll()`.
-- Allows immediate actions to bypass future-dated tasks.
-- Resolves current configuration when executing.
-- Logs simulated execution without transmitting HTTP.
-- Treats blank commands and endpoints as safe no-ops.
-- Clears pending tasks after execution failure.
-- Rejects overflow rather than discarding existing work.
-
-The temporary diagnostic test functions and HTTP test endpoint were removed after validation.
-
-#### Cooperative scheduling baseline
-
-The current development settings are:
-
-| Parameter | Value |
-|---|---|
-| Action poll interval | 0.01 seconds |
-| Management HTTP poll interval | 0.01 seconds |
-| Main-loop idle sleep | 0.001 seconds |
-| Silent inbound HTTP client timeout | 0.5 seconds |
-| Active inbound HTTP client timeout | 4.0 seconds |
-
-These values improved observed responsiveness during bench testing.
-
-They are implementation settings, not guaranteed real-time performance limits.
-
-#### Inbound HTTP behavior
-
-The CONFIG management server currently supports one active client connection.
-
-Some browsers establish connections that send no HTTP request bytes. Such connections can temporarily prevent another request from being accepted.
-
-A short silent-client timeout limits the resulting delay without imposing the same deadline on active transfers.
-
-Occasional zero-byte timeout warnings may remain during browser navigation.
-
-The management server and outbound equipment transport have separate responsibilities and must remain architecturally independent.
-
-#### Phase B readiness
-
-The queue is ready for initial integration with a minimal outbound HTTP transport.
-
-The following remain pending:
-
-- Actual GET and POST transmission.
-- Bounded outbound socket operations.
-- HTTP response validation.
-- Network failure and timeout tests.
-- Toggle history and direction selection.
-- RUN-mode execution with physical inputs.
-- Measured throughput under real device traffic.
-
-Do not interpret successful queue simulation as proof of outbound networking reliability.
 
 ---
 

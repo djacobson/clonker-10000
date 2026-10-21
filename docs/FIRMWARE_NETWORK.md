@@ -422,53 +422,113 @@ This established the browser-to-dispatcher path without risking unintended AV co
 
 The next milestone is to extend that shared dispatcher to perform real outbound HTTP requests.
 
-## 7. Shared Action Dispatcher
+## 7. Shared Action Dispatcher — The Dumb Queue
 
-The current dispatcher is implemented in:
+**Implementation status:** Chapter 3, Phase A complete (October 20, 2026).
+
+The shared action engine is implemented in:
 
 `firmware/clonker/actions.py`
 
-It currently:
+It is a cooperative, bounded task queue used by the browser Test Remote and intended for future physical controls and custom actions.
 
-- Validates the room ID.
-- Validates the action ID.
-- Reads the current room configuration.
-- Resolves the action's target category.
-- Checks whether the target endpoint is configured.
-- Checks whether command paths are present.
-- Logs the action.
-- Returns a JSON-serializable stub result.
+### Action submission
 
-For ordinary actions, it checks the configured `path`.
+The browser submits a fundamental action through:
 
-For toggles, it considers `on_path` and `off_path` as candidate paths.
+```text
+POST /api/action?room=room-1&action=volume-up
+```
 
-It does not yet choose an ON/OFF direction.
+The HTTP handler calls:
+
+```python
+actions.dispatch(room_id, action_id)
+```
+
+The dispatcher:
+
+- Validates the room and action IDs.
+- Checks the configured target and command paths.
+- Rejects submission when the queue is full.
+- Appends a task containing room ID, action ID, and due time.
+- Returns a JSON-serializable acknowledgment.
+
+The acknowledgment reports `status: queued`.
+
+**Queued does not mean executed.**
+
+### Queue execution
+
+The cooperative main loop calls:
+
+```python
+actions.poll()
+```
+
+Each invocation executes at most one eligible task.
+
+The engine:
+
+- Maintains a maximum of 128 pending tasks.
+- Supports immediate and monotonic-time delayed execution.
+- Allows immediate tasks to bypass future-dated tasks.
+- Preserves insertion order among eligible tasks.
+- Resolves the current validated configuration at execution time.
+- Logs simulated execution or an unconfigured no-op.
+- Clears remaining pending tasks after an execution failure.
+
+The queue runs in both CONFIG and RUN modes.
+
+During Phase A, execution is logging-only. No equipment commands are transmitted.
+
+### Queue management
+
+The production interface includes:
+
+```python
+actions.dispatch(room_id, action_id, delay_seconds=0)
+actions.poll()
+actions.clear(reason="Manual reset")
+actions.status()
+```
+
+A successful configuration change clears pending tasks so that commands from an earlier configuration cannot remain scheduled.
+
+Temporary diagnostic test functions and the `/api/test/queue` endpoint were removed after Phase A validation.
+
+### Toggle behavior
+
+The JSON v2 schema provides separate `on_path` and `off_path` fields for power and mute toggles.
+
+The queue currently checks whether either path is configured.
+
+It does not yet select a direction or maintain toggle history.
+
+Toggle direction selection is reserved for a later implementation step.
 
 ### Current limitations
 
-The dispatcher does not:
+The action engine does not yet:
 
-- Open outbound network connections.
-- Send HTTP GET or POST commands.
-- Parse device responses.
-- Maintain toggle command history.
-- Query actual device state.
-- Retry failed commands automatically (intentionally excluded from V1).
+- Open outbound device connections.
+- Send actual HTTP GET or POST commands.
+- Validate device HTTP responses.
+- Maintain toggle direction history.
+- Query actual equipment state.
+- Retry failed commands automatically (excluded from the initial design).
 
-These capabilities must not be inferred from the presence of configured command paths.
+These limitations do not prevent queue submission or simulated execution.
 
-### Shared dispatcher principle
+### Shared action principle
 
-Future physical buttons and encoders should call the same dispatcher used by the browser Test Remote.
+The browser Test Remote, physical controls, and future custom commands must use the same action engine.
 
-Physical control code must not contain Denon, Roku, or LG command syntax.
+Physical control code must not contain vendor-specific HTTP paths or device IP addresses.
 
-The dispatcher resolves generic actions against current JSON v2 configuration.
+The action engine resolves generic actions against the current JSON v2 configuration.
 
-The outbound transport handles HTTP communication.
-
-This preserves the core principle:
+The outbound transport handles device communication.
 
 **Clonker controls actions, not brands.**
 
