@@ -14,8 +14,8 @@ Outbound actions are logging-only during Chapter 3, Phase A.
 
 import time
 
-from clonker import logger
-from clonker import web
+from clonker.system import logger
+from clonker.net import web
 from clonker import actions
 from clonker.controls import switches
 from clonker import device_config_v2 as device_config

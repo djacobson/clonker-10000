@@ -18,7 +18,7 @@ import json
 import errno
 import storage
 
-from clonker import clock, logger
+from clonker.system import clock, logger
 from clonker import device_config_v2 as device_config
 from clonker import actions
 

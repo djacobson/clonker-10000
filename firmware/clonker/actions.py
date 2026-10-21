@@ -15,7 +15,7 @@ remaining tasks, but does not disable the queue.
 
 import time
 
-from clonker import logger
+from clonker.system import logger
 from clonker import device_config_v2 as device_config
 
 

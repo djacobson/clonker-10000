@@ -9,7 +9,7 @@
 # GitHub: https://github.com/djacobson/clonker-10000
 
 # Test
-# from clonker import clock
+# from clonker.system import clock
 # clock.set_utc(1791579600, "BROWSER")
 # print(clock.timestamp())
 
