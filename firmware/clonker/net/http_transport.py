@@ -25,8 +25,9 @@ import wifi
 DEFAULT_PORT = 80
 
 # Initial diagnostic values; tune using real device measurements.
-SOCKET_TIMEOUT = 1.0
-TOTAL_TIMEOUT = 2.5
+SOCKET_TIMEOUT = 0.5
+TOTAL_TIMEOUT = 1.5
+
 
 MAX_STATUS_LINE = 128
 HTTP_DIAGNOSTICS = True

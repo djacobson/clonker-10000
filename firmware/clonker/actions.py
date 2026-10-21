@@ -1,21 +1,28 @@
 # The Clonker 10000
-# clonker/actions.py -- The Dumb Queue (logging-only prototype)
+# clonker/actions.py -- The Dumb Queue
+#
+# Chapter 3, Phase B2 -- Real HTTP execution
 #
 # Clonker Designed by David Jacobson
 
 """Shared action dispatcher and cooperative task queue.
 
-Chapter 3, Phase A: simulate command execution through serial logging.
-No outbound HTTP requests are sent.
+One poll executes at most one eligible task. Future-dated tasks
+never prevent immediate tasks from running.
 
-One poll executes at most one eligible task. Future-dated tasks never
-prevent immediate tasks from running. An execution failure discards all
-remaining tasks, but does not disable the queue.
+Commands resolve against the CURRENT configuration at execution time.
+
+An execution failure discards all remaining tasks, but does not
+disable the queue. No automatic retries.
+
+Toggle state tracking is deferred. Toggle actions are not
+transmitted until ON/OFF selection is implemented.
 """
 
 import time
 
 from clonker.system import logger
+from clonker.net import http_transport
 from clonker import device_config_v2 as device_config
 
 
@@ -31,11 +38,7 @@ _peak_depth = 0
 
 
 def dispatch(room_id, action_id, delay_seconds=0):
-    """Validate and enqueue one fundamental action.
-
-    The browser uses the default immediate scheduling. The optional delay
-    supports future custom commands and direct REPL scheduler tests.
-    """
+    """Validate and enqueue one fundamental action."""
     global _peak_depth
 
     if room_id not in device_config.ROOM_IDS:
@@ -50,18 +53,24 @@ def dispatch(room_id, action_id, delay_seconds=0):
         logger.warning("DUMB QUEUE: Full; action rejected")
         raise ValueError("Action queue full")
 
-    # Configuration is authoritative. Do not retain references to it
-    # inside queued tasks.
-    room, action = device_config.action_details(room_id, action_id)
+    # Configuration is authoritative. Do not retain references
+    # to it inside queued tasks.
+    room, action = device_config.action_details(
+        room_id, action_id
+    )
 
     target = action["target"]
     endpoint = room["devices"][target]
-    is_toggle = action_id in ("mute-toggle", "power-toggle")
+
+    is_toggle = action_id in (
+        "mute-toggle", "power-toggle"
+    )
 
     paths = (
         (action["on_path"], action["off_path"])
         if is_toggle else (action["path"],)
     )
+
     configured = bool(endpoint and any(paths))
 
     due = (
@@ -96,7 +105,7 @@ def dispatch(room_id, action_id, delay_seconds=0):
 
 
 def poll():
-    """Execute at most one eligible task; never wait for a deadline."""
+    """Execute at most one eligible task."""
     global _last_result, _last_error
 
     if not _queue:
@@ -106,7 +115,6 @@ def poll():
     selected = None
 
     # Find the first eligible task in insertion order.
-    # A delayed task cannot hold an immediate task hostage.
     for index, task in enumerate(_queue):
         if task["due"] == 0 or now >= task["due"]:
             selected = index
@@ -116,54 +124,101 @@ def poll():
         return False
 
     task = _queue.pop(selected)
+
     room_id = task["room"]
     action_id = task["action"]
 
     try:
-        # Resolve the CURRENT configuration at execution time.
-        room, action = device_config.action_details(room_id, action_id)
+        # Resolve CURRENT configuration at execution time.
+        room, action = device_config.action_details(
+            room_id, action_id
+        )
+
+        room_name = room["name"]
         target = action["target"]
         endpoint = room["devices"][target]
+        method = action["method"]
 
-        is_toggle = action_id in ("mute-toggle", "power-toggle")
-        if is_toggle:
-            # Toggle history is a later milestone. Neither direction
-            # is selected or implied during this logging-only phase.
-            paths = (action["on_path"], action["off_path"])
-        else:
-            paths = (action["path"],)
+        # Toggle selection requires state tracking.
+        # Never guess ON or OFF.
+        if action_id in ("mute-toggle", "power-toggle"):
+            message = (
+                "DEFERRED: {} / {} "
+                "(toggle state not implemented)"
+            ).format(room_name, action_id)
 
-        configured = bool(endpoint and any(paths))
+            logger.info(message)
+            _last_result = message
+            _last_error = None
+            return True
 
-        if configured:
-            message = "SIMULATED: {} / {} -> {} {} (no HTTP sent)".format(
-                room["name"], action_id, target, endpoint
-            )
-        else:
+        path = action["path"]
+
+        # Blank endpoint or path means an intentional no-op.
+        if not endpoint or not path:
             message = "NO-OP: {} / {} (unconfigured)".format(
-                room["name"], action_id
+                room_name, action_id
             )
+
+            logger.info(message)
+            _last_result = message
+            _last_error = None
+            return True
+
+        logger.info(
+            "EXECUTING: {} / {} -> {} {} {}".format(
+                room_name,
+                action_id,
+                target,
+                method,
+                path,
+            )
+        )
+
+        # Blocking HTTP. The scheduler resumes when this
+        # request completes or raises an exception.
+        result = http_transport.send(
+            endpoint,
+            method,
+            path,
+        )
+
+        message = (
+            "EXECUTED: {} / {} -> HTTP {} ({} ms)"
+        ).format(
+            room_name,
+            action_id,
+            result["status"],
+            result["total_ms"],
+        )
 
         logger.info(message)
         _last_result = message
         _last_error = None
+
         return True
 
     except Exception as error:
-        # This catches simulated failures and unexpected execution errors.
-        # The task being executed has already been removed.
+        # The executing task has already been removed.
+        # Preserve Phase A fail-stop queue semantics.
         discarded = len(_queue)
         _queue.clear()
 
         _last_error = "{} / {}: {}".format(
-            room_id, action_id, error
-        )
-        _last_result = "FAILED; {} pending tasks discarded".format(
-            discarded
+            room_id, action_id, repr(error)
         )
 
-        logger.warning("DUMB QUEUE: {}".format(_last_error))
-        logger.warning("DUMB QUEUE: {}".format(_last_result))
+        _last_result = (
+            "FAILED; {} pending tasks discarded"
+        ).format(discarded)
+
+        logger.warning(
+            "DUMB QUEUE: {}".format(_last_error)
+        )
+        logger.warning(
+            "DUMB QUEUE: {}".format(_last_result)
+        )
+
         return True
 
 
@@ -171,9 +226,13 @@ def clear(reason="Manual reset"):
     """Discard pending tasks, preserving diagnostic history."""
     discarded = len(_queue)
     _queue.clear()
-    logger.info("DUMB QUEUE: Cleared {} tasks ({})".format(
-        discarded, reason
-    ))
+
+    logger.info(
+        "DUMB QUEUE: Cleared {} tasks ({})".format(
+            discarded, reason
+        )
+    )
+
     return discarded
 
 
