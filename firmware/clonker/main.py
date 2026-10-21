@@ -23,6 +23,7 @@ from clonker import device_config_v2 as device_config
 
 # Management HTTP service is low priority.
 WEB_POLL_INTERVAL = 0.01
+ACTION_POLL_INTERVAL = 0.01
 
 
 def main():
@@ -49,6 +50,7 @@ def main():
 
     web_running = False
     next_web_poll = time.monotonic()
+    next_action_poll = time.monotonic()
 
     try:
         while True:
@@ -57,7 +59,11 @@ def main():
             # Priority 3: CONFIG management HTTP.
             #
             # The queue is polled in both CONFIG and RUN modes.
-            actions.poll()
+            now = time.monotonic()
+
+            if now >= next_action_poll:
+                actions.poll()
+                next_action_poll = time.monotonic() + ACTION_POLL_INTERVAL
 
             # CONFIG/RUN is an application mode, not an HTTP command.
             config_mode = switches.config_enabled()
