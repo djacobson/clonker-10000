@@ -334,10 +334,18 @@
     ];
 
     const DEVICE_IDS = [
-        "tv",
-        "avr",
-        "streaming"
+        "device-1",
+        "device-2",
+        "device-3"
     ];
+
+    // Fixed labels for the three built-in device slots.
+    // Device IDs are generic; these labels are UI-only.
+    const DEVICE_LABELS = {
+        "device-1": "TV",
+        "device-2": "AVR",
+        "device-3": "Streaming"
+    };
 
     const ACTION_IDS = [
         "volume-up",
@@ -367,7 +375,8 @@
     // configuration property represented by the control.
 
     function createField(parent, labelText, value,
-                         fieldName, choices = null) {
+                     fieldName, choices = null,
+                     choiceLabels = null) {
 
         const label = document.createElement("label");
         label.textContent = labelText;
@@ -381,7 +390,9 @@
                 const option = document.createElement("option");
 
                 option.value = choice;
-                option.textContent = choice.toUpperCase();
+                option.textContent = choiceLabels
+                    ? choiceLabels[choice]
+                    : choice.toUpperCase();
 
                 control.appendChild(option);
             }
@@ -445,7 +456,7 @@
             for (const deviceId of DEVICE_IDS) {
                 const control = createField(
                     deviceFields,
-                    deviceId.toUpperCase() + " Address",
+                    DEVICE_LABELS[deviceId] + " Address",
                     room.devices[deviceId],
                     deviceId
                 );
@@ -493,7 +504,8 @@
                     "Target",
                     action.target,
                     "target",
-                    DEVICE_IDS
+                    DEVICE_IDS,
+                    DEVICE_LABELS
                 );
 
 

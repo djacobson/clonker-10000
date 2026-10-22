@@ -18,14 +18,27 @@ import json
 import os
 
 
-# Fixed v2 schema: three rooms, three device types, 14 fundamental actions.
+# JSON v3 schema: three rooms, three built-in device slots,
+# and fourteen fundamental actions.
+#
+# Built-in device slots:
+#   device-1 = TV
+#   device-2 = AVR
+#   device-3 = Streaming
+#
+# These are generic destination identifiers.
+# The labels describe our original home-theater setup.
+
 CONFIG_FILE = "/clonker/device_config.json"
-CONFIG_VERSION = 2
+CONFIG_VERSION = 3
 MAX_CONFIG_BYTES = 8192
 MAX_ROOM_NAME_LENGTH = 40
 MAX_PATH_LENGTH = 512
+
 ROOM_IDS = ("room-1", "room-2", "room-3")
-DEVICE_IDS = ("tv", "avr", "streaming")
+
+DEVICE_IDS = ("device-1", "device-2", "device-3")
+
 ACTION_IDS = (
     "volume-up", "volume-down", "mute-toggle",
     "nav-up", "nav-down", "nav-left", "nav-right",
