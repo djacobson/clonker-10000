@@ -52,6 +52,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 16–19, 2026 | 5. Production JSON and toggle schema | Active JSON v2 configuration established |
 | Oct 19, 2026 | 6. Browser Test Remote | Fourteen logging-only actions verified |
 | Oct 20, 2026 | 7. Dumb Queue and HTTP responsiveness | Logging-only queue validated; HTTP recovery improved |
+| Oct 21, 2026 | 8. Outbound HTTP and burst execution | Real Denon/Roku commands verified; five-command burst passed |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -1041,6 +1042,202 @@ It has not yet learned to boss around the Denon.
 
 **CLONK! ⚡🔩**
 
+
+---
+
+# Milestone 8 — The Clonker Learns to Talk Back
+
+**Date:** October 21, 2026  
+**Status:** PASS — outbound HTTP and controlled burst testing
+
+### Goal
+
+Extend the logging-only Dumb Queue into a functioning
+network-command execution pipeline.
+
+Prove that the Raspberry Pi Pico 2 W can send configured
+HTTP commands to actual home theater equipment without
+abandoning the simple cooperative architecture.
+
+### Implementation
+
+Chapter 3 Phase B introduced outbound HTTP execution
+using CircuitPython socketpool networking.
+
+The execution path is:
+
+Browser Test Remote
+    -> POST /api/action
+    -> actions.dispatch()
+    -> Dumb Queue
+    -> actions.poll()
+    -> JSON v2 action resolution
+    -> Outbound HTTP transport
+    -> Configured equipment
+
+The transport supports the GET and POST commands needed
+for the initial Denon and Roku integrations.
+
+The action queue remains separate from the network
+transport. It accepts commands independently of the
+time required to execute them.
+
+Commands are executed sequentially, with one eligible
+queue item processed per poll.
+
+### Network Investigation
+
+Before integrating outbound HTTP into the firmware,
+several standalone TCP experiments were performed.
+
+Initial experiments with nonblocking socket connections
+encountered CircuitPython-specific behavior, including
+OSError(119), subsequent connection errors, and unreliable
+immediate sends.
+
+Repeated connect calls were not a dependable method for
+determining connection completion.
+
+Blocking connections with explicit socket timeouts
+proved more predictable.
+
+Observed successful connection times were generally
+around 85–125 milliseconds for reachable equipment.
+
+Unreachable endpoints returned errors within bounded
+test intervals.
+
+The resulting transport deliberately accepts a small,
+bounded blocking interval rather than introducing a
+complex asynchronous connection state machine.
+
+This remains a cooperative scheduling tradeoff, not
+a claim that outbound networking is nonblocking.
+
+### Real Equipment Tests
+
+Successful commands were sent to the Sunroom system:
+
+- Denon AVR-X1800H: Volume Up.
+- Denon AVR-X1800H: Volume Down.
+- Roku: Home.
+- Roku: Back.
+
+The Denon returned HTTP 200 responses.
+
+The LG television displayed the expected volume-bar
+changes, providing independent visible confirmation
+that the receiver commands affected the equipment.
+
+The Roku returned HTTP 200 for tested navigation
+commands.
+
+Browser Test Remote buttons successfully submitted
+commands through the same action dispatcher used by
+the production queue.
+
+### Five-Command Burst Test
+
+A controlled REPL experiment submitted five Sunroom
+Volume Up actions without polling between submissions.
+
+All five actions were accepted.
+
+Observed queue state before execution:
+
+- Queue capacity: 128.
+- Current depth: 5.
+- Peak depth: 5.
+- Last error: None.
+
+Five successive calls to actions.poll() each executed
+one queued command.
+
+All five returned HTTP 200.
+
+Observed individual execution times:
+
+- 117.2 ms.
+- 125.0 ms.
+- 85.9 ms.
+- 85.9 ms.
+- 85.9 ms.
+
+Combined reported execution time was approximately
+500 milliseconds.
+
+After execution:
+
+- Queue depth: 0.
+- Peak depth: 5.
+- Last error: None.
+- All five poll calls returned True.
+
+The queue preserved the submitted command sequence and
+drained successfully.
+
+### Architectural Significance
+
+**The Dumb Queue gives us a place to absorb commands
+arriving faster than the network can process them.**
+
+The queue separates command acceptance from command
+execution.
+
+This allows short bursts of incoming actions to be
+accepted without attempting simultaneous outbound
+network operations.
+
+The approach also provides a foundation for future
+physical encoders and buttons, which may generate
+events faster than individual HTTP transactions finish.
+
+The queue does not make the network faster. It provides
+an orderly place for commands to wait.
+
+### Remaining Limitations
+
+This milestone does not establish:
+
+- Sustained high-rate input performance.
+- Responsiveness during prolonged network failures.
+- Long-duration memory and socket stability.
+- Every HTTP failure and timeout scenario.
+- Physical encoder or GPIO input behavior.
+- Runtime toggle ON/OFF history.
+- Custom action execution.
+- Actual device-state synchronization.
+
+The browser acknowledgment reports successful queue
+acceptance, not confirmed equipment execution.
+
+HTTP 200 indicates a successful HTTP response; it
+does not independently prove every device state change.
+
+### Outcome
+
+**Chapter 3 Phase B passed its initial functional and
+controlled burst tests.**
+
+The Clonker has moved beyond simulated action logging.
+
+It now accepts browser commands, resolves configured
+actions, queues them, sends real HTTP requests, and
+receives successful responses from home theater equipment.
+
+The five-command burst confirmed orderly queue
+execution under a controlled backlog.
+
+The Dumb Queue has learned to take orders.
+
+The network transport has learned to deliver them.
+
+And somewhere in the Sunroom, a Denon receiver has
+discovered that a tiny Raspberry Pi is giving it
+instructions.
+
+**CLONK! ⚡🔩**
+
 ---
 
 # Maintaining This Journal
@@ -1105,22 +1302,79 @@ This journal preserves the engineering reasoning and test evidence that commit m
 
 # Where the Story Stands
 
-**As of October 20, 2026:**
+**As of October 21, 2026 — Chapter 3 Complete**
 
-The Clonker has a working JSON v2 configuration system, browser management interface, persistent storage safeguards, and a validated logging-only Dumb Queue supporting fourteen fundamental actions per room.
+The Clonker 10000 has crossed an important threshold.
 
-Chapter 3, Phase A is complete. Cooperative scheduling and HTTP responsiveness have been improved through measured bench testing, with remaining limitations documented in Milestone 7.
+What began as a collection of beautiful metallic knobs, ambitious ideas, and a mildly unreasonable desire to reinvent the remote control is now a functioning network control system.
 
-The next major chapter is real outbound HTTP device control.
+The Raspberry Pi Pico 2 W is running CircuitPython 10.3.1 with:
 
-After that come physical switches, encoders, room selection, and the satisfying mechanical personality that inspired the entire project.
+- A validated JSON v2 configuration system.
+- Browser-based configuration editing and persistence.
+- Revision checking, backup rotation, and recovery safeguards.
+- A browser Test Remote supporting fourteen fundamental actions.
+- A cooperative action scheduler.
+- The magnificent, deliberately uncomplicated Dumb Queue™.
+- Working outbound HTTP communication with Denon and Roku equipment.
+- Real-device command execution confirmed through HTTP responses and observed equipment behavior.
 
-The Clonker isn't finished.
+Chapter 3 began with a logging-only action dispatcher.
 
-But it has progressed from a collection of beautiful knobs and questionable ambitions into an actual running software system.
+It ended with the Clonker successfully commanding real home theater equipment.
+
+Along the way, we investigated CircuitPython socket behavior, measured connection timing, implemented bounded HTTP operations, and demonstrated that five rapidly queued commands could execute sequentially without errors.
+
+### The Dumb Queue Has Earned Its Name
+
+One of the most important architectural decisions was also one of the simplest.
+
+**The Dumb Queue gives us a place to absorb commands arriving faster than the network can process them.**
+
+It doesn't attempt to understand the home theater.
+
+It doesn't predict what the user wants.
+
+It doesn't maintain an elaborate model of equipment state.
+
+It accepts commands, remembers their order, and executes them when their turn arrives.
+
+Sometimes the smartest component is the one that knows exactly how little it needs to know.
+
+### What Comes Next
+
+The software foundation is now capable of controlling equipment, but the Clonker is still far from its ultimate physical form.
+
+Important work remains:
+
+- Runtime ON/OFF toggle command history.
+- Additional network failure and recovery testing.
+- Physical rotary encoder integration.
+- Tactile buttons and room selection.
+- Hardware CONFIG/RUN switching.
+- Custom actions and command sequences.
+- OLED status feedback.
+- Audible CLONK effects.
+- Power management and enclosure construction.
+
+The next chapter can build upon an actual working control pipeline rather than a collection of simulated actions.
+
+The Clonker still has no magnificent enclosure.
+
+Its beautiful knobs are still waiting for their moment.
+
+And the marketing department remains permanently disbanded.
+
+But something fundamental has changed.
+
+**The Clonker no longer merely knows what it wants to do.**
+
+**It can actually do it.**
+
+---
 
 **THE CLONKER 10000**
 
-*Designed by David Jacobson.*
+*Less sleek. More CLONK.*
 
 **CLONK! ⚡🔩**
