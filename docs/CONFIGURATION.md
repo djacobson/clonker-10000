@@ -1,10 +1,11 @@
 # The Clonker 10000 — Configuration, Persistence & Recovery
 
-**Design reference:** Updated October 19, 2026  
+
+**Design reference:** Updated October 21, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
 **Runtime:** CircuitPython 10.3.1  
 **Active configuration:** JSON v2  
-**Status:** Configuration engine and browser editor operational; browser action dispatcher tested in logging-only mode; outbound AV commands pending.
+**Status:** JSON v2 configuration, browser editor, shared Dumb Queue™, and real outbound HTTP equipment control operational. Runtime toggle history remains pending.
 
 > **Clonker controls actions, not brands. Configuration determines where those actions go.**
 
@@ -48,7 +49,9 @@ The active configuration system provides:
 
 These are implemented capabilities, although the complete persistence failure-test matrix remains unfinished.
 
-**Important distinction:** The configuration engine stores commands, and the browser Test Remote can dispatch action requests to a logging stub. Actual HTTP commands to AV equipment have **not** yet been implemented.
+**Important distinction:** JSON v2 stores the configured commands, the Dumb Queue™ schedules their execution, and the outbound HTTP transport sends them to AV equipment. Real Denon and Roku commands were successfully tested on October 21, 2026.
+
+Power and mute toggle commands are represented in the schema, but runtime ON/OFF direction selection is not yet implemented.
 
 See:
 
@@ -64,10 +67,11 @@ See:
 | `/clonker/device_config.json` | Active configuration path on the Pico |
 | `firmware/clonker/device_config_v2.py` | Validation, serialization, revision control, persistence, recovery |
 | `firmware/clonker/main.py` | Startup configuration loading |
-| `firmware/clonker/web.py` | Configuration HTTP API and browser action routing |
+| `firmware/clonker/net/web.py` | Inbound configuration HTTP API and browser action routing |
+| `firmware/clonker/net/http_transport.py` | Outbound HTTP GET/POST communication with configured equipment |
 | `firmware/clonker/www/index.html` | Browser configuration editor |
 | `firmware/clonker/www/remote.html` | Browser Test Remote |
-| `firmware/clonker/actions.py` | Shared action dispatcher; currently logging-only |
+| `firmware/clonker/actions.py` | Shared Dumb Queue™, configuration resolution, and action execution |
 | `firmware/clonker/legacy/device_config.py` | Historical XML v1 configuration engine |
 | `firmware/clonker/legacy/device_config.xml` | Historical XML v1 configuration |
 
@@ -415,11 +419,13 @@ For a toggle action:
 - Blank selected ON/OFF path: no command.
 - No-op must not advance toggle history.
 
-The current logging-only dispatcher determines whether an action appears configured using the selected endpoint and the presence of at least one candidate path.
+The active dispatcher determines whether an action is configured using the selected endpoint and available command path.
 
-For toggles, this is only a preliminary configured/not-configured indication. It does not yet select the next ON/OFF direction.
+For ordinary actions, a blank endpoint or command path produces a safe no-op during queue execution.
 
-A stub result reporting `configured: true` must not be interpreted as evidence that a device command was sent.
+For toggles, the configured indication considers whether at least one ON/OFF path is present. Runtime toggle direction selection is not yet implemented; queued toggle actions are currently deferred without transmitting a command.
+
+**A browser response reporting `status: queued` means the action was accepted for scheduling, not that an HTTP command was successfully transmitted or that the equipment changed state.**
 
 ## 8. Reserved Custom Actions
 
@@ -1142,26 +1148,39 @@ See [Development History](DEVELOPMENT_HISTORY.md).
 
 ## 23. Next Development Boundary
 
-The configuration engine is now the operational foundation for the next phase.
+As of October 21, 2026, JSON v2 configuration, browser action dispatch, the Dumb Queue™, and outbound HTTP GET/POST execution are operational.
 
-The next milestone is real HTTP action execution.
+The configuration schema has already supported real Denon and Roku commands without requiring another redesign.
 
-Recommended sequence:
+### Next development priorities
 
-1. Review the current `actions.py` logging dispatcher.
-2. Inspect available CircuitPython socket and HTTP capabilities.
-3. Implement a minimal bounded outbound HTTP request path.
-4. Test one low-risk Denon or Roku command from the browser Test Remote.
-5. Verify the result using serial logs and observed device behavior.
-6. Expand ordinary action execution.
-7. Confirm blank endpoints and paths produce safe no-ops.
-8. Implement independent per-room toggle command history.
-9. Test failed commands without advancing toggle history.
-10. Later integrate physical controls and RUN-only operation.
+1. Implement runtime ON/OFF direction selection for power and mute toggles.
+2. Maintain independent, volatile command history for each room and toggle action.
+3. Advance toggle history only after successful command transmission.
+4. Verify that blank commands and failed requests do not advance toggle history.
+5. Test network failures, connection timeouts, and queue cancellation behavior.
+6. Verify ordinary actions in RUN mode without the management HTTP listener.
+7. Integrate physical buttons, rotary encoders, and room selection.
+8. Measure command latency and responsiveness under real encoder workloads.
+9. Revisit custom actions only after the fundamental controls are reliable.
 
-The active JSON v2 schema should not require another redesign merely to begin ordinary command execution.
+### Configuration stability
 
-Avoid premature abstractions, general macro engines, complex state tracking, or unnecessary persistence changes.
+The active JSON v2 schema should remain stable unless new requirements demonstrate a concrete need for change.
+
+Avoid introducing speculative fields, device-state synchronization, complex macro engines, or additional persistence machinery merely because they might someday be useful.
+
+### Execution boundary
+
+Configuration defines what commands mean.
+
+The Dumb Queue™ determines when they execute.
+
+The outbound HTTP transport handles network communication.
+
+The controlled equipment remains authoritative for its actual state.
+
+**Clonker controls actions, not brands.**
 
 ## 24. Design Principles
 
@@ -1191,7 +1210,7 @@ Clonker's planned toggle history records commands, not equipment truth.
 
 The existing persistence safeguards must not be weakened during HTTP action development.
 
-**JSON v2 is operational. Browser action dispatch is operational in logging-only form. Real device commands are next.**
+**JSON v2 is operational. Browser configuration and action dispatch are operational. The Dumb Queue™ executes real outbound HTTP commands to Denon and Roku equipment. Runtime toggle history and physical controls are the next development frontier.**
 
 ---
 
