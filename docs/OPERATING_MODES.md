@@ -81,7 +81,7 @@ The browser can:
 - View clock status.
 - Synchronize the RAM clock.
 - Open the browser Test Remote.
-- Send action requests to the logging-only dispatcher.
+- Submit configured actions to the shared dispatcher and outbound execution queue.
 
 However, attempting to save configuration through `POST /api/config` is rejected with HTTP 403.
 
@@ -223,9 +223,12 @@ When CONFIG is enabled, the application provides:
 - System clock status.
 - Browser UTC clock synchronization.
 - Browser Test Remote.
-- Logging-only fundamental action dispatch.
+- Fundamental action dispatch through the shared queue and outbound HTTP transport.
 
-The browser Test Remote currently exercises the shared action dispatcher without transmitting commands to AV equipment.
+The browser Test Remote submits actions to the shared Dumb Queue.
+Ordinary configured actions can execute real outbound HTTP
+commands. Power and mute toggles remain deferred until runtime
+direction selection is implemented.
 
 ### Current simulated switch
 
@@ -561,6 +564,12 @@ The management server has no application authentication.
 Do not expose it through router port forwarding.
 
 ## 12. Verification Status — October 19, 2026
+
+> **Historical snapshot:** This section preserves the
+> October 19 verification status. Outbound HTTP execution
+> was subsequently implemented and verified on October 21.
+> See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for
+> current networking status.
 
 ### Implemented and tested
 

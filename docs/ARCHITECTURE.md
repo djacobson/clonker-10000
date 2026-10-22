@@ -94,12 +94,6 @@ The browser configuration interface was developed early to establish and test th
 
                              v
 
-                    GENERIC ACTION REQUEST
-
-                             |
-
-                             v
-
                        actions.py
 
                     Validate / Enqueue
@@ -110,7 +104,7 @@ The browser configuration interface was developed early to establish and test th
 
                       THE DUMB QUEUE
 
-                [IMPLEMENTED — LOGGING ONLY]
+                       [IMPLEMENTED]
 
                              |
 
@@ -124,13 +118,16 @@ The browser configuration interface was developed early to establish and test th
 
                              v
 
-                    Resolve configuration
+                    Resolve current JSON v2
+                       configuration
 
                              |
 
                              v
 
-                   Select command / toggle
+                  Select ordinary command
+
+                  (Toggles still deferred)
 
                              |
 
@@ -138,13 +135,14 @@ The browser configuration interface was developed early to establish and test th
 
                     OUTBOUND HTTP TRANSPORT
 
-                         [PLANNED]
+                         [IMPLEMENTED]
 
                              |
 
                              v
 
-                      DENON / ROKU / LG
+                       DENON / ROKU
+
 
        CONFIG MANAGEMENT SERVICES [IMPLEMENTED]
 
@@ -160,6 +158,7 @@ The browser configuration interface was developed early to establish and test th
 
          +-- JSON configuration persistence
 
+
 ```
 
 The browser and eventual physical controls use the same action system.
@@ -174,95 +173,94 @@ The outbound transport knows how to send HTTP commands. It does not know why a c
 
 ## 3. Implementation Status
 
-**Status reference: October 20, 2026**
+**Status reference: October 21, 2026 — Chapter 3 completed**
 
 ### Implemented and tested
 
-- Raspberry Pi Pico 2 W running CircuitPython.
-
+- Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
 - Wi-Fi connectivity and serial diagnostics.
-
 - GP17 SERVICE/DEVICE filesystem-ownership jumper.
-
 - JSON v2 configuration with three rooms.
-
-- Validated configuration held in RAM.
-
+- Validated active configuration held in RAM.
 - Browser configuration editor on HTTP port 9090.
-
 - Browser clock synchronization.
-
 - Revision-aware configuration saves.
-
-- Configuration backup rotation.
-
+- Configuration backup rotation and startup recovery.
 - Stale-browser-tab revision conflict detection.
-
 - Browser Test Remote at `/remote.html`.
-
 - Fourteen fundamental action buttons.
-
 - POST `/api/action` routing to `actions.dispatch()`.
+- Shared Dumb Queue with 128-task capacity.
+- Scheduled action execution and eligible-task ordering.
+- Current-configuration resolution at execution time.
+- Outbound HTTP GET/POST transport.
+- Real Denon AVR volume commands.
+- Real Roku navigation commands.
+- Five-command queued volume burst.
+- Recovery following an unreachable-endpoint failure.
 
-- Logging-only fundamental action dispatcher.
+The browser Test Remote and future physical controls share the
+same action dispatcher and execution path.
 
-- Fast internal `device_config.action_details()` accessor.
+Successful browser submission acknowledges queue acceptance,
+not completed device execution.
 
-- Browser responses describing accepted dispatcher requests.
-
-The fourteen fundamental action buttons have been exercised through the logging-only dispatcher.
-
-**No real outbound AV equipment commands have been sent by this dispatcher.**
+Real outbound HTTP commands were successfully executed on
+October 21, 2026.
 
 ### Implemented with additional testing still appropriate
 
 - Strict JSON v2 validation.
-
 - Expected-revision persistence.
-
 - Disk-versus-RAM configuration change detection.
-
 - Verified temporary-file writes.
-
 - Backup-based configuration recovery.
-
 - Bounded cooperative inbound HTTP service.
+- Bounded blocking outbound HTTP operations.
+- Queue behavior under network failures.
 
-These features have been exercised in development, but not every failure scenario has been tested.
+These features have been exercised in development, but not
+every failure scenario has been tested.
 
-Interrupted writes, power-loss behavior, malformed HTTP requests, and other failure-injection cases must not be described as verified without new evidence.
+Interrupted writes, power-loss behavior, malformed HTTP
+requests, sustained command traffic, and other failure-injection
+cases must not be described as verified without new evidence.
 
 Backup rotation is not a power-loss-atomic transaction.
 
+The Dumb Queue buffers commands but does not make outbound
+TCP operations nonblocking or guarantee physical input capture
+while the scheduler is blocked.
+
 ### Not yet implemented
 
-- The Dumb Queue.
-
-- Scheduled action execution.
-
-- Outbound HTTP GET/POST transport.
-
-- RAM toggle-command history.
-
+- RAM toggle-command direction history.
+- Runtime power/mute ON/OFF command selection.
 - User-defined custom-action execution.
-
 - Physical button and encoder input.
-
 - Physical CONFIG/RUN switch.
-
 - Physical room selector.
-
 - OLED status.
-
 - Audible feedback.
-
 - Battery management and sleep/wake behavior.
+- Apple TV integration.
 
 ### Next development milestone
 
-Implement the Dumb Queue in logging-only mode and test it through the existing browser Test Remote.
+Chapter 4 focuses on physical control integration and
+remaining action behavior.
 
-After successful queue testing, introduce outbound HTTP transport and perform the first real Denon Volume Up test.
+Candidate work includes toggle direction history, physical
+button input, optical encoder investigation, room selection,
+and scheduler responsiveness measurements.
+
+The implementation order remains a design decision.
+
+See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for current
+networking behavior and verified test results.
+
+See [Development History](DEVELOPMENT_HISTORY.md) for the
+chronological Chapter 3 implementation record.
 
 ---
 
@@ -451,9 +449,7 @@ This avoids repeatedly validating and copying the entire configuration for every
 
 - No second configuration cache is required.
 
-The current logging-only dispatcher uses this accessor.
-
-Future queued actions should resolve configuration when executed, rather than retain stale configuration references indefinitely.
+The shared action dispatcher uses this accessor. Queued actions resolve the current configuration at execution time rather than retaining stale configuration references.
 
 A successful configuration change should clear pending tasks and invalidate affected toggle history.
 
@@ -1213,7 +1209,7 @@ actions.dispatch(room_id, action_id)
 
 ```
 
-The dispatcher validates the request, enqueues the action, and returns a queue-acceptance acknowledgment. Actual execution remains logging-only during Phase A.
+The dispatcher validates the request, enqueues the action, and returns a queue-acceptance acknowledgment. Ordinary actions execute through the outbound HTTP transport when selected by `actions.poll()`. Runtime toggle direction selection remains deferred.
 
 ### Implemented queue integration
 
@@ -1414,6 +1410,13 @@ Configuration endpoints and command paths should remain validated before being u
 ---
 
 ## 18. Development and Test Sequence
+
+> **Historical development record:** The following phases
+> describe the original implementation sequence. References
+> to logging-only execution, planned networking, and pending
+> tests reflect their status at that point in development.
+> For current behavior, see Section 3 and
+> [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md).
 
 ### Phase A — Logging-only Dumb Queue
 

@@ -1248,6 +1248,14 @@ The new switch inventory may change priorities.
 
 ## 21. Current Hardware Milestone
 
+> **Historical hardware snapshot — October 19, 2026:**
+> The following inventory and implementation status describe
+> the project at that date. Outbound HTTP execution was
+> subsequently completed and verified on October 21.
+> Physical action controls remain unintegrated.
+> See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md)
+> for current network functionality.
+
 **As of October 19, 2026:**
 
 ### Working

@@ -229,7 +229,7 @@
     </div>
 
     <div class="note">
-        Test remote · logging only · no device commands
+        Test remote · live equipment control
     </div>
 
     <div class="panel">
@@ -401,9 +401,8 @@
 
 <script>
     // Test remote: submit only room and fundamental action IDs.
-    // Pico determines the configured action details.
-    //
-    // Phase 1: logging only. No outbound device commands.
+    // Pico resolves configuration and queues actions for execution.
+    // A queued acknowledgment does not guarantee device execution.
 
     const status = document.getElementById("status");
     const room = document.getElementById("room");

@@ -9,7 +9,8 @@
 CONFIG mode runs the HTTP management interface; RUN mode stops it.
 The shared action queue runs in either mode.
 
-Outbound actions are logging-only during Chapter 3, Phase A.
+Ordinary queued actions execute through the outbound HTTP transport.
+Power and mute toggles remain deferred until direction selection is implemented.
 """
 
 import time
