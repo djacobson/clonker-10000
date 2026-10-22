@@ -1422,30 +1422,59 @@ This journal preserves the engineering reasoning and test evidence that commit m
 
 # Where the Story Stands
 
-**As of October 21, 2026 — Chapter 3 Complete**
+**As of October 22, 2026 — Chapter 4, Phase 1 Complete**
 
-The Clonker 10000 has crossed an important threshold.
+The Clonker 10000 has crossed two important thresholds.
 
-What began as a collection of beautiful metallic knobs, ambitious ideas, and a mildly unreasonable desire to reinvent the remote control is now a functioning network control system.
+First, it learned to communicate with real home theater equipment.
+
+Then, it learned that a device doesn't need to be called a television, receiver, or streaming player to receive a command.
+
+What began as a collection of beautiful metallic knobs, ambitious ideas, and a mildly unreasonable desire to reinvent the remote control is now a functioning, configurable network control system.
 
 The Raspberry Pi Pico 2 W is running CircuitPython 10.3.1 with:
 
-- A validated JSON v2 configuration system.
+- A validated JSON v3 configuration system.
+- Three fixed rooms and three generic built-in device slots per room.
+- Fourteen configurable fundamental actions per room.
 - Browser-based configuration editing and persistence.
 - Revision checking, backup rotation, and recovery safeguards.
-- A browser Test Remote supporting fourteen fundamental actions.
+- Stale-browser-tab conflict protection.
+- A browser Test Remote.
 - A cooperative action scheduler.
 - The magnificent, deliberately uncomplicated Dumb Queue™.
 - Working outbound HTTP communication with Denon and Roku equipment.
 - Real-device command execution confirmed through HTTP responses and observed equipment behavior.
 
-Chapter 3 began with a logging-only action dispatcher.
+Chapter 3 established the complete browser-to-equipment command pipeline.
 
-It ended with the Clonker successfully commanding real home theater equipment.
+Chapter 4 began by separating device identity from device category.
 
-Along the way, we investigated CircuitPython socket behavior, measured connection timing, implemented bounded HTTP operations, and demonstrated that five rapidly queued commands could execute sequentially without errors.
+The original configuration identifiers:
 
-### The Dumb Queue Has Earned Its Name
+```text
+tv
+avr
+streaming
+```
+
+have become:
+
+```text
+device-1
+device-2
+device-3
+```
+
+The browser retains the familiar TV, AVR, and Streaming labels.
+
+The firmware no longer depends on those labels to understand where commands belong.
+
+This refactor was completed without redesigning the queue or outbound transport.
+
+That is exactly the kind of architectural stability we want.
+
+## The Dumb Queue Has Earned Its Name
 
 One of the most important architectural decisions was also one of the simplest.
 
@@ -1457,31 +1486,53 @@ It doesn't predict what the user wants.
 
 It doesn't maintain an elaborate model of equipment state.
 
-It accepts commands, remembers their order, and executes them when their turn arrives.
+It accepts commands, remembers their order, and executes them when eligible.
+
+Future-dated work does not prevent unrelated immediate commands from executing.
+
+Network failures cancel pending work without permanently disabling the remote.
+
+And future compound actions will use this same queue rather than creating an entirely separate execution system.
 
 Sometimes the smartest component is the one that knows exactly how little it needs to know.
 
-### What Comes Next
+## What Comes Next
 
-The software foundation is now capable of controlling equipment, but the Clonker is still far from its ultimate physical form.
+The next development phase introduces **user-defined custom devices**.
 
-Important work remains:
+The objective is to extend each room beyond its three built-in device slots while preserving the existing fundamental-action model.
+
+After that, custom and compound actions will allow named sequences of HTTP commands.
+
+The agreed architecture uses:
+
+- Stable custom-device identities.
+- Ordered command steps.
+- Post-completion waits.
+- Lightweight predecessor dependencies.
+- Independent command interleaving.
+- All-or-nothing queue admission.
+- Existing queue-wide failure cancellation.
+
+The initial implementation will deliberately avoid loops, nested macros, conditional scripting, and unnecessary execution frameworks.
+
+Other important work remains:
 
 - Runtime ON/OFF toggle command history.
 - Additional network failure and recovery testing.
 - Physical rotary encoder integration.
 - Tactile buttons and room selection.
 - Hardware CONFIG/RUN switching.
-- Custom actions and command sequences.
 - OLED status feedback.
 - Audible CLONK effects.
 - Power management and enclosure construction.
-
-The next chapter can build upon an actual working control pipeline rather than a collection of simulated actions.
+- Future Apple TV compatibility.
 
 The Clonker still has no magnificent enclosure.
 
 Its beautiful knobs are still waiting for their moment.
+
+The guarded SYSTEM MASTER switch has yet to receive its ceremonial assignment.
 
 And the marketing department remains permanently disbanded.
 
@@ -1490,6 +1541,8 @@ But something fundamental has changed.
 **The Clonker no longer merely knows what it wants to do.**
 
 **It can actually do it.**
+
+And now we're teaching it how to do more without making it unnecessarily complicated.
 
 ---
 
