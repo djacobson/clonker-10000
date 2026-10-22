@@ -262,6 +262,18 @@ A future optimized volume path must preserve the ability to operate ordinary but
 
 **The Dumb Queue™ buffers the traffic. It does not repeal the laws of TCP.**
 
+### Apple TV — planned future integration
+
+Apple TV support is a stated project objective, but is outside the current firmware implementation.
+
+The existing outbound HTTP transport has been validated with Denon and Roku. Apple TV control may require additional protocol support, including discovery, pairing, authentication, and persistent communication sessions.
+
+No Apple TV transport, protocol adapter, or pairing implementation exists in the current firmware.
+
+The future implementation should preserve Clonker's device-independent fundamental actions and reuse existing infrastructure where practical, without assuming that Apple TV communicates like Roku.
+
+Protocol selection, configuration requirements, and module organization remain open design decisions.
+
 ## 15. Related documents
 
 - [Architecture](ARCHITECTURE.md) — system boundaries and design rationale.

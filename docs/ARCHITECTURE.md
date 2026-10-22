@@ -1229,6 +1229,18 @@ This distinction must remain clear in logs and browser feedback.
 
 The browser should not need to wait for a scheduled command to finish.
 
+### Future Apple TV compatibility
+
+Apple TV is a planned device-control target for Clonker.
+
+The fundamental action model should remain independent of device brands and communication protocols. A navigation or playback action should represent the same user intent regardless of whether the selected streaming device is Roku or Apple TV.
+
+The current outbound HTTP transport is implemented and tested for Denon and Roku. Apple TV may require different discovery, pairing, authentication, session management, and command-transport mechanisms.
+
+Those requirements will be evaluated during a future development phase. No Apple TV protocol implementation, configuration-schema extension, or specific module structure is committed at this time.
+
+**Design objective:** Accommodate Apple TV without compromising the existing Denon/Roku implementation or introducing unnecessary complexity before its requirements are understood.
+
 ### Compatibility
 
 The existing browser Test Remote should remain usable without unnecessary UI redesign.

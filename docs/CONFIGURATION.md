@@ -166,6 +166,18 @@ It does not currently support DNS hostnames, IPv6 addresses, HTTPS URLs, or auth
 
 Device endpoints are independent of action mappings. A volume action may target a TV, AVR, or streaming device, subject to the capabilities of the configured equipment.
 
+### Future Apple TV support
+
+The `streaming` device category is intentionally generic. It is not intended to be permanently limited to Roku.
+
+**Apple TV is an explicit future compatibility objective.**
+
+The current JSON v2 endpoint and action schema supports the implemented HTTP-based Denon and Roku commands. It should not be assumed sufficient for Apple TV's eventual control requirements.
+
+Apple TV integration may require protocol-specific connection, authentication, and command configuration. Those requirements have not yet been established.
+
+No JSON v2 schema changes are proposed solely for Apple TV at this stage. The existing configuration model remains authoritative until a future implementation provides concrete requirements.
+
 ### Example development endpoints
 
 The current development configuration has used:

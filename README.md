@@ -197,6 +197,16 @@ The current configuration supports three rooms, each with its own devices and co
 
 Custom actions are planned for additional functions such as listening modes and other equipment-specific operations.
 
+### Device Compatibility Roadmap
+
+Clonker's current, tested network-control targets are Denon AV receivers and Roku streaming devices.
+
+**Apple TV support is an explicit future project objective.** The long-term goal is to support Apple TV alongside Roku through the same fundamental Clonker actions, without requiring different physical controls.
+
+Other network-controllable TVs, receivers, and streaming devices may be considered as the project develops.
+
+Apple TV support has not yet been implemented or tested. Its protocol, pairing, authentication, and integration requirements will be investigated when that development phase begins.
+
 **The goal is simple: the physical controls shouldn't care whether they're talking to a Denon, Roku, or something we haven't added yet.**
 
 ---
