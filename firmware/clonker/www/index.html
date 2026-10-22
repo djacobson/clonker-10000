@@ -324,7 +324,7 @@
 
 
 <script>
-    // JSON v2 configuration constants.
+    // JSON v3 configuration constants.
     const MAX_CONFIG_ATTEMPTS = 5;
 
     const ROOM_IDS = [
@@ -591,9 +591,9 @@
 
             const config = await response.json();
 
-            if (config.version !== 2) {
+            if (config.version !== 3) {
                 throw new Error(
-                    "Expected JSON configuration version 2"
+                    "Expected JSON configuration version 3"
                 );
             }
 
