@@ -267,39 +267,67 @@ The October 2026 test configuration uses:
 
 The TV endpoints are currently blank.
 
-Room 3 remains a placeholder.
+Room 3 is a supported but currently unconfigured room ID.
 
 These addresses are development examples, not guaranteed permanent network assignments.
 
-### 4.5 Future custom devices
+### 4.5 Future custom devices — agreed design
 
-The next planned extension is a separate `custom_devices` collection for additional user-defined destinations.
+**Status:** Design agreed; not implemented in JSON v3.
 
-Proposed terminology:
-
-- **Built-in device:** One of the three fixed slots.
-- **Custom device:** An additional user-defined destination.
-- **Destination:** Any configured device endpoint selected by a command.
-
-Proposed stable IDs include:
+The three built-in destinations remain:
 
 ```text
-device-1
-device-2
-device-3
-custom-1
-custom-2
+device-1 — TV
+device-2 — AVR
+device-3 — Streaming
 ```
 
-The built-in slots will remain eligible for fundamental actions.
+Their identities and home-theater-oriented fundamental-action interface are reserved. Their endpoints and action mappings remain editable.
 
-Custom devices are intended primarily for custom action steps.
+Additional user-defined destinations will use the same ID namespace, beginning with `device-4`.
 
-Custom device IDs should remain stable when other devices are deleted. Deleting one custom device must not silently renumber references to another.
+Examples:
 
-**Not yet implemented:** JSON v3 does not currently accept a `custom_devices` property.
+```text
+device-4 — Joey's PS5
+device-5 — Lighting Controller
+```
 
-The exact future schema will be settled during implementation.
+Custom destinations will be stored in an optional, separate `custom_devices` object within each configured room. This avoids restructuring the existing `devices` object or the current home-theater editor.
+
+Conceptual future JSON fragment:
+
+```json
+"custom_devices": {
+  "device-4": {
+    "name": "Joey's PS5",
+    "endpoint": "192.168.50.70:80"
+  }
+}
+```
+
+The example is illustrative only. It is not accepted by the current validator and does not imply that a PS5 exposes a compatible HTTP API.
+
+Agreed rules:
+
+- `custom_devices` may be omitted when unused.
+- Custom IDs begin at `device-4` and remain stable.
+- Removing one custom destination must not renumber another.
+- Names are editable display strings, never execution identifiers.
+- Each custom destination has a configured endpoint.
+- Fundamental actions continue targeting only built-in destinations.
+- Custom action steps may target built-in or custom destinations.
+- All destinations share the existing HTTP transport and a common resolution mechanism.
+- No device-type registry, capability model, discovery system, or device-specific execution behavior is required.
+
+A future custom-device editor may provide add, edit, and remove controls without changing the existing TV/AVR/Streaming editing interface.
+
+The exact capacity limit and detailed validation rules will be settled when custom destinations are implemented, using named constants.
+
+**Implementation order:** Custom/compound actions first, using existing built-in destinations for live tests. Custom destinations follow when needed.
+
+No JSON schema change is required until the feature is implemented.
 
 ---
 
@@ -1286,22 +1314,24 @@ These findings reinforce the project's incremental test discipline.
 
 ## 20. Planned Development
 
-### 20.1 Custom devices
 
-Add user-defined device destinations without changing the meaning of the three built-in slots.
+### 20.1 Custom devices — deferred implementation
 
-Keep the first implementation simple:
+The design is agreed in Section 4.5.
 
-- Stable IDs.
-- User-defined names.
-- IPv4 endpoints.
-- Strict validation.
-- Browser add/remove controls.
-- No unnecessary protocol generalization.
+Implementation is deferred until custom destinations are useful for testing or real operation.
 
-### 20.2 Custom and compound actions
+The future implementation will introduce optional named destinations using `device-4` onward, with stable identities, validated endpoints, and shared destination resolution.
+
+The existing home-theater editor and fundamental-action model will remain intact.
+
+### 20.2 Custom and compound actions — next implementation
 
 Allow user-defined actions containing ordered command steps.
+
+Begin by targeting existing built-in devices and reusing the Dumb Queue and HTTP transport.
+
+Custom-device support is not a prerequisite for this work.
 
 Reuse the existing queue and HTTP transport.
 
@@ -1429,7 +1459,7 @@ As of October 22, 2026:
 - Physical action controls.
 - Apple TV protocol integration.
 
-The next configuration milestone is adding custom devices, followed by custom and compound actions.
+The next configuration milestone is executable custom and compound actions, initially using built-in destinations. Optional custom-device support follows when needed.
 
 These features should extend the tested foundation rather than replace it.
 

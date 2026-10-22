@@ -4,7 +4,7 @@
 **Active platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
 **Current milestone:** Chapter 4, Phase 2 complete — optional rooms implemented and regression-tested; JSON v3 remains active.
-**Next milestone:** User-defined custom devices, followed by compound actions.
+**Next milestone:** Custom and compound actions using existing built-in destinations; optional custom devices deferred.
 
 > **Clonker controls actions, not brands. Controlled devices own their own state.**
 
@@ -877,84 +877,83 @@ It does not belong in:
 
 ---
 
-## 13. Custom Devices — Next Milestone
+## 13. Custom Devices — Agreed Future Extension
 
-**Status:** Planned, not implemented.
+**Status:** Design agreed; implementation deferred.
 
-The next architectural extension is support for additional user-defined device destinations.
+Custom destinations extend the Clonker beyond the home-theater behaviors implied by its fundamental actions.
 
-### 13.1 Built-in versus custom devices
+The execution engine should not need to understand the category or capabilities of a custom destination.
 
-Built-in devices are the three fixed slots:
+### 13.1 Built-in and custom identities
 
-```text
-device-1
-device-2
-device-3
-```
-
-Custom devices are additional named destinations defined by the user.
-
-The two categories must remain distinguishable.
-
-### 13.2 Proposed model
-
-Each room will eventually contain a separate collection of custom devices.
-
-A custom device is expected to have:
-
-- Stable internal ID.
-- User-editable name.
-- Configured endpoint.
-
-Example conceptual IDs:
+The three reserved built-in destinations are:
 
 ```text
-custom-1
-custom-2
-custom-3
+device-1 — TV
+device-2 — AVR
+device-3 — Streaming
 ```
 
-These are proposed conventions, not currently accepted JSON.
+These identities remain associated with the existing fundamental-action editor.
 
-### 13.3 Fundamental-action boundary
+Future custom destinations use the same numbered namespace, beginning at `device-4`.
 
-Fundamental actions will continue targeting built-in device slots.
+They will be stored separately in an optional per-room `custom_devices` collection.
 
-Custom action steps may target either built-in or custom devices.
+This separation preserves the existing browser editor and configuration representation for the three built-in slots.
 
-This avoids broadening the fundamental-action model unnecessarily.
+### 13.2 Minimal custom-device model
 
-### 13.4 Centralized destination resolution
+Each custom destination requires:
 
-The action system should resolve device destinations through a common helper or clearly defined shared mechanism.
+- Stable device ID.
+- Editable display name.
+- Configured HTTP endpoint.
 
-The rest of the execution pipeline should not need to know whether an endpoint came from a built-in or custom device.
+Names are for display and selection only. Execution references stable IDs.
 
-Avoid scattering separate built-in/custom lookup rules throughout the codebase.
+A custom device is not required to declare a device type, capabilities, supported commands, or equipment-state model.
+
+### 13.3 Action boundaries
+
+Fundamental actions retain their home-theater-oriented meaning and target the three built-in slots.
+
+Custom actions may target any configured destination.
+
+This preserves the established fundamental-action interface while allowing user-defined behavior beyond home theater equipment.
+
+### 13.4 Shared destination resolution
+
+All command steps should resolve their destination through one common mechanism.
+
+The HTTP transport should receive an endpoint and command, without needing to know whether the destination is built-in or custom.
+
+Custom destinations do not require a second transport, dispatcher, or queue.
 
 ### 13.5 Stable references
 
-Deleting a custom device must not silently retarget an action to another device.
+Deleting a custom device must not renumber remaining devices.
 
-Device IDs should not be renumbered merely because an earlier device was removed.
+References to missing destinations must be rejected or explicitly handled during configuration validation.
 
-Configuration validation must reject or explicitly handle references to missing destinations.
+Custom-device names may change without affecting action references.
 
-### 13.6 Scope boundaries
+### 13.6 Scope and implementation order
 
-The first implementation should use the existing HTTP endpoint model.
+Custom-device implementation is deferred.
 
-Do not add:
+The next implementation phase will introduce custom and compound actions using existing built-in destinations for testing.
 
-- DNS support.
-- HTTPS.
-- Authentication.
-- Device discovery.
-- Protocol plug-ins.
-- Complex device capabilities.
+Future custom-device support should extend that implementation without requiring a redesign.
 
-Those features require separate justification and testing.
+The initial custom-device implementation will reuse the existing HTTP endpoint model.
+
+Do not introduce device discovery, capability registries, device classes, protocol plug-ins, authentication frameworks, or unrelated abstractions without a separate demonstrated need.
+
+The custom-device editor may be added later without redesigning the current home-theater-centric interface.
+
+**KISS principle:** A destination has an identity, a name, and an address. Behavior belongs to actions, not device definitions.
 
 ---
 
