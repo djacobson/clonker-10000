@@ -1601,6 +1601,44 @@ And perhaps the most important development rule:
 
 ---
 
+## 25.1 Future Objective — Clonker Recipe Library
+
+**Status:** Conceptual; deferred until after custom devices and compound actions.
+
+A future Clonker Recipe Library may provide downloadable
+configuration examples for common equipment combinations
+and custom action sequences.
+
+Recipes could be hosted on the Clonker website or in a
+GitHub-hosted sample catalog.
+
+The browser configuration editor may eventually offer a
+recipe selector that:
+
+1. Retrieves a catalog of available recipes.
+2. Displays descriptive titles and equipment information.
+3. Loads a selected recipe into the editor.
+4. Allows the user to review and modify the configuration.
+5. Requires an explicit Save action before persistence.
+
+Recipes may include external documentation describing
+equipment compatibility, command behavior, setup
+requirements, and custom action examples.
+
+Detailed descriptions and attribution belong with the
+recipe catalog, not in the operational device configuration.
+
+The Pico must remain fully operational without internet
+access or access to the recipe library.
+
+Recipe loading must not bypass configuration validation,
+revision protection, or the existing save safeguards.
+
+**Design principle:** Recipes help users configure the
+Clonker; they do not become a runtime dependency.
+
+---
+
 ## 26. Reference Documents
 
 - [Configuration & Recovery](CONFIGURATION.md) — active JSON v3 schema, validation, persistence, and recovery.
