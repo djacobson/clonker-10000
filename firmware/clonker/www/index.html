@@ -324,6 +324,10 @@
 
 
 <script>
+    // Configuration schema version.
+    // Must match CONFIG_VERSION in device_config_v2.py.
+    const CONFIG_VERSION = 3;
+
     // JSON v3 configuration constants.
     const MAX_CONFIG_ATTEMPTS = 5;
 
@@ -591,9 +595,9 @@
 
             const config = await response.json();
 
-            if (config.version !== 3) {
+            if (config.version !== CONFIG_VERSION) {
                 throw new Error(
-                    "Expected JSON configuration version 3"
+                    "Expected JSON configuration version " + CONFIG_VERSION
                 );
             }
 
@@ -723,9 +727,10 @@
         });
 
         return {
-            version: 2,
+            version: CONFIG_VERSION,
             rooms: rooms
         };
+
     }
 
 
