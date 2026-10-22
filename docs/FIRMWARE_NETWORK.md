@@ -1,1018 +1,279 @@
 # The Clonker 10000 — Firmware, HTTP & Clock
 
-**Design reference:** Updated October 19, 2026  
-**Hardware:** Raspberry Pi Pico 2 W  
-**Runtime:** CircuitPython 10.3.1  
-**Status:** Wi-Fi, CONFIG HTTP service, JSON v2 configuration, browser clock, and logging-only Dumb Queue operational. Outbound device HTTP pending.
+**Design reference:** October 21, 2026  
+**Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
+**Status:** Chapter 3 Phase B validated — real Denon and Roku commands executed through the browser, Dumb Queue™, and outbound HTTP transport.  
+**Scope:** Current firmware behavior and operational boundaries. For the development chronology, see [Development History](DEVELOPMENT_HISTORY.md).
 
-> **One monster, two directions of HTTP traffic: inbound management and outbound equipment control.**
+> One monster. Two directions of HTTP. A deliberately Dumb Queue™ between the buttons and the network.
 
-## 1. Runtime Overview
+---
 
-The Clonker 10000 currently runs on a Raspberry Pi Pico 2 W using CircuitPython 10.3.1.
+## 1. Purpose and implementation status
 
-Development network:
+This document describes **the current running firmware**, not the chronological sequence of experiments. It covers startup, the cooperative scheduler, inbound management HTTP, outbound device HTTP, action execution, clock and logging, test evidence, and limitations.
 
-- Wi-Fi: dedicated 2.4 GHz SSID `jrtr`.
-- Reserved Pico IP: `192.168.50.12`.
-- Hostname and credentials: configured through private `settings.toml`.
-- Management interface: `http://192.168.50.12:9090/`.
-- Browser Test Remote: `http://192.168.50.12:9090/remote.html`.
+**Working and tested:** Wi-Fi, JSON v2 configuration, browser management and Test Remote, inbound HTTP on port 9090, queued ordinary actions, outbound GET/POST commands to Denon and Roku, and a controlled five-command backlog.
 
-These are local development settings, not universal defaults.
+**Not yet implemented:** physical GPIO action inputs, runtime power/mute toggle selection, custom-action execution, device-state polling, and specialized volume-encoder handling. More exhaustive failure, load, and long-duration testing remains pending.
 
-The firmware uses a cooperative main loop rather than a threaded application architecture.
+The firmware is intended for a trusted home LAN, not internet exposure.
 
-Its current responsibilities are:
+## 2. Firmware layout and ownership
 
-- Load the validated JSON v2 configuration.
-- Initialize and use Wi-Fi connectivity.
-- Log configured rooms and endpoints.
-- Evaluate the simulated CONFIG/RUN switch.
-- Start and stop the management HTTP listener.
-- Service incoming HTTP requests.
-- Provide browser clock synchronization.
-- Support configuration editing and persistence.
-- Route browser Test Remote requests to a logging-only dispatcher.
+| Repository path | Responsibility |
+|---|---|
+| `firmware/code.py` | CircuitPython entry point |
+| `firmware/clonker/main.py` | Startup and cooperative scheduling |
+| `firmware/clonker/net/web.py` | Inbound CONFIG-mode HTTP server and API |
+| `firmware/clonker/net/http_transport.py` | Outbound blocking HTTP client |
+| `firmware/clonker/actions.py` | Action validation, Dumb Queue™, execution and failure policy |
+| `firmware/clonker/device_config_v2.py` | JSON v2 validation, active configuration, revisions and persistence |
+| `firmware/clonker/system/clock.py` | Browser-synchronized UTC reference and timestamps |
+| `firmware/clonker/system/logger.py` | Serial logging |
+| `firmware/clonker/controls/switches.py` | Simulated CONFIG/RUN selection pending GPIO |
+| `firmware/clonker/www/index.html` | Configuration and clock UI |
+| `firmware/clonker/www/remote.html` | Browser Test Remote |
 
-Physical control scanning, real outbound equipment commands, and periodic background tasks are not yet operational.
+The active configuration lives at `/clonker/device_config.json` on CIRCUITPY. The repository's `firmware/` layout is deployed onto the Pico; repository-relative paths are not necessarily runtime absolute paths.
 
-## 2. Firmware Entry and Main Loop
+**Separation of responsibilities:** The browser accepts requests; `actions.py` decides what to execute; JSON supplies the endpoint and command; `http_transport.py` handles only the outbound network transaction. Neither physical inputs nor the transport should hardcode room-specific equipment mappings.
 
-CircuitPython starts:
+## 3. Startup and cooperative scheduling
 
-`firmware/code.py`
+`firmware/code.py` invokes `clonker.main.main()`. Startup loads and validates the JSON v2 configuration, logs room and device information, and enters the cooperative loop. Successful browser saves publish the new validated configuration to RAM; action execution resolves the current configuration rather than retaining a stale copy.
 
-which invokes:
-
-`clonker.main.main()`
-
-The application entry point is:
-
-`firmware/clonker/main.py`
-
-### Startup sequence
-
-The main application:
-
-1. Logs the Clonker startup banner.
-2. Loads JSON v2 configuration through `device_config_v2.load()`.
-3. Logs successful three-room configuration loading.
-4. Logs each room ID and name.
-5. Logs configured TV, AVR, and streaming endpoints.
-6. Logs the number of fundamental actions per room.
-7. Enters the cooperative application loop.
-
-The active configuration is loaded once at startup.
-
-Successful browser configuration saves update the configuration engine's authoritative in-memory state without requiring a reboot.
-
-The dispatcher reads current configuration through `device_config.room()` rather than retaining a stale startup snapshot.
-
-### Cooperative scheduling
-
-**Implementation baseline:** October 20, 2026
-
-The application uses a cooperative main loop with independently scheduled action and management HTTP polling.
-
-Current timing constants:
+Current scheduling constants in `main.py`:
 
 ```python
 WEB_POLL_INTERVAL = 0.01
 ACTION_POLL_INTERVAL = 0.01
 ```
 
-The main loop also yields briefly:
+The loop also calls `time.sleep(0.001)` on each iteration. It polls the action queue in both CONFIG and RUN modes, evaluates CONFIG/RUN, and polls the inbound web server only while CONFIG is enabled. Each `actions.poll()` executes at most one eligible queued action.
 
-```python
-time.sleep(0.001)
-```
+This is **cooperative scheduling, not multitasking**. The inbound listener is nonblocking and advances one operation per poll. An outbound HTTP request is deliberately blocking and temporarily prevents the main loop from polling other services. The 10 ms poll intervals are scheduling intentions, **not** guaranteed input latency or a promise of uninterrupted GPIO scanning.
 
-The intended execution priority is:
+The CONFIG/RUN switch is currently simulated; the physical GPIO control is not implemented. SERVICE/DEVICE filesystem ownership is a separate mode described in [Operating Modes](OPERATING_MODES.md).
 
-1. Physical GPIO input handling (future).
-2. One eligible queued action.
-3. CONFIG/RUN mode evaluation.
-4. CONFIG management HTTP polling.
-5. Brief idle sleep.
+## 4. Wi-Fi and socket resources
 
-`actions.poll()` executes at most one eligible task per invocation.
+The development Pico uses a private 2.4 GHz Wi-Fi network, with a reserved address of `192.168.50.12`. The management interface is normally available at:
 
-A future-dated task does not block a later immediate task.
+- `http://192.168.50.12:9090/`
+- `http://192.168.50.12:9090/remote.html`
 
-Action polling remains enabled in both CONFIG and RUN modes.
+These are **development-specific addresses**, not firmware defaults. Wi-Fi credentials are kept in private settings, not in documentation or source-control examples.
 
-The inbound management HTTP listener runs only in CONFIG mode.
+Both inbound and outbound networking use CircuitPython `wifi.radio` and `socketpool`. Each module maintains its own `SocketPool` object. The outbound module reuses its pool but **does not reuse individual TCP connections**. Every device command opens a fresh socket and closes it in `finally`.
 
-The 10 ms polling intervals are scheduling targets, not guaranteed response latencies.
+The inbound server and outbound transport share the same radio, but not a common client socket or a shared request state machine.
 
-#### Responsiveness findings
+## 5. Inbound HTTP server
 
-During October 20 bench testing, unrestricted action polling coincided with intermittent serial-console connection difficulty and slow browser page loading.
+**Module:** `firmware/clonker/net/web.py`  
+**Port:** `9090`  
+**Mode:** CONFIG only  
+**Architecture:** Nonblocking, single active client, cooperative `poll()`.
 
-Limiting action polling to approximately 100 Hz improved responsiveness.
+The server accepts, receives, parses, builds a response, sends in chunks, and closes a client over successive polls. It does not use a threaded OS or support many simultaneous active requests. Its listener backlog is not the same as concurrent request processing.
 
-Adding a 1 ms main-loop sleep improved responsiveness further.
-
-These changes were retained as the development baseline.
-
-The investigation did not conclusively establish whether the original behavior resulted from CPU scheduling, USB servicing, Wi-Fi interaction, or another runtime effect.
-
-Further tuning should be driven by measured behavior under actual outbound HTTP and physical input workloads.
-
-#### GPIO implications
-
-A 1 ms main-loop sleep is a reasonable initial setting for ordinary momentary buttons.
-
-It is not yet a validated sampling strategy for the Grayhill optical volume encoder.
-
-Encoder pulse rates, decoding reliability, and possible interrupt-driven handling must be evaluated during physical hardware integration.
-
-### CONFIG/RUN transitions
-
-The main loop checks:
-
-```python
-switches.config_enabled()
-```
-
-When CONFIG becomes enabled, it starts the HTTP listener.
-
-When CONFIG becomes disabled, it stops the listener.
-
-The current switch state is simulated and defaults to CONFIG enabled.
-
-The physical CONFIG/RUN switch is not yet connected.
-
-Future RUN operation must preserve Wi-Fi and the loaded configuration so outbound equipment commands can continue without the management server.
-
-The current implementation does not yet establish end-to-end RUN-mode device control.
-
-## 3. Independent Operating Modes
-
-Clonker has two separate operating-mode dimensions.
-
-### SERVICE (USB) / DEVICE
-
-Selected by GP17 at boot.
-
-- GP17 open: SERVICE (USB), host-writable filesystem.
-- GP17 grounded: DEVICE, Pico-writable filesystem.
-
-The selection is implemented in `firmware/boot.py`.
-
-Changing SERVICE/DEVICE requires a full power cycle.
-
-In SERVICE mode, the Pico cannot persist configuration changes to its read-only filesystem.
-
-In DEVICE mode, the Pico can persist configuration changes.
-
-### CONFIG / RUN
-
-Controls application behavior, not filesystem ownership.
-
-- CONFIG: management HTTP service enabled.
-- RUN: management HTTP service disabled.
-
-CONFIG/RUN is currently simulated in firmware.
-
-The future physical maintained switch should change this mode during runtime without requiring a reboot.
-
-**DEVICE is not synonymous with RUN.**
-
-See [Operating Modes](OPERATING_MODES.md).
-
-## 4. Management HTTP Server
-
-The inbound HTTP server is implemented in:
-
-`firmware/clonker/net/web.py`
-
-It listens on TCP port:
-
-`9090`
-
-The server is intended for a trusted local network.
-
-It does not implement application-level authentication.
-
-Do not expose this port through internet port forwarding.
-
-CircuitPython Web Workflow on port 80 is disabled in private `settings.toml` using:
-
-```toml
-CIRCUITPY_WEB_API_PORT = 0
-```
-
-This was adopted because of suspected socket conflicts during development.
-
-The Clonker management server is separate from CircuitPython Web Workflow.
-
-### Server implementation
-
-The management server uses:
-
-- `wifi`
-- `socketpool`
-- `json`
-- `errno`
-- `storage`
-
-It accepts one active client at a time.
-
-Its `poll()` function advances a limited unit of work per call:
-
-- Accept a client.
-- Receive a request chunk.
-- Prepare a response.
-- Send a response chunk.
-- Close the completed or failed connection.
-
-The implementation retains connection state between polls.
-
-It uses nonblocking socket operations to avoid waiting indefinitely for an idle browser client.
-
-A slow or stalled client can still consume server capacity until timeout.
-
-The server does not provide concurrent request processing.
-
-### HTTP limits
-
-Current firmware constants:
+Current limits:
 
 | Constant | Value |
 |---|---:|
-| `PORT` | `9090` |
-| `MAX_REQUEST_BYTES` | `10240` |
-| `MAX_HEADER_BYTES` | `2048` |
-| `IO_CHUNK_BYTES` | `512` |
-| `CLIENT_TIMEOUT_SECONDS` | `4.0` |
-| `HTTP_DIAGNOSTICS` | `False` |
+| `MAX_REQUEST_BYTES` | 10,240 bytes |
+| `MAX_HEADER_BYTES` | 2,048 bytes |
+| `IO_CHUNK_BYTES` | 512 bytes |
+| `IDLE_CLIENT_TIMEOUT_SECONDS` | 0.5 s |
+| `CLIENT_TIMEOUT_SECONDS` | 4.0 s |
+| Inbound `HTTP_DIAGNOSTICS` | `False` |
 
-The JSON configuration engine separately limits serialized configuration to 8192 UTF-8 bytes.
+The configuration engine separately limits serialized JSON to 8,192 UTF-8 bytes.
 
-Configuration POST requests require a valid Content-Length and a complete body before JSON parsing.
+### Why there are two inbound timeouts
 
-The server bounds request accumulation before processing.
+Browser testing exposed connections that were accepted but sent no request bytes. A single four-second timeout could make the browser feel stalled because the server had only one active-client slot. The server now abandons **silent** connections after about 0.5 seconds while allowing up to four seconds of inactivity for an active receive/send operation.
 
-### CircuitPython nonblocking sockets
+This mitigated observed navigation delays in Chrome on Windows and Safari on iPad. The precise origin of the silent connections was not conclusively established. The timeout change is not a multi-client server redesign.
 
-The tested runtime uses:
-
-```python
-errno.EAGAIN
-```
-
-for would-block conditions.
-
-The implementation does not assume that `errno.EWOULDBLOCK` is available.
-
-The helper `_socket_would_block()` recognizes `EAGAIN`.
-
-This is a CircuitPython compatibility decision based on earlier testing.
-
-### HTTP response behavior
-
-The server generates responses with:
-
-- HTTP status.
-- Content-Type.
-- Content-Length.
-- Cache-Control: no-store.
-- Connection: close.
-
-Responses are sent incrementally using bounded chunks.
-
-Connections are closed after completion or failure.
-
-These are implementation characteristics, not a guarantee that every malformed request or network failure has been tested.
-
-## 5. Management HTTP Routes
-
-The active server supports the following routes.
+## 6. Management API and browser interfaces
 
 | Request | Behavior |
 |---|---|
-| `GET /` | Serve configuration and clock page |
-| `GET /remote.html` | Serve browser Test Remote |
-| `GET /api/clock` | Return clock source and timestamp |
-| `POST /api/clock?utc=...` | Synchronize clock from browser |
-| `GET /api/config` | Return active JSON v2 configuration and metadata |
-| `POST /api/config` | Validate and save JSON v2 configuration |
-| `POST /api/action?room=...&action=...` | Dispatch a fundamental action to logging stub |
+| `GET /` | Configuration and clock page |
+| `GET /remote.html` | Browser Test Remote |
+| `GET /api/config` | Validated current configuration plus revision and filesystem-writable metadata |
+| `POST /api/config` | Validate, revision-check and save configuration where permitted |
+| `GET /api/clock` | Current clock source and timestamp |
+| `POST /api/clock?utc=...` | Set browser-supplied UTC reference |
+| `POST /api/action?room=...&action=...` | Validate and **enqueue** a fundamental action |
 
-Unknown routes return HTTP 404.
+The action route calls `actions.dispatch(room_id, action_id)` and returns a JSON acknowledgment, including `status: queued` and queue depth. It **does not wait** for network execution. `ok: true` means the request was accepted into the queue, not that the device received or acted upon it.
 
-### GET /api/config
+Configuration saves are blocked when the Pico filesystem is read-only (SERVICE/USB ownership). In writable DEVICE mode, saves are subject to strict JSON validation, revision checks, disk consistency checks, and verified backup rotation. A changed successful save clears pending queue items; an unchanged save does not need to rewrite the file. See [Configuration](CONFIGURATION.md) for the authoritative persistence details.
 
-Returns the active configuration along with:
+The browser Test Remote exposes the fourteen fundamental actions for each configured room. Its custom-action selector is illustrative, not an executable custom-action engine.
 
-- `revision`
-- `filesystem_writable`
+## 7. The Dumb Queue™ and action execution
 
-These are response metadata, not persisted JSON configuration fields.
+**Module:** `firmware/clonker/actions.py`  
+**Capacity:** 128 queued tasks  
+**Public API:** `dispatch(room_id, action_id, delay_seconds=0)`, `poll()`, `clear(reason=...)`, `status()`.
 
-The configuration engine returns a validated copy of active data.
+> **The Dumb Queue gives us a place to absorb commands arriving faster than the network can process them.**
 
-### POST /api/config
+A queued task stores only the room ID, action ID, and due time. It does not capture an IP address, HTTP method, or command path. At execution, `actions.poll()` resolves the **current** JSON configuration.
 
-The endpoint:
+Immediate actions are eligible immediately. Delayed actions use `time.monotonic()` and do not block eligible immediate actions queued behind them. Among eligible tasks, insertion order is preserved. This is **not strict FIFO across future-dated tasks**.
 
-1. Rejects writes when the Pico filesystem is read-only.
-2. Parses the submitted JSON.
-3. Extracts the expected configuration revision.
-4. Validates the configuration.
-5. Checks revision and on-disk consistency.
-6. Detects unchanged configuration.
-7. Performs verified persistence when changed.
-8. Returns save status and the current revision.
+One poll executes **at most one** eligible task. A blank endpoint or ordinary command path produces a logged no-op and no outbound connection. For a configured ordinary action, the queue calls `http_transport.send(endpoint, method, path)` and logs its result.
 
-In SERVICE (USB) mode, write attempts receive HTTP 403.
+**Current toggle boundary:** `mute-toggle` and `power-toggle` are accepted into the queue but execution is deliberately marked `DEFERRED`. No ON/OFF HTTP command is transmitted until state-direction selection is implemented. The JSON schema already supports `on_path` and `off_path`.
 
-In DEVICE mode, valid writes may proceed.
+### Queue failure policy
 
-A stale revision is rejected and the browser directs the user to refresh.
+A transport or execution exception is caught by `actions.poll()`. The executing item has already been removed; the queue **discards all remaining pending items**, logs the failure, and remains available for later submissions. There are **no automatic retries**. The transport itself does not clear the queue.
 
-### POST /api/action
+`status()` reports current depth, capacity, historical peak depth, last result, and last error. Peak depth is historical within the running process; `clear()` does not reset it.
 
-Example:
+**Important distinction:** A failed device command can cancel pending work. It does not permanently disable Clonker.
 
-```text
-POST /api/action?room=room-1&action=volume-up
-```
+## 8. Outbound blocking HTTP transport
 
-The browser Test Remote uses this route to request a generic action.
+**Module:** `firmware/clonker/net/http_transport.py`  
+**Interface:** `send(endpoint, method, path)`.
 
-The route:
+The transport validates a dotted IPv4 endpoint with optional `:port` (default 80), accepts GET and POST, requires an absolute command path, checks Wi-Fi connectivity, and constructs an HTTP/1.1 request with `Host`, `Connection: close`, and `Content-Length: 0`.
 
-1. Parses the room and action parameters.
-2. Rejects malformed parameter structures.
-3. Calls `actions.dispatch(room_id, action_id)`.
-4. Returns the dispatcher's JSON result.
+It then:
 
-The parser uses fixed ASCII identifiers rather than `urllib.parse`, which was unsuitable for the tested CircuitPython environment.
+1. Opens a new TCP socket from its shared SocketPool.
+2. Sets a bounded socket timeout and connects.
+3. Sends the complete request, handling partial sends.
+4. Reads and parses the HTTP **status line**, bounded to 128 bytes.
+5. Accepts 2xx status codes; raises on non-2xx or transport errors.
+6. Returns endpoint, method, path, status and timing fields.
+7. Closes the socket in `finally`, including on failure.
 
-The dispatcher independently validates room and action IDs.
+The current implementation **does not read the complete response headers or body**. It is intentionally minimal and suitable only for commands whose success can be judged sufficiently from the HTTP status. It does not implement TLS, redirects, authentication, arbitrary POST bodies, connection persistence, or device-specific response parsing. Apple TV control is not implemented by this transport.
 
-**This endpoint does not currently send an HTTP request to AV equipment.**
-
-## 6. Browser Test Remote
-
-The Test Remote is implemented in:
-
-`firmware/clonker/www/remote.html`
-
-It provides a browser interface for all fourteen fundamental actions.
-
-The user can select a room and trigger actions without physical hardware.
-
-This gives Clonker a working development harness for the next stage.
-
-### Current request flow
-
-```text
-Browser Test Remote
-        |
-        | POST /api/action
-        v
-web.py
-        |
-        v
-actions.dispatch()
-        |
-        v
-device_config.room(room_id)
-        |
-        v
-Validate action configuration
-        |
-        v
-Serial log + JSON stub response
-```
-
-The current response indicates that a valid action was accepted by the logging stub.
-
-Example status fields include:
-
-```json
-{
-  "ok": true,
-  "status": "stub",
-  "room": "room-1",
-  "room_name": "Den",
-  "action": "volume-up",
-  "configured": true,
-  "message": "STUB: Den / volume-up (logged; no command sent)"
-}
-```
-
-This is an illustrative response for a configured Den volume action.
-
-`ok: true` means the stub accepted the request.
-
-It does **not** mean a network command was transmitted or that the equipment responded.
-
-### Verification milestone
-
-On October 19, 2026, the browser Test Remote and logging-only dispatcher were exercised on the Pico.
-
-All fourteen fundamental action buttons were reported working in the stub test.
-
-This established the browser-to-dispatcher path without risking unintended AV commands.
-
-The next milestone is to extend that shared dispatcher to perform real outbound HTTP requests.
-
-## 7. Shared Action Dispatcher — The Dumb Queue
-
-**Implementation status:** Chapter 3, Phase A complete (October 20, 2026).
-
-The shared action engine is implemented in:
-
-`firmware/clonker/actions.py`
-
-It is a cooperative, bounded task queue used by the browser Test Remote and intended for future physical controls and custom actions.
-
-### Action submission
-
-The browser submits a fundamental action through:
-
-```text
-POST /api/action?room=room-1&action=volume-up
-```
-
-The HTTP handler calls:
+Current transport constants:
 
 ```python
-actions.dispatch(room_id, action_id)
+SOCKET_TIMEOUT = 0.5
+TOTAL_TIMEOUT = 1.5
+MAX_STATUS_LINE = 128
+HTTP_DIAGNOSTICS = True
 ```
 
-The dispatcher:
+`SOCKET_TIMEOUT` bounds an individual blocking socket operation. `TOTAL_TIMEOUT` is a **cooperative deadline checked between operations**, not an asynchronous hard wall-clock limit. A single operation may extend beyond the nominal total deadline; the total also depends on the CircuitPython stack's actual timeout behavior. Neither setting proves uninterrupted GPIO responsiveness.
 
-- Validates the room and action IDs.
-- Checks the configured target and command paths.
-- Rejects submission when the queue is full.
-- Appends a task containing room ID, action ID, and due time.
-- Returns a JSON-serializable acknowledgment.
+Timing results include `connect_ms`, `send_ms`, `response_ms`, and `total_ms`, measured with `time.monotonic()`. Observed readings can be quantized; a displayed `0.0 ms` phase is not proof of literally zero elapsed time.
 
-The acknowledgment reports `status: queued`.
+Inbound and outbound `HTTP_DIAGNOSTICS` are separate module settings. Outbound diagnostics are currently **enabled** for integration testing.
 
-**Queued does not mean executed.**
+## 9. CircuitPython TCP findings and design rationale
 
-### Queue execution
+Initial nonblocking outbound socket experiments were attractive because console calls appeared responsive. However, connection completion and subsequent sends were not reliably distinguishable using the APIs available in this tested CircuitPython environment. Observed errors included `OSError(119)` and later connection errors; an expected `getsockopt(SO_ERROR)` inspection path was unavailable.
 
-The cooperative main loop calls:
+The team therefore chose **bounded blocking outbound HTTP for ordinary buttons**, while retaining nonblocking inbound HTTP where cooperative service is essential. This is a deliberate simplicity/performance tradeoff, not a claim that nonblocking TCP cannot be made to work.
 
-```python
-actions.poll()
-```
+The tested blocking implementation repeatedly succeeded on reachable Roku and Denon endpoints. A deliberately unreachable LAN address failed predictably and a subsequent Roku request succeeded. Under a 0.5-second socket timeout, one unreachable-address test failed after approximately 539 ms; other measured failures depended on the configured timeout and socket behavior.
 
-Each invocation executes at most one eligible task.
+Successful ordinary commands generally completed in approximately **86–164 ms** in the initial bench tests. Most measured time was often spent establishing a fresh TCP connection. These measurements motivate, but do not yet justify implementing, persistent connections for high-rate volume control.
 
-The engine:
+## 10. Device mappings and command examples
 
-- Maintains a maximum of 128 pending tasks.
-- Supports immediate and monotonic-time delayed execution.
-- Allows immediate tasks to bypass future-dated tasks.
-- Preserves insertion order among eligible tasks.
-- Resolves the current validated configuration at execution time.
-- Logs simulated execution or an unconfigured no-op.
-- Clears remaining pending tasks after an execution failure.
+The JSON v2 configuration supports three fixed room IDs, each with editable names and optional `tv`, `avr`, and `streaming` endpoints. Each room contains fourteen fixed fundamental action mappings. A non-toggle mapping identifies target, HTTP method and path. Toggle mappings have paired ON/OFF paths.
 
-The queue runs in both CONFIG and RUN modes.
+**Verified development endpoints (October 21, 2026):**
 
-During Phase A, execution is logging-only. No equipment commands are transmitted.
+| Equipment | Endpoint | Tested example |
+|---|---|---|
+| Den AVR-X3700H | `192.168.50.44:8080` | `GET /goform/formiPhoneAppDirect.xml?MVUP` returned HTTP 200 while receiver was in standby; no wake was observed |
+| Sunroom AVR-X1800H | `192.168.50.40:8080` | `GET /goform/formiPhoneAppDirect.xml?MVUP` and `?MVDOWN` changed the volume |
+| Sunroom Roku | `192.168.50.28:8060` | `POST /keypress/Right`, `/keypress/Home`, `/keypress/Back` |
 
-### Queue management
+The Den Roku has also been configured at `192.168.50.43:8060`, but that is **not** the Roku endpoint used for the documented Sunroom tests.
 
-The production interface includes:
+A Denon status query to `/goform/formMainZone_MainZoneXml.xml` returned HTTP 403 during testing. That did not prevent a different Denon control endpoint from returning HTTP 200. Do not generalize the 403 to the whole receiver API.
 
-```python
-actions.dispatch(room_id, action_id, delay_seconds=0)
-actions.poll()
-actions.clear(reason="Manual reset")
-actions.status()
-```
+The Den AVR-X3700H accepted a volume-up HTTP request while in standby without visibly waking the receiver or LG TV. An HTTP 200 acknowledges an HTTP-level result, **not necessarily a physical state change**.
 
-A successful configuration change clears pending tasks so that commands from an earlier configuration cannot remain scheduled.
+These addresses and behaviors are local test observations, not universal manufacturer defaults.
 
-Temporary diagnostic test functions and the `/api/test/queue` endpoint were removed after Phase A validation.
+## 11. Clock synchronization and logging
 
-### Toggle behavior
+**Clock module:** `clonker/system/clock.py`  
+**Logger module:** `clonker/system/logger.py`.
 
-The JSON v2 schema provides separate `on_path` and `off_path` fields for power and mute toggles.
+The clock initially uses `DEFAULTTIME`, showing monotonic uptime rather than pretending to know the date. The browser can submit a UTC Unix timestamp through `/api/clock`; the clock stores the reference UTC and monotonic time, then derives later timestamps from elapsed monotonic time. `NTP` is an accepted clock source in the module interface but automated NTP synchronization is not established by this milestone.
 
-The queue currently checks whether either path is configured.
+The logger prints timestamped serial messages with DEBUG, INFO, WARNING and ERROR severity thresholds. It does not persist logs to flash or run background network tasks.
 
-It does not yet select a direction or maintain toggle history.
+**Clock domains must remain distinct:** browser UTC is for readable timestamps and diagnostics; `time.monotonic()` is for queue delays and elapsed-time measurements. Adjusting the wall-clock reference must not shift scheduled queue deadlines.
 
-Toggle direction selection is reserved for a later implementation step.
+## 12. Verification record — Chapter 3 Phase B
 
-### Current limitations
+**Date:** October 21, 2026. **Scope:** Controlled bench and browser tests, not production qualification.
 
-The action engine does not yet:
+- Roku read-only GET returned HTTP 200.
+- Sunroom Denon GET Volume Up and Volume Down returned HTTP 200, with visible LG volume-bar changes.
+- Sunroom Roku POST navigation commands returned HTTP 200 and produced observed navigation.
+- Den AVR-X3700H returned HTTP 200 for a volume command while in standby, without observed wake behavior.
+- A deliberately unreachable endpoint generated a bounded error; later requests recovered without resetting the socket pool.
+- Reliability runs at 1.0-second and 0.5-second socket timeouts reported **24/24 successful reachable requests**, **two expected unreachable failures**, and **two successful post-failure recoveries**.
+- Browser Test Remote commands successfully traversed `/api/action` → Dumb Queue → outbound transport → equipment.
+- A controlled REPL burst enqueued **five** Sunroom Volume Up commands before polling. Peak depth reached **5**. Five polls executed five HTTP 200 responses, with reported times of **117.2, 125.0, 85.9, 85.9 and 85.9 ms**. Queue depth returned to **0**, with no recorded error.
 
-- Open outbound device connections.
-- Send actual HTTP GET or POST commands.
-- Validate device HTTP responses.
-- Maintain toggle direction history.
-- Query actual equipment state.
-- Retry failed commands automatically (excluded from the initial design).
+The burst demonstrated bounded backlog acceptance and sequential drain. It did **not** demonstrate five simultaneous HTTP transactions, high-rate browser request handling, or uninterrupted GPIO event capture.
 
-These limitations do not prevent queue submission or simulated execution.
+The earlier logging-only Phase A tests remain documented in [Development History](DEVELOPMENT_HISTORY.md). Do not confuse historical stub responses with the current live execution path.
 
-### Shared action principle
+## 13. Known limitations and safety boundaries
 
-The browser Test Remote, physical controls, and future custom commands must use the same action engine.
+- **Blocking outbound requests:** pause the cooperative scheduler; physical encoder responsiveness is untested.
+- **Single active inbound client:** idle-browser mitigation is useful but not equivalent to concurrent HTTP handling.
+- **Failure policy:** one failed execution clears the remaining queue; that is intentional but may be revisited for special controls.
+- **Toggle actions:** queue acceptance is implemented; ON/OFF execution is deferred.
+- **Response interpretation:** HTTP 2xx does not guarantee the device physically changed state; response bodies are not parsed.
+- **No retries:** avoids duplicate button effects but leaves transient failures to the user or later policy.
+- **No persistent TCP:** each command incurs connection establishment overhead.
+- **No authentication:** the management service is designed for a trusted LAN; do not forward port 9090 to the internet.
+- **Persistence safeguards:** backup rotation is not a fully atomic power-loss transaction.
+- **Incomplete coverage:** sustained load, extended Wi-Fi outages, malformed-device responses, memory stability, physical RUN-mode operation, and comprehensive failure injection remain to be tested.
 
-Physical control code must not contain vendor-specific HTTP paths or device IP addresses.
+## 14. Future networking and volume-encoder work
 
-The action engine resolves generic actions against the current JSON v2 configuration.
+The **Grayhill optical volume encoder** inspired the project and may require a different policy from ordinary slow button presses. The v1 transport is intentionally simple: one blocking request, one TCP connection, one HTTP status acknowledgment.
 
-The outbound transport handles device communication.
+Possible future investigations, **not implemented or committed design requirements**, include:
 
-**Clonker controls actions, not brands.**
+- Measure actual encoder event rates and physical input capture during network operations.
+- Consider accumulation, coalescing, acceleration, or bounded backpressure for rapid volume changes.
+- Test whether the Denon API supports persistent HTTP connections and whether connection reuse meaningfully improves throughput.
+- Consider configurable per-device or per-action connection behavior only if evidence supports it.
+- Avoid assuming Roku, Apple TV, LG, and Denon have identical networking capabilities.
+- Keep custom-action sequences on the shared queue rather than inventing a second execution engine.
+- Implement per-room power/mute command-direction history separately from transport logic.
 
-## 8. JSON v2 Configuration and Persistence
+A future optimized volume path must preserve the ability to operate ordinary buttons and must not pretend that the current queue automatically captures events while blocking.
 
-The active configuration engine is:
+**The Dumb Queue™ buffers the traffic. It does not repeal the laws of TCP.**
 
-`firmware/clonker/device_config_v2.py`
+## 15. Related documents
 
-It provides:
-
-- Three fixed rooms.
-- Three optional device endpoints per room.
-- Fourteen fundamental actions per room.
-- GET/POST method configuration.
-- Ordinary command paths.
-- Paired ON/OFF toggle paths.
-- Strict structural validation.
-- Compact deterministic JSON serialization.
-- Revision checking.
-- Verified writes.
-- Backup rotation.
-- Startup backup fallback.
-
-The active configuration file is:
-
-`/clonker/device_config.json`
-
-Successful browser saves publish the new validated configuration into RAM after persistence.
-
-The dispatcher reads the current configuration for each request, avoiding a stale startup snapshot.
-
-### Persistence boundaries
-
-The active configuration engine maintains:
-
-```text
-device_config.json
-device_config.json.bak
-device_config.json.bak.old
-```
-
-Temporary writes use:
-
-```text
-device_config.json.tmp
-```
-
-The multi-file replacement sequence is not power-loss-atomic.
-
-Unexpected power interruption can still cause data loss or leave files requiring recovery.
-
-Loading a backup does not silently overwrite a damaged primary.
-
-See [Configuration & Recovery](CONFIGURATION.md) for full details.
-
-## 9. Clock Service
-
-The central clock service is:
-
-`firmware/clonker/system/clock.py`
-
-It supports two current behaviors:
-
-- Default monotonic uptime reference.
-- Browser-provided UTC reference stored in RAM.
-
-### DEFAULTTIME
-
-Before browser synchronization, the clock reports monotonic uptime using a format similar to:
-
-```text
-[DEFAULTTIME +001234.5s]
-```
-
-This requires no external time service.
-
-### BROWSER
-
-The browser can submit a UTC Unix timestamp through:
-
-```text
-POST /api/clock?utc=...
-```
-
-The clock stores:
-
-- Reference UTC seconds.
-- Reference monotonic time.
-- Source name.
-
-Later timestamps are calculated from elapsed monotonic time.
-
-Example:
-
-```text
-2026-10-19T20:00:00Z
-```
-
-The browser synchronization is stored only in RAM.
-
-It does not modify JSON configuration or write flash.
-
-A restart returns the clock to its default state until synchronized again.
-
-### NTP
-
-The clock module recognizes `NTP` as a possible source name.
-
-Automatic NTP synchronization is **not implemented**.
-
-NTP remains a future enhancement.
-
-### Clock limitations
-
-The browser reference is approximate.
-
-There is no current guarantee of clock accuracy over long periods, during network disruptions, or across restarts.
-
-The clock is primarily a diagnostic timestamp service.
-
-## 10. Serial Logging
-
-The logging module is:
-
-`firmware/clonker/system/logger.py`
-
-It supports four severity levels:
-
-| Level | Numeric value |
-|---|---:|
-| DEBUG | 10 |
-| INFO | 20 |
-| WARNING | 30 |
-| ERROR | 40 |
-
-The default logging level is INFO.
-
-The logger writes timestamped messages to serial output.
-
-It does not write log files to flash.
-
-It does not require network connectivity.
-
-It does not create background tasks.
-
-### Example
-
-```text
-2026-10-19T20:00:00Z INFO    STUB: Den / volume-up (logged; no command sent)
-```
-
-The exact timestamp depends on clock synchronization.
-
-### HTTP diagnostics
-
-`web.py` contains:
-
-```python
-HTTP_DIAGNOSTICS = False
-```
-
-Setting this to `True` enables additional HTTP trace logging.
-
-This is a development diagnostic feature.
-
-It should normally remain disabled unless troubleshooting a specific issue.
-
-Detailed tracing can add overhead and increase serial output.
-
-## 11. Outbound Device HTTP — Agreed V1 Design
-
-**Design agreed:** October 17–18, 2026  
-**Status:** Approved architecture; transport not implemented.
-
-The inbound management HTTP server and outbound device HTTP client have separate responsibilities.
-
-The inbound server receives browser requests.
-
-The outbound transport will send configured commands to Denon, Roku, LG, or other supported HTTP devices.
-
-### Intended request flow
-
-```text
-Browser Test Remote or physical control
-                  |
-                  v
-          Generic room/action
-                  |
-                  v
-          actions.dispatch()
-                  |
-                  v
-        Current JSON v2 mapping
-                  |
-                  v
-         Resolve target endpoint
-                  |
-                  v
-         Resolve command path
-                  |
-                  v
-         Outbound HTTP transport
-                  |
-                  v
-          Configured AV device
-```
-
-The outbound transport should not contain room-selection policy or equipment-specific toggle state.
-
-### Networking requirements
-
-The initial implementation should:
-
-- Use the existing Wi-Fi connection.
-- Reuse shared networking resources where practical.
-- Support configured HTTP GET and POST methods.
-- Support IPv4 endpoints with optional ports.
-- Default to port 80 when omitted.
-- Use bounded connection and response timeouts.
-- Release network resources after success or failure.
-- Return useful success/failure information.
-- Permit subsequent actions after a failed request.
-- Avoid automatic retries that could duplicate commands.
-
-Persistent TCP connection caching is not required for V1.
-
-Connection pooling, batching, and complex queues should be deferred until testing shows a need.
-
-### Ordinary action behavior
-
-For an ordinary action:
-
-1. Resolve current room and action.
-2. Resolve configured target endpoint.
-3. Read method and path.
-4. If endpoint or path is blank, perform a no-op.
-5. Otherwise send one HTTP request.
-6. Report the result.
-
-A blank action must not open a network connection.
-
-### Toggle behavior
-
-The JSON v2 configuration already stores:
-
-- `on_path`
-- `off_path`
-
-for:
-
-- `power-toggle`
-- `mute-toggle`
-
-The planned dispatcher will maintain independent RAM command history for each room and toggle action.
-
-Initial history is unknown.
-
-The first request selects ON.
-
-After a successful ON request, the next selects OFF.
-
-After a successful OFF request, the next selects ON.
-
-A failed request, blank endpoint, or blank selected path does not advance history.
-
-The history records the last successfully sent command direction, **not actual equipment state**.
-
-The outbound transport receives a selected path and sends one request.
-
-It does not own toggle history.
-
-No device-state polling is required for V1.
-
-## 12. Initial Device Command Examples
-
-### Denon AVR
-
-Example configured commands:
-
-```text
-GET /goform/formiPhoneAppDirect.xml?MVUP
-GET /goform/formiPhoneAppDirect.xml?MVDOWN
-GET /goform/formiPhoneAppDirect.xml?MUON
-GET /goform/formiPhoneAppDirect.xml?MUOFF
-```
-
-Development endpoints:
-
-```text
-Den:     192.168.50.44:8080
-Sunroom: 192.168.50.40:8080
-```
-
-### Roku
-
-Example configured commands:
-
-```text
-POST /keypress/Home
-POST /keypress/Back
-POST /keypress/Play
-POST /keypress/Up
-POST /keypress/Down
-POST /keypress/Left
-POST /keypress/Right
-```
-
-Development endpoints:
-
-```text
-Den:     192.168.50.43:8060
-Sunroom: 192.168.50.28:8060
-```
-
-These are known development command patterns, not evidence of successful Pico outbound execution.
-
-Roku POST requests may initially follow the form-style convention previously exercised with iOS Shortcuts.
-
-Actual request framing and device response handling must be verified on the Pico.
-
-The final system-power strategy remains unverified.
-
-
-## HTTP Responsiveness and Connection Lifecycle — October 20, 2026
-
-### Observed behavior
-
-The CONFIG management server uses a cooperative, single-active-client HTTP implementation.
-
-Browser navigation occasionally paused while the server waited for an accepted TCP connection that transmitted no request data.
-
-The behavior was observed in:
-
-- Chrome on a Windows Lenovo laptop.
-- Safari on an iPad.
-
-The browser-specific cause was not conclusively established.
-
-### Diagnostic evidence
-
-Temporary HTTP tracing showed accepted connections followed by zero-byte receive timeouts:
-
-```text
-HTTP client timed out: phase=RECEIVING,
-request_bytes=0, sent_bytes=0, response_bytes=0
-```
-
-Other connections successfully processed ordinary browser requests.
-
-The traces confirmed successful routing of the configuration page, Test Remote page, clock API, configuration API, and action API.
-
-No corresponding application crash was observed during the final tests.
-
-### Timeout policy
-
-The HTTP server now distinguishes silent connections from active transfers.
-
-```python
-IDLE_CLIENT_TIMEOUT_SECONDS = 0.5
-CLIENT_TIMEOUT_SECONDS = 4.0
-```
-
-A connection that has not provided any request bytes is abandoned after approximately half a second.
-
-Connections that have begun receiving request data, or are sending a response, retain the four-second inactivity timeout.
-
-This prevents an idle connection from occupying the single active-client slot for the full four seconds.
-
-### Diagnostics
-
-The server retains:
-
-```python
-HTTP_DIAGNOSTICS = False
-```
-
-When enabled, the diagnostic trace reports accepted connections and parsed request lines.
-
-Normal operation leaves verbose tracing disabled.
-
-Timeout warnings remain available without verbose tracing.
-
-### Remaining limitations
-
-- Only one inbound client is serviced at a time.
-- Browser-created idle connections can still cause brief pauses.
-- The exact origin of those connections has not been established.
-- A short idle timeout is a mitigation, not a multi-client architecture.
-- Real outbound device communication has not yet been tested alongside the inbound management server.
-
-The current behavior is acceptable for initial single-user CONFIG-mode development.
-
-Do not introduce multi-client complexity without evidence that it is necessary.
-
-### Outbound HTTP considerations
-
-The planned outbound transport will share the Pico's Wi-Fi radio with the management interface.
-
-Outbound operations must use bounded network timeouts and release their sockets.
-
-The action engine remains responsible for queue cancellation and failure policy.
-
-The transport must not alter inbound HTTP connection state or own the Dumb Queue.
-
-## 13. Next Development and Test Sequence
-
-The browser Test Remote provides the preferred initial test harness for outbound HTTP work.
-
-Recommended sequence:
-
-1. Review the current `actions.py` logging dispatcher.
-2. Review the current networking capabilities available in CircuitPython 10.3.1.
-3. Agree on a minimal outbound transport interface.
-4. Implement one bounded HTTP GET request to a low-risk Denon command.
-5. Trigger the action from the browser Test Remote in CONFIG mode.
-6. Confirm serial logs, transport result, and actual equipment response.
-7. Implement and test Roku POST requests.
-8. Test blank endpoints and paths as no-ops.
-9. Test invalid endpoints, connection failures, and timeouts.
-10. Expand ordinary action execution.
-11. Implement per-room toggle command history.
-12. Verify that failed toggle requests do not advance history.
-13. Test RUN mode without the management HTTP listener.
-14. Integrate physical buttons and encoders.
-15. Measure responsiveness before considering optimization.
-
-### CONFIG-mode testing first
-
-The earlier plan suggested disabling CONFIG before initial command tests to remove management HTTP overhead.
-
-That recommendation was written before the browser Test Remote existed.
-
-The preferred initial test is now:
-
-**Browser Test Remote → shared dispatcher → outbound transport → AV device.**
-
-RUN-only testing remains important, but comes later when physical controls or another direct action trigger are available.
-
-### Performance priorities
-
-The initial goal is reliable functionality, not maximum command throughput.
-
-Avoid introducing:
-
-- Volume acceleration.
-- Event accumulation.
-- Persistent TCP caching.
-- General macro engines.
-- Automatic command retries.
-- Speculative device-state synchronization.
-
-Actual hardware measurements should determine whether these features are needed.
-
-## 14. Security and Reliability Boundaries
-
-Clonker currently assumes a trusted home LAN.
-
-The management server has no application authentication.
-
-Configured HTTP endpoints are intended for local AV equipment.
-
-Do not expose the management server to the public internet.
-
-Do not treat HTTP success as proof that a device changed state.
-
-Do not treat a successful stub dispatch as proof that a command was transmitted.
-
-Do not treat backup rotation as a fully atomic storage transaction.
-
-Do not assume cooperative polling guarantees physical encoder responsiveness until hardware tests have been performed.
-
-These distinctions should remain explicit in future implementation and documentation.
-
-## 15. Reference Documents
-
-- [Architecture](ARCHITECTURE.md) — system boundaries and action execution design.
-- [Configuration & Recovery](CONFIGURATION.md) — JSON v2 schema, revisions, persistence, and recovery.
-- [Operating Modes](OPERATING_MODES.md) — SERVICE/DEVICE and CONFIG/RUN.
-- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical input plans.
-- [Development & Deployment](DEVELOPMENT.md) — repository, Pico, and iPad workflow.
-- [Development History](DEVELOPMENT_HISTORY.md) - development milestones.
-- [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — current milestone and next development phase.
+- [Architecture](ARCHITECTURE.md) — system boundaries and design rationale.
+- [Configuration](CONFIGURATION.md) — JSON v2 schema, revision control, backups, and recovery.
+- [Operating Modes](OPERATING_MODES.md) — SERVICE/DEVICE and CONFIG/RUN behavior.
+- [Hardware & Physical Controls](HARDWARE_CONTROLS.md) — knobs, switches, and future GPIO integration.
+- [Development & Deployment](DEVELOPMENT.md) — editing and deployment workflow.
+- [Development History](DEVELOPMENT_HISTORY.md) — dated experiments, failures, and verified milestones.
 
 ---
 
+**THE CLONKER 10000**  
+*Less sleek. More CLONK.*  
 **CLONK! ⚡🔩**
+N
