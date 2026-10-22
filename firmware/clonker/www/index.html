@@ -416,11 +416,13 @@
     }
 
 
-    // Render the three fixed rooms from the active JSON configuration.
+    // Render configured rooms in their established ID order.
     //
-    // Each room contains its name, three optional
-    // device addresses, and fourteen fundamental
-    // HTTP action definitions.
+    // The schema permits one to three rooms. Unconfigured
+    // room slots are omitted from the editor.
+    //
+    // Each configured room contains its name, three built-in
+    // device addresses, and fourteen fundamental actions.
 
     function renderDeviceConfig(config) {
         const container =
@@ -431,7 +433,11 @@
         for (const roomId of ROOM_IDS) {
             const room = config.rooms[roomId];
 
-            const section = document.createElement("section");
+            if (!room) {
+                continue;
+            }
+
+            const section = document.createElement("section"); 
             section.className = "room";
             section.dataset.roomId = roomId;
 

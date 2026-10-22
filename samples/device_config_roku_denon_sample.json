@@ -1,4 +1,3 @@
-
 {
   "version": 3,
   "rooms": {
@@ -164,89 +163,6 @@
           "method": "POST",
           "on_path": "/keypress/Home",
           "off_path": "/keypress/PowerOff"
-        }
-      },
-      "custom_actions": []
-    },
-    "room-3": {
-      "name": "Room 3",
-      "devices": {
-        "device-1": "",
-        "device-2": "",
-        "device-3": ""
-      },
-      "actions": {
-        "volume-up": {
-          "target": "device-2",
-          "method": "GET",
-          "path": ""
-        },
-        "volume-down": {
-          "target": "device-2",
-          "method": "GET",
-          "path": ""
-        },
-        "mute-toggle": {
-          "target": "device-2",
-          "method": "GET",
-          "on_path": "",
-          "off_path": ""
-        },
-        "nav-up": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "nav-down": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "nav-left": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "nav-right": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "select": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "back": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "home": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "play-pause": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "skip-back": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "skip-forward": {
-          "target": "device-3",
-          "method": "GET",
-          "path": ""
-        },
-        "power-toggle": {
-          "target": "device-1",
-          "method": "GET",
-          "on_path": "",
-          "off_path": ""
         }
       },
       "custom_actions": []

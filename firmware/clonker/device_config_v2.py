@@ -38,6 +38,8 @@ MAX_ROOM_NAME_LENGTH = 40
 MAX_PATH_LENGTH = 512
 
 ROOM_IDS = ("room-1", "room-2", "room-3")
+MIN_ROOMS = 1
+MAX_ROOMS = len(ROOM_IDS)
 
 DEVICE_IDS = ("device-1", "device-2", "device-3")
 
@@ -101,11 +103,29 @@ def validate_config(config):
     _keys(config, ("version", "rooms"), "root")
     if type(config["version"]) is not int or config["version"] != CONFIG_VERSION:
         raise ValueError("Unsupported configuration version")
-    _keys(config["rooms"], ROOM_IDS, "rooms")
+
+    configured_rooms = config["rooms"]
+
+    if not isinstance(configured_rooms, dict):
+        raise ValueError("Invalid rooms collection")
+
+    if not MIN_ROOMS <= len(configured_rooms) <= MAX_ROOMS:
+        raise ValueError("Invalid room count")
+
+    for room_id in configured_rooms:
+        if room_id not in ROOM_IDS:
+            raise ValueError("Unknown room: " + str(room_id))
+
     rooms = {}
 
+    # Preserve the established room-ID ordering while allowing
+    # unused rooms to be absent from the configuration.
     for room_id in ROOM_IDS:
-        room = config["rooms"][room_id]
+        if room_id not in configured_rooms:
+            continue
+
+        room = configured_rooms[room_id]
+
         _keys(room, ("name", "devices", "actions", "custom_actions"), room_id)
         name = room["name"]
         if (not isinstance(name, str) or not name.strip() or
