@@ -31,9 +31,14 @@ def main():
     logger.info("THE CLONKER 10000")
     logger.info("Application started")
 
-    # Load the production JSON v2 configuration once at startup.
-    settings = device_config.load()
-    logger.info("Three-room configuration loaded from JSON v2")
+    # Load the active JSON configuration once at startup.
+    device_config.load()
+
+    logger.info(
+        "Three-room configuration loaded from JSON v{}".format(
+            device_config.CONFIG_VERSION
+        )
+    )
 
     # Log configured rooms and endpoints for bench diagnostics.
     for room_id in device_config.ROOM_IDS:
