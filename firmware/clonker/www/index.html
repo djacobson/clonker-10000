@@ -295,7 +295,7 @@
     </div>
 
 
-    <!-- JSON v2 Device Configuration -->
+    <!-- JSON Device Configuration -->
 
     <section class="panel device-panel">
         <h2>Device Configuration</h2>
@@ -416,7 +416,7 @@
     }
 
 
-    // Render the three fixed rooms from JSON v2.
+    // Render the three fixed rooms from the active JSON configuration.
     //
     // Each room contains its name, three optional
     // device addresses, and fourteen fundamental
@@ -573,7 +573,7 @@
 
     // Load configuration from the Pico.
     //
-    // GET /api/config returns JSON v2 configuration
+    // GET /api/config returns the active JSON configuration.
     // plus the current revision and filesystem status.
     //
     // Retry briefly during initial page loading.
@@ -653,7 +653,7 @@
 
     // Collect the edited configuration from the page.
     //
-    // The resulting object matches the JSON v2 schema.
+    // The resulting object matches the active JSON schema.
     // Custom actions remain an empty array until that
     // feature is implemented.
 

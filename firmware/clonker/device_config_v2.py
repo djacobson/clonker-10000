@@ -1,13 +1,15 @@
-# The Clonker 10000 -- JSON configuration v2
+# The Clonker 10000 -- JSON configuration
 # clonker/device_config_v2.py
 #
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
 
-"""Validated JSON v2 configuration and revision-protected persistence.
+"""Validated JSON configuration and revision-protected persistence.
 
-JSON v2 now serves the firmware and browser configuration interface.
-The XML v1 engine remains available separately for rollback.
+The active schema version is defined by CONFIG_VERSION below.
+The module retains its original v2 filename for import stability.
+The XML v1 engine remains available separately for historical reference
+and rollback with a compatible earlier firmware/configuration combination.
 
 Blank IP addresses and HTTP paths are intentional, valid no-ops.
 Normal load() may fall back to backups but NEVER silently repairs a primary.

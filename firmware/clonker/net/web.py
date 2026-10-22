@@ -1,5 +1,5 @@
 # The Clonker 10000
-# clonker/web.py -- JSON v2 configuration HTTP service
+# clonker/net/web.py -- JSON configuration HTTP service
 #
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
@@ -8,7 +8,7 @@
 
 Only one client is serviced at a time. poll() advances one accept, receive,
 or send operation so the main loop can service physical controls later.
-Configuration saves use the JSON v2 engine's revision and path safeguards.
+Configuration saves use the active JSON engine's revision and path safeguards.
 """
 
 import time
@@ -23,7 +23,8 @@ from clonker import device_config_v2 as device_config
 from clonker import actions
 
 
-# HTTP service and request limits. JSON v2 is larger than the XML v1 payload.
+# HTTP service and request limits. JSON payloads are larger than
+# the original XML v1 payloads.
 WEB_ROOT = "/clonker/www"
 PORT = 9090
 HTTP_DIAGNOSTICS = False
