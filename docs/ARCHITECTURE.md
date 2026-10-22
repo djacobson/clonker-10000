@@ -6,7 +6,7 @@
 
 **Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
 
-**Current milestone:** Chapter 3, Phase A complete — logging-only Dumb Queue validated; outbound HTTP transport pending.
+**Current milestone:** Chapter 3 complete — outbound HTTP GET/POST operational; real Denon/Roku commands and five-command Dumb Queue burst verified October 21, 2026.
 
 > **Clonker controls actions, not brands. Controlled devices own their own state.**
 
@@ -303,7 +303,11 @@ After successful queue testing, introduce outbound HTTP transport and perform th
 | `firmware/clonker/legacy/device_config.xml` | Historical XML v1 example |
 
 
-The outbound HTTP transport is planned for `firmware/clonker/net/http_transport.py` during Chapter 3, Phase B. It is not yet implemented.
+The outbound HTTP transport is implemented in `firmware/clonker/net/http_transport.py` as part of Chapter 3, Phase B.
+
+It handles configured HTTP GET/POST requests using CircuitPython networking and bounded socket operations. Command selection, room resolution, queue scheduling, and toggle policy remain outside the transport.
+
+Real Denon AVR and Roku commands were successfully exercised on October 21, 2026.
 
 The `net/` package owns networking services; the `system/` package owns shared clock and logging services.
 
@@ -553,7 +557,7 @@ Physical controls must not embed vendor-specific HTTP paths or IP addresses.
 
 **Design agreed:** October 20, 2026  
 
-**Implementation status:** IMPLEMENTED AND BENCH-TESTED — logging-only Phase A complete; outbound HTTP pending.
+**Implementation status:** IMPLEMENTED AND HARDWARE-TESTED — Chapter 3 complete. The queue executes configured outbound HTTP GET/POST commands. A controlled five-command burst successfully drained with five HTTP 200 responses.
 
 ### Purpose
 
@@ -574,6 +578,16 @@ It provides a common execution mechanism for:
 The objective is to avoid separate execution frameworks for immediate actions, delayed commands, and custom sequences.
 
 **One queue. One poller. One shared HTTP transport.**
+
+### Why the Dumb Queue Matters
+
+**The Dumb Queue gives us a place to absorb commands arriving faster than the network can process them.**
+
+Command acceptance and network execution are deliberately separate operations. Incoming actions can accumulate in a bounded queue while the transport executes requests sequentially.
+
+The queue does not accelerate HTTP transactions or make synchronous network operations nonblocking. It provides predictable ordering, bounded buffering, and a shared execution path for browser and future physical controls.
+
+On October 21, 2026, five consecutive Sunroom Volume Up commands were queued before polling. All five executed successfully, producing HTTP 200 responses in approximately 500 milliseconds combined. Queue depth returned to zero without errors.
 
 ### Conceptual task representation
 
