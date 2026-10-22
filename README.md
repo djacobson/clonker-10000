@@ -233,25 +233,36 @@ The Clonker uses a small, intentionally straightforward software architecture.
 
 ```text
 Physical controls (planned)       Browser Test Remote
-            |                             |
-            v                             v
-       Input events                 HTTP action API
-            |                             |
-            +--------------+--------------+
-                           |
-                           v
-                    Action dispatcher
-                           |
-                           v
-                  JSON v2 configuration
-                           |
-                           v
-                 Outbound HTTP transport
-                       (planned)
-                           |
-                           v
-                 Home theater equipment
+             |                             |
+             v                             v
+        Input events                 HTTP action API
+             |                             |
+             +--------------+--------------+
+                            |
+                            v
+                     Action dispatcher
+                            |
+                            v
+                    THE DUMB QUEUE
+                     (implemented)
+                            |
+                            v
+                   JSON v2 resolution
+                            |
+                            v
+                  Outbound HTTP transport
+                     (implemented)
+                            |
+                            v
+                  Home theater equipment
+                    Denon AVR / Roku
 ```
+
+The shared **Dumb Queue™** accepts generic actions and executes them sequentially through the outbound HTTP transport.
+
+The queue absorbs commands arriving faster than the network can process them. It does not make network I/O nonblocking.
+
+Real Denon and Roku commands were successfully executed from the Pico on October 21, 2026.
 
 ### Configuration
 
@@ -292,9 +303,13 @@ The interface currently provides:
 - A clock synchronization interface.
 - SERVICE/DEVICE filesystem ownership protection.
 
-The Test Remote currently reaches a **logging-only action dispatcher**.
+The Test Remote uses the same shared action dispatcher and Dumb Queue™ intended for the future physical controls.
 
-The next major milestone is making those actions send actual network commands to the equipment.
+**Real outbound HTTP control is operational.** The Pico has successfully executed configured Denon AVR and Roku commands over Wi-Fi.
+
+The browser receives an acknowledgment when an action is queued. Actual device execution occurs subsequently through the cooperative scheduler.
+
+The next development phase will focus on completing runtime toggle behavior, improving failure testing, and integrating the physical controls.
 
 ---
 
@@ -317,36 +332,45 @@ This allows the software architecture to be tested before committing to a final 
 
 ## Project Status
 
-**October 2026 — Extreme beta, but the little monster is alive.**
+**October 21, 2026 — Chapter 3 complete. Extreme beta, but the little monster can now control real equipment.**
 
 ### Working and tested
 
 - Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
 - Wi-Fi connectivity and browser management interface.
-- JSON v2 configuration loading and validation.
+- JSON v2 configuration loading, validation, and persistence.
 - Browser configuration editing and saving.
 - Revision checking and stale-edit rejection.
 - No-change detection and backup rotation.
 - SERVICE/DEVICE jumper controlling filesystem write ownership.
-- Browser Test Remote reaching the logging-only dispatcher.
-- All fourteen fundamental browser actions exercised as stubs.
+- Browser Test Remote with fourteen fundamental action controls.
+- Shared Dumb Queue™ with bounded capacity and cooperative scheduling.
+- Outbound HTTP GET/POST transport using bounded blocking socket operations.
+- Real Denon AVR Volume Up and Volume Down commands.
+- Real Roku Home and Back commands.
+- Controlled five-command burst test, with all five commands completing successfully and returning HTTP 200.
+
+The queue can accept multiple commands before executing them sequentially. Network operations temporarily block the cooperative loop, and physical encoder responsiveness has not yet been measured.
 
 ### Not yet implemented or fully tested
 
-- Actual outbound HTTP commands to AV equipment.
-- Runtime ON/OFF toggle-state tracking.
+- Runtime ON/OFF toggle command history.
 - Physical button and rotary encoder integration.
 - Physical room selection and CONFIG/RUN switching.
 - Custom-action execution.
 - OLED display and audible feedback.
 - Final enclosure and power architecture.
+- Comprehensive network failure and timeout recovery tests.
+- Sustained high-rate command workloads.
 - Additional configuration failure-injection tests.
 
-The earlier XML configuration implementation is retained as historical reference.
+The earlier XML configuration implementation remains in the repository as historical and rollback reference.
 
-**Next major milestone: Make the Clonker actually control the home theater equipment.**
+**Next major phase: Give the working Clonker its physical controls.**
 
-After that, the big metal switches get their turn.
+The software has learned to communicate.
+
+Now the big metal switches get their turn.
 
 ---
 
@@ -363,7 +387,7 @@ The project is being documented as it develops, including decisions, testing, an
 | [Operating Modes](docs/OPERATING_MODES.md) | SERVICE/DEVICE and CONFIG/RUN |
 | [Development](docs/DEVELOPMENT.md) | Development and deployment workflow |
 | [Development History](docs/DEVELOPMENT_HISTORY.md) | Major Milestones in Clonker development |
-| [Chapter 2 Handoff](docs/CHAPTER_2_HANDOFF.md) | Current implementation snapshot and next development milestone |
+| [Chapter 2 Handoff](docs/CHAPTER_2_HANDOFF.md) | Historical Chapter 2 handoff and development baseline |
 
 This is a personal, experimental maker project, not a finished commercial product.
 
