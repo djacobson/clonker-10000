@@ -19,7 +19,7 @@ It is the authoritative reference for the current JSON configuration implementat
 
 The Clonker currently provides:
 
-- Three fixed rooms.
+- One to three configured rooms, using three supported room IDs.
 - Three generic built-in device slots per room.
 - Fourteen fixed fundamental actions per room.
 - Editable HTTP targets, methods, and command paths.
@@ -133,15 +133,26 @@ The root contains exactly two properties:
 
 The version must be the integer `3`.
 
-The rooms object must contain exactly:
+
+The `rooms` object must contain at least one and no more than three rooms.
+
+Supported room IDs are:
 
 - `room-1`
 - `room-2`
 - `room-3`
 
-Additional room IDs and missing room IDs are rejected.
+Any nonempty subset of these IDs is valid.
 
-The fixed room IDs are used internally for lookup and dispatch. Room names are editable display labels.
+Unknown room IDs, duplicate JSON keys, and an empty room collection are not permitted by the intended schema. The current validator explicitly rejects unknown IDs and an empty collection; duplicate-key detection is not currently implemented.
+
+Room IDs remain stable and are used internally for lookup and dispatch. Room names are editable display labels.
+
+The operational configuration currently contains only `room-1` (Den) and `room-2` (Sunroom).
+
+The browser renders only configured rooms. Adding and removing rooms through the editor is not yet implemented.
+
+The firmware constants `MIN_ROOMS`, `MAX_ROOMS`, and `ROOM_IDS` define the supported room count and identities.
 
 ### 3.2 Room object
 
@@ -593,7 +604,7 @@ The following example illustrates the current structure of one room.
 
 **This is an incomplete example, not a deployable configuration.**
 
-A valid operational configuration requires all three rooms and all fourteen fundamental actions in every room.
+A valid operational configuration requires at least one configured room and all fourteen fundamental actions within each configured room.
 
 ```json
 {
@@ -962,7 +973,7 @@ It operates through the Pico's HTTP management service.
 
 The editor supports:
 
-- Three fixed rooms.
+- Display of one to three configured rooms; unused room slots are omitted.
 - Editable room names.
 - Built-in device endpoint addresses.
 - Fourteen fundamental actions per room.
@@ -1397,7 +1408,7 @@ As of October 22, 2026:
 **Implemented and tested:**
 
 - JSON v3 configuration.
-- Three fixed rooms.
+- One to three configured rooms, with Den and Sunroom currently deployed.
 - Three generic built-in device slots per room.
 - Fourteen fundamental actions per room.
 - Browser configuration editing.

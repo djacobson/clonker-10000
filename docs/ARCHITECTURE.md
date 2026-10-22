@@ -3,7 +3,7 @@
 **Design reference:** Updated October 22, 2026  
 **Active platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
-**Current milestone:** Chapter 4, Phase 1 complete — JSON v3 generic built-in device identifiers implemented and regression-tested.  
+**Current milestone:** Chapter 4, Phase 2 complete — optional rooms implemented and regression-tested; JSON v3 remains active.
 **Next milestone:** User-defined custom devices, followed by compound actions.
 
 > **Clonker controls actions, not brands. Controlled devices own their own state.**
@@ -162,7 +162,7 @@ The following boundaries should remain true as the project grows:
 - Wi-Fi connectivity and serial logging.
 - GP17 SERVICE/DEVICE filesystem-ownership selection.
 - JSON v3 configuration.
-- Three fixed rooms.
+- One to three configured rooms using stable, supported room IDs.
 - Three generic built-in device slots per room.
 - Fourteen fundamental actions per room.
 - Strict configuration validation.
@@ -322,9 +322,9 @@ Its detailed rules are documented in [Configuration, Persistence & Recovery](CON
 
 This section covers architectural responsibilities rather than duplicating the full schema.
 
-### 6.1 Fixed rooms
+### 6.1 Optional rooms with stable identities
 
-The firmware has three fixed room IDs:
+The firmware supports three room IDs:
 
 ```text
 room-1
@@ -332,9 +332,26 @@ room-2
 room-3
 ```
 
-Room names are editable.
+The operational JSON may contain any nonempty subset of these IDs.
 
-Room IDs remain stable and are used for configuration lookup and dispatch.
+The minimum configured-room count is one; the maximum is three.
+
+Room IDs remain stable and are used for configuration lookup and action dispatch. Room names are editable display labels.
+
+Unused room IDs do not require placeholder room objects in the JSON.
+
+The browser renders only rooms present in the validated configuration. It does not yet provide Add Room or Delete Room controls.
+
+The current operational configuration contains:
+
+- `room-1` — Den
+- `room-2` — Sunroom
+
+Room 3 remains supported but is not configured.
+
+The validator uses named room-capacity constants rather than requiring all supported IDs to be present.
+
+This prepares the configuration model for future dynamic room editing without introducing that interface now.
 
 ### 6.2 Generic built-in devices
 
@@ -1285,7 +1302,7 @@ See [Hardware & Controls](HARDWARE_CONTROLS.md).
 
 **Status:** Planned for physical controls.
 
-The configuration model supports three rooms.
+The configuration model supports up to three rooms, with one or more configured at a time.
 
 The physical interface will eventually determine which room or rooms receive actions.
 

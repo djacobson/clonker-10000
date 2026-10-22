@@ -1360,6 +1360,108 @@ The Dumb Queue remains blissfully indifferent.
 
 ---
 
+# Milestone 10 — The Great Room 3 Eviction
+
+**Date:** October 22, 2026  
+**Status:** PASS — Chapter 4, Phase 2 complete
+
+### Goal
+
+Make room configuration optional while preserving the existing room identities, fundamental actions, and browser configuration safeguards.
+
+Remove the unused third room from the operational configuration without removing support for it from the firmware.
+
+### Implementation
+
+JSON v3 remains the active schema.
+
+The firmware continues to recognize three stable room IDs:
+
+- `room-1`
+- `room-2`
+- `room-3`
+
+The configuration validator now accepts any nonempty subset of these IDs.
+
+Named constants define the minimum and maximum room counts.
+
+The operational configuration now contains only:
+
+- `room-1` — Den
+- `room-2` — Sunroom
+
+The browser configuration editor renders only rooms present in the active configuration.
+
+The existing fourteen fundamental actions remain required within each configured room.
+
+No dynamic Add Room or Delete Room controls were introduced.
+
+### Startup correction
+
+Initial testing exposed a remaining assumption in `main.py`.
+
+The configuration validator correctly loaded two rooms, but startup diagnostics attempted to access `room-3` unconditionally.
+
+This produced:
+
+```text
+KeyError: room-3
+```
+
+The diagnostic loop was corrected to skip absent rooms.
+
+The startup message was also updated to report the actual configured-room count instead of assuming three rooms.
+
+The corrected firmware started successfully.
+
+### Regression testing
+
+Live Pico testing confirmed:
+
+- Successful JSON v3 startup with two rooms.
+- Correct Den and Sunroom endpoint loading.
+- No Room 3 displayed in the browser editor.
+- HTTP management service startup.
+- Successful Sunroom Denon volume-up command with HTTP 200.
+- Successful browser configuration save.
+- Configuration persistence across Pico restart.
+- Configuration-change queue clearing.
+- Successful stale-tab revision rejection after another tab saved a newer configuration.
+
+The Sunroom name was restored after the test.
+
+### Architectural outcome
+
+The change required no redesign of:
+
+- The fourteen fundamental actions.
+- The Dumb Queue.
+- Outbound HTTP transport.
+- Configuration revision protection.
+- Existing backup and persistence mechanisms.
+
+Room identities remain stable, but unused rooms no longer occupy operational JSON space.
+
+This establishes a foundation for future dynamic room editing without introducing that feature prematurely.
+
+### Remaining work
+
+Custom devices and compound actions remain the next major development objectives.
+
+Additional optional-room validation edge cases and backup-rotation regression testing may be performed as needed.
+
+The Clonker can still support Room 3.
+
+It simply no longer insists that Room 3 pay rent.
+
+**Chapter 4, Phase 2 passed.**
+
+**The Great Room 3 Eviction is complete.**
+
+**CLONK! ⚡🔩**
+
+---
+
 # Maintaining This Journal
 
 Future milestones should be appended using a consistent structure.
@@ -1422,7 +1524,7 @@ This journal preserves the engineering reasoning and test evidence that commit m
 
 # Where the Story Stands
 
-**As of October 22, 2026 — Chapter 4, Phase 1 Complete**
+**As of October 22, 2026 — Chapter 4, Phase 2 Complete**
 
 The Clonker 10000 has crossed two important thresholds.
 
@@ -1435,7 +1537,7 @@ What began as a collection of beautiful metallic knobs, ambitious ideas, and a m
 The Raspberry Pi Pico 2 W is running CircuitPython 10.3.1 with:
 
 - A validated JSON v3 configuration system.
-- Three fixed rooms and three generic built-in device slots per room.
+- One to three configured rooms, with three generic built-in device slots per room.
 - Fourteen configurable fundamental actions per room.
 - Browser-based configuration editing and persistence.
 - Revision checking, backup rotation, and recovery safeguards.
