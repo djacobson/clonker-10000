@@ -32,7 +32,7 @@ def main():
     logger.info("Application started")
 
     # Load the active JSON configuration once at startup.
-    device_config.load()
+    settings = device_config.load()
 
     logger.info(
         "Three-room configuration loaded from JSON v{}".format(
