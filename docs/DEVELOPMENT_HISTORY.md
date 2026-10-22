@@ -1240,6 +1240,126 @@ instructions.
 
 ---
 
+# Milestone 9 — The Clonker Learns to Forget What a TV Is
+
+**Date:** October 22, 2026  
+**Status:** PASS — Chapter 4, Phase 1 complete
+
+### Goal
+
+Replace the built-in device-category identifiers with generic, stable device-slot identifiers.
+
+Prepare the configuration architecture for future user-defined devices without changing the fundamental-action model or rewriting the Dumb Queue.
+
+### Implementation
+
+The active JSON schema advanced from version 2 to version 3.
+
+Built-in device identifiers changed:
+
+| Previous ID | New ID | Browser label |
+|---|---|---|
+| `tv` | `device-1` | TV |
+| `avr` | `device-2` | AVR |
+| `streaming` | `device-3` | Streaming |
+
+The browser retained familiar labels while using generic IDs internally.
+
+Updated components included:
+
+- JSON configuration validator.
+- Operational configuration file.
+- Readable configuration sample.
+- Browser configuration editor.
+- Browser schema-version checks.
+
+The configuration engine retained its historical `device_config_v2.py` filename for import stability.
+
+The Dumb Queue and outbound HTTP transport required no redesign.
+
+### Test evidence
+
+Regression testing confirmed:
+
+- Successful JSON v3 startup.
+- Correct room and endpoint loading.
+- Browser configuration rendering.
+- Correct TV, AVR, and Streaming labels.
+- Denon volume-up execution.
+- Roku Back and Home execution.
+- Successful configuration saves.
+- Persistence after Pico restart.
+- Backup rotation.
+- Stale-tab revision rejection.
+- Successful save after refreshing a stale tab.
+
+The refactor preserved the operational fundamental-action pipeline.
+
+### Bugs and corrections
+
+Two browser references to configuration version 2 were identified and corrected during integration.
+
+A subsequent startup diagnostic cleanup accidentally removed the local `settings` assignment in `main.py`.
+
+The Pico reported:
+
+```text
+NameError: name 'settings' isn't defined
+```
+
+Restoring:
+
+```python
+settings = device_config.load()
+```
+
+resolved the startup failure.
+
+The correction was tested and pushed.
+
+This was a useful reminder that even a comment-oriented cleanup can introduce an executable-code regression.
+
+### Documentation consolidation
+
+The configuration and architecture references were subsequently updated to describe the active JSON v3 implementation.
+
+The configuration reference now separates current schema rules from historical JSON v2 development.
+
+The architecture reference documents the planned custom-device and compound-action extensions while preserving the existing execution boundaries.
+
+No firmware behavior changes were required for this documentation work.
+
+### Remaining limitations
+
+This milestone did not implement:
+
+- Custom device definitions.
+- Custom action execution.
+- Compound command sequences.
+- Runtime toggle direction history.
+- Physical control integration.
+- Additional equipment protocols.
+
+The active validator still requires `custom_actions` to be empty and does not accept a `custom_devices` collection.
+
+### Outcome
+
+**Chapter 4, Phase 1 passed.**
+
+The Clonker now identifies its built-in destinations without insisting that they be a television, receiver, or streaming device.
+
+Its browser can still call them TV, AVR, and Streaming.
+
+Its firmware no longer has to believe those labels.
+
+The Dumb Queue remains blissfully indifferent.
+
+**The Clonker has learned an important lesson: a device is a destination, not a personality.**
+
+**CLONK! ⚡🔩**
+
+---
+
 # Maintaining This Journal
 
 Future milestones should be appended using a consistent structure.
