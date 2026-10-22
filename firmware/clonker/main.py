@@ -34,15 +34,22 @@ def main():
     # Load the active JSON configuration once at startup.
     settings = device_config.load()
 
+    configured_rooms = settings["rooms"]
+
     logger.info(
-        "Three-room configuration loaded from JSON v{}".format(
+        "{} room(s) loaded from JSON v{}".format(
+            len(configured_rooms),
             device_config.CONFIG_VERSION
         )
     )
 
-    # Log configured rooms and endpoints for bench diagnostics.
+    # Log only rooms present in the active configuration.
     for room_id in device_config.ROOM_IDS:
-        room = settings["rooms"][room_id]
+        if room_id not in configured_rooms:
+            continue
+
+        room = configured_rooms[room_id]
+
         logger.info("{}: {}".format(room_id, room["name"]))
 
         for device_id in device_config.DEVICE_IDS:
