@@ -14,9 +14,9 @@
        alt="Clonker OLED Display Concept"
        style="vertical-align: top;">
   &nbsp;&nbsp;
-  <img src="images/tmp_tri_selector.jpeg"
+  <img src="images/tmp_toggle.jpeg"
        height="150"
-       alt="Clonker Room Selector Concept"
+       alt="Clonker Room Toggle Concept"
        style="vertical-align: top;">
 </p>
 
