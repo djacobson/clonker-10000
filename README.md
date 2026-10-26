@@ -239,6 +239,15 @@ See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed i
 
 ## Software Architecture
 
+<p align="center">
+  <img src="images/clonker_brain.jpeg" alt="The Clonker 10000 Brain" width="600">
+  <br>
+  <sub>
+    <b>The Clonker Brain</b> — A Raspberry Pi Pico 2 W,
+    a little CircuitPython, and an unreasonable amount of ambition.
+  </sub>
+</p>
+
 The Clonker uses a small, intentionally straightforward software architecture.
 
 ```text
