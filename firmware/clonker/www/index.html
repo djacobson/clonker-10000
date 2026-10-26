@@ -580,56 +580,172 @@
 
             // Custom actions.
             //
-            // Display only for now. Editing controls will be
-            // introduced separately in Phase 3C.3.
+            // Phase 3C.3a: browser-only Add/Delete editor.
+            // Configuration saving remains unchanged until 3C.3b.
             //
-            // Array order is execution order. No reordering UI.
+            // Actions retain their array order. No reordering UI.
 
             const customActions = room.custom_actions || [];
 
             const customDetails = document.createElement("details");
 
             const customSummary = document.createElement("summary");
-            customSummary.textContent =
-                "Custom Actions (" + customActions.length + ")";
-
             customDetails.appendChild(customSummary);
 
-            if (customActions.length === 0) {
-                const emptyMessage = document.createElement("p");
-                emptyMessage.textContent = "No custom actions configured.";
-                customDetails.appendChild(emptyMessage);
-            }
+            const actionList = document.createElement("div");
+            customDetails.appendChild(actionList);
 
-            for (const action of customActions) {
-                const actionDetails = document.createElement("details");
-                actionDetails.className = "action-editor";
 
-                const actionSummary = document.createElement("summary");
-                actionSummary.textContent =
-                    action.name + " (" + action.steps.length + " steps)";
+            // Rebuild the custom-action display after changes.
 
-                actionDetails.appendChild(actionSummary);
+            function refreshCustomActions() {
+                actionList.replaceChildren();
 
-                const idText = document.createElement("p");
-                idText.textContent = "Action ID: " + action.id;
-                actionDetails.appendChild(idText);
+                customSummary.textContent =
+                    "Custom Actions (" + customActions.length + ")";
 
-                action.steps.forEach((step, index) => {
+                for (const action of customActions) {
+                    const actionDetails = document.createElement("details");
+                    actionDetails.className = "custom-action-editor action-editor";
+
+                    const actionSummary = document.createElement("summary");
+                    actionDetails.appendChild(actionSummary);
+
+                    function updateTitle() {
+                        actionSummary.textContent =
+                            (action.name || action.id) +
+                            " (" + action.steps.length + " steps)";
+                    }
+
+                    updateTitle();
+
+
+                    // Existing saved IDs cannot be edited.
+                    //
+                    // New actions may change their suggested IDs
+                    // until the configuration is successfully saved.
+
+                    const saved = (loadedCustomActions[roomId] || [])
+                        .some(item => item.id === action.id);
+
+                    const idField = createField(
+                        actionDetails,
+                        "Action ID",
+                        action.id,
+                        "id"
+                    );
+
+                    idField.readOnly = saved;
+
+                    idField.addEventListener("input", () => {
+                        action.id = idField.value.trim();
+                        updateTitle();
+                    });
+
+
+                    // Editable display name.
+
+                    const nameField = createField(
+                        actionDetails,
+                        "Display Name",
+                        action.name,
+                        "name"
+                    );
+
+                    nameField.addEventListener("input", () => {
+                        action.name = nameField.value;
+                        updateTitle();
+                    });
+
+
+                    // Steps remain read-only during 3C.3a.
+
                     const stepInfo = document.createElement("p");
-
                     stepInfo.textContent =
-                        (index + 1) + ". " +
-                        step.target + " " +
-                        step.method + " " +
-                        step.path +
-                        " | Wait after: " + step.wait_after_ms + " ms";
+                        action.steps.length + " command step(s)";
 
                     actionDetails.appendChild(stepInfo);
+
+
+                    // Delete the entire custom action.
+
+                    const deleteButton = document.createElement("button");
+                    deleteButton.type = "button";
+                    deleteButton.textContent = "− Delete Action";
+
+                    deleteButton.addEventListener("click", () => {
+                        if (!confirm("Delete this custom action?")) {
+                            return;
+                        }
+
+                        customActions.splice(
+                            customActions.indexOf(action),
+                            1
+                        );
+
+                        refreshCustomActions();
+                    });
+
+                    actionDetails.appendChild(deleteButton);
+                    actionList.appendChild(actionDetails);
+                }
+
+
+                // Empty-state message.
+
+                if (customActions.length === 0) {
+                    const emptyMessage = document.createElement("p");
+                    emptyMessage.textContent =
+                        "No custom actions configured.";
+
+                    actionList.appendChild(emptyMessage);
+                }
+
+                addButton.disabled = customActions.length >= 16;
+            }
+
+
+            // Add a custom action with a suggested unique ID.
+            //
+            // One initial command step is provided. The full
+            // step editor will arrive in Phase 3C.3b.
+
+            const addButton = document.createElement("button");
+            addButton.type = "button";
+            addButton.textContent = "+ Add Action";
+
+            addButton.addEventListener("click", () => {
+                if (customActions.length >= 16) {
+                    return;
+                }
+
+                const existingIds = new Set(
+                    customActions.map(action => action.id)
+                );
+
+                let n = 1;
+
+                while (existingIds.has("custom-action-" + n)) {
+                    n++;
+                }
+
+                customActions.push({
+                    id: "custom-action-" + n,
+                    name: "New Custom Action",
+                    steps: [{
+                        target: "device-3",
+                        method: "POST",
+                        path: "/keypress/Home",
+                        wait_after_ms: 0
+                    }]
                 });
 
-                customDetails.appendChild(actionDetails);
-            }
+                refreshCustomActions();
+                customDetails.open = true;
+            });
+
+            customDetails.appendChild(addButton);
+            refreshCustomActions();
 
             section.appendChild(customDetails);
             container.appendChild(section);
