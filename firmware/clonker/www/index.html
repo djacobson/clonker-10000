@@ -580,8 +580,8 @@
 
             // Custom actions.
             //
-            // Phase 3C.3a: browser-only Add/Delete editor.
-            // Configuration saving remains unchanged until 3C.3b.
+            // Phase 3C.3b.1: browser-only custom-action editor.
+            // Configuration saving will be connected in 3C.3b.2.
             //
             // Actions retain their array order. No reordering UI.
 
@@ -658,13 +658,157 @@
                     });
 
 
-                    // Steps remain read-only during 3C.3a.
+                    // Phase 3C.3b.1: editable command steps.
+                    //
+                    // Step names are intentionally omitted.
+                    // Array order determines execution order.
 
-                    const stepInfo = document.createElement("p");
-                    stepInfo.textContent =
-                        action.steps.length + " command step(s)";
+                    const stepsContainer = document.createElement("div");
+                    actionDetails.appendChild(stepsContainer);
 
-                    actionDetails.appendChild(stepInfo);
+                    function renderSteps() {
+                        stepsContainer.replaceChildren();
+
+                        action.steps.forEach((step, index) => {
+                            const stepDetails =
+                                document.createElement("details");
+
+                            const stepSummary =
+                                document.createElement("summary");
+
+                            stepDetails.appendChild(stepSummary);
+
+                            function updateStepTitle() {
+                                const deviceName =
+                                    DEVICE_LABELS[step.target] ||
+                                    step.target;
+
+                                stepSummary.textContent =
+                                    (index + 1) + ". " +
+                                    deviceName + " · " +
+                                    step.method + " · " +
+                                    step.path;
+                            }
+
+                            updateStepTitle();
+
+                            const targetField = createField(
+                                stepDetails,
+                                "Target",
+                                step.target,
+                                "target",
+                                DEVICE_IDS,
+                                DEVICE_LABELS
+                            );
+
+                            targetField.addEventListener("change", () => {
+                                step.target = targetField.value;
+                                updateStepTitle();
+                            });
+
+                            const methodField = createField(
+                                stepDetails,
+                                "Method",
+                                step.method,
+                                "method",
+                                ["GET", "POST"]
+                            );
+
+                            methodField.addEventListener("change", () => {
+                                step.method = methodField.value;
+                                updateStepTitle();
+                            });
+
+                            const pathField = createField(
+                                stepDetails,
+                                "Command Path",
+                                step.path,
+                                "path"
+                            );
+
+                            pathField.addEventListener("input", () => {
+                                step.path = pathField.value;
+                                updateStepTitle();
+                            });
+
+                            const waitField = createField(
+                                stepDetails,
+                                "Wait After (ms)",
+                                step.wait_after_ms,
+                                "wait_after_ms"
+                            );
+
+                            waitField.type = "number";
+                            waitField.min = "0";
+                            waitField.max = "60000";
+                            waitField.step = "1";
+
+                            // The final step must not have a wait.
+                            waitField.disabled =
+                                index === action.steps.length - 1;
+
+                            waitField.addEventListener("input", () => {
+                                step.wait_after_ms =
+                                    Number(waitField.value);
+                            });
+
+                            const deleteStepButton =
+                                document.createElement("button");
+
+                            deleteStepButton.type = "button";
+                            deleteStepButton.textContent = "− Delete Step";
+
+                            deleteStepButton.disabled =
+                                action.steps.length <= 1;
+
+                            deleteStepButton.addEventListener(
+                                "click", () => {
+                                    if (action.steps.length <= 1) {
+                                        return;
+                                    }
+
+                                    action.steps.splice(index, 1);
+
+                                    // A new final step cannot retain a wait.
+                                    action.steps[
+                                        action.steps.length - 1
+                                    ].wait_after_ms = 0;
+
+                                    renderSteps();
+                                    updateTitle();
+                                }
+                            );
+
+                            stepDetails.appendChild(deleteStepButton);
+                            stepsContainer.appendChild(stepDetails);
+                        });
+
+                        addStepButton.disabled =
+                            action.steps.length >= 16;
+                    }
+
+                    const addStepButton = document.createElement("button");
+                    addStepButton.type = "button";
+                    addStepButton.textContent = "+ Add Step";
+
+                    addStepButton.addEventListener("click", () => {
+                        if (action.steps.length >= 16) {
+                            return;
+                        }
+
+                        action.steps.push({
+                            target: "device-3",
+                            method: "POST",
+                            path: "/keypress/Home",
+                            wait_after_ms: 0
+                        });
+
+                        renderSteps();
+                        updateTitle();
+                    });
+
+                    actionDetails.appendChild(addStepButton);
+                    renderSteps();
 
 
                     // Delete the entire custom action.
@@ -704,8 +848,8 @@
                 addButton.disabled = customActions.length >= 16;
             }
 
-
             // Add a custom action with a suggested unique ID.
+            // Start with one editable command step.
             //
             // One initial command step is provided. The full
             // step editor will arrive in Phase 3C.3b.
