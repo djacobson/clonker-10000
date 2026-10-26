@@ -28,6 +28,13 @@ And perhaps a case that opens with actual lunchbox latches.
 
 *(For now, imagine those magnificent controls mounted on a big-ass, honkin' brick of an enclosure, weighing somewhere between 0.5 and 10 pounds. Possibly steampunk-ish. Definitely not something that disappears between sofa cushions.)*
 
+**Current HW**:  
+Firmware platform: Raspberry Pi Pico.  
+Streamer targets: Roku Ultra.  
+   (soon Apple TV next Beta, Amazon Fire TV after that).  
+Audio equipment: Denon AVRs.  
+   (possibly next TCL, LG, Samsung TVs after that, and Pioneer AVRs for ex.).  
+
 ---
 
 ## Why Does This Thing Exist?
