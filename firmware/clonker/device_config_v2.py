@@ -20,22 +20,24 @@ import json
 import os
 
 
-# JSON v3 schema: three rooms, three built-in device slots,
-# and fourteen fundamental actions.
+# JSON v4: optional rooms, three reserved built-in destinations,
+# fourteen fundamental actions, and user-defined custom actions.
 #
-# Built-in device slots:
-#   device-1 = TV
-#   device-2 = AVR
-#   device-3 = Streaming
-#
-# These are generic destination identifiers.
-# The labels describe our original home-theater setup.
+# Custom destinations (device-4 onward) are reserved for a
+# future schema extension; they are not accepted yet.
 
 CONFIG_FILE = "/clonker/device_config.json"
-CONFIG_VERSION = 3
+CONFIG_VERSION = 4
+
 MAX_CONFIG_BYTES = 8192
 MAX_ROOM_NAME_LENGTH = 40
 MAX_PATH_LENGTH = 512
+
+MAX_CUSTOM_ACTIONS_PER_ROOM = 16
+MAX_STEPS_PER_ACTION = 16
+MAX_WAIT_AFTER_MS = 60000
+MAX_CUSTOM_ACTION_ID_LENGTH = 40
+MAX_CUSTOM_ACTION_NAME_LENGTH = 60
 
 ROOM_IDS = ("room-1", "room-2", "room-3")
 MIN_ROOMS = 1
@@ -96,6 +98,122 @@ def _ip(value, location):
             raise ValueError("Invalid IPv4: " + location)
 
     return value
+
+
+def resolve_endpoint(room, device_id):
+    """Resolve a built-in destination from a validated room.
+
+    Future custom destinations will extend this single helper
+    without changing command-step target identifiers.
+    """
+    if device_id in DEVICE_IDS:
+        return room["devices"][device_id]
+
+    raise ValueError("Unknown device destination: " + str(device_id))
+
+
+def _custom_action_id(value, location):
+    """Validate a stable, URL-friendly custom action identifier."""
+    if (not isinstance(value, str) or
+            not 1 <= len(value) <= MAX_CUSTOM_ACTION_ID_LENGTH):
+        raise ValueError("Invalid custom action ID: " + location)
+
+    allowed = "abcdefghijklmnopqrstuvwxyz0123456789-"
+
+    if (value[0] == "-" or value[-1] == "-" or
+            any(ch not in allowed for ch in value)):
+        raise ValueError("Invalid custom action ID: " + location)
+
+    return value
+
+
+def _custom_actions(value, room_id):
+    """Validate and normalize ordered custom HTTP actions."""
+    if not isinstance(value, list):
+        raise ValueError("Invalid custom actions: " + room_id)
+
+    if len(value) > MAX_CUSTOM_ACTIONS_PER_ROOM:
+        raise ValueError("Too many custom actions: " + room_id)
+
+    validated = []
+    seen_ids = set()
+
+    for index, action in enumerate(value):
+        where = "{}.custom_actions[{}]".format(room_id, index)
+
+        _keys(action, ("id", "name", "steps"), where)
+
+        action_id = _custom_action_id(action["id"], where)
+
+        if action_id in seen_ids:
+            raise ValueError("Duplicate custom action ID: " + action_id)
+
+        seen_ids.add(action_id)
+
+        name = action["name"]
+
+        if (not isinstance(name, str) or
+                not name.strip() or
+                len(name) > MAX_CUSTOM_ACTION_NAME_LENGTH):
+            raise ValueError("Invalid custom action name: " + where)
+
+        steps = action["steps"]
+
+        if (not isinstance(steps, list) or
+                not 1 <= len(steps) <= MAX_STEPS_PER_ACTION):
+            raise ValueError("Invalid custom action steps: " + where)
+
+        validated_steps = []
+
+        for step_index, step in enumerate(steps):
+            step_where = "{}.steps[{}]".format(where, step_index)
+
+            _keys(
+                step,
+                ("target", "method", "path", "wait_after_ms"),
+                step_where
+            )
+
+            target = step["target"]
+            method = step["method"]
+            path = step["path"]
+            wait_ms = step["wait_after_ms"]
+
+            # Custom destinations will be added to this resolution
+            # model later. Only built-in destinations exist today.
+            if not isinstance(target, str) or target not in DEVICE_IDS:
+                raise ValueError("Invalid custom target: " + step_where)
+
+            if method not in ("GET", "POST"):
+                raise ValueError("Invalid custom method: " + step_where)
+
+            if (not isinstance(path, str) or
+                    not path or
+                    len(path) > MAX_PATH_LENGTH or
+                    not path.startswith("/")):
+                raise ValueError("Invalid custom path: " + step_where)
+
+            if (type(wait_ms) is not int or
+                    not 0 <= wait_ms <= MAX_WAIT_AFTER_MS):
+                raise ValueError("Invalid custom wait: " + step_where)
+
+            if step_index == len(steps) - 1 and wait_ms != 0:
+                raise ValueError("Final custom step must have zero wait: " + step_where)
+
+            validated_steps.append({
+                "target": target,
+                "method": method,
+                "path": path,
+                "wait_after_ms": wait_ms,
+            })
+
+        validated.append({
+            "id": action_id,
+            "name": name.strip(),
+            "steps": validated_steps,
+        })
+
+    return validated
 
 
 def validate_config(config):
@@ -189,14 +307,17 @@ def validate_config(config):
 
             actions[action_id] = validated_action
 
-        # Placeholder for later user-defined HTTP actions; not implemented yet.
-        if not isinstance(room["custom_actions"], list) or room["custom_actions"]:
-            raise ValueError("Custom actions not yet supported: " + room_id)
+        # User-defined actions are validated independently of
+        # fundamental actions and preserve their declared order.
+        custom_actions = _custom_actions(
+            room["custom_actions"], room_id
+        )
+
         rooms[room_id] = {
             "name": name.strip(),
             "devices": devices,
             "actions": actions,
-            "custom_actions": [],
+            "custom_actions": custom_actions,
         }
 
     return {"version": CONFIG_VERSION, "rooms": rooms}
