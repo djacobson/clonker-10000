@@ -576,7 +576,64 @@
             }
 
             section.appendChild(details);
+
+
+            // Custom actions.
+            //
+            // Display only for now. Editing controls will be
+            // introduced separately in Phase 3C.3.
+            //
+            // Array order is execution order. No reordering UI.
+
+            const customActions = room.custom_actions || [];
+
+            const customDetails = document.createElement("details");
+
+            const customSummary = document.createElement("summary");
+            customSummary.textContent =
+                "Custom Actions (" + customActions.length + ")";
+
+            customDetails.appendChild(customSummary);
+
+            if (customActions.length === 0) {
+                const emptyMessage = document.createElement("p");
+                emptyMessage.textContent = "No custom actions configured.";
+                customDetails.appendChild(emptyMessage);
+            }
+
+            for (const action of customActions) {
+                const actionDetails = document.createElement("details");
+                actionDetails.className = "action-editor";
+
+                const actionSummary = document.createElement("summary");
+                actionSummary.textContent =
+                    action.name + " (" + action.steps.length + " steps)";
+
+                actionDetails.appendChild(actionSummary);
+
+                const idText = document.createElement("p");
+                idText.textContent = "Action ID: " + action.id;
+                actionDetails.appendChild(idText);
+
+                action.steps.forEach((step, index) => {
+                    const stepInfo = document.createElement("p");
+
+                    stepInfo.textContent =
+                        (index + 1) + ". " +
+                        step.target + " " +
+                        step.method + " " +
+                        step.path +
+                        " | Wait after: " + step.wait_after_ms + " ms";
+
+                    actionDetails.appendChild(stepInfo);
+                });
+
+                customDetails.appendChild(actionDetails);
+            }
+
+            section.appendChild(customDetails);
             container.appendChild(section);
+
         }
     }
 
