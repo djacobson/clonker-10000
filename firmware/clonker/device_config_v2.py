@@ -399,6 +399,26 @@ def action_details(room_id, action_id):
     return room, action
 
 
+def custom_action_details(room_id, action_id):
+    """Fast internal access to a validated custom action.
+
+    Returns references to the active configuration, not copies.
+    Callers MUST treat these dictionaries as read-only.
+
+    Raises KeyError if the room or custom action does not exist.
+    """
+    if _current is None:
+        raise RuntimeError("Configuration not loaded")
+
+    room = _current["rooms"][room_id]
+
+    for action in room["custom_actions"]:
+        if action["id"] == action_id:
+            return room, action
+
+    raise KeyError("Unknown custom action: " + str(action_id))
+
+
 def revision(config=None):
     """Stable 32-bit FNV-1a revision over canonical UTF-8 JSON."""
     if config is None:
