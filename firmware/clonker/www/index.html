@@ -372,6 +372,10 @@
     let configRevision = null;
     let configWritable = false;
 
+    // Preserve custom actions until their editor is implemented.
+    // Keep a separate copy of the last loaded configuration.
+    let loadedCustomActions = {};
+
 
     // Create a labeled text field or dropdown.
     //
@@ -607,6 +611,17 @@
                 );
             }
 
+            loadedCustomActions = {};
+
+            for (const roomId of ROOM_IDS) {
+                const room = config.rooms[roomId];
+
+                if (room) {
+                    loadedCustomActions[roomId] =
+                        JSON.parse(JSON.stringify(room.custom_actions));
+                }
+            }
+
             configRevision = config.revision;
             configWritable =
                 config.filesystem_writable === true;
@@ -659,9 +674,8 @@
 
     // Collect the edited configuration from the page.
     //
-    // The resulting object matches the active JSON schema.
-    // Custom actions remain an empty array until that
-    // feature is implemented.
+    // Until the custom-action editor is implemented,
+    // preserve custom actions from the last successful load.
 
     function collectDeviceConfig() {
         const rooms = {};
@@ -673,9 +687,10 @@
                 name: "",
                 devices: {},
                 actions: {},
-                custom_actions: []
+                custom_actions: JSON.parse(JSON.stringify(
+                    loadedCustomActions[roomId] || []
+                ))
             };
-
 
             // Room name.
 
