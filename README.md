@@ -28,12 +28,16 @@ And perhaps a case that opens with actual lunchbox latches.
 
 *(For now, imagine those magnificent controls mounted on a big-ass, honkin' brick of an enclosure, weighing somewhere between 0.5 and 10 pounds. Possibly steampunk-ish. Definitely not something that disappears between sofa cushions.)*
 
-**Current HW**:  
-Firmware platform: Raspberry Pi Pico.  
-Streamer targets: Roku Ultra.  
-   (soon Apple TV next Beta, Amazon Fire TV after that).  
-Audio equipment: Denon AVRs.  
-   (possibly next TCL, LG, Samsung TVs after that, and Pioneer AVRs for ex.).  
+<p>
+  <sub>
+    <b>⚙️ CURRENT COMPATIBILITY — EXTREME BETA</b><br>
+    <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython<br>
+    <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned next) · Amazon Fire TV (future)<br>
+    <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
+    <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<br>
+    <b>Configuration:</b> Browser-based editor · Wi-Fi HTTP commands · Custom action sequences (in development)
+  </sub>
+</p>
 
 ---
 
