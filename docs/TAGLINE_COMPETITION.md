@@ -18,27 +18,29 @@ The engineering department has agreed to preserve them as historical evidence.
 ### The Complete List
 
 1. **The Clonker 10000 — Less sleek. More CLONK.**
-2. The Clonker 10000 — Fewer buttons. Bigger switches. Zero focus groups.
-3. The Clonker 10000 — Designed by an engineer. Not a marketing department. You can tell because the buttons are big enough to find.
-4. The Clonker 10000 — If you need reading glasses to find the volume button, somebody failed.
-5. The Clonker 10000 — Big metal switches. Real mechanical feedback. No advertising space available.
-6. The Clonker 10000 — Finally, a remote designed for human thumbs instead of product photography.
-7. The Clonker 10000 — No rubber chiclets. No hidden screws. No marketing department.
-8. The Clonker 10000 — Designed to be operated in the dark, repaired in the light, and admired from across the room.
-9. The Clonker 10000 — The only remote that might require a lunchbox latch inspection before servicing.
-10. The Clonker 10000 — Built for people who believe a button should announce that it's been pressed.
-11. The Clonker 10000 — Our buttons are so big, the marketing department called them a safety hazard.
-12. The Clonker 10000 — Not your grandfather's 117-button remote. Not your grandson's rubber chiclet, either.
-13. The Clonker 10000 — Six power buttons were five too many. Sponsored buttons are one too many.
-14. The Clonker 10000 — All the good stuff from yesterday. All the useful stuff from today. None of the crap.
-15. The Clonker 10000 — The only remote whose service manual might include lunchbox latch adjustment.
-16. The Clonker 10000 — Because programming a remote shouldn't require programming three other remotes first.
-17. The Clonker 10000 — No infrared archaeology. No activity wizardry. Just CLONK.
-18. The Clonker 10000 — We kept the universal remote. We fired the universal remote programming experience.
-19. The Clonker 10000 — The only activity you'll need to configure is enjoying the movie.
-20. The Clonker 10000 — Your home theater has an IP address. It's time your remote noticed.
-21. The Clonker 10000 — Big buttons aren't just for seniors. They're for people with thumbs.
-22. The Clonker 10000 — No IR codes. No programming rituals. No HELP button to help the HELP button.
+2. The Clonker 10000 — A slicker clicker than the city slickers can make. - Jim Martin
+3. The Clonker 10000 — Stop clicking, start clonking. - Chris Martin
+4. The Clonker 10000 — Fewer buttons. Bigger switches. Zero focus groups.
+5. The Clonker 10000 — Designed by an engineer. Not a marketing department. You can tell because the buttons are big enough to find.
+6. The Clonker 10000 — If you need reading glasses to find the volume button, somebody failed.
+7. The Clonker 10000 — Big metal switches. Real mechanical feedback. No advertising space available.
+8. The Clonker 10000 — Finally, a remote designed for human thumbs instead of product photography.
+9. The Clonker 10000 — No rubber chiclets. No hidden screws. No marketing department.
+10. The Clonker 10000 — Designed to be operated in the dark, repaired in the light, and admired from across the room.
+11. The Clonker 10000 — The only remote that might require a lunchbox latch inspection before servicing.
+12. The Clonker 10000 — Built for people who believe a button should announce that it's been pressed.
+13. The Clonker 10000 — Our buttons are so big, the marketing department called them a safety hazard.
+14. The Clonker 10000 — Not your grandfather's 117-button remote. Not your grandson's rubber chiclet, either.
+15. The Clonker 10000 — Six power buttons were five too many. Sponsored buttons are one too many.
+16. The Clonker 10000 — All the good stuff from yesterday. All the useful stuff from today. None of the crap.
+17. The Clonker 10000 — The only remote whose service manual might include lunchbox latch adjustment.
+18. The Clonker 10000 — Because programming a remote shouldn't require programming three other remotes first.
+19. The Clonker 10000 — No infrared archaeology. No activity wizardry. Just CLONK.
+20. The Clonker 10000 — We kept the universal remote. We fired the universal remote programming experience.
+21. The Clonker 10000 — The only activity you'll need to configure is enjoying the movie.
+22. The Clonker 10000 — Your home theater has an IP address. It's time your remote noticed.
+23. The Clonker 10000 — Big buttons aren't just for seniors. They're for people with thumbs.
+24. The Clonker 10000 — No IR codes. No programming rituals. No HELP button to help the HELP button.
 
 ---
 
