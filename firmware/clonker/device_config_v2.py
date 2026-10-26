@@ -20,7 +20,7 @@ import json
 import os
 
 
-# JSON v4: optional rooms, three reserved built-in destinations,
+# Clonker Config v4 (JSON): optional rooms, three reserved built-in destinations,
 # fourteen fundamental actions, and user-defined custom actions.
 #
 # Custom destinations (device-4 onward) are reserved for a
