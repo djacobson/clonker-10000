@@ -122,6 +122,11 @@
             border-radius: 6px;
         }
 
+        /* Breathing room for custom-action controls. */
+        .custom-action-editor button {
+            margin: 8px 10px 4px 0;
+        }
+ 
         .action-editor strong {
             display: block;
             margin-bottom: 8px;
@@ -666,12 +671,13 @@
                     const stepsContainer = document.createElement("div");
                     actionDetails.appendChild(stepsContainer);
 
-                    function renderSteps() {
+                    function renderSteps(openStepIndex = -1) {
                         stepsContainer.replaceChildren();
 
                         action.steps.forEach((step, index) => {
                             const stepDetails =
                                 document.createElement("details");
+                            stepDetails.open = index === openStepIndex; 
 
                             const stepSummary =
                                 document.createElement("summary");
@@ -799,11 +805,11 @@
                         action.steps.push({
                             target: "device-3",
                             method: "POST",
-                            path: "/keypress/Home",
+                            path: "",
                             wait_after_ms: 0
                         });
 
-                        renderSteps();
+                        renderSteps(action.steps.length - 1);
                         updateTitle();
                     });
 
@@ -850,9 +856,6 @@
 
             // Add a custom action with a suggested unique ID.
             // Start with one editable command step.
-            //
-            // One initial command step is provided. The full
-            // step editor will arrive in Phase 3C.3b.
 
             const addButton = document.createElement("button");
             addButton.type = "button";
@@ -879,7 +882,7 @@
                     steps: [{
                         target: "device-3",
                         method: "POST",
-                        path: "/keypress/Home",
+                        path: "",
                         wait_after_ms: 0
                     }]
                 });
