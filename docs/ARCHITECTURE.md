@@ -409,12 +409,13 @@ That distinction matters for rapid rotary encoders. Hardware event capture and a
 
 - Repeated volume commands during normal Denon/Roku traffic.
 - Encoder rotation while an outbound HTTP request is in progress.
-- Independent action interleaving during a custom-action wait.
 - Queue behavior near capacity.
-- Endpoint timeout and queue cancellation.
+- Extended endpoint timeout and queue cancellation scenarios.
 - Long-running monotonic scheduling.
 
-The successful Roku/Denon compound-action test confirms sequential execution and a cooperative wait; it does **not** yet establish physical encoder responsiveness under load.
+**Verified October 27, 2026:** An independent Sunroom Volume Up action executed successfully during the Movie custom action's three-second cooperative wait, before the Denon Quick Select step resumed.
+
+This confirms cooperative interleaving for the tested browser-submitted actions. It does **not** establish physical encoder responsiveness under load or eliminate the blocking behavior of outbound HTTP requests.
 
 ---
 
@@ -450,7 +451,7 @@ The dispatcher advances history only after the HTTP transport reports successful
 
 **Bench verification:** Sunroom Denon mute ON/OFF and Roku Home/PowerOff executed successfully. Roku power commands operated the LG G1 and Denon X1800H HDMI-CEC chain. Changed-configuration reset and independent Sunroom/Den room histories were verified.
 
-Deliberately failed HTTP requests and blank toggle paths remain untested as negative cases.
+**October 27, 2026 negative tests:** Repeated requests to an unreachable Sunroom Denon endpoint preserved the pending ON direction. Blank selected toggle paths and missing endpoints produced repeatable no-ops without advancing history. Restoring the endpoint and command paths produced successful HTTP 200 ON/OFF execution. Broader network-failure coverage remains outstanding.
 
 ---
 
@@ -527,13 +528,13 @@ Denon: GET /goform/formiPhoneAppDirect.xml?MSQUICK1
 CUSTOM COMPLETE
 ```
 
-This establishes a working two-device, two-step custom-action path. It does not prove every device state change or every failure/interleaving scenario.
+This establishes a working two-device, two-step custom-action path. Subsequent October 27, 2026 testing also confirmed that an independent Sunroom Volume Up command could execute during the three-second cooperative wait, before the Denon Quick Select step. These tests do not establish every device state change, failure scenario, or physical-input responsiveness.
 
 ### 14.6 Browser configuration and testing
 
 The browser editor can create, rename, edit, and remove custom actions and their steps. It validates and persists them through the same revision-protected configuration pipeline.
 
-The Test Remote loads the saved custom actions for the selected room and exposes an explicit Run control. A minor deferred refinement is preserving the selected custom-action dropdown entry after dispatch.
+The Test Remote loads saved custom actions for the selected room and exposes an explicit Run control. October 27, 2026 browser testing confirmed that the Sunroom Movie action remained selected and Run remained enabled after execution and after switching rooms. Selection persistence among multiple custom actions remains unverified; no browser change was necessary.
 
 ### 14.7 Deliberate scope limits
 
