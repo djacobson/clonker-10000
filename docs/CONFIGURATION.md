@@ -793,24 +793,29 @@ Readable documentation samples may be formatted with indentation and whitespace 
 
 ## 10. Strict Validation
 
-The configuration engine validates the entire object before publishing it.
+The Clonker Config v4 engine validates the complete configuration before publishing it.
 
 Validation rejects:
 
 - Missing or unknown root fields.
 - Unsupported schema versions.
-- Missing or extra rooms.
+- Missing or invalid room collections.
 - Missing or unknown room properties.
 - Invalid room names.
 - Missing or extra built-in device keys.
 - Invalid endpoint types or formats.
 - Missing or unknown fundamental actions.
-- Missing or extra action properties.
+- Missing or extra fundamental-action properties.
 - Invalid action targets.
 - Unsupported HTTP methods.
-- Invalid command-path types.
-- Paths exceeding the length limit.
-- Nonempty custom-action arrays.
+- Invalid command-path types or lengths.
+- Invalid custom-action structures.
+- Duplicate custom-action IDs within a room.
+- Invalid custom-action names or IDs.
+- Missing, empty, or oversized custom-action step collections.
+- Invalid command-step targets, methods, or paths.
+- Invalid post-command waits.
+- Nonzero waits on final command steps.
 - Oversized serialized configurations.
 
 The validator returns a normalized, ordered copy.
@@ -819,21 +824,31 @@ It does not modify the submitted object in place.
 
 ### 10.1 Active limits
 
-| Constant | Value |
+| Constant or constraint | Value |
 |---|---:|
-| `CONFIG_VERSION` | `3` |
+| `CONFIG_VERSION` | `4` |
 | `MAX_CONFIG_BYTES` | `8192` |
 | `MAX_ROOM_NAME_LENGTH` | `40` |
 | `MAX_PATH_LENGTH` | `512` |
-| Fixed rooms | `3` |
+| `MAX_CUSTOM_ACTION_ID_LENGTH` | `40` |
+| `MAX_CUSTOM_ACTION_NAME_LENGTH` | `60` |
+| Supported room slots | `3` |
 | Built-in device slots per room | `3` |
 | Fundamental actions per room | `14` |
+| Custom actions per room | `16` maximum |
+| Steps per custom action | `1–16` |
+| Post-command wait | `0–60000` ms |
+| Final step wait | `0` ms |
 
-The byte limit applies to UTF-8 JSON.
+The configuration-size limit applies to UTF-8 JSON in its operational serialized form.
 
-The October 22 compact development configuration was approximately 3.7 KB, leaving room for future schema extensions.
+Clonker Config v4 retains the 8,192-byte limit.
 
-The 8 KB limit must be reconsidered when implementing custom devices and compound actions.
+The fully populated Roku/Denon development configuration demonstrates that the current limit can accommodate two rooms, twenty-eight fundamental actions, five custom actions, and ten custom-action steps.
+
+The readable sample is larger because of indentation and whitespace. It is intended for documentation rather than direct Pico deployment.
+
+Increasing the configuration-size limit should be driven by actual requirements and measured resource usage, not speculation.
 
 ### 10.2 Duplicate JSON keys
 
