@@ -603,7 +603,7 @@
 
             // Rebuild the custom-action display after changes.
 
-            function refreshCustomActions() {
+            function refreshCustomActions(openAction = null) {
                 actionList.replaceChildren();
 
                 customSummary.textContent =
@@ -612,6 +612,7 @@
                 for (const action of customActions) {
                     const actionDetails = document.createElement("details");
                     actionDetails.className = "custom-action-editor action-editor";
+                    actionDetails.open = action === openAction;
 
                     const actionSummary = document.createElement("summary");
                     actionDetails.appendChild(actionSummary);
@@ -886,9 +887,11 @@
                         wait_after_ms: 0
                     }]
                 });
-
-                refreshCustomActions();
+                refreshCustomActions(
+                    customActions[customActions.length - 1]
+                );
                 customDetails.open = true;
+
             });
 
             customDetails.appendChild(addButton);
