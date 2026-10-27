@@ -1,11 +1,11 @@
 
 # The Clonker 10000 — Configuration, Persistence & Recovery
 
-**Design reference:** Updated October 22, 2026  
+**Design reference:** Updated October 27, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
 **Runtime:** CircuitPython 10.3.1  
-**Active configuration:** JSON v3  
-**Status:** Generic built-in device slots, fundamental actions, browser configuration, revision-protected persistence, Dumb Queue™, and outbound HTTP execution operational.
+**Active configuration:** Clonker Config v4 (JSON format)  
+**Status:** Fundamental actions, executable custom actions, browser configuration, revision-protected persistence, Dumb Queue™, and outbound HTTP execution operational.
 
 > **Clonker controls actions, not brands. Configuration determines where those actions go.**
 
@@ -22,20 +22,23 @@ The Clonker currently provides:
 - One to three configured rooms, using three supported room IDs.
 - Three generic built-in device slots per room.
 - Fourteen fixed fundamental actions per room.
+- Executable user-defined custom actions with ordered command steps.
 - Editable HTTP targets, methods, and command paths.
+- Configurable post-command waits within custom actions.
 - Separate ON/OFF paths for power and mute actions.
-- Strict JSON validation.
-- Compact, deterministic serialization.
+- Strict Clonker Config v4 validation.
+- Compact, deterministic JSON serialization.
 - Revision-protected browser configuration saves.
 - Verified temporary writes and backup rotation.
-- Startup fallback to valid configuration backups.
+- Startup fallback to valid, schema-compatible configuration backups.
 - An in-memory configuration snapshot.
 - Shared action scheduling through the Dumb Queue™.
 - Real outbound HTTP GET/POST execution.
+- Browser Test Remote execution of fundamental and custom actions.
 
-Custom devices and custom actions are planned but are not yet implemented.
+Custom devices remain planned but are not yet implemented.
 
-Runtime power/mute toggle direction selection also remains pending.
+Runtime power/mute toggle direction selection also remains pending. Although the configuration stores separate ON/OFF paths, the dispatcher currently defers these toggle actions.
 
 The active firmware loads:
 
@@ -96,9 +99,9 @@ Developers must not assume these copies are synchronized.
 
 ### 2.2 Schema version versus module filename
 
-The active schema is JSON v3.
+The active schema is **Clonker Config v4**.
 
-The active Python implementation is still named:
+The active Python implementation retains its historical filename:
 
 `device_config_v2.py`
 
@@ -107,31 +110,37 @@ This is intentional for now. Renaming the module would require updating its impo
 The firmware's authoritative schema constant is:
 
 ```python
-CONFIG_VERSION = 3
+CONFIG_VERSION = 4
 ```
 
-The browser editor defines its corresponding constant:
+The browser editor defines the corresponding constant:
 
 ```javascript
-const CONFIG_VERSION = 3;
+const CONFIG_VERSION = 4;
 ```
 
 These constants must agree.
 
+The root `"version"` property in the JSON configuration must also match.
+
 The startup log reads the Python constant rather than embedding a separate numeric version.
+
+Clonker Config version numbers describe the configuration schema, not the CircuitPython runtime, firmware release, or browser editor version.
 
 ---
 
-## 3. JSON v3 Structure
+## 3. Clonker Config v4 Structure
 
 ### 3.1 Root object
+
+Clonker Config v4 uses JSON as its storage format.
 
 The root contains exactly two properties:
 
 - `version`
 - `rooms`
 
-The version must be the integer `3`.
+The version must be the integer `4`.
 
 
 The `rooms` object must contain at least one and no more than three rooms.
@@ -184,7 +193,7 @@ Renaming a room does not change its internal ID or action mappings.
 
 ### 4.1 The three built-in slots
 
-JSON v3 replaced the original device-category identifiers with generic device-slot identifiers.
+Clonker Config v3 replaced the original device-category identifiers with generic device-slot identifiers. Clonker Config v4 retains those identifiers.
 
 | Internal ID | Fixed browser label | Original JSON v2 ID |
 |---|---|---|
@@ -273,7 +282,7 @@ These addresses are development examples, not guaranteed permanent network assig
 
 ### 4.5 Future custom devices — agreed design
 
-**Status:** Design agreed; not implemented in JSON v3.
+**Status:** Design agreed; custom devices remain unimplemented in Clonker Config v4.
 
 The three built-in destinations remain:
 
@@ -1026,15 +1035,20 @@ The engine reduces risk through validation and verified temporary writes, but ca
 
 The complete power-loss failure matrix has not been exhaustively tested.
 
+
 ### 14.2 Version compatibility
 
-JSON v3 validation rejects JSON v2 configuration files.
+Clonker Config v4 validation rejects configuration files using earlier schema versions.
 
-An old `.bak` from v2 is not a valid fallback under the active v3 firmware.
+A backup created under Clonker Config v2 or v3 is not automatically a valid fallback for firmware expecting Config v4.
+
+The configuration engine does not perform automatic schema migration during recovery.
 
 During schema transitions, retain external backups of the previous working firmware/configuration pair.
 
 Do not assume that a historical backup is compatible merely because it contains valid JSON.
+
+A configuration backup must match the schema expected by the firmware that loads it.
 
 ---
 
