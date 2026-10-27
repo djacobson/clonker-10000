@@ -260,7 +260,7 @@ a remote control.
 Or possibly the control panel of a very small submarine.
 
 <p align="center">
-  <img src="images/clonker_prototype.jpeg"
+  <img src="images/clonker_prototype.png"
        width="600"
        alt="The Clonker 10000 hardware prototype">
 </p>
