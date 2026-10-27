@@ -9,8 +9,9 @@
 CONFIG mode runs the HTTP management interface; RUN mode stops it.
 The shared action queue runs in either mode.
 
-Ordinary queued actions execute through the outbound HTTP transport.
-Power and mute toggles remain deferred until direction selection is implemented.
+Fundamental and custom actions execute through the shared Dumb Queue.
+Power and mute toggles use independent, volatile ON/OFF command histories.
+Outbound HTTP requests are synchronous and blocking.
 """
 
 import time
