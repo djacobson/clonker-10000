@@ -178,7 +178,7 @@ Persistent browser configuration saves require **both** a writable Pico filesyst
 - **DEVICE + CONFIG:** A save can proceed if schema validation, revision checks, disk consistency checks, and persistence safeguards pass.
 - **Either RUN combination:** The browser save endpoint is unavailable because the management listener is stopped.
 
-A successful **changed** save updates persistent configuration, performs the engine's backup safeguards, publishes the new validated RAM configuration, and clears pending queue work to avoid carrying stale requests across a configuration change. An **unchanged** save avoids an unnecessary flash rewrite.
+A successful **changed** save updates persistent configuration, performs the engine's backup safeguards, publishes the new validated RAM configuration, **clears pending queue work, and resets all volatile toggle-direction histories** to avoid carrying stale requests or command history across a configuration change. An **unchanged** save avoids an unnecessary flash rewrite and preserves the existing queue and toggle histories.
 
 Do not infer that backup rotation is a fully atomic transaction under sudden power loss. See [Configuration & Recovery](CONFIGURATION.md) for exact guarantees and remaining limits.
 
@@ -190,9 +190,9 @@ Three different concepts must remain separate:
 2. **CONFIG/RUN switch:** application management-interface availability.
 3. **Guarded SYSTEM MASTER / `power-toggle`:** a planned physical equipment-control input and a fundamental action identifier.
 
-The Config v4 schema supports `on_path` and `off_path` for power/mute toggles. Runtime direction selection remains **DEFERRED**: queue acceptance exists, but no automatic ON/OFF selection is implemented yet.
+The Config v4 schema supports `on_path` and `off_path` for power/mute toggles. Runtime direction selection is **IMPLEMENTED**: the dispatcher maintains independent, volatile ON/OFF command histories per room and action. A successful HTTP request advances the next direction; a changed configuration save resets all histories.
 
-A future RAM-only toggle history must not be represented as authoritative equipment state. External remotes, HDMI-CEC, and manual device controls can change equipment independently.
+This command history is **not authoritative equipment state**. External remotes, HDMI-CEC, and manual device controls can change equipment independently. Deliberate failure-path and blank-command tests remain outstanding.
 
 Changing SERVICE/DEVICE or CONFIG/RUN must **never** transmit a power command merely because a mode changed.
 
@@ -218,7 +218,7 @@ The proposed room selector is a separate physical control. Den, Sunroom, and a p
 
 ### Guarded power input
 
-The guarded SYSTEM MASTER concept is distinct from both operating-mode controls. Its final physical hardware and the corresponding runtime power-toggle behavior remain under development.
+The guarded SYSTEM MASTER concept is distinct from both operating-mode controls. Its final physical hardware and GPIO integration remain under development. The underlying `power-toggle` software action is already implemented and bench-tested through the browser Test Remote.
 
 For component inventory, GPIO planning, and mechanical design, see [Hardware & Controls](HARDWARE_CONTROLS.md).
 
@@ -246,6 +246,9 @@ For the full deployment checklist, see [Development & Deployment](DEVELOPMENT.md
 - CONFIG-mode browser management service and Test Remote.
 - Fundamental action dispatch through the shared queue to real Denon/Roku equipment.
 - Config v4 custom actions and cooperative multi-step execution, including a tested Roku command, wait, and Denon command.
+- Runtime power/mute ON/OFF direction selection through the shared dispatcher, bench-tested October 27, 2026 using the browser Test Remote.
+- Sunroom Denon mute ON/OFF and Roku Home/PowerOff execution, including the LG G1 and Denon X1800H HDMI-CEC power chain.
+- Changed-configuration toggle-history reset and independent Den/Sunroom histories.
 
 ### Implemented, not exhaustively verified
 
@@ -258,7 +261,6 @@ For the full deployment checklist, see [Development & Deployment](DEVELOPMENT.md
 
 - Physical CONFIG/RUN switch and GPIO debounce.
 - Physical room selector, guarded power control, and button/encoder input path.
-- Runtime power/mute toggle direction selection.
 - End-to-end physical DEVICE + RUN operation.
 - OLED and audible feedback integration.
 - Custom device slots and Apple TV protocol support.
