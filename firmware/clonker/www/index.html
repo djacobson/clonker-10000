@@ -333,6 +333,9 @@
     // Must match CONFIG_VERSION in device_config_v2.py.
     const CONFIG_VERSION = 4;
 
+    // Must match MAX_CONFIG_BYTES in device_config_v2.py.
+    const MAX_CONFIG_BYTES = 8192;
+ 
     // Clonker Config v4 configuration constants.
     const MAX_CONFIG_ATTEMPTS = 5;
 
@@ -593,6 +596,9 @@
             // Actions retain their array order. No reordering UI.
 
             const customActions = room.custom_actions || [];
+            // Track actions loaded from Pico independently
+            // of their editable IDs.
+            const savedActions = new WeakSet(customActions); 
             editedCustomActions[roomId] = customActions;
 
             const customDetails = document.createElement("details");
@@ -634,8 +640,7 @@
                     // New actions may change their suggested IDs
                     // until the configuration is successfully saved.
 
-                    const saved = (loadedCustomActions[roomId] || [])
-                        .some(item => item.id === action.id);
+                    const saved = savedActions.has(action);
 
                     const idField = createField(
                         actionDetails,
@@ -938,6 +943,7 @@
             }
 
             loadedCustomActions = {};
+            editedCustomActions = {};
 
             for (const roomId of ROOM_IDS) {
                 const room = config.rooms[roomId];
@@ -1077,10 +1083,9 @@
     }
 
 
-    // Collect the edited configuration from the page.
-    //
-    // Until the custom-action editor is implemented,
-    // preserve custom actions from the last successful load.
+    // Collect fundamental actions from HTML controls and
+    // custom actions from the live browser-side model.
+    // Validate custom actions before submitting.
 
     function collectDeviceConfig() {
         const rooms = {};
@@ -1203,12 +1208,21 @@
 
             submitted.revision = configRevision;
 
+            const payload = JSON.stringify(submitted);
+
+            if (new TextEncoder().encode(payload).length > MAX_CONFIG_BYTES) {
+                throw new Error(
+                    "Configuration exceeds the " +
+                    MAX_CONFIG_BYTES + "-byte limit."
+                );
+            }
+
             const response = await fetch("/api/config", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(submitted),
+                body: payload,
                 cache: "no-store"
             });
 
