@@ -20,7 +20,7 @@ Configuration saves clear pending work through the web service.
 An execution failure discards all remaining tasks.
 No automatic retries.
 
-Power and mute toggle direction selection remains deferred.
+Power and mute use independent, volatile ON/OFF command histories.
 """
 
 import time
@@ -39,6 +39,11 @@ _queue = []
 _last_result = None
 _last_error = None
 _peak_depth = 0
+
+# Key: (room_id, action_id)
+# Value: next direction ("on" or "off").
+# Missing entries default to ON.
+_toggle_next = {}
 
 
 def dispatch(room_id, action_id, delay_seconds=0):
@@ -195,19 +200,18 @@ def poll():
                 room, target
             )
 
-            # Toggle direction tracking is not implemented.
+            # Toggle direction tracking
             if action_id in ("mute-toggle", "power-toggle"):
-                message = (
-                    "DEFERRED: {} / {} "
-                    "(toggle state not implemented)"
-                ).format(room["name"], action_id)
-
-                logger.info(message)
-                _last_result = message
-                _last_error = None
-                return True
-
-            path = action["path"]
+                toggle_key = (room_id, action_id)
+                toggle_direction = _toggle_next.get(
+                    toggle_key, "on"
+                )
+                path = action[
+                    "on_path" if toggle_direction == "on"
+                    else "off_path"
+                ]
+            else:
+                path = action["path"]
 
             # Fundamental actions retain blank-command no-ops.
             if not endpoint or not path:
@@ -243,6 +247,20 @@ def poll():
         logger.info(message)
         _last_result = message
         _last_error = None
+
+        if kind == "fundamental" and action_id in (
+            "mute-toggle", "power-toggle"
+        ):
+            _toggle_next[toggle_key] = (
+                "off" if toggle_direction == "on" else "on"
+            )
+            logger.info(
+                "TOGGLE: {} / {} completed {}; next {}".format(
+                    room["name"], action_id,
+                    toggle_direction.upper(),
+                    _toggle_next[toggle_key].upper()
+                )
+            )
 
         if kind == "custom":
             next_index = task["step"] + 1
@@ -304,10 +322,14 @@ def poll():
         return True
 
 
-def clear(reason="Manual reset"):
-    """Discard pending tasks, preserving diagnostic history."""
+def clear(reason="Manual reset", reset_toggles=False):
+    """Discard pending tasks; optionally reset toggle history."""
     discarded = len(_queue)
     _queue.clear()
+
+    if reset_toggles:
+        _toggle_next.clear()
+        logger.info("TOGGLE: All direction histories reset")
 
     logger.info(
         "DUMB QUEUE: Cleared {} tasks ({})".format(

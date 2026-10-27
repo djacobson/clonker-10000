@@ -231,9 +231,14 @@ def _build_response(first_line, request=None):
                 if not isinstance(submitted, dict):
                     raise ValueError("Configuration must be a JSON object")
                 expected_revision = submitted.pop("revision", None)
+
                 changed = device_config.save(submitted, expected_revision)
                 if changed:
-                    actions.clear("Configuration changed")
+                    actions.clear(
+                        "Configuration changed",
+                        reset_toggles=True
+                    )
+
                 body = json.dumps({
                     "message": "Configuration saved" if changed else "Configuration unchanged",
                     "saved": changed,
