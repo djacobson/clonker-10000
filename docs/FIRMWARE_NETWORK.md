@@ -15,7 +15,7 @@ This document describes the **current firmware implementation**, not a chronolog
 
 **Implemented and exercised on hardware:** Wi-Fi, Clonker Config v4 JSON loading and persistence, browser configuration, the browser Test Remote, the CONFIG-mode HTTP management service, fourteen fundamental action IDs, user-defined custom actions, the shared Dumb Queue™, outbound HTTP GET/POST, and real Denon/Roku commands. A compound custom action has successfully executed a Roku command, waited cooperatively, and then executed a Denon command.
 
-**Still deferred:** physical GPIO input integration, power/mute toggle direction selection, custom device slots, specialized volume-encoder behavior, equipment-state polling, and Apple TV protocol support. Stress, failure-injection, power-loss, and long-uptime coverage are not exhaustive.
+**Still deferred:** physical GPIO input integration, custom device slots, specialized volume-encoder behavior, equipment-state polling, and Apple TV protocol support. Runtime power/mute toggle direction selection is implemented and bench-tested. Stress, failure-injection, power-loss, and long-uptime coverage are not exhaustive.
 
 The HTTP management service is intended for a **trusted home LAN**, not direct internet exposure.
 
@@ -120,7 +120,7 @@ The browser Test Remote supports fundamental actions and room-specific custom ac
 
 ### 6.1 Configuration saves and queue consistency
 
-A save is permitted only when the Pico filesystem is writable by firmware in DEVICE mode. The configuration engine checks schema, expected revision, disk/RAM consistency, and persistence safeguards. A **changed successful save** causes `web.py` to clear pending queue work so commands cannot continue under superseded configuration. An unchanged save does not require a rewrite.
+A save is permitted only when the Pico filesystem is writable by firmware in DEVICE mode. The configuration engine checks schema, expected revision, disk/RAM consistency, and persistence safeguards. A **changed successful save** causes `web.py` to clear pending queue work **and reset all volatile toggle-direction histories** so commands cannot continue under superseded configuration. An unchanged save preserves both the queue and toggle histories.
 
 The full validation, backup rotation, startup recovery, and stale-browser-tab behavior are specified in [Configuration](CONFIGURATION.md). A browser-visible editor does not imply the filesystem is writable.
 
@@ -158,7 +158,7 @@ Among eligible entries, queue order determines selection. This is intentionally 
 
 For a configured ordinary fundamental action, `poll()` resolves the endpoint, HTTP method, and path, then calls `http_transport.send()`. An ordinary action with a missing endpoint or blank path produces a logged **NO-OP**, not an outbound request.
 
-`mute-toggle` and `power-toggle` are admitted but currently log **DEFERRED** at execution. Config v4 stores separate `on_path` and `off_path`, but runtime direction selection/history is not implemented. Do not describe those actions as operational toggles.
+`mute-toggle` and `power-toggle` execute using the configured `on_path` and `off_path`. The dispatcher selects the direction from independent, volatile histories for each room and toggle action, then sends the selected HTTP command. History advances only after successful HTTP execution. A missing endpoint or blank selected path produces a logged no-op without advancing history.
 
 ### 7.4 Custom and compound execution
 
@@ -254,12 +254,25 @@ Browser configuration, persistence, and actual multi-step execution were exercis
 
 These are **verified functional scenarios**, not exhaustive coverage of malformed responses, extended network outages, simultaneous user inputs, interrupted writes, long uptime, or all power/mute behaviors. Preserve dated raw evidence in [Development History](DEVELOPMENT_HISTORY.md).
 
+### 12.3 Runtime toggle bench tests — October 27, 2026
+
+The browser Test Remote exercised the implemented `mute-toggle` and `power-toggle` actions against real Sunroom equipment.
+
+- **Mute:** Sunroom Denon X1800H accepted explicit `MUON` and `MUOFF` GET requests with HTTP 200 responses. Repeated presses alternated ON/OFF successfully, with observed HTTP transaction times of approximately 100–125 ms.
+- **Power:** Sunroom Roku accepted `Home` and `PowerOff` POST requests with HTTP 200 responses. The Roku Home command successfully powered on the LG G1 and Denon X1800H through HDMI-CEC; the PowerOff command shut down the chain. Observed HTTP transactions were approximately 145–188 ms.
+- **Configuration reset:** A changed configuration save logged `TOGGLE: All direction histories reset` and cleared the pending queue. The next Sunroom mute request selected ON and completed successfully.
+- **Room independence:** After exercising Sunroom mute, the Den room independently selected ON for its first mute request, returning HTTP 200.
+
+These tests confirm working direction selection, successful-command advancement, changed-save reset, and independent room histories.
+
+The tests do **not** establish automatic equipment-state detection, nor do they exhaustively verify failure-path history preservation, blank toggle paths, or high-rate input behavior.
+
 ## 13. Known limitations and operational boundaries
 
 - **Blocking outbound requests:** temporarily pause the cooperative scheduler; GPIO responsiveness remains to be measured.
 - **One active inbound client:** short silent-client timeout mitigates stalls but does not add concurrency.
 - **Queue-wide cancellation:** one execution failure discards pending tasks; no automatic retries or rollback.
-- **Power/mute toggles:** configuration fields exist; runtime ON/OFF direction selection remains deferred.
+- **Power/mute toggles:** volatile per-room/action direction history is implemented and bench-tested. It tracks successful commands, not authoritative equipment state; failed HTTP requests and blank toggle paths remain to be deliberately tested.
 - **HTTP result interpretation:** status 2xx does not establish that the physical equipment changed state.
 - **No response-body interpretation:** the transport reads the status line only.
 - **No connection persistence or TLS:** a new plain-HTTP TCP connection is used per command.
@@ -275,7 +288,7 @@ The immediate priority is to **preserve the working Config v4 baseline** while m
 1. Integrate a small physical input path and verify ordinary action dispatch.
 2. Measure encoder event capture during actual outbound HTTP requests and compound waits.
 3. Explore volume-event accumulation, acceleration, or coalescing only if measurements show a need.
-4. Implement and test power/mute direction selection without claiming authoritative equipment state.
+4. Deliberately test toggle failure handling and blank/unconfigured paths, confirming that direction history does not advance.
 5. Refine the Test Remote's custom-action selection persistence when convenient.
 6. Evaluate custom device slots and additional protocols as separate, explicit design changes.
 
