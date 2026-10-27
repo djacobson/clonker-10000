@@ -644,7 +644,7 @@ When a custom action is submitted:
 
 Waiting is cooperative rather than a blocking sleep.
 
-The design allows unrelated eligible actions to be processed while a compound action is waiting. Additional live interleaving regression testing remains on the development checklist.
+The design allows unrelated eligible actions to be processed while a compound action is waiting. This was verified on October 27, 2026: an independent Sunroom Volume Up action executed during the Movie custom action's three-second cooperative wait, before its Denon Quick Select step.
 
 The queue and transport retain responsibility for command execution, errors, and cancellation behavior.
 
@@ -1495,7 +1495,7 @@ The browser Test Remote supports room-specific custom-action selection and expli
 
 Real Roku and Denon compound-action execution has been verified.
 
-Additional regression testing remains desirable, particularly command interleaving during waits and negative validation cases.
+Cooperative interleaving was verified October 27, 2026: an independent Sunroom Volume Up command executed during the Movie custom action's three-second wait, before the delayed Denon Quick Select step. Broader stress and malformed-request regression coverage remains desirable.
 
 Custom-device targets remain deferred until optional custom devices are implemented.
 
@@ -1507,7 +1507,7 @@ The dispatcher maintains independent, volatile command-direction histories for e
 
 This is command history, not authoritative equipment-state detection. External remotes and HDMI-CEC may change equipment state without Clonker knowing.
 
-Remaining verification includes deliberately failed HTTP requests and unconfigured toggle paths.
+Failure-path verification completed October 27, 2026: repeated unreachable-endpoint requests preserved direction history, while blank selected paths and missing endpoints produced repeatable no-ops. These focused tests do not establish exhaustive network-failure coverage.
 
 ### 20.4 Physical controls
 
@@ -1677,15 +1677,17 @@ The operational configuration is stored as compact JSON and remains subject to t
 
 **October 27, 2026 bench verification:** Sunroom Denon mute ON/OFF commands executed successfully. Sunroom Roku Home/PowerOff commands operated the LG G1 and Denon X1800H HDMI-CEC power chain. A changed configuration save reset direction history, the next Sunroom mute selected ON, and the Den room independently selected ON.
 
-Failure-path history preservation and blank-path behavior remain code-reviewed but not deliberately bench-tested.
+**October 27, 2026 closeout verification:** Deliberately unreachable HTTP endpoints preserved toggle direction across repeated failed requests. Blank selected paths and missing endpoints produced repeatable no-ops without advancing direction. Restored Sunroom Denon mute ON/OFF requests returned HTTP 200.
+
+A Sunroom Volume Up command executed successfully during the Movie custom action's three-second cooperative wait, before its Denon Quick Select step resumed.
 
 **Remaining development:**
 
 - Optional user-defined custom devices.
 - Physical buttons, encoders, and room-selection controls.
 - Apple TV protocol integration.
-- Additional scheduler-interleaving and negative validation tests.
-- Minor browser Test Remote refinements.
+- Extended load, malformed-response, network-outage, and long-uptime regression testing.
+- Additional browser Test Remote refinements only if reproducible issues warrant them.
 
 Custom actions currently target the three built-in device slots. Custom-device support remains intentionally deferred.
 
