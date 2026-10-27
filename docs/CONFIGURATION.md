@@ -1325,19 +1325,25 @@ The future implementation will introduce optional named destinations using `devi
 
 The existing home-theater editor and fundamental-action model will remain intact.
 
-### 20.2 Custom and compound actions — next implementation
+### 20.2 Custom and compound actions — implemented
 
-Allow user-defined actions containing ordered command steps.
+Custom and compound actions were implemented during Chapter 4 as part of Clonker Config v4.
 
-Begin by targeting existing built-in devices and reusing the Dumb Queue and HTTP transport.
+Each custom action has a stable ID, editable display name, and ordered command steps targeting configured built-in devices.
 
-Custom-device support is not a prerequisite for this work.
+Each step specifies an HTTP GET/POST operation and may include a post-command wait.
 
-Reuse the existing queue and HTTP transport.
+Execution reuses the existing Dumb Queue™ and outbound HTTP transport. No separate macro executor was introduced.
 
-Support waits between steps without blocking unrelated eligible actions.
+The browser configuration editor supports creating, editing, deleting, validating, and saving custom actions.
 
-Do not introduce a separate macro execution subsystem.
+The browser Test Remote supports room-specific custom-action selection and explicit execution.
+
+Real Roku and Denon compound-action execution has been verified.
+
+Additional regression testing remains desirable, particularly command interleaving during waits and negative validation cases.
+
+Custom-device targets remain deferred until optional custom devices are implemented.
 
 ### 20.3 Runtime toggles
 
@@ -1371,11 +1377,11 @@ The original XML implementation established important ideas around configuration
 
 It is no longer the active configuration format.
 
-### JSON v2
+### Clonker Config v2
 
-JSON v2 introduced the production configuration engine and browser integration.
+Clonker Config v2 established the JSON-based configuration engine and browser integration.
 
-Its original device identifiers were:
+Its original built-in device identifiers were:
 
 ```text
 tv
@@ -1383,19 +1389,45 @@ avr
 streaming
 ```
 
-Those identifiers are historical and are not accepted as built-in device keys or fundamental-action targets by the active v3 validator.
+Those identifiers are historical and are not accepted as built-in device keys or fundamental-action targets by the active Clonker Config v4 validator.
 
-### JSON v3
+### Clonker Config v3
 
-JSON v3 introduced generic built-in device identifiers while retaining the existing fundamental-action structure.
+Clonker Config v3 introduced generic built-in device identifiers while retaining the fundamental-action structure.
 
-It is the active schema as of October 22, 2026.
+It became operational on October 22, 2026, during Chapter 4 Phase 1.
 
-No automatic v2-to-v3 migration is implemented.
+The built-in identifiers changed to:
 
-During development, the configuration was intentionally replaced with a matching v3 file.
+```text
+device-1
+device-2
+device-3
+```
 
-Earlier configurations remain recoverable through Git history and separately preserved backups.
+No automatic v2-to-v3 migration was implemented. During development, the configuration was intentionally replaced with a matching v3 file.
+
+### Clonker Config v4
+
+Clonker Config v4 introduced executable custom actions and ordered HTTP command steps.
+
+Each configured room retains its fourteen fundamental actions and may additionally define named custom actions in the `custom_actions` array.
+
+Custom actions have stable IDs, editable names, and ordered command steps with optional post-command waits.
+
+Execution reuses the existing Dumb Queue™ and outbound HTTP transport.
+
+The browser configuration editor supports creating, editing, deleting, validating, and saving custom actions. The Test Remote supports room-specific selection and execution.
+
+Clonker Config v4 became operational and was successfully tested during Chapter 4 in October 2026.
+
+It is the active configuration schema as of October 27, 2026.
+
+JSON remains the serialization format. The root `"version"` field identifies the Clonker Config schema version, independently of firmware and CircuitPython versions.
+
+No automatic v3-to-v4 migration was introduced.
+
+Earlier configurations remain recoverable through Git history and separately preserved backups when paired with compatible firmware.
 
 ---
 
@@ -1433,35 +1465,69 @@ Even apparently cosmetic startup changes deserve a smoke test.
 
 ## 23. Current Engineering Position
 
-As of October 22, 2026:
+**As of October 27, 2026 — Chapter 4, Clonker Config v4 operational.**
+
+Clonker Config v4 is the active versioned configuration schema. JSON remains its storage format, and the root `"version": 4` identifies the schema version.
 
 **Implemented and tested:**
 
-- JSON v3 configuration.
-- One to three configured rooms, with Den and Sunroom currently deployed.
+- Clonker Config v4, with fixed fundamental actions and executable user-defined custom actions.
+- Up to three supported room IDs, with Den and Sunroom currently configured.
 - Three generic built-in device slots per room.
 - Fourteen fundamental actions per room.
-- Browser configuration editing.
-- Strict schema validation.
-- Revision-protected saves.
-- Backup rotation and restart persistence.
+- Custom actions with stable IDs, editable names, and ordered command steps.
+- Browser creation, editing, deletion, validation, and persistence of custom actions.
+- Room-specific custom-action selection and explicit Run execution in the browser Test Remote.
+- Cooperative post-command waits using the shared Dumb Queue™.
+- Strict configuration validation and size enforcement.
+- Revision-protected browser saves.
+- Verified temporary writes, backup rotation, and restart persistence.
 - Stale-tab conflict rejection.
-- Shared Dumb Queue™.
-- Outbound HTTP GET/POST commands.
+- Outbound HTTP GET/POST execution.
 - Real Denon and Roku control.
+- Successful live two-device compound-action execution.
 
-**Not yet implemented:**
+The first verified live compound action used the Sunroom Roku Ultra and Denon AVR-X1800H:
 
-- User-defined custom devices.
-- Executable custom actions.
-- Compound command sequences.
-- Runtime power/mute direction history.
-- Physical action controls.
+1. Send Roku Home using HTTP POST.
+2. Wait 3,000 milliseconds after the command completes.
+3. Execute Denon Quick Select 1 using HTTP GET.
+
+Both commands returned HTTP 200, and the connected equipment responded as expected.
+
+The fully populated Roku/Denon configuration contains:
+
+| Room | Fundamental actions | Custom actions | Command steps |
+|---|---:|---:|---:|
+| Den | 14 | 3 | 6 |
+| Sunroom | 14 | 2 | 4 |
+| **Total** | **28** | **5** | **10** |
+
+A readable sample is maintained at:
+
+`docs/samples/device_config_roku_denon_sample.json`
+
+The operational configuration is stored as compact JSON and remains subject to the 8,192-byte size limit.
+
+**Supported in configuration, but not yet operational at runtime:**
+
+- Separate ON/OFF command paths for power and mute.
+- Runtime selection of the appropriate toggle direction.
+
+The configuration editor can store both paths, but the dispatcher currently defers power/mute toggle actions because runtime direction tracking has not been implemented.
+
+**Remaining development:**
+
+- Runtime power/mute direction history, without assuming knowledge of actual equipment state.
+- Optional user-defined custom devices.
+- Physical buttons, encoders, and room-selection controls.
 - Apple TV protocol integration.
+- Additional scheduler-interleaving and negative validation tests.
+- Minor browser Test Remote refinements.
 
-The next configuration milestone is executable custom and compound actions, initially using built-in destinations. Optional custom-device support follows when needed.
+Custom actions currently target the three built-in device slots. Custom-device support remains intentionally deferred.
 
-These features should extend the tested foundation rather than replace it.
+Clonker Config v4 extends the established configuration, queue, and HTTP transport architecture without introducing a separate macro execution subsystem.
 
 > **The Clonker does not need to understand a device's personality. It needs a destination, a command, and the good sense to stay out of the way.**
 
