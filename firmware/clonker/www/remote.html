@@ -186,9 +186,8 @@
             box-shadow: 0 0 0 4px #20242a;
         }
 
-        /* Future user-defined actions.
-           Selectable placeholder; no execution. */
-
+        /* Room-specific custom-action selector. */
+        
         .custom-action {
             margin-top: 24px;
         }
@@ -196,6 +195,28 @@
         .custom-action label {
             display: block;
             font-size: 14px;
+        }
+
+        /* Custom-action selector and deliberate Run button. */
+
+        .custom-action-controls {
+            display: flex;
+            align-items: stretch;
+            gap: 9px;
+        }
+
+        .custom-action-controls select {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .custom-action-controls button {
+            margin-top: 7px;
+            min-width: 65px;
+        }
+
+        .custom-action-controls select:disabled {
+            opacity: 0.55;
         }
 
         /* Action feedback. */
@@ -340,37 +361,21 @@
         </div>
 
 
-        <!-- Future user-defined actions.
-             Dropdown is selectable but executes nothing. -->
+        <!-- Custom actions for the selected room.
+             Select first, then explicitly Run. -->
 
         <div class="custom-action">
 
-            <label for="custom-action">
-                Custom Action (coming later)
-            </label>
+            <label for="custom-action">Custom Action</label>
 
-            <select id="custom-action">
+            <div class="custom-action-controls">
+                <select id="custom-action" disabled>
+                    <option value="">Loading actions...</option>
+                </select>
 
-                <option value="" selected>
-                    Choose custom action…
-                </option>
-
-                <option value="movie-mode">
-                    Movie Mode
-                </option>
-
-                <option value="stereo-mode">
-                    Stereo Mode
-                </option>
-
-                <option value="next-audio-mode">
-                    Next Audio Mode
-                </option>
-
-            </select>
-
-            <div class="note">
-                Illustrative choices only -- no action is sent.
+                <button id="run-custom-action" disabled>
+                    Run
+                </button>
             </div>
 
         </div>
@@ -421,7 +426,8 @@
             document.querySelectorAll("button[data-action]");
 
         buttons.forEach(button => button.disabled = true);
-
+        updateCustomActions();
+ 
         status.textContent =
             "Sending " + room.value + " / " + action + "...";
 
@@ -457,7 +463,10 @@
             buttons.forEach(
                 button => button.disabled = false
             );
+
+            updateCustomActions();
         }
+ 
     }
 
 
@@ -470,8 +479,83 @@
             });
         });
 
-    // Custom Action dropdown intentionally has no
-    // change handler until that feature is implemented.
+
+    // Populate the custom-action selector for the chosen room.
+    // Selection alone never executes an action.
+
+    const customSelect = document.getElementById("custom-action");
+    const runCustom = document.getElementById("run-custom-action");
+
+    let customActionsByRoom = {};
+
+    function updateCustomActions() {
+        const actions = customActionsByRoom[room.value] || [];
+
+        customSelect.replaceChildren();
+
+        for (const action of actions) {
+            const option = document.createElement("option");
+            option.value = action.id;
+            option.textContent = action.name;
+            customSelect.appendChild(option);
+        }
+
+        if (actions.length === 0) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No custom actions";
+            customSelect.appendChild(option);
+        }
+
+        customSelect.disabled = busy || actions.length === 0;
+        runCustom.disabled = busy || actions.length === 0;
+    }
+
+
+    // Load saved actions, not unsaved configuration edits.
+    // The Pico remains the authority for available actions.
+
+    async function loadCustomActions() {
+        try {
+            const response = await fetch("/api/config", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+
+            const config = await response.json();
+            const loaded = {};
+
+            for (const [roomId, roomConfig] of
+                    Object.entries(config.rooms || {})) {
+                loaded[roomId] = roomConfig.custom_actions || [];
+            }
+
+            customActionsByRoom = loaded;
+            updateCustomActions();
+
+        } catch (error) {
+            customActionsByRoom = {};
+            updateCustomActions();
+            status.textContent =
+                "Custom actions unavailable: " + error.message;
+        }
+    }
+
+
+    room.addEventListener("change", updateCustomActions);
+
+    runCustom.addEventListener("click", () => {
+        if (!customSelect.disabled && customSelect.value) {
+            sendAction(customSelect.value);
+        }
+    });
+
+    updateCustomActions();
+    loadCustomActions();
+ 
 </script>
 
 </body>
