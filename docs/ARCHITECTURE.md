@@ -82,7 +82,7 @@ The architecture favors explicit responsibilities and simple interfaces over abs
                        COMMAND RESOLUTION
                      Fundamental: one step
                      Custom: ordered steps
-                     Toggles: deferred
+                       Toggles: ON/OFF history
                                |
                                v
                        HTTP GET / POST
@@ -162,7 +162,6 @@ An HTTP 200 response confirms an HTTP result, **not** the equipment's actual res
 
 ### 3.3 Not yet implemented
 
-- Runtime power/mute toggle direction selection and volatile direction history.
 - User-defined custom device destinations (`device-4` onward).
 - Physical buttons and encoders connected to the dispatcher.
 - Physical CONFIG/RUN and room selectors.
@@ -292,7 +291,7 @@ A blank endpoint or path is a safe fundamental-action no-op rather than an attem
 
 `power-toggle` and `mute-toggle` store one target and method plus separate `on_path` and `off_path`. The schema and browser editor support both directions.
 
-**Runtime direction selection is not implemented.** The dispatcher currently logs a deferred toggle and does not send either configured ON or OFF path.
+**Runtime direction selection is implemented.** The dispatcher selects ON or OFF from independent, volatile per-room/action histories when a queued task executes. A successful HTTP request advances the next direction; failed or unconfigured requests do not.
 
 ### 7.3 Physical mapping
 
@@ -330,7 +329,7 @@ The sample is illustrative; the saved custom-action ID must match an ID in the a
 
 Due times use `time.monotonic()`. Zero means immediately eligible; a positive value is an absolute monotonic deadline.
 
-Each `poll()` scans for the **first eligible task**, removes it, and processes at most **one HTTP command or eligible no-op/deferred action**. A future-dated task does not block an immediately eligible task behind it. Among currently eligible tasks, queue order matters.
+Each `poll()` scans for the **first eligible task**, removes it, and processes at most **one HTTP command or eligible no-op**. A future-dated task does not block an immediately eligible task behind it. Among currently eligible tasks, queue order matters.
 
 This is intentionally **not strict FIFO**.
 
@@ -338,7 +337,7 @@ This is intentionally **not strict FIFO**.
 
 ### 8.3 Fundamental execution
 
-A fundamental task resolves its current configuration at execution time. An ordinary configured command is sent through the HTTP transport. A blank ordinary command becomes a no-op. Toggle actions currently return a deferred diagnostic without transmission.
+A fundamental task resolves its current configuration at execution time. An ordinary configured command is sent through the HTTP transport. A blank command becomes a no-op. Toggle actions select the configured ON or OFF path using volatile command history and advance that history only after successful HTTP execution.
 
 ### 8.4 Custom-step execution
 
@@ -433,19 +432,25 @@ The Grayhill volume encoder is part of the planned hardware audition. Electrical
 
 ## 12. Toggle Actions and Command History
 
-The agreed initial direction-selection design uses small **volatile command history**, independently for each room and each toggle action.
+**Status:** Implemented; bench-tested October 27, 2026.
 
-Proposed initial rules:
+The dispatcher maintains small, **volatile command-direction histories**, independently for each room and each toggle action (`power-toggle` and `mute-toggle`).
+
+Runtime rules:
 
 1. Unknown history initially selects ON.
-2. A successful ON submission makes OFF the next direction.
-3. A successful OFF submission makes ON the next direction.
-4. Failed, blank, or unconfigured requests do not advance history.
-5. History is not persisted; reboot resets it to unknown.
+2. Direction is selected when the queued action executes.
+3. Successful ON execution makes OFF the next direction.
+4. Successful OFF execution makes ON the next direction.
+5. Failed, blank, or unconfigured requests do not advance history.
+6. History is not persisted; reboot resets it to unknown.
+7. A changed configuration save clears queued actions and resets all toggle histories. An unchanged save preserves them.
 
-This would track the direction of Clonker commands, **not the equipment's actual state**. Other remotes, HDMI-CEC, apps, and physical controls may change state without Clonker knowing.
+The dispatcher advances history only after the HTTP transport reports successful execution. This is **command history, not equipment-state detection**. Other remotes, HDMI-CEC, applications, and physical controls may change equipment state without Clonker knowing.
 
-**Status:** Agreed future behavior only. The runtime currently defers toggle execution. Do not describe the rules above as implemented.
+**Bench verification:** Sunroom Denon mute ON/OFF and Roku Home/PowerOff executed successfully. Roku power commands operated the LG G1 and Denon X1800H HDMI-CEC chain. Changed-configuration reset and independent Sunroom/Den room histories were verified.
+
+Deliberately failed HTTP requests and blank toggle paths remain untested as negative cases.
 
 ---
 
