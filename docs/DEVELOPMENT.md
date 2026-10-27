@@ -299,7 +299,7 @@ This is an **illustrative** response. Names, queue depth, and configured state d
 
 The dispatcher validates the room and action, admits an eligible task, and resolves the current configuration when the task executes. Configured ordinary actions use outbound HTTP GET/POST. Missing endpoints or blank ordinary paths are intentional logged no-ops.
 
-**Power and mute toggles are operational:** the dispatcher selects configured ON/OFF paths using independent, volatile histories for each room and toggle action. Direction advances only after successful HTTP execution. Changed configuration saves reset all histories. Sunroom mute and power toggles, configuration-reset behavior, and independent Den/Sunroom histories were bench-tested October 27, 2026. Failed requests and blank paths remain to be deliberately tested.
+**Power and mute toggles are operational:** the dispatcher selects configured ON/OFF paths using independent, volatile histories for each room and toggle action. Direction advances only after successful HTTP execution. Changed configuration saves reset all histories. October 27, 2026 bench tests verified Sunroom mute and power toggles, configuration-reset behavior, independent Den/Sunroom histories, failed-request direction preservation, and repeatable no-ops for blank paths and missing endpoints. This is command-direction history, not authoritative equipment-state detection.
 
 ### 8.2 Custom and compound actions
 
@@ -416,7 +416,7 @@ Use precise labels in documentation and conversation:
 - **Historical:** An earlier implementation, test, or decision superseded by the current baseline.
 - **Deferred:** Intentionally not active, even if some configuration or UI support already exists.
 
-A browser stub from October 19 was **historical**. Today's browser action pipeline is operational. A future Apple TV adapter remains **planned**. Runtime power/mute direction execution is **implemented and bench-tested**, while negative-path verification remains incomplete.
+A browser stub from October 19 was **historical**. The current browser action pipeline is operational. A future Apple TV adapter remains **planned**. Runtime power/mute direction execution, negative-path direction preservation, and cooperative custom-action interleaving were bench-tested October 27, 2026. Broader stress and physical-input verification remain incomplete.
 
 Never turn an intended design into a success claim just because its schema fields or UI controls exist.
 
@@ -428,9 +428,8 @@ The working Config v4 baseline should be protected while proceeding in measured 
 
 ### 12.1 Small refinements
 
-- Evaluate the Test Remote custom-action selector's post-run selection behavior.
-- Test eligible fundamental actions during a custom action's cooperative wait.
-- Expand queue, malformed-request, and network-failure regression coverage where useful.
+- Expand queue-capacity, malformed-request, prolonged-network-failure, and long-uptime regression coverage where useful.
+- Revisit Test Remote selection persistence if a reproducible issue appears with multiple custom actions in one room.
 - Avoid speculative performance changes without measurements.
 
 ### 12.2 Physical-control integration
@@ -443,7 +442,6 @@ The working Config v4 baseline should be protected while proceeding in measured 
 
 ### 12.3 Deferred action and protocol capabilities
 
-- Deliberately test failed and unconfigured power/mute requests to verify that volatile direction history does not advance; runtime toggle execution itself is implemented and bench-tested.
 - Add user-defined custom device slots only when the working baseline and requirements justify the extension.
 - Pursue Apple TV compatibility as an explicit objective, recognizing that discovery, pairing, authentication, and session management may require an adapter beyond stateless HTTP GET/POST.
 - Continue OLED, audio feedback, power, and enclosure work according to hardware readiness.
