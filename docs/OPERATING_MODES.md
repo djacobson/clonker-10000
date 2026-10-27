@@ -1,612 +1,278 @@
 # The Clonker 10000 — Operating Modes
 
-**Design reference:** Updated October 19, 2026  
+**Design reference:** Updated October 27, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
 **Runtime:** CircuitPython 10.3.1  
-**Status:** SERVICE/DEVICE filesystem selection implemented and tested; CONFIG/RUN application logic implemented with simulated switch; physical CONFIG/RUN switch pending.
+**Current baseline:** Chapter 4 / Clonker Config v4  
+**Status:** SERVICE/DEVICE filesystem selection implemented and tested; CONFIG/RUN application-mode logic implemented with simulated input; physical CONFIG/RUN switch pending.
 
-> **Two switches. Two completely different jobs. One appropriately complicated monster.**
+> Two switches. Two completely different jobs. One appropriately complicated monster.
 
-## 1. Overview
+---
 
-The Clonker 10000 has two independent operating-mode dimensions:
+## 1. Purpose and mode boundaries
 
-1. **SERVICE (USB) / DEVICE** — determines who can write the CircuitPython filesystem.
-2. **CONFIG / RUN** — determines whether the application management HTTP interface is available.
+Clonker has **two independent operating-mode dimensions**:
 
-These modes serve different purposes and must not be confused.
+1. **SERVICE (USB) / DEVICE** decides whether the USB host or the Pico firmware owns filesystem writes. This is selected at boot.
+2. **CONFIG / RUN** decides whether the application exposes its management HTTP interface. This is an application-level selection intended to change during runtime.
 
-SERVICE/DEVICE is a boot-time maintenance selection.
+Neither dimension is an AV equipment power command. Neither selects a room. Neither changes the definition of a configured action.
 
-CONFIG/RUN is an application-level operating selection intended to change during normal runtime.
-
-Neither mode directly controls the power state of a television, receiver, or streaming device.
-
-### Mode comparison
-
-| Property | SERVICE (USB) / DEVICE | CONFIG / RUN |
+| Property | SERVICE / DEVICE | CONFIG / RUN |
 |---|---|---|
-| Purpose | Filesystem write ownership | Management interface availability |
-| Audience | Developer / maintenance | End user |
-| Control | Internal GP17 jumper | Future external maintained switch |
-| Evaluated by | `boot.py` | `main.py` |
-| When evaluated | At boot | Continuously during runtime |
-| Reboot required | Yes, full power cycle | No, by design |
-| Implemented | Yes | Logic implemented; switch simulated |
-| Physical control tested | Yes, GP17 jumper | No |
-| Changes AV equipment state | No | No |
+| Responsibility | Filesystem write ownership | Management HTTP availability |
+| Mechanism | GP17 boot jumper | Simulated software state; physical switch planned |
+| Evaluated by | `firmware/boot.py` | Main loop via `controls/switches.py` |
+| Selection time | At boot | During application operation |
+| Requires full power cycle to change | **Yes** | **No**, by design |
+| Implemented | Yes, tested | Listener logic implemented; physical input not wired |
+| Changes external equipment power | No | No |
 
-The intended normal operating combination is **DEVICE + RUN**.
+**Normal eventual operation:** DEVICE + RUN.  
+**Normal browser configuration:** DEVICE + CONFIG.  
+**USB firmware deployment:** SERVICE, generally with CONFIG available for inspection.
 
-The intended browser configuration combination is **DEVICE + CONFIG**.
+The application can execute configured outbound actions through the shared Dumb Queue™ while CONFIG is enabled. The action poller is not inherently dependent on the management listener. Physical-input operation in RUN remains unverified because physical controls have not been integrated.
 
-## 2. SERVICE (USB) Mode
+## 2. SERVICE (USB): host-owned filesystem
 
 **Status:** Implemented and tested.
 
-SERVICE mode is selected when the GP17 jumper is open during boot.
-
-`boot.py` configures GP17 as an input with an internal pull-up resistor.
-
-With the jumper open, GP17 reads HIGH.
-
-The boot message is:
+`boot.py` configures GP17 with an internal pull-up. With the jumper **open**, GP17 reads HIGH and selects SERVICE mode.
 
 ```text
 CLONKER BOOT: SERVICE (USB) mode (jumper OPEN)
 ```
 
-### Filesystem behavior
-
-In SERVICE mode:
+In SERVICE:
 
 - The USB host can write the CIRCUITPY filesystem.
-- The Pico application sees the filesystem as read-only.
-- Firmware files can be deployed from the host computer.
-- Configuration files can be copied or replaced from the host.
+- The Pico application sees that filesystem as read-only.
+- Firmware and other files can be deployed from the host.
 - The Pico cannot persist browser configuration changes.
-- USB serial and REPL access remain available.
+- Serial console and REPL access remain available.
+- The application may still run, connect to Wi-Fi, and execute configured actions.
 
-This is the preferred mode for firmware deployment and maintenance.
+### SERVICE + CONFIG browser behavior
 
-### Browser behavior in SERVICE + CONFIG
+With CONFIG enabled, the browser can inspect the active **Config v4** JSON, review room/device/action mappings, synchronize the RAM clock, and use the Test Remote to submit fundamental or custom actions.
 
-The management interface can still run while the filesystem is read-only.
+A configuration save through `POST /api/config` is rejected with **HTTP 403** when the filesystem is read-only. CONFIG availability does **not** imply write permission.
 
-The browser can:
+SERVICE is a filesystem-maintenance state, not an instruction to disable the application or its outbound equipment-control capability.
 
-- Open the configuration page.
-- Read the active JSON v2 configuration.
-- Inspect room and action mappings.
-- View clock status.
-- Synchronize the RAM clock.
-- Open the browser Test Remote.
-- Submit configured actions to the shared dispatcher and outbound execution queue.
-
-However, attempting to save configuration through `POST /api/config` is rejected with HTTP 403.
-
-The HTTP server checks actual filesystem writability rather than assuming that CONFIG implies write permission.
-
-### Important distinction
-
-SERVICE does not mean the application must stop running.
-
-It means the USB host owns filesystem writes.
-
-The application can continue operating with its loaded configuration, subject to the capabilities currently implemented.
-
-## 3. DEVICE Mode
+## 3. DEVICE: Pico-owned filesystem
 
 **Status:** Implemented and tested.
 
-DEVICE mode is selected when GP17 is connected to GND during boot.
-
-On the current Pico 2 W:
-
-- GP17 is physical pin 22.
-- The adjacent GND connection used for the jumper is physical pin 23.
-
-With the jumper grounded, GP17 reads LOW.
-
-The boot message is:
+Grounding GP17 at boot selects DEVICE mode. On the Pico 2 W, the documented jumper uses **GP17 physical pin 22** and adjacent **GND physical pin 23**.
 
 ```text
 CLONKER BOOT: DEVICE mode (jumper GROUNDED)
 ```
 
-`boot.py` executes:
+The boot code remounts the filesystem for firmware writes:
 
 ```python
 storage.remount("/", readonly=False)
 ```
 
-### Filesystem behavior
+In DEVICE:
 
-In DEVICE mode:
-
-- The Pico application can write its filesystem.
+- The Pico application can persist validated configuration changes.
 - The USB host sees CIRCUITPY as read-only.
-- The browser configuration engine can persist valid changes.
-- Configuration backups can be rotated.
-- The active configuration can be updated in RAM after successful persistence.
-- USB serial and REPL access remain available.
+- The configuration engine can perform its guarded save and backup process.
+- A successful changed save publishes the new validated configuration into RAM.
+- Serial and REPL access remain available.
 
-DEVICE mode is the intended normal operating filesystem mode.
+### DEVICE + CONFIG browser behavior
 
-### Browser behavior in DEVICE + CONFIG
+This is the normal browser-editing combination. The user can edit configured rooms, generic built-in device slots, fundamental mappings, and custom actions; save valid Config v4 data with revision protection; synchronize the clock; and exercise the Test Remote.
 
-This is the combination used for browser configuration editing.
+The exact schema, limits, validation, backup rotation, and recovery rules belong in [Configuration & Recovery](CONFIGURATION.md).
 
-The user can:
+**DEVICE does not mean RUN.** Filesystem ownership and application management availability remain independent.
 
-- Edit room names.
-- Configure TV, AVR, and streaming endpoints.
-- Edit the fourteen fundamental actions per room.
-- Save valid JSON v2 configuration.
-- Receive stale-revision protection.
-- Exercise the browser Test Remote.
-- Synchronize the clock.
+## 4. Changing SERVICE / DEVICE safely
 
-Configuration saves use the safeguards documented in [Configuration & Recovery](CONFIGURATION.md).
+The GP17 jumper is a **boot-time selection**. A Ctrl+D soft reload is not a substitute for changing filesystem ownership.
 
-### DEVICE does not mean RUN
+To change ownership:
 
-DEVICE only determines filesystem ownership.
+1. Finish and save any host-side file edits.
+2. Disconnect Pico power.
+3. Set GP17 **open** for SERVICE or **grounded** for DEVICE.
+4. Reconnect power and observe the boot message.
+5. Confirm the expected filesystem write ownership before copying files or saving configuration.
 
-It does not disable the browser management interface.
+Do not change the jumper while powered. Do not attempt host writes while the Pico owns the filesystem. Do not assume a browser's ability to display configuration means that it can save it.
 
-A Pico can be in DEVICE mode while CONFIG is active.
+## 5. CONFIG: management interface enabled
 
-This distinction is essential to the current development workflow.
+**Status:** Implemented at application level; physical mode switch pending.
 
-## 4. Changing SERVICE / DEVICE
+CONFIG enables the Clonker management HTTP service on **port 9090**. In the documented development network the Pico is normally at `192.168.50.12`:
 
-SERVICE/DEVICE selection is made by `firmware/boot.py`.
+- Configuration page: `http://192.168.50.12:9090/`
+- Test Remote: `http://192.168.50.12:9090/remote.html`
 
-The relevant logic is:
+These addresses are development-specific, not firmware defaults.
 
-```python
-jumper = digitalio.DigitalInOut(board.GP17)
-jumper.direction = digitalio.Direction.INPUT
-jumper.pull = digitalio.Pull.UP
+CONFIG makes available:
 
-if jumper.value:
-    print("CLONKER BOOT: SERVICE (USB) mode (jumper OPEN)")
-else:
-    print("CLONKER BOOT: DEVICE mode (jumper GROUNDED)")
-    storage.remount("/", readonly=False)
+- The Config v4 editor and configuration API.
+- Revision-aware saves **only** when the filesystem is writable.
+- Clock status and browser-supplied UTC synchronization.
+- The browser Test Remote.
+- Fundamental and custom-action submission through `POST /api/action`.
 
-jumper.deinit()
-```
+The Test Remote is **operational**, not a logging-only stub. It can enqueue configured actions which the shared Dumb Queue™ executes using the outbound HTTP transport. An enqueue acknowledgment does not itself prove successful execution or an equipment-state change.
 
-The jumper is read during boot and then released.
+### Simulated mode selection
 
-Changing its position while the application is running does not change filesystem ownership.
+The mode-selection module is `firmware/clonker/controls/switches.py`; GPIO placeholders live in `firmware/clonker/controls/pins.py`.
 
-### Required procedure
-
-1. Disconnect Pico power.
-2. Set the GP17 jumper to the desired position.
-3. Reconnect power.
-4. Confirm the boot message.
-5. Verify expected filesystem ownership before editing or saving files.
-
-A full power cycle is required.
-
-A soft reload, including Ctrl+D from the REPL, must not be relied upon to apply a new jumper selection.
-
-Do not change the jumper while the Pico is powered.
-
-## 5. CONFIG Mode
-
-**Status:** Application logic implemented; switch currently simulated.
-
-CONFIG mode enables Clonker's application management HTTP server.
-
-The server listens on port 9090.
-
-Current development address:
-
-`http://192.168.50.12:9090/`
-
-Browser Test Remote:
-
-`http://192.168.50.12:9090/remote.html`
-
-### CONFIG services
-
-When CONFIG is enabled, the application provides:
-
-- Browser configuration editor.
-- JSON v2 configuration inspection.
-- Revision-aware configuration saving when the filesystem is writable.
-- System clock status.
-- Browser UTC clock synchronization.
-- Browser Test Remote.
-- Fundamental action dispatch through the shared queue and outbound HTTP transport.
-
-The browser Test Remote submits actions to the shared Dumb Queue.
-Ordinary configured actions can execute real outbound HTTP
-commands. Power and mute toggles remain deferred until runtime
-direction selection is implemented.
-
-### Current simulated switch
-
-The implementation is in:
-
-`firmware/clonker/controls/switches.py`
-
-Current behavior:
-
-```python
-_simulated_config = True
-
-
-def config_enabled():
-    if pins.CONFIG_SWITCH_PIN is None:
-        return _simulated_config
-
-    raise NotImplementedError("CONFIG GPIO not implemented")
-```
-
-`CONFIG_SWITCH_PIN` is currently `None` in `controls/pins.py`.
-
-Therefore, the normal startup behavior is CONFIG enabled.
-
-A development helper also exists:
-
-```python
-switches.set_simulated_config(enabled)
-```
-
-This changes the simulated state in RAM.
-
-It is not a browser-facing operating-mode control and is not connected to physical hardware.
+The current CONFIG/RUN input is simulated with CONFIG enabled by default. The development helper `switches.set_simulated_config(enabled)` can change the simulated state in RAM. This is **not** a browser-facing mode switch, and the physical CONFIG/RUN GPIO is not yet assigned.
 
 ### Listener lifecycle
 
-`main.py` checks `switches.config_enabled()` during each main-loop iteration.
+The main loop checks the selected application mode and starts the management listener on entry to CONFIG, or stops it on entry to RUN. The listener is not recreated every iteration. While CONFIG is enabled, `web.poll()` is scheduled cooperatively at approximately 10 ms intervals.
 
-When CONFIG becomes enabled, it calls:
+That interval is **not** a guaranteed browser response time. Outbound HTTP execution is currently blocking and can temporarily pause other cooperative work. See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md).
 
-```python
-web.start()
-```
+## 6. RUN: management interface disabled
 
-When CONFIG becomes disabled, it calls:
+**Status:** Listener transition logic implemented; physical input and end-to-end physical remote behavior not yet verified.
 
-```python
-web.stop()
-```
-
-The listener is started or stopped on transitions rather than recreated on every loop iteration.
-
-While CONFIG is enabled, `web.poll()` is scheduled approximately every 10 milliseconds.
-
-This interval is not a guaranteed HTTP response time.
-
-## 6. RUN Mode
-
-**Status:** Listener transition logic implemented; physical switch and real equipment-control operation pending.
-
-RUN is intended to be Clonker's normal remote-control mode.
-
-When RUN is selected:
+RUN is intended to be the normal operating state of the completed remote. In RUN:
 
 - The management HTTP listener is stopped.
-- The configuration editor is unavailable.
-- The browser Test Remote is unavailable.
-- Wi-Fi remains available for future outbound equipment commands.
-- The validated configuration remains in RAM.
-- Physical inputs should continue producing generic actions.
-- Outbound HTTP device commands should remain operational.
+- The browser editor, configuration API, clock endpoint, and Test Remote are unavailable.
+- Wi-Fi and the validated in-memory configuration remain available.
+- The shared action poller remains part of the application's cooperative loop.
+- Physical controls are intended to generate actions without needing the management server.
 
-### Current implementation
+**Important distinction:** Real outbound Denon/Roku command execution **is implemented**. What remains untested is the complete physical-control-to-device experience in RUN, because the physical buttons, encoders, and mode switch are not yet integrated.
 
-The application already contains the transition logic:
+Changing CONFIG/RUN should not reload configuration from flash. The application continues using its active validated RAM snapshot, including a successfully saved change made in CONFIG.
 
-```python
-elif not config_mode and web_running:
-    web.stop()
-    web_running = False
-    logger.info("RUN mode enabled")
-```
+The final remote should accept ordinary physical controls in both CONFIG and RUN; CONFIG adds management services rather than disabling the remote. This requirement awaits hardware verification.
 
-However, the current firmware does not yet implement physical button or encoder input processing.
+## 7. Four operating combinations
 
-It also does not yet implement outbound HTTP commands to AV equipment.
-
-Therefore, RUN-mode remote-control functionality is **design intent**, not a completed end-to-end feature.
-
-### No configuration reload required
-
-CONFIG/RUN transitions should not reload the configuration file.
-
-The application should continue using the validated in-memory configuration.
-
-Successful browser saves already publish updated configuration into that state.
-
-The future RUN implementation should preserve this behavior.
-
-### Physical controls in either mode
-
-The eventual physical remote should continue accepting normal control input in both CONFIG and RUN modes.
-
-CONFIG enables additional management services; it should not turn off the remote's core control capabilities.
-
-This requirement has not yet been hardware-tested.
-
-## 7. The Four Mode Combinations
-
-The two dimensions produce four possible combinations.
-
-| Filesystem mode | Application mode | Intended behavior |
+| Filesystem mode | Application mode | Expected behavior |
 |---|---|---|
-| SERVICE (USB) | CONFIG | Host firmware maintenance; browser inspection and testing; no browser config saves |
-| SERVICE (USB) | RUN | Host owns filesystem; management server off; future physical control may operate |
-| DEVICE | CONFIG | Browser configuration, persistence, clock, and Test Remote |
-| DEVICE | RUN | Normal remote operation; management server off |
+| **SERVICE** | **CONFIG** | USB host can deploy files; browser can inspect/test; configuration writes rejected |
+| **SERVICE** | **RUN** | USB host owns writes; management server off; action engine remains available, but physical-input operation is pending |
+| **DEVICE** | **CONFIG** | Pico owns writes; browser configuration, guarded saves, and Test Remote available |
+| **DEVICE** | **RUN** | Pico owns writes; management server off; intended normal physical remote mode, not yet end-to-end hardware-tested |
 
-### SERVICE + CONFIG
+The mode combinations describe filesystem and management behavior, **not** a guarantee that every planned physical feature is implemented.
 
-Useful during development.
+## 8. Configuration persistence and mode permissions
 
-The USB host can update firmware.
+Persistent browser configuration saves require **both** a writable Pico filesystem and an available CONFIG management endpoint.
 
-The browser can inspect configuration and exercise the logging stub.
+- **SERVICE + CONFIG:** `POST /api/config` is rejected with HTTP 403 because the Pico filesystem is read-only.
+- **DEVICE + CONFIG:** A save can proceed if schema validation, revision checks, disk consistency checks, and persistence safeguards pass.
+- **Either RUN combination:** The browser save endpoint is unavailable because the management listener is stopped.
 
-Browser configuration writes are rejected because the Pico filesystem is read-only.
+A successful **changed** save updates persistent configuration, performs the engine's backup safeguards, publishes the new validated RAM configuration, and clears pending queue work to avoid carrying stale requests across a configuration change. An **unchanged** save avoids an unnecessary flash rewrite.
 
-### SERVICE + RUN
+Do not infer that backup rotation is a fully atomic transaction under sudden power loss. See [Configuration & Recovery](CONFIGURATION.md) for exact guarantees and remaining limits.
 
-A possible maintenance or diagnostic combination.
+## 9. Operating modes are not equipment power controls
 
-The host retains filesystem write ownership.
+Three different concepts must remain separate:
 
-The management listener is disabled.
+1. **GP17 SERVICE/DEVICE jumper:** boot-time filesystem ownership.
+2. **CONFIG/RUN switch:** application management-interface availability.
+3. **Guarded SYSTEM MASTER / `power-toggle`:** a planned physical equipment-control input and a fundamental action identifier.
 
-Future physical controls may operate using the configuration already loaded in RAM.
+The Config v4 schema supports `on_path` and `off_path` for power/mute toggles. Runtime direction selection remains **DEFERRED**: queue acceptance exists, but no automatic ON/OFF selection is implemented yet.
 
-This combination is not yet verified for actual AV control.
+A future RAM-only toggle history must not be represented as authoritative equipment state. External remotes, HDMI-CEC, and manual device controls can change equipment independently.
 
-### DEVICE + CONFIG
+Changing SERVICE/DEVICE or CONFIG/RUN must **never** transmit a power command merely because a mode changed.
 
-The currently established browser configuration workflow.
+## 10. Physical controls and GPIO integration
 
-The Pico owns filesystem writes.
-
-The management interface is available.
-
-Valid browser configuration changes can be saved and activated.
-
-This is the combination used for JSON v2 persistence testing.
-
-### DEVICE + RUN
-
-The intended normal end-user combination.
-
-The Pico owns filesystem writes.
-
-The management listener is disabled.
-
-Physical controls and outbound AV commands will eventually operate without requiring browser management services.
-
-This is the target operating arrangement, not a completed hardware milestone.
-
-## 8. Configuration Saving Rules
-
-Persistent configuration saves require both:
-
-1. A writable Pico filesystem.
-2. An available CONFIG management endpoint.
-
-The normal combination is DEVICE + CONFIG.
-
-### SERVICE + CONFIG
-
-`POST /api/config` returns HTTP 403 because the filesystem is read-only.
-
-### DEVICE + CONFIG
-
-The save may proceed if:
-
-- The submitted configuration is valid.
-- The expected revision matches.
-- The primary file passes consistency checks.
-- The save path matches the loaded configuration path.
-- Persistence succeeds.
-
-Successful changed saves update the primary file, rotate backups, and publish the new configuration into RAM.
-
-Unchanged saves avoid unnecessary flash writes.
-
-### RUN mode
-
-The browser configuration endpoint is unavailable because the management HTTP listener is stopped.
-
-RUN is not a separate permission to write or deny writes.
-
-Filesystem ownership remains determined by SERVICE/DEVICE.
-
-See [Configuration & Recovery](CONFIGURATION.md) for persistence and recovery details.
-
-## 9. CONFIG/RUN Is Not System Power
-
-The physical CONFIG/RUN switch is an internal application control.
-
-Moving it must not issue a power command to any television, receiver, or streaming device.
-
-Clonker also defines a separate fundamental action:
-
-`power-toggle`
-
-This action is intended for a physical momentary control.
-
-Its configuration contains:
-
-- `target`
-- `method`
-- `on_path`
-- `off_path`
-
-The ON/OFF fields are implemented in JSON v2.
-
-Actual command execution and RAM toggle history are not yet implemented.
-
-### Future guarded controls
-
-The hardware concept includes a prominent guarded system-power control.
-
-That is separate from the CONFIG/RUN switch and the GP17 maintenance jumper.
-
-The final physical arrangement is still under development.
-
-The application operating-mode switch must never be mistaken for the external equipment power control.
-
-## 10. Hardware Integration Plan
-
-The current pin definitions are in:
-
-`firmware/clonker/controls/pins.py`
-
-Relevant placeholders:
-
-```python
-CONFIG_SWITCH_PIN = None
-ROOM_SELECTOR_A_PIN = None
-ROOM_SELECTOR_B_PIN = None
-
-VOLUME_ENCODER_A_PIN = None
-VOLUME_ENCODER_B_PIN = None
-
-SELECT_ENCODER_A_PIN = None
-SELECT_ENCODER_B_PIN = None
-```
-
-These pins are not assigned yet.
+The current pin plan is in `firmware/clonker/controls/pins.py`. The physical CONFIG/RUN switch, room selector, volume encoder, and selector encoder have not yet been assigned operational GPIO inputs.
 
 ### CONFIG/RUN switch requirements
 
-The future physical switch should:
+The eventual switch should:
 
-- Be a maintained two-position control.
-- Be readable by the Pico at runtime.
-- Have a defined electrical default state.
-- Use appropriate debounce or stable-state detection.
-- Avoid interfering with GP17 filesystem ownership.
-- Start or stop the management listener only when the state changes.
-- Leave active configuration in RAM.
-- Avoid generating an AV equipment command.
+- Be a maintained, clearly identifiable two-position control.
+- Be read during runtime, without a power cycle.
+- Have a defined electrical default and stable-state/debounce behavior.
+- Avoid interference with the GP17 maintenance jumper.
+- Start or stop the management listener only on state transitions.
+- Leave the active RAM configuration intact.
+- Generate no external AV equipment command.
 
-The final GPIO pin and electrical implementation remain undecided.
+### Room selection
 
-### Room selector
+The proposed room selector is a separate physical control. Den, Sunroom, and a possible Both selection are design candidates; group-command semantics remain to be finalized. Room selection is **not** an operating-mode dimension.
 
-The proposed physical room selector is a separate control.
+### Guarded power input
 
-It may select Den, Both, or Sunroom, subject to the final hardware design.
+The guarded SYSTEM MASTER concept is distinct from both operating-mode controls. Its final physical hardware and the corresponding runtime power-toggle behavior remain under development.
 
-The meaning of Both and any group-command behavior remain to be finalized.
+For component inventory, GPIO planning, and mechanical design, see [Hardware & Controls](HARDWARE_CONTROLS.md).
 
-Room selection is not an operating-mode dimension.
+## 11. Deployment, recovery, and security cautions
 
-### Power button
+- Preserve the Pico's current `device_config.json` before replacing it from a repository copy; the running device may contain newer browser edits.
+- Keep private Wi-Fi credentials in `settings.toml`; do not commit them or overwrite them during routine firmware deployment.
+- Confirm the intended GP17 mode before copying files or testing persistence.
+- Refresh stale browser tabs after a revision conflict rather than bypassing the conflict protection.
+- Treat a successful HTTP action acknowledgment as queue admission, not proof that equipment changed state.
+- CircuitPython Web Workflow is separate from Clonker's management service. The documented development setup disables Web Workflow with `CIRCUITPY_WEB_API_PORT = 0` following observed networking interference; the precise cause was not conclusively established.
+- The Clonker management service has no application-level authentication. Use it on a trusted LAN only; do not expose port 9090 through internet-facing port forwarding.
 
-The proposed guarded momentary power button will emit the `power-toggle` fundamental action.
+For the full deployment checklist, see [Development & Deployment](DEVELOPMENT.md).
 
-It is not a substitute for the CONFIG/RUN switch.
+## 12. Verification status and remaining work
 
-See [Hardware & Controls](HARDWARE_CONTROLS.md).
+**Current reference date:** October 27, 2026.
 
-## 11. Deployment and Recovery Cautions
+### Implemented and exercised
 
-### Before changing filesystem ownership
+- GP17 boot-time SERVICE/DEVICE selection and corresponding filesystem ownership.
+- DEVICE-mode browser saves and SERVICE-mode rejection of persistent writes.
+- Config v4 validation, revision protection, and selected backup/recovery behavior.
+- CONFIG-mode browser management service and Test Remote.
+- Fundamental action dispatch through the shared queue to real Denon/Roku equipment.
+- Config v4 custom actions and cooperative multi-step execution, including a tested Roku command, wait, and Denon command.
 
-- Save and close host-side file edits.
-- Disconnect power.
-- Move the GP17 jumper.
-- Reconnect power.
-- Confirm the boot message.
-- Verify the expected read/write ownership.
+### Implemented, not exhaustively verified
 
-### During browser configuration
+- All CONFIG/RUN listener transitions and failure-cleanup paths.
+- Configuration availability across every mode transition and unusual network failure.
+- All interrupted-write and power-loss recovery cases.
+- Extended load and long-uptime behavior.
 
-- Use DEVICE + CONFIG for persistent saves.
-- Confirm the current configuration revision.
-- Refresh stale browser tabs before retrying a save.
-- Do not manually modify the primary JSON file while assuming the running application will automatically reload it.
-- Preserve external backups before deliberate schema or deployment changes.
+### Not yet implemented or end-to-end tested
 
-### Private runtime settings
+- Physical CONFIG/RUN switch and GPIO debounce.
+- Physical room selector, guarded power control, and button/encoder input path.
+- Runtime power/mute toggle direction selection.
+- End-to-end physical DEVICE + RUN operation.
+- OLED and audible feedback integration.
+- Custom device slots and Apple TV protocol support.
 
-Keep `settings.toml` out of Git.
+Historical October 19 mode tests and subsequent Chapter 3/4 networking milestones remain in [Development History](DEVELOPMENT_HISTORY.md). They should not be mistaken for the current implementation status.
 
-It contains environment-specific Wi-Fi and runtime settings.
+## 13. Related documents
 
-### CircuitPython Web Workflow
-
-CircuitPython Web Workflow is distinct from Clonker's management server.
-
-It is currently disabled using:
-
-```toml
-CIRCUITPY_WEB_API_PORT = 0
-```
-
-This was adopted because of suspected socket conflicts.
-
-Clonker's own management service uses port 9090.
-
-### Trusted LAN only
-
-The management server has no application authentication.
-
-Do not expose it through router port forwarding.
-
-## 12. Verification Status — October 19, 2026
-
-> **Historical snapshot:** This section preserves the
-> October 19 verification status. Outbound HTTP execution
-> was subsequently implemented and verified on October 21.
-> See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for
-> current networking status.
-
-### Implemented and tested
-
-- GP17 boot-time SERVICE/DEVICE selection.
-- SERVICE host-writable filesystem behavior.
-- DEVICE Pico-writable filesystem behavior.
-- DEVICE-mode browser configuration saves.
-- SERVICE-mode rejection of browser configuration writes.
-- JSON v2 revision protection and selected backup behavior.
-- CONFIG-enabled browser management service.
-- Browser Test Remote logging-only action dispatch.
-
-### Implemented but not fully exercised
-
-- Runtime CONFIG-to-RUN and RUN-to-CONFIG listener transitions using the simulated switch.
-- HTTP listener cleanup under all network failure conditions.
-- Configuration availability through every possible mode transition.
-
-### Not yet implemented
-
-- Physical CONFIG/RUN switch.
-- GPIO-based mode detection and debounce.
-- Physical room selector.
-- Physical power button.
-- Physical volume and selector encoders.
-- Real outbound AV device commands.
-- End-to-end DEVICE + RUN remote operation.
-
-## 13. Reference Documents
-
-- [Architecture](ARCHITECTURE.md) — overall system architecture and action dispatcher.
-- [Configuration & Recovery](CONFIGURATION.md) — JSON v2 schema and persistence.
-- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) — main loop, management HTTP, and clock.
-- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical control design.
-- [Development & Deployment](DEVELOPMENT.md) — firmware deployment workflow.
-- [Development History](DEVELOPMENT_HISTORY.md) - development milestones.
-- [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — current milestone and next phase.
+- [Architecture](ARCHITECTURE.md) — overall design boundaries and ownership.
+- [Configuration & Recovery](CONFIGURATION.md) — authoritative Config v4 schema, persistence, and recovery.
+- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) — current networking, scheduler, queue, and transport.
+- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and GPIO planning.
+- [Development & Deployment](DEVELOPMENT.md) — iPad-first development and deployment workflow.
+- [Development History](DEVELOPMENT_HISTORY.md) — dated engineering milestones and tests.
 
 ---
 
