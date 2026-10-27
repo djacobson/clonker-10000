@@ -32,10 +32,10 @@ And perhaps a case that opens with actual lunchbox latches.
   <sub>
     <b>⚙️ CURRENT COMPATIBILITY — EXTREME BETA</b><br>
     <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython<br>
-    <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned next) · Amazon Fire TV (future)<br>
+    <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (future)<br>
     <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
     <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<br>
-    <b>Configuration:</b> Browser-based editor · Wi-Fi HTTP commands · Custom action sequences (in development)
+    <b>Configuration:</b> Browser-based editor · Wi-Fi HTTP commands · Executable custom action sequences
   </sub>
 </p>
 
@@ -206,7 +206,7 @@ Each action can be mapped to a configured TV, AV receiver, or streaming device.
 
 The current configuration supports three rooms, each with its own devices and command mappings.
 
-Custom actions are planned for additional functions such as listening modes and other equipment-specific operations.
+**Custom actions are now operational in firmware.** They can combine ordered device commands and cooperative waits for equipment-specific functions such as listening modes or a simple movie-start sequence. The browser Test Remote can execute them today; physical buttons and selectors are still to come.
 
 ### Device Compatibility Roadmap
 
@@ -248,6 +248,47 @@ See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed i
 
 ---
 
+## A Peek at the Hardware
+
+The Clonker 10000 is still very much a work in progress.
+
+The final enclosure hasn't materialized yet, but the knobs,
+switches, and assorted electronic organs are beginning to
+assemble into something that might eventually resemble
+a remote control.
+
+Or possibly the control panel of a very small submarine.
+
+<p align="center">
+  <img src="images/clonker_prototype.jpeg"
+       width="600"
+       alt="The Clonker 10000 hardware prototype">
+</p>
+
+*Actual prototype. Industrial design department still missing.
+Marketing department still disbanded.*
+
+---
+
+## A Peek at the Software
+
+The configuration interface already exists and runs on the Pico.
+
+<p align="left">
+  <img src="images/clonker_config_sample.png"
+       height="300"
+       alt="Clonker Configuration Interface"
+       style="vertical-align: top;">
+</p>
+
+The project also includes a browser Test Remote for exercising the same fundamental action IDs that future physical controls will invoke. It can also run configured custom actions, including multi-step sequences across different devices.
+
+This allows the software architecture to be tested before committing to a final enclosure and GPIO wiring arrangement.
+
+**The knobs aren't wired yet. The brains are already talking to the equipment.**
+
+---
+
 ## Software Architecture
 
 <p align="center">
@@ -277,7 +318,7 @@ Physical controls (planned)       Browser Test Remote
                      (implemented)
                             |
                             v
-                   JSON v2 resolution
+                  Config v4 resolution
                             |
                             v
                   Outbound HTTP transport
@@ -288,17 +329,17 @@ Physical controls (planned)       Browser Test Remote
                     Denon AVR / Roku
 ```
 
-The shared **Dumb Queue™** accepts generic actions and executes them sequentially through the outbound HTTP transport.
+The shared **Dumb Queue™** accepts generic actions and executes eligible work through the outbound HTTP transport.
 
-The queue absorbs commands arriving faster than the network can process them. It does not make network I/O nonblocking.
+Custom actions reuse that same queue. A cooperative wait lets an unrelated eligible command execute before a delayed custom-action step resumes. The outbound HTTP requests themselves remain synchronous and blocking; the queue does not make network I/O nonblocking.
 
-Real Denon and Roku commands were successfully executed from the Pico on October 21, 2026.
+Real Denon and Roku commands were successfully executed from the Pico on October 21, 2026. Runtime toggles, multi-step custom actions, and independent command interleaving during a custom-action wait were subsequently verified on October 27.
 
 ### Configuration
 
 Configuration is stored in JSON and edited through the Clonker's browser interface.
 
-The system supports:
+The current **Clonker Config v4** system supports:
 
 - Three fixed rooms with editable names.
 - TV, AVR, and streaming-device endpoints per room.
@@ -306,7 +347,10 @@ The system supports:
 - Fourteen fundamental actions per room.
 - GET and POST command definitions.
 - Separate ON and OFF command paths for mute and power toggles.
+- Volatile, independent toggle command-direction histories per room and action.
 - Blank commands as intentional no-ops.
+- Up to sixteen named custom actions per room, each containing one to sixteen ordered steps.
+- Cooperative waits between custom-action steps.
 - Configuration revision checking.
 - Stale-edit conflict protection.
 - No-change detection.
@@ -314,15 +358,11 @@ The system supports:
 - Validated startup recovery.
 - Filesystem write protection during USB SERVICE mode.
 
-The ON/OFF paths are supported by the configuration schema.
-
-**The runtime toggle-state selection logic is not yet implemented.**
-
-Custom actions are reserved for a future phase.
+**Runtime toggle direction selection is implemented and tested.** The next ON/OFF direction advances only after a successful HTTP request. It is command history, not authoritative knowledge of the equipment's actual power or mute state.
 
 ### Management Interface
 
-The Pico hosts a browser-based configuration and testing interface on port `9090`.
+The Pico hosts a browser-based configuration and testing interface on port `9090` while in CONFIG mode.
 
 The interface currently provides:
 
@@ -330,69 +370,58 @@ The interface currently provides:
 - Device and room settings.
 - Configuration save and validation.
 - A Test Remote with all fourteen fundamental actions.
+- Room-specific custom-action selection and execution.
 - A clock synchronization interface.
 - SERVICE/DEVICE filesystem ownership protection.
 
 The Test Remote uses the same shared action dispatcher and Dumb Queue™ intended for the future physical controls.
 
-**Real outbound HTTP control is operational.** The Pico has successfully executed configured Denon AVR and Roku commands over Wi-Fi.
+**Real outbound HTTP control is operational.** The Pico has successfully executed configured Denon AVR and Roku commands over Wi-Fi, including a two-device custom action.
 
 The browser receives an acknowledgment when an action is queued. Actual device execution occurs subsequently through the cooperative scheduler.
 
-The next development phase will focus on completing runtime toggle behavior, improving failure testing, and integrating the physical controls.
-
----
-
-## A Peek at the Software
-
-The configuration interface already exists and runs on the Pico.
-
-<p align="left">
-  <img src="images/clonker_config_sample.png"
-       height="300"
-       alt="Clonker Configuration Interface"
-       style="vertical-align: top;">
-</p>
-
-The project also includes a browser Test Remote for exercising the same fundamental action IDs that future physical controls will invoke.
-
-This allows the software architecture to be tested before committing to a final enclosure and GPIO wiring arrangement.
+The next major development phase will focus on integrating and measuring physical controls while protecting the verified firmware baseline.
 
 ---
 
 ## Project Status
 
-**October 21, 2026 — Chapter 3 complete. Extreme beta, but the little monster can now control real equipment.**
+**October 27, 2026 — Chapter 4 complete. Extreme beta, but the little monster has a tested network-control brain.**
 
 ### Working and tested
 
 - Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
 - Wi-Fi connectivity and browser management interface.
-- JSON v2 configuration loading, validation, and persistence.
+- Config v4 JSON configuration loading, validation, and persistence.
 - Browser configuration editing and saving.
 - Revision checking and stale-edit rejection.
 - No-change detection and backup rotation.
 - SERVICE/DEVICE jumper controlling filesystem write ownership.
-- Browser Test Remote with fourteen fundamental action controls.
+- Browser Test Remote with fourteen fundamental action controls and custom-action execution.
 - Shared Dumb Queue™ with bounded capacity and cooperative scheduling.
 - Outbound HTTP GET/POST transport using bounded blocking socket operations.
 - Real Denon AVR Volume Up and Volume Down commands.
 - Real Roku Home and Back commands.
 - Controlled five-command burst test, with all five commands completing successfully and returning HTTP 200.
+- Runtime mute and power toggle direction selection, including successful ON/OFF commands and independent room histories.
+- Configuration-change reset of toggle direction histories.
+- Failed-request direction preservation and no-op behavior for blank paths or missing endpoints.
+- Multi-step Sunroom Movie custom action: Roku Home, three-second wait, then Denon Quick Select 1.
+- Independent Volume Up command executing successfully during that custom action's cooperative wait.
 
-The queue can accept multiple commands before executing them sequentially. Network operations temporarily block the cooperative loop, and physical encoder responsiveness has not yet been measured.
+The queue can accept multiple commands and execute eligible work in order. Network operations temporarily block the cooperative loop, and physical encoder responsiveness has not yet been measured.
 
 ### Not yet implemented or fully tested
 
-- Runtime ON/OFF toggle command history.
 - Physical button and rotary encoder integration.
 - Physical room selection and CONFIG/RUN switching.
-- Custom-action execution.
 - OLED display and audible feedback.
 - Final enclosure and power architecture.
-- Comprehensive network failure and timeout recovery tests.
-- Sustained high-rate command workloads.
+- Apple TV protocol support and other future device adapters.
+- Comprehensive network failure, malformed-response, and prolonged-outage recovery tests.
+- Sustained high-rate command workloads and long-uptime stability.
 - Additional configuration failure-injection tests.
+- Custom-action selection persistence with multiple actions in one room.
 
 The earlier XML configuration implementation remains in the repository as historical and rollback reference.
 
@@ -412,11 +441,11 @@ The project is being documented as it develops, including decisions, testing, an
 |---|---|
 | [Architecture](docs/ARCHITECTURE.md) | Overall system design and implementation boundaries |
 | [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) | Physical controls, component inventory, and design manifesto |
-| [Configuration](docs/CONFIGURATION.md) | JSON v2 schema, validation, and recovery |
+| [Configuration](docs/CONFIGURATION.md) | Config v4 JSON schema, validation, and recovery |
 | [Firmware & Network](docs/FIRMWARE_NETWORK.md) | HTTP API, networking, and clock behavior |
 | [Operating Modes](docs/OPERATING_MODES.md) | SERVICE/DEVICE and CONFIG/RUN |
 | [Development](docs/DEVELOPMENT.md) | Development and deployment workflow |
-| [Development History](docs/DEVELOPMENT_HISTORY.md) | Major Milestones in Clonker development |
+| [Development History](docs/DEVELOPMENT_HISTORY.md) | Major milestones in Clonker development |
 | [Chapter 2 Handoff](docs/CHAPTER_2_HANDOFF.md) | Historical Chapter 2 handoff and development baseline |
 
 This is a personal, experimental maker project, not a finished commercial product.
