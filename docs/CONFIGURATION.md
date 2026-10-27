@@ -755,7 +755,7 @@ A valid operational configuration requires the complete set of fourteen fundamen
 
 The repository maintains a complete, readable Clonker Config v4 sample at:
 
-`docs/samples/device_config_roku_denon_sample.json`
+`samples/device_config_roku_denon_sample.json`
 
 The sample contains:
 
@@ -1622,7 +1622,7 @@ The fully populated Roku/Denon configuration contains:
 
 A readable sample is maintained at:
 
-`docs/samples/device_config_roku_denon_sample.json`
+`samples/device_config_roku_denon_sample.json`
 
 The operational configuration is stored as compact JSON and remains subject to the 8,192-byte size limit.
 
