@@ -380,7 +380,9 @@
     // Preserve custom actions until their editor is implemented.
     // Keep a separate copy of the last loaded configuration.
     let loadedCustomActions = {};
-
+    // Live custom-action edits, maintained by the browser editor.
+    let editedCustomActions = {};
+ 
 
     // Create a labeled text field or dropdown.
     //
@@ -591,6 +593,7 @@
             // Actions retain their array order. No reordering UI.
 
             const customActions = room.custom_actions || [];
+            editedCustomActions[roomId] = customActions;
 
             const customDetails = document.createElement("details");
 
@@ -995,6 +998,85 @@
     }
 
 
+    // Validate custom actions before submitting configuration.
+    //
+    // The firmware remains the final authority.
+    // This provides useful errors without writing to flash.
+
+    function validateCustomActions(actions, roomName) {
+        if (actions.length > 16) {
+            throw new Error(roomName + ": too many custom actions.");
+        }
+
+        const ids = new Set();
+
+        for (const action of actions) {
+            const id = action.id;
+
+            if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ||
+                    id.length > 48) {
+                throw new Error(
+                    roomName + ": invalid custom action ID: " + id
+                );
+            }
+
+            if (ids.has(id)) {
+                throw new Error(
+                    roomName + ": duplicate custom action ID: " + id
+                );
+            }
+
+            ids.add(id);
+
+            if (!action.name.trim() || action.name.length > 80) {
+                throw new Error(
+                    roomName + ": invalid name for " + id
+                );
+            }
+
+            if (action.steps.length < 1 || action.steps.length > 16) {
+                throw new Error(
+                    roomName + ": invalid step count for " + id
+                );
+            }
+
+            action.steps.forEach((step, index) => {
+                const where =
+                    roomName + " / " + id + " / step " + (index + 1);
+
+                if (!DEVICE_IDS.includes(step.target)) {
+                    throw new Error(where + ": invalid target.");
+                }
+
+                if (!["GET", "POST"].includes(step.method)) {
+                    throw new Error(where + ": invalid HTTP method.");
+                }
+
+                if (!step.path.startsWith("/")) {
+                    throw new Error(
+                        where + ": command path must begin with /."
+                    );
+                }
+
+                if (!Number.isInteger(step.wait_after_ms) ||
+                        step.wait_after_ms < 0 ||
+                        step.wait_after_ms > 60000) {
+                    throw new Error(
+                        where + ": wait must be 0–60000 ms."
+                    );
+                }
+
+                if (index === action.steps.length - 1 &&
+                        step.wait_after_ms !== 0) {
+                    throw new Error(
+                        where + ": final step must have zero wait."
+                    );
+                }
+            });
+        }
+    }
+
+
     // Collect the edited configuration from the page.
     //
     // Until the custom-action editor is implemented,
@@ -1068,6 +1150,19 @@
                 });
 
             rooms[roomId] = room;
+
+
+            // Custom actions.
+            //
+            // Read the browser-side model, including edited steps.
+            // Validate before allowing the configuration to save.
+
+            room.custom_actions = JSON.parse(JSON.stringify(
+                editedCustomActions[roomId] || []
+            ));
+
+            validateCustomActions(room.custom_actions, room.name);
+
         });
 
         return {
