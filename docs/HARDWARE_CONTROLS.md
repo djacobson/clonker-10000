@@ -1,41 +1,24 @@
 # THE CLONKER 10000
 ## Hardware & Physical Controls
 
-**Design reference:** Updated October 19, 2026  
-**Project:** The Clonker 10000  
-**Current controller:** Raspberry Pi Pico 2 W  
-**Firmware:** CircuitPython 10.3.1  
-**Hardware status:** Bench prototype / component evaluation / physical controls not yet integrated
+**Design reference:** Updated October 27, 2026  
+**Controller:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
+**Firmware baseline:** Chapter 4 / Clonker Config v4  
+**Hardware baseline:** GP17 SERVICE/DEVICE jumper tested; physical action controls not yet integrated
 
 > A gloriously overengineered, tactile, Wi-Fi home theater remote. Two rotary controls, real buttons, questionable restraint, and absolutely no interest in becoming another touchscreen.
 
 ---
 
-## 1. Hardware Philosophy
+## 1. Purpose and hardware philosophy
 
-The Clonker 10000 is intended to be a substantial, tactile, purpose-built remote control for multiple home theater systems.
+The Clonker 10000 is a substantial, serviceable, purpose-built remote for multiple home theater systems. It should offer physical controls usable without looking, a prominent volume knob, a separate selection knob, dedicated navigation and playback controls, an unmistakable power control, and—if useful—a small display and short audible feedback.
 
-The design emphasizes:
+**Core boundary:** Physical controls produce generic events. The selected room and validated configuration determine the action and network destination. GPIO code must not embed Denon or Roku commands.
 
-- Physical controls that can be operated without looking.
-- A prominent rotary volume control.
-- A separate rotary selection control.
-- Dedicated navigation and playback controls.
-- Satisfying mechanical button action.
-- A visually distinctive power control.
-- A small, useful status display.
-- Optional audible feedback.
-- Wi-Fi control of configured AV equipment.
-- A serviceable, expandable electronics architecture.
-- An enclosure worthy of the name Clonker.
+This is the **hardware design and implementation reference**, not the authority for configuration schema or HTTP behavior. See [Configuration](CONFIGURATION.md), [Architecture](ARCHITECTURE.md), and [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for those details. Procurement entries below distinguish *ordered or candidate* from *received, electrically verified, installed,* and *tested*; a purchase record alone proves none of the latter.
 
-The hardware should feel deliberate and mechanically satisfying.
-
-The software should remain flexible enough to accommodate changing equipment and control assignments without rewiring the entire remote.
-
-**Design principle:** Physical controls generate generic events. Configuration determines what those events do.
-
-## 1A. The Clonker Design Manifesto
+## 2. The Clonker Design Manifesto
 
 **The Clonker 10000 is not a return to the past. It's a selective rescue operation.**
 
@@ -73,176 +56,57 @@ The Clonker rejects the worst of both eras.
 
 ### The Harmony Memorial Department
 
-We respect the ambitious efforts of Logitech Harmony and the other universal-remote pioneers.
+We respect the ambitious efforts of Logitech Harmony and the other universal-remote pioneers. They were attempting to bring order to a spectacularly fragmented home theater industry. We also remember the configuration software.
 
-They were attempting to bring order to a spectacularly fragmented home theater industry.
-
-We also remember the configuration software.
-
-The Clonker keeps the useful idea — one configurable controller for multiple devices — and leaves the infrared archaeology behind.
-
-Our initial design uses network commands and editable configuration instead of IR code libraries and synchronization rituals.
-
-IR is not part of the current plan. Future optional support is not ruled out.
+The Clonker keeps the useful idea—one configurable controller for multiple devices—and leaves the infrared archaeology behind. Initial control uses network commands and editable configuration, not IR libraries or synchronization rituals. IR is not on the current implementation path, though future optional support is not ruled out.
 
 **We want to watch the movie, not spend Saturday teaching the remote what a movie is.**
 
-### A Tip of the Hat to Accessibility
+### A tip of the hat to accessibility
 
-We applaud companies producing simplified, large-button remotes for seniors and people with accessibility needs.
+We applaud companies producing simplified, large-button remotes for seniors and people with accessibility needs. They're solving real problems, and we're not trying to replace or compete with those products.
 
-They're solving real problems, and we're not trying to replace or compete with those products.
-
-We're simply wondering why tactile, easy-to-find controls, sensible button counts, and straightforward operation shouldn't be desirable for everybody.
-
-After all, you shouldn't have to qualify for a senior discount to get a volume button you can find in the dark.
+We're simply wondering why tactile, easy-to-find controls, sensible button counts, and straightforward operation shouldn't be desirable for everybody. After all, you shouldn't have to qualify for a senior discount to get a volume button you can find in the dark.
 
 **Accessibility isn't a niche feature. Sometimes it's just good engineering.**
 
-### Serviceability, Clonker Style
+### Serviceability, Clonker style
 
-The enclosure should be designed for maintenance, experimentation, and modification.
-
-Possible features include:
-
-- Actual lunchbox-style latches for opening the case.
-- An accessible internal electronics workspace.
-- A real internal work light.
-- Convenient USB maintenance access.
-- Clearly identified wiring and connectors.
-- Room for future hardware experimentation.
-
-These are design ideas, not finalized or implemented features.
-
-The objective is to make the Clonker pleasant to own, operate, modify, and repair.
+Possible enclosure features include actual lunchbox-style latches, accessible internal electronics, an internal work light, convenient USB maintenance access, labeled wiring and connectors, and space for future experiments. These are concepts, **not finalized enclosure features**.
 
 If servicing the remote requires holding a flashlight in your teeth while searching for microscopic screws, we've failed.
 
-### The Bottom Line
-
-The Clonker isn't retro.
-
-It isn't minimalist.
-
-It's **selectively maximalist**.
-
-Maximum attention to the things that matter. Minimum tolerance for everything that doesn't.
+The Clonker isn't retro. It isn't minimalist. It's **selectively maximalist**: maximum attention to the things that matter; minimum tolerance for everything that doesn't.
 
 **The Clonker 10000 — Less sleek. More CLONK.**
 
 ---
 
-## 2. Current Controller Platform
+## 3. Controller platform and the one working hardware input
 
-### Active processor
+### Active controller
 
-**Raspberry Pi Pico 2 W**
+**Raspberry Pi Pico 2 W**, RP2350, integrated Wi-Fi, CircuitPython 10.3.1. It provides USB serial/filesystem maintenance, GPIO for future physical controls, and the running Config v4 browser/HTTP firmware under `firmware/clonker/`.
 
-- RP2350 microcontroller.
-- Integrated Wi-Fi.
-- CircuitPython 10.3.1.
-- GPIO for physical controls.
-- USB serial and filesystem access.
-- Local HTTP management interface.
-- JSON v2 configuration storage.
+The earlier **Unexpected Maker FeatherS3[D] / ESP32-S3** selection is historical. Its pinout, sleep behavior, and firmware assumptions must not be transferred to the Pico without verification.
 
-This is the active firmware and development platform.
+### GP17 SERVICE/DEVICE jumper — implemented and tested
 
-The repository's current firmware is located under:
+| Connection | Pico physical pin | Behavior |
+|---|---:|---|
+| GP17, internal pull-up | 22 | Boot-time ownership input |
+| GND | 23 | Jumper ground |
 
-`firmware/clonker/`
-
-### Earlier processor selection
-
-**Unexpected Maker FeatherS3[D] — ESP32-S3**
-
-Originally selected for the first Clonker prototype.
-
-This board remains part of the project's hardware history and may be useful for future experimentation.
-
-However:
-
-- It is not the current production firmware target.
-- The current firmware is written and tested for Pico 2 W.
-- GPIO assignments must not be copied between platforms without verification.
-- Earlier ESP32-S3 assumptions must not be treated as current implementation details.
-
-The Pico 2 W is the authoritative hardware platform for the present development chapter.
-
----
-
-## 3. Implemented Hardware: SERVICE / DEVICE Jumper
-
-**Status: IMPLEMENTED AND TESTED**
-
-The first functioning physical hardware input is the internal filesystem-ownership jumper.
-
-### Electrical connection
-
-| Signal | Pico GPIO | Physical pin |
+| Jumper at power-on | Mode | Filesystem writer |
 |---|---|---|
-| SERVICE/DEVICE input | GP17 | 22 |
-| Ground | GND | 23 |
+| Open | SERVICE (USB) | USB host |
+| GP17 grounded | DEVICE | Pico firmware |
 
-GP17 is configured with an internal pull-up.
+`firmware/boot.py` reads GP17 during boot; DEVICE remounts the filesystem writable for the Pico. **Change the jumper only while unpowered and perform a full power cycle.** Ctrl+D is not an ownership-mode change. A removable internal jumper, recessed switch, or internal slide switch could eventually replace the bench jumper; final choice TBD. It must remain distinct from CONFIG/RUN and SYSTEM MASTER.
 
-### Jumper states
+See [Operating Modes](OPERATING_MODES.md) for precise mode behavior and deployment cautions.
 
-| Jumper | Mode | Filesystem ownership |
-|---|---|---|
-| Open | SERVICE (USB) | USB host writes |
-| Connected to GND | DEVICE | Pico firmware writes |
-
-Implementation:
-
-`firmware/boot.py`
-
-The jumper is read during boot.
-
-In DEVICE mode, firmware executes:
-
-```python
-storage.remount("/", readonly=False)
-```
-
-The selection requires a full power cycle.
-
-A CircuitPython soft reload is not sufficient to reliably change filesystem ownership.
-
-### Final enclosure considerations
-
-The SERVICE/DEVICE jumper should remain an internal maintenance control.
-
-Possible final implementations include:
-
-- Removable jumper.
-- Recessed maintenance switch.
-- Internal two-position slide switch.
-
-**Final hardware: TBD**
-
-It should not be confused with the user-facing CONFIG/RUN control.
-
----
-
-## 4. Planned Physical Control Layout
-
-The original design concept includes:
-
-- Two rotary controls near the top.
-- A large VOLUME knob.
-- A smaller SELECTOR knob.
-- Directional navigation controls.
-- Dedicated playback and function buttons.
-- A guarded system-power control.
-- A small side-mounted room selector.
-- A CONFIG/RUN control.
-- Optional OLED status display.
-- Optional audio feedback.
-
-The layout is a design direction, not a finalized mechanical drawing.
-
-### Proposed control arrangement
+## 4. Proposed control layout
 
 ```text
              THE CLONKER 10000
@@ -270,1044 +134,329 @@ The layout is a design direction, not a finalized mechanical drawing.
       |____________________________|
 
         SIDE: ROOM SELECTOR TBD
-
         CONFIG/RUN: LOCATION TBD
 ```
 
-This diagram is illustrative only.
+**Concept only.** Dimensions, ergonomics, button spacing, mounting depths, guard clearance, and display position are not fixed. Thumb reach and tactile identification take precedence over decorative symmetry.
 
-Control spacing, button grouping, display placement, enclosure dimensions, and guard geometry remain open.
+## 5. Primary rotary controls
 
-The final design should prioritize ergonomics and thumb reach over symmetry alone.
+### Volume — Grayhill 62A22-02-040C
 
----
+**Selected for evaluation / ordered from DigiKey; electrical testing not confirmed in this reference.** Associated large silver/clear-matte knob: **Kilo OEJNI-90-3-5**, approximately 23.5 mm diameter.
 
-## 5. Volume Encoder
+- Clockwise: generic `volume-up`; counterclockwise: `volume-down`.
+- Initial firmware behavior: one action per accepted step; avoid acceleration, batching, or aggressive network repeat until responsiveness is measured.
+- Encoder driver, wiring, GPIO assignment, and physical tests: **not implemented**.
+- **Critical electrical check:** Verify the Grayhill encoder's actual datasheet, pinout, power requirements, signal type, and 3.3 V GPIO compatibility. An optical encoder must not be assumed equivalent to a passive mechanical quadrature encoder; interface circuitry may be necessary.
+- Future investigation: encoder detent behavior, debounce/decoding, repeat rate, command backlog, and interaction with the cooperative queue.
 
-**Selected component: Grayhill 62A22-02-040C**
+### Selector — Bourns PEC11R-4215F-S0024
 
-**Procurement status:** Ordered from DigiKey; delivery and physical testing not independently confirmed in this document.
+**Selected for evaluation / ordered from DigiKey; installation and testing not confirmed.** Associated smaller black knob with white indicator: **Kilo OEJL-63-4-7**.
 
-### Associated knob
+Possible roles: cycling configured custom actions, OLED menu selection, function context, or future settings. **No final selector behavior is committed.** Confirm the actual purchased part's terminals and whether its push-switch contact is available before assigning a press action.
 
-**Kilo OEJNI-90-3-5**
+GPIO A/B, any switch GPIO, step decoding, debounce, and display integration are TBD. Unlike the volume encoder, the selector is context-sensitive by design; it must still produce generic events rather than device-specific URLs.
 
-- Approximately 23.5 mm diameter.
-- Silver / clear-matte appearance.
-- Intended as the larger, visually dominant VOLUME knob.
+## 6. Navigation, playback, and function buttons
 
-### Intended behavior
+The desired navigation cluster is **UP / DOWN / LEFT / RIGHT / OK**, preferably intuitive by touch. Candidates include individual tactile switches, a purpose-built directional assembly, or a mechanically linked cluster. None has been finalized or integrated.
 
-The volume encoder generates directional steps:
+The other likely dedicated functions are Back, Home, Play/Pause, Skip Back, Skip Forward, Mute, and a guarded power control. The fourteen firmware fundamentals **do not require fourteen physical buttons**; selector/OLED access may expose other functions.
 
-- Clockwise: `volume-up`.
-- Counterclockwise: `volume-down`.
+**Candidate tactile hardware:** Adafruit **#3347 metal-ball momentary switches**, ordered for experimentation. They may suit navigation, playback, or secondary controls; actual feel and mounting must be auditioned.
 
-The action dispatcher resolves the current room and configured target.
+**Still open:** switch travel and force, spacing, long-press/repeat policy, debounce, illumination, and mechanical layout. A held navigation button must not inadvertently flood the network.
 
-Typical initial target: Denon AVR.
+### Generic action vocabulary
 
-The encoder itself should contain no Denon-specific logic.
+The current fourteen fixed action IDs are:
 
-### Initial firmware strategy
+| Category | IDs |
+|---|---|
+| Volume | `volume-up`, `volume-down`, `mute-toggle` |
+| Navigation | `nav-up`, `nav-down`, `nav-left`, `nav-right`, `select`, `back`, `home` |
+| Playback | `play-pause`, `skip-back`, `skip-forward` |
+| Equipment power | `power-toggle` |
 
-V1 should use one fundamental action per accepted encoder step.
+The current Config v4 firmware also supports **room-specific executable custom actions**, including multi-step GET/POST commands and cooperative waits. A future selector or dedicated button may invoke a custom action through the **same dispatcher**. Physical control mapping remains a hardware/UI design decision; exact schema and execution behavior belong in the configuration and firmware references.
 
-Initially avoid:
-
-- Volume acceleration.
-- Large accumulated step batches.
-- Complex velocity curves.
-- Continuous network-command flooding.
-
-These features may be evaluated after real-world responsiveness testing.
-
-### Electrical integration
-
-**TBD**
-
-Before wiring:
-
-- Verify the encoder's actual electrical interface and pinout.
-- Confirm required supply voltage and current.
-- Determine appropriate signal conditioning.
-- Verify compatibility with Pico 2 W GPIO voltage limits.
-- Confirm whether additional interface circuitry is required.
-
-Do not assume that an optical encoder is electrically interchangeable with a simple mechanical quadrature encoder.
-
-### Firmware status
-
-- GPIO assignment: TBD.
-- Driver: Not implemented.
-- Physical step testing: Pending.
-- Network command testing: Pending.
+**Toggle boundary:** Configured ON/OFF paths exist for mute and power; runtime toggle direction/history remains deferred. Do not mistake a browser action being accepted for a confirmed equipment-state change.
 
 ---
 
-## 6. Selector Encoder
+## 7. SYSTEM MASTER: guarded power and ignition concept
 
-**Selected component: Bourns PEC11R-4215F-S0024**
+**Design status: Provisionally agreed October 20, 2026; not implemented or tested.** This is a signature feature and deserves its own design record.
 
-**Procurement status:** Ordered from DigiKey; installation and testing pending confirmation.
+The guarded **SYSTEM MASTER momentary button** is intended to perform two logically distinct jobs:
 
-### Associated knob
+1. While Clonker is awake, invoke the configured `power-toggle` action for the selected room.
+2. When Clonker is in deep sleep, wake the controller and, **only if the wake cause is reliably identified**, initiate a single theater-power ON action.
 
-**Kilo OEJL-63-4-7**
+SYSTEM MASTER is **not** GP17 filesystem ownership, CONFIG/RUN, the Pico reset control, or necessarily a direct power cut to the controller. The physical button contains no hardcoded Denon/Roku commands.
 
-- Small black knob.
-- White position indicator.
-- Intended to contrast with the larger silver VOLUME knob.
+### Normal awake operation
 
-### Intended behavior
+A press requests `power-toggle` through the common action dispatcher. Future toggle-history logic will choose the intended ON/OFF path; it must not be mistaken for knowledge of the equipment's actual state. Other remotes, HDMI-CEC, and manual controls can change that state independently.
 
-The selector encoder is reserved for context-dependent selection.
+### Preferred deep-sleep ignition sequence
 
-Possible uses include:
+1. Lift the protective guard.
+2. Press SYSTEM MASTER **once**.
+3. Wake or reboot the Pico as required.
+4. Play a short *engine-starting* sound, if audio hardware is available.
+5. Reconnect Wi-Fi and load validated runtime configuration.
+6. Invoke the selected room's configured **ON** command.
+7. Resume normal remote operation.
 
-- Cycling available custom actions.
-- Navigating a small OLED menu.
-- Selecting a function or operating context.
-- Adjusting future user-facing options.
+**Provisional rule: Assume ON after deep sleep.** Do not attempt to reconstruct the theater's previous power state across sleep. The wake-triggered operation should use the configured `on_path`; this is only safe if the real device command has the intended ON semantics. A native toggle may turn off equipment already on and must be tested separately.
 
-The final behavior has not been decided.
+The ignition sound is reserved for genuine deep-sleep ignition, not every ordinary power press.
 
-### Push-switch behavior
+### Wake-cause safety and exactly-once behavior
 
-Any integrated encoder push-switch functionality must be verified against the actual purchased part and datasheet before assigning a function.
+The Pico must reliably distinguish a SYSTEM MASTER wake from an ordinary reset, power restoration, or unrelated reboot **before automatically sending any theater power command**.
 
-Do not assume an additional push action exists or is wired.
+If that cannot be established, the acceptable fallback is to wake, restore operation, **send no automatic power command**, and wait for the next deliberate SYSTEM MASTER press. One physical press/release must never generate duplicate equipment commands; debounce and release handling must account for boot and Wi-Fi startup.
 
-### Electrical and firmware status
+### Light sleep is optional
 
-- GPIO A: TBD.
-- GPIO B: TBD.
-- Push-switch GPIO, if used: TBD.
-- Debounce and step decoding: Not implemented.
-- UI behavior: TBD.
+Light sleep could begin after inactivity and wake transparently on an ordinary control, performing that control's intended action without an ignition ritual. If the power savings are small or Wi-Fi/input complexity excessive, omit it. A simple **AWAKE / DEEP SLEEP** model is acceptable.
 
----
+### Battery and power architecture
 
-## 7. Navigation Controls
+Rechargeable battery operation is preferred, but the battery, charging circuitry, and power distribution are **not selected**. A regulated USB power bank is a candidate for early experiments, not a finalized solution.
 
-Clonker defines five primary navigation actions:
+Measure or verify Pico Wi-Fi current, idle/sleep draw, reconnection cost, OLED and audio load, optical encoder supply, battery capacity, safe charging, and USB maintenance access. Some power banks shut off under low-current loads. Mechanical unilluminated switches should have negligible steady-state draw, but illuminated controls and supporting circuits may not.
 
-- `nav-up`
-- `nav-down`
-- `nav-left`
-- `nav-right`
-- `select`
+### Required experiments before implementing ignition
 
-The physical design should provide an intuitive directional arrangement with a central selection control.
+1. Verify Pico 2 W / CircuitPython support for the intended sleep state and wake GPIO.
+2. Confirm a **brief** momentary press can wake the system without being held through boot.
+3. Reliably identify wake cause; distinguish it from reset or power restoration.
+4. Measure awake, idle, sleep, and Wi-Fi reconnect current and timing.
+5. Prove one press produces **at most one** power action, including bounce/release cases.
+6. Verify the actual configured ON command against the home theater.
+7. Test optional startup audio and assess light-sleep benefits.
+8. Verify the battery/power architecture can support the chosen wake mechanism.
 
-### Candidate implementation
+Prior ESP32-S3 sleep experiments are historical, **not proof** of Pico 2 W behavior. No wake GPIO, sleep state machine, battery management, ignition sound, or wake-triggered equipment action exists in current firmware.
 
-A five-button directional cluster:
+**One guarded button. One deliberate press. The Clonker handles the rest.**
 
-```text
-             UP
-              ^
-              |
-       LEFT - OK - RIGHT
-              |
-              v
-             DOWN
-```
+*Because apparently turning on the television now requires starting an engine.*
 
-This may be implemented using:
+### Guard, button, and illumination candidates
 
-- Individual tactile switches.
-- A purpose-built navigation assembly.
-- A mechanically linked directional control.
+Preferred mechanical concept: flip-up red ignition guard over a comfortably accessible **momentary** button, with optional illumination.
 
-**Final hardware: TBD**
+- **FILN 19 mm black ring-illuminated momentary pushbutton**, three-pack ordered for evaluation. Advertised 12 V/24 V illumination, approximately 19 mm mounting hole, black metal-style housing. **Candidate, not final selection.**
+- **Red “Start Engine” protective cover**, ordered for fit/appearance evaluation. Compatibility with the eventual button is unverified.
+- Other prominent power-toggle hardware remains under consideration; no final guard/button pairing is recorded.
 
-### Firmware behavior
+Evaluate button height, guard clearance, actuation feel, contact layout, mounting depth, illumination voltage, and available enclosure space. **Never drive a 12 V/24 V LED ring directly from Pico GPIO**; illumination and switch contacts are separate circuits requiring correct supply/driver design and terminal verification.
 
-Each press produces a generic action event.
+## 8. CONFIG/RUN switch and room selector
 
-The current room configuration determines the target and HTTP command.
+### CONFIG/RUN — physical implementation pending
 
-For example, navigation may be mapped to Roku POST commands.
+Firmware currently simulates CONFIG enabled (`_simulated_config = True` in `controls/switches.py`; `CONFIG_SWITCH_PIN = None` in `controls/pins.py`). The management listener can be started/stopped by application mode logic, but no real switch is wired.
 
-The physical navigation layer must not hardcode Roku URLs.
+Candidate: a maintained two-position switch, final type/location TBD. Requirements:
 
-### Open design questions
+- Stable runtime input with known polarity and debounce.
+- Listener starts/stops **on state changes**, not on every poll.
+- No AV power command and no unnecessary flash writes.
+- Independent of GP17 SERVICE/DEVICE and the guarded SYSTEM MASTER button.
+- Validated configuration stays available in RAM through transitions.
 
-- Button type and travel.
-- Actuation force.
-- Mechanical spacing.
-- Single-click versus long-press behavior.
-- Repeat behavior while held.
-- Debounce timing.
-- Whether the navigation assembly is illuminated.
+See [Operating Modes](OPERATING_MODES.md) for the four mode combinations and filesystem permissions.
 
-No navigation buttons have yet been integrated into the Pico firmware.
+### Physical room selector — candidate three-position switch
 
----
-
-## 8. Function and Playback Buttons
-
-Clonker's fourteen fundamental actions do not require fourteen dedicated physical buttons.
-
-The current physical design direction includes convenient access to:
-
-- Back.
-- Home.
-- Play/Pause.
-- Skip Back.
-- Skip Forward.
-- Mute Toggle.
-- Power Toggle.
-
-Some actions may eventually be accessed through the selector encoder or OLED menu.
-
-### Known candidate button hardware
-
-**Adafruit #3347 metal ball tactile momentary switches**
-
-Previously ordered for experimentation.
-
-Possible uses:
-
-- Navigation functions.
-- Playback functions.
-- Secondary action buttons.
-
-Final assignments are not established.
-
-### Additional switches
-
-**NEW SWITCH INVENTORY — TBD**
-
-Additional switches have been acquired or selected but have not yet been documented with photographs, model numbers, or electrical specifications.
-
-Reserve the following entries:
-
-| Placeholder | Proposed purpose | Status |
-|---|---|---|
-| New Switch A | TBD | Awaiting identification |
-| New Switch B | TBD | Awaiting identification |
-| New Switch C | TBD | Awaiting identification |
-| Additional switches | TBD | Inventory update pending |
-
-These placeholders are intentionally noncommittal.
-
-Do not infer switch type, rating, illumination, latching behavior, or pinout until the parts are identified.
-
----
-
-## 9. System Power Control
-
-**Design status: UNDER ACTIVE EVALUATION**
-
-One of Clonker's signature features is a prominent system-power control.
-
-The intended experience is mechanically satisfying and visually distinctive.
-
-The original concept involved a guarded, race-car-style control.
-
-### Important architectural distinction
-
-The system-power control is an external equipment action.
-
-It invokes the configurable fundamental action:
-
-`power-toggle`
-
-It is not the same as:
-
-- SERVICE/DEVICE.
-- CONFIG/RUN.
-- Pico power supply control.
-- A firmware reset switch.
-
-### Current action model
-
-The JSON v2 configuration defines:
-
-```json
-{
-  "target": "avr",
-  "method": "GET",
-  "on_path": "/example/on",
-  "off_path": "/example/off"
-}
-```
-
-The paths above are illustrative, not actual equipment commands.
-
-The future dispatcher will select ON or OFF according to independent RAM command history.
-
-The toggle-state algorithm is not yet implemented.
-
-### SYSTEM MASTER Ignition and Sleep/Wake Design
-
-**Design status: PROVISIONALLY AGREED — NOT IMPLEMENTED OR TESTED**
-
-**Decision date:** October 20, 2026
-
-The guarded SYSTEM MASTER momentary button has two responsibilities:
-
-1. Operate the configured home theater `power-toggle` action.
-2. Wake the Clonker itself when it is in deep sleep.
-
-These responsibilities are logically separate, even though they share
-one physical control.
-
-The preferred user experience is a single, deliberate button press.
-Holding the button down or pressing it twice should not be necessary
-for normal operation.
-
-#### Normal operation — Clonker awake
-
-When the Clonker is awake, pressing SYSTEM MASTER invokes the normal
-configured `power-toggle` action for the selected room.
-
-This is the same fundamental action available through the browser
-Test Remote.
-
-The physical button must not contain hardcoded Roku or Denon commands.
-
-The eventual dispatcher will determine the appropriate ON/OFF
-command using its normal toggle-state logic.
-
-#### Deep-sleep wake — ignition sequence
-
-The preferred behavior after a SYSTEM MASTER wake is:
-
-1. The user lifts the protective ignition guard.
-2. The user presses SYSTEM MASTER once.
-3. The Pico wakes and reboots, if required.
-4. The Clonker plays a short engine-starting sound.
-5. Wi-Fi reconnects and the runtime configuration becomes available.
-6. The Clonker invokes the configured `power-toggle` ON command.
-7. Normal remote operation resumes.
-
-**Provisional rule: Assume ON after deep sleep.**
-
-The Clonker does not need to remember the theater's previous power
-state across deep sleep.
-
-For the initial implementation, the wake-triggered action should
-select the configured `on_path`, rather than attempting to reconstruct
-the previous toggle state.
-
-This assumes the configured ON command has the intended behavior.
-A native toggle command may turn off equipment that is already on,
-so device-specific behavior must be tested.
-
-The ignition sound is intended to play only during a deep-sleep
-ignition sequence, not on every ordinary power-button press.
-
-#### Wake-event identification and fallback
-
-The Pico must reliably identify a SYSTEM MASTER wake before
-automatically sending a theater power command.
-
-If the firmware or hardware cannot reliably distinguish that wake
-event from an ordinary reboot, reset, or power restoration, the
-acceptable fallback is:
-
-- Wake or reboot the Clonker.
-- Restore normal operation.
-- Do not automatically send a theater power command.
-- Let the next SYSTEM MASTER press operate the configured action.
-
-A single press-and-release cycle must never produce duplicate
-theater power commands.
-
-Button debounce and release detection must account for startup
-and reboot behavior.
-
-#### Light sleep
-
-Light sleep is an optional, automatic power-saving optimization.
-
-It is not a separate user-facing operating mode.
-
-If implemented, the intended behavior is:
-
-- Enter light sleep after an inactivity period.
-- Wake transparently when a physical control is used.
-- Process that control's normal action.
-- Avoid unnecessary user-visible startup rituals.
-
-Light sleep may be omitted entirely if its power savings are
-insufficient or its interaction with Wi-Fi and input handling
-adds unnecessary complexity.
-
-The simpler AWAKE / DEEP SLEEP design remains acceptable.
-
-#### Battery and power architecture
-
-The preferred direction is rechargeable battery operation.
-
-A small regulated USB power bank is a candidate for early
-prototyping, but the final battery and charging architecture
-have not been selected.
-
-Battery sizing must consider:
-
-- Pico 2 W consumption during Wi-Fi operation.
-- Sleep and wake current.
-- Wi-Fi reconnect time and energy.
-- OLED power consumption.
-- Audio amplifier and speaker usage.
-- Optical encoder power requirements.
-- Power-bank low-current auto-shutdown behavior.
-- Safe charging and service access.
-
-Mechanical switches without illumination should contribute
-negligible steady-state power consumption.
-
-Actual measurements should determine battery capacity and
-whether additional power-switching hardware is needed.
-
-#### Required future experiments
-
-Before implementing this design:
-
-1. Verify CircuitPython sleep and wake support on the Pico 2 W.
-2. Determine whether a momentary GPIO input can wake the Pico
-   from the selected low-power state.
-3. Verify that a brief press is sufficient without holding
-   the button throughout boot.
-4. Determine how wake cause can be identified reliably.
-5. Measure awake, idle, and sleep current.
-6. Measure Wi-Fi reconnection time.
-7. Test exactly-once handling of the wake-triggered action.
-8. Test the configured ON command with the actual theater equipment.
-9. Evaluate audio playback during startup.
-10. Decide whether light sleep provides worthwhile benefits.
-
-Earlier sleep experiments on the ESP32-S3 Feather may provide
-useful historical context, but their hardware and API behavior
-must not be assumed to apply to the Pico 2 W.
-
-#### Implementation boundary
-
-This section records intended future behavior only.
-
-No GPIO wake source, sleep state machine, ignition sound,
-battery-management logic, or wake-triggered theater command
-has been implemented.
-
-The current development priority remains outbound HTTP action
-execution through the browser Test Remote.
-
-**Design philosophy:** One guarded button. One deliberate press.
-The Clonker handles the rest.
-
-*Because apparently turning on the television now requires
-starting an engine.*
-
-### Guarded momentary concept
-
-The preferred direction has included:
-
-- A flip-up protective guard.
-- A momentary pushbutton beneath the guard.
-- A distinctive mechanical action.
-- Optional illumination.
-- A button tall enough to operate comfortably with the guard open.
-
-The final guard/button combination has not been selected.
-
-### Known candidate hardware
-
-**FILN 19 mm black ring-illuminated momentary pushbutton**
-
-Previously ordered as a three-pack for experimentation.
-
-Reported characteristics:
-
-- Black metal-style housing.
-- Momentary / self-reset operation.
-- Illuminated ring.
-- Advertised 12 V / 24 V LED illumination.
-- Approximately 19 mm mounting diameter.
-
-This is a candidate, not the final selected power button.
-
-### Electrical caution
-
-The switch contacts and LED illumination are separate electrical considerations.
-
-The Pico 2 W GPIO must not be used to directly supply a 12 V or 24 V illumination circuit.
-
-Any illumination implementation requires an appropriate power source and driver arrangement.
-
-Switch contact wiring, common terminals, and polarity must be verified before connecting to GPIO.
-
-### New power-switch candidates
-
-**TBD — awaiting photographs and specifications.**
-
-Future evaluation should compare:
-
-- Guard compatibility.
-- Button height.
-- Momentary versus maintained operation.
-- Mechanical feel.
-- Mounting diameter.
-- Contact configuration.
-- Illumination voltage.
-- Overall appearance.
-- Enclosure clearance.
-
-No final power-switch hardware decision is recorded here.
-
----
-
-## 10. CONFIG / RUN Control
-
-**Status: Firmware mode logic implemented; physical control TBD.**
-
-CONFIG/RUN is a separate internal application mode.
-
-### CONFIG
-
-Enables Clonker's browser management interface.
-
-### RUN
-
-Disables the browser management listener while preserving the intended remote-control application.
-
-### Current implementation
-
-`firmware/clonker/controls/switches.py`
-
-Currently:
-
-```python
-_simulated_config = True
-```
-
-The mode is simulated because:
-
-```python
-CONFIG_SWITCH_PIN = None
-```
-
-The future physical implementation will replace this simulation.
-
-### Proposed hardware
-
-A maintained two-position switch.
-
-Previous design discussions included a guarded race-car-style switch for this purpose.
-
-However, the final hardware assignment remains open.
-
-**CONFIG/RUN SWITCH: TBD**
-
-### Requirements
-
-The control must:
-
-- Produce a stable logical state.
-- Be read at runtime.
-- Avoid accidental mode changes.
-- Avoid flash writes on every poll.
-- Start or stop the management server only on transitions.
-- Not send an AV equipment HTTP command.
-- Remain electrically independent of the GP17 SERVICE/DEVICE jumper.
-
-The final GPIO, polarity, debounce, and mounting location are TBD.
-
-See [Operating Modes](OPERATING_MODES.md).
-
----
-
-## 11. Physical Room Selector
-
-**Design status: Candidate hardware ordered; behavior not finalized.**
-
-The room selector determines which configured room receives fundamental actions.
-
-The current browser Test Remote already supports selecting a room.
-
-The physical remote needs an equivalent selection mechanism.
-
-### Original proposed positions
+Original proposed positions:
 
 ```text
 DEN  /  BOTH  /  SUNROOM
 ```
 
-The middle BOTH position is a proposed group-control mode.
+**uxcell three-position DPDT slide switch assortment**, ordered for evaluation; final selection and GPIO wiring TBD. This is a *physical selection concept*, not the Config v4 room-ID model. The current configuration supports up to three rooms; `room-1` (Den), `room-2` (Sunroom), and `room-3` (third room/placeholder) are examples. **BOTH is not a fourth configured room.**
 
-It is not one of the three JSON room IDs.
+Open decisions: whether BOTH broadcasts to both rooms; whether commands are sequential; how one-room failures behave; whether volume, mute, and power participate; how per-room toggle history is handled; and what happens to the third configured room. Do not silently implement group semantics before those choices are made.
 
-The JSON configuration contains:
+Electrical design may use two GPIO inputs with defined pull-ups/pull-downs and transition/debounce handling. `ROOM_SELECTOR_A_PIN` and `ROOM_SELECTOR_B_PIN` remain unassigned.
 
-- `room-1` — Den.
-- `room-2` — Sunroom.
-- `room-3` — third room / placeholder.
+## 9. OLED and audible feedback
 
-How a physical BOTH selection interacts with the third configured room remains a design decision.
+### OLED status display
 
-### Candidate hardware
+Candidate: **0.49-inch SSD1306 OLED, 64 × 32 pixels, I2C**, two-pack ordered for experimentation. No final mounting, pinout, driver, or UI is implemented.
 
-**uxcell three-position DPDT slide switch assortment**
+Potential indications: selected room, selector context/custom action, CONFIG/RUN, Wi-Fi, and brief action status. It should be readable at arm's length, update cheaply, and remain **optional**: ordinary volume and navigation must work without looking at a screen.
 
-Previously ordered for experimentation.
+### Audible feedback
 
-Intended as a small side-mounted selector.
+Candidate components previously ordered:
 
-Final switch selection is not confirmed.
-
-### Firmware considerations
-
-The current placeholder pins are:
-
-```python
-ROOM_SELECTOR_A_PIN = None
-ROOM_SELECTOR_B_PIN = None
-```
-
-The implementation will need to distinguish switch positions reliably.
-
-Depending on the final switch contact arrangement, it may require:
-
-- Two GPIO inputs.
-- Pull-up or pull-down configuration.
-- Defined behavior for transitions.
-- Debounce or stable-position detection.
-
-### BOTH behavior
-
-**TBD**
-
-Questions include:
-
-- Send an action to both configured rooms?
-- Sequential versus independent dispatch?
-- Failure behavior if one room is unreachable?
-- Whether volume commands should affect both rooms.
-- Whether power toggles should operate both rooms.
-- How per-room toggle command history is maintained.
-- Whether BOTH applies to all fundamental actions.
-
-Do not implement group semantics until these decisions are made.
-
----
-
-## 12. OLED Status Display
-
-**Status: Proposed / candidate hardware discussed.**
-
-Candidate display:
-
-**0.49-inch SSD1306 OLED, 64 × 32 pixels, I2C**
-
-The small display is intended to provide compact status information without turning Clonker into a touchscreen.
-
-### Possible displayed information
-
-- Selected room.
-- Current action context.
-- Selected custom action.
-- CONFIG/RUN status.
-- Wi-Fi connection status.
-- Brief command feedback.
-
-### Design priorities
-
-- Legible at arm's length.
-- Minimal menu complexity.
-- Low update overhead.
-- No requirement to look at the display for ordinary volume or navigation.
-- Graceful operation if the display is absent.
-
-### Implementation status
-
-- Final display selection: TBD.
-- I2C pin assignments: TBD.
-- Driver integration: Not implemented.
-- Menu system: Not implemented.
-- Screen layout: TBD.
-
-The OLED is optional for initial real-device HTTP control testing.
-
----
-
-## 13. Audible Feedback
-
-**Status: Components ordered / concept evaluation; firmware integration pending.**
-
-Clonker may provide short audible feedback for selected interactions.
-
-### Known components
-
-**Adafruit piezo element — PS1240, PID 160**
-
-Candidate for simple tones or beeps.
-
-**Adafruit MAX98357A I2S amplifier — PID 3006**
-
-Candidate for richer audio output.
-
-**MECCANIXITY 23 mm, 8 ohm, 1 watt mini speakers**
-
-Two-pack ordered for experimentation.
-
-### Potential uses
-
-- Startup sound.
-- Power-action confirmation.
-- Mode-change feedback.
-- Short error tone.
-- Signature Clonker sound.
-
-### Design constraints
-
-- Audio feedback must not delay physical input handling.
-- Volume should be appropriate for a handheld remote.
-- Sounds should be brief and optional.
-- Speaker/amplifier power requirements must be verified.
-- GPIO and I2S pin assignments are TBD.
-
-The initial real-device command implementation does not depend on audio feedback.
-
----
-
-## 14. Breadboard and Wiring Inventory
-
-The following supporting components were previously ordered for development.
-
-| Component | Purpose |
+| Component | Proposed role |
 |---|---|
-| Adafruit 830-tie breadboard, PID 239 | Prototyping |
-| Dupont jumper assortment | Temporary interconnects |
-| Ledvillage 22 AWG solid-core wire assortment | Breadboard wiring |
-| WG-026 alligator leads | Temporary testing |
-| ALLECIN resistor assortment | Pull-ups, pull-downs, LED circuits |
-| 300-piece 3 mm / 5 mm LED assortment | Visual experiments |
-| Soldering iron | Permanent assembly work |
+| Adafruit PS1240 piezo element (PID 160) | Simple tones/beeps |
+| Adafruit MAX98357A I2S amplifier (PID 3006) | Richer sound playback |
+| MECCANIXITY 23 mm, 8 Ω, 1 W mini speakers (two-pack) | Speaker audition |
 
-Existing personal parts bins may provide additional components.
-
-This is an inventory reference, not a guarantee that every item has been received, inspected, or tested.
+Possible uses include short startup/ignition sound, action confirmation, mode-change chirp, and errors. Sound should be brief, optional, appropriate for handheld use, and **not block input responsiveness**. Verify power, amplifier/speaker compatibility, and GPIO/I2S assignments before wiring. No audio subsystem is implemented.
 
 ---
 
-## 15. Current Firmware GPIO Map
+## 10. Parts and procurement register
 
-Source:
+**Status convention:** The records below reflect selected/ordered candidates documented in project discussions. They do **not** assert receipt, inspection, or successful bench tests unless explicitly stated. Update this table when hardware is physically inventoried.
 
-`firmware/clonker/controls/pins.py`
+| Item | Part / description | Intended evaluation | Recorded status |
+|---|---|---|---|
+| Controller | Raspberry Pi Pico 2 W | Active controller | **In use; tested** |
+| Earlier controller | Unexpected Maker FeatherS3[D] | Historical platform | Historical, not active |
+| Volume encoder | Grayhill 62A22-02-040C | Main volume | Ordered; interface unverified |
+| Volume knob | Kilo OEJNI-90-3-5 | Large silver knob | Ordered |
+| Selector encoder | Bourns PEC11R-4215F-S0024 | Function selection | Ordered |
+| Selector knob | Kilo OEJL-63-4-7 | Small black knob | Ordered |
+| Tactile switches | Adafruit #3347 metal-ball | Navigation/playback | Ordered candidate |
+| Guarded button | FILN 19 mm red-ring momentary, 3-pack | SYSTEM MASTER | Ordered candidate |
+| Guard | Red “Start Engine” cover | SYSTEM MASTER | Ordered candidate |
+| Slide selector | uxcell 3-position DPDT assortment | Room selection | Ordered candidate |
+| OLED | 0.49-inch SSD1306 64×32 I2C, 2-pack | Status | Ordered candidate |
+| Piezo | Adafruit PS1240 | Tones | Ordered candidate |
+| I2S amp | Adafruit MAX98357A | Audio | Ordered candidate |
+| Speakers | MECCANIXITY 23 mm, 8 Ω, 1 W, 2-pack | Audio | Ordered candidate |
+| Breadboard | Adafruit 830-tie, PID 239 | Prototyping | Ordered |
+| Jumpers | Dupont assortment | Temporary wiring | Ordered |
+| Solid wire | Ledvillage 22 AWG assortment | Breadboard wiring | Ordered |
+| Test leads | WG-026 alligator leads | Temporary testing | Ordered |
+| Resistors | ALLECIN assortment | Biasing/LED circuits | Ordered |
+| LEDs | 300-piece 3 mm / 5 mm assortment | Indicator experiments | Ordered |
 
-Current definitions:
+A soldering iron and miscellaneous personal parts may also be available; this is not a verified warehouse inventory. Other switches mentioned informally but not identified by model should **not** be assigned invented specifications. When adding parts, record manufacturer/model, quantity, photo, received/tested status, contact type, voltage, dimensions, intended function, and eventual GPIO.
 
-```python
-CONFIG_SWITCH_PIN = None
+## 11. GPIO ownership and physical-input software boundary
 
-ROOM_SELECTOR_A_PIN = None
-ROOM_SELECTOR_B_PIN = None
+### Current pin assignment status
 
-VOLUME_ENCODER_A_PIN = None
-VOLUME_ENCODER_B_PIN = None
-
-SELECT_ENCODER_A_PIN = None
-SELECT_ENCODER_B_PIN = None
-```
-
-### Assignment status
-
-| Control | GPIO assignment | Status |
+| Control/interface | GPIO | Status |
 |---|---|---|
-| SERVICE/DEVICE jumper | GP17 | Implemented |
-| CONFIG/RUN switch | TBD | Simulated |
-| Room selector A | TBD | Not implemented |
-| Room selector B | TBD | Not implemented |
-| Volume encoder A | TBD | Not implemented |
-| Volume encoder B | TBD | Not implemented |
-| Selector encoder A | TBD | Not implemented |
-| Selector encoder B | TBD | Not implemented |
-| Navigation buttons | TBD | Not implemented |
-| Playback buttons | TBD | Not implemented |
-| Mute button | TBD | Not implemented |
-| System power button | TBD | Not implemented |
-| OLED I2C | TBD | Not implemented |
-| I2S audio | TBD | Not implemented |
-| Indicator LEDs | TBD | Not implemented |
+| SERVICE/DEVICE jumper | **GP17** | Implemented/tested |
+| CONFIG/RUN | TBD (`None`) | Simulated |
+| Room selector A/B | TBD (`None`) | Unwired |
+| Volume encoder A/B | TBD (`None`) | Unwired |
+| Selector encoder A/B | TBD (`None`) | Unwired |
+| Navigation, playback, mute, power | TBD | Unwired |
+| OLED I2C | TBD | Not integrated |
+| Audio / I2S | TBD | Not integrated |
+| Indicator LEDs | TBD | Not integrated |
 
-Do not assign pins solely for documentation convenience.
+The existing placeholders live in `firmware/clonker/controls/pins.py`. Do not assign pins for the sake of completing a diagram. Review electrical requirements, supply voltage, pin conflicts, wake capability, and enclosure wiring first.
 
-The final map should be determined after reviewing all electrical interfaces, available GPIO, and physical wiring constraints.
-
----
-
-## 16. Fundamental Action Vocabulary
-
-The firmware defines fourteen fixed fundamental action IDs per room.
-
-| Action ID | Purpose |
-|---|---|
-| `volume-up` | Increase volume |
-| `volume-down` | Decrease volume |
-| `mute-toggle` | Toggle mute |
-| `nav-up` | Navigate up |
-| `nav-down` | Navigate down |
-| `nav-left` | Navigate left |
-| `nav-right` | Navigate right |
-| `select` | Select / OK |
-| `back` | Navigate back |
-| `home` | Return home |
-| `play-pause` | Play / pause |
-| `skip-back` | Skip backward |
-| `skip-forward` | Skip forward |
-| `power-toggle` | Toggle equipment power |
-
-The IDs are fixed in firmware.
-
-Each room configures its own target, HTTP method, and command path or paths.
-
-Ordinary actions use:
-
-- `target`
-- `method`
-- `path`
-
-Mute and power toggles use:
-
-- `target`
-- `method`
-- `on_path`
-- `off_path`
-
-A blank command path or unconfigured target endpoint is valid and represents a no-op.
-
-### Physical mapping
-
-There is no requirement for fourteen individual physical buttons.
-
-Encoders, dedicated buttons, menus, and future user-defined functions can share the fundamental action vocabulary.
-
-The physical input layer must remain separate from device-specific HTTP command syntax.
-
----
-
-## 17. Physical Input Software Architecture
-
-The intended event path is:
+### Intended event path
 
 ```text
 Physical switch / encoder
           |
           v
-GPIO input sampling
+GPIO sampling + debounce / step decoding  [NOT YET INTEGRATED]
           |
           v
-Debounce / step decoding
+Generic event + selected room/context
           |
           v
-Generic control event
+actions.dispatch(room_id, action_id)      [IMPLEMENTED]
           |
           v
-Room selection
+Validated Config v4 + shared Dumb Queue™  [IMPLEMENTED]
           |
           v
-actions.dispatch()
+Bounded outbound HTTP GET/POST           [IMPLEMENTED]
           |
           v
-Current JSON v2 configuration
-          |
-          v
-Outbound HTTP transport
-          |
-          v
-Configured AV equipment
+Configured AV equipment                 [DENON/ROKU VERIFIED]
 ```
 
-### Current implementation boundary
+The browser Test Remote already uses the dispatcher, including executable custom actions and cooperative compound waits. **Only the physical input capture and its mapping to that dispatcher remain unconnected.** The shared queue has bounded capacity; future input drivers must avoid flooding it with bounce, held-button repeats, or excessively fast encoder events.
 
-The browser Test Remote already calls:
+Physical-input code should detect transitions reliably, avoid blocking delays, define repeat behavior, survive disconnected/invalid controls safely, and keep responsive operation during network work. GPIO wiring definitions are developer-owned firmware constants, **not ordinary user-editable JSON configuration fields**.
 
-```python
-actions.dispatch(room_id, action_id)
-```
+## 12. Electrical design and bench safety
 
-The dispatcher currently validates and logs requests.
+Before connecting a component:
 
-It does not send real outbound HTTP commands yet.
+1. Confirm its exact manufacturer part number and **datasheet**.
+2. Identify contacts, commons, polarity, push-switch terminals, and separate illumination terminals.
+3. Verify momentary versus maintained behavior, supply voltage, signal levels, and maximum current.
+4. Keep Pico GPIO at compatible **3.3 V logic**; do not apply 5 V, 12 V, or 24 V directly to GPIO.
+5. Use appropriate pull-ups/pull-downs, current limiting, and drivers for LEDs or other loads.
+6. Avoid floating inputs and check power/ground before energizing.
+7. Prototype **one input at a time**, observe raw transitions, then add debounce and action dispatch.
+8. Recheck the Grayhill optical encoder's interface separately; do not wire it as a mechanical encoder on assumption.
+9. Check battery, charging, and audio power budgets before combining loads.
+10. Document verified wiring and pin assignments only after real bench tests.
 
-Physical GPIO capture has not been connected to the dispatcher.
+No final PCB, enclosure, or permanent power architecture is implied by this document.
 
-### Scheduling requirements
+## 13. Open mechanical and system decisions
 
-The physical input layer should:
+- Final enclosure material, dimensions, service latches, internal work light, and USB access.
+- Volume/selector spacing and shaft/knob mounting.
+- Navigation cluster and dedicated button type, feel, layout, and illumination.
+- Final guard/button pairing, ignition-button mounting, and ring-light driver.
+- CONFIG/RUN switch location and stable electrical default.
+- Physical room selector and exact BOTH semantics.
+- OLED mount, display behavior, and whether to install it at all.
+- Speaker grille, amplifier placement, sound volume, and optional audio design.
+- Battery chemistry/capacity, charger, power switch, measurement points, and low-power architecture.
+- Wake-capable GPIO and reliable SYSTEM MASTER wake identification.
+- Final GPIO allocation, cable routing, service connectors, and strain relief.
 
-- Detect button transitions reliably.
-- Decode encoder direction accurately.
-- Avoid blocking delays.
-- Preserve responsiveness during network operations.
-- Avoid repeated actions caused by contact bounce.
-- Define behavior for held buttons.
-- Handle invalid or disconnected controls safely.
+These are **open decisions**, not omissions to fill with guesses.
 
-### Configuration ownership
+## 14. Recommended hardware development sequence
 
-Physical control mappings should use validated runtime configuration wherever appropriate.
+Real Denon/Roku HTTP execution and compound custom actions have already been demonstrated through the browser. The next hardware phase should build on that proven software path:
 
-GPIO assignments and electrical pin definitions remain developer-controlled firmware settings.
+1. Inventory the actual received components and verify datasheets, especially the Grayhill interface and power candidates.
+2. Plan GPIO/power allocation without prematurely freezing the final enclosure.
+3. Wire **one simple momentary button** and verify raw GPIO input.
+4. Add debounce and dispatch one existing fundamental action through the shared queue; verify the physical equipment response.
+5. Measure responsiveness and queue behavior under rapid/repeated presses.
+6. Wire and characterize the Bourns selector encoder; decide its first minimal behavior.
+7. Verify and prototype the Grayhill optical volume encoder electrically, then dispatch volume steps.
+8. Prototype the room selector; decide BOTH semantics before implementing them.
+9. Implement and test the physical CONFIG/RUN switch and transitions.
+10. Audition navigation/playback buttons and refine ergonomics.
+11. Evaluate guarded SYSTEM MASTER, power supply, and sleep/wake feasibility **before** promising one-press ignition.
+12. Add optional OLED/audio only when they improve usability; then refine permanent wiring and enclosure.
 
-They are not ordinary user-editable JSON configuration fields.
+This is a proposed order, not a fixed commitment. A compelling new switch or mechanical discovery may change the build sequence.
 
----
+## 15. Current verification snapshot — October 27, 2026
 
-## 18. Electrical Design Rules
+**Implemented and tested:** Pico 2 W / CircuitPython startup, Wi-Fi, USB/REPL, GP17 filesystem ownership, Config v4 browser configuration/persistence, browser Test Remote, fundamental outbound GET/POST actions, executable custom actions, shared cooperative queue, and a real Roku → wait → Denon compound sequence.
 
-Before connecting new hardware to the Pico:
+**Implemented in firmware but not fully hardware-exercised:** CONFIG/RUN listener transitions through simulated state; action dispatch under all network/failure/load scenarios.
 
-1. Verify the component's actual part number and datasheet.
-2. Identify contact terminals, common pins, and illumination terminals.
-3. Confirm whether the control is momentary or maintained.
-4. Verify required operating voltage.
-5. Verify the Pico's 3.3 V GPIO compatibility.
-6. Use suitable pull-ups, pull-downs, and current-limiting components.
-7. Provide a proper driver for higher-voltage LEDs or other loads.
-8. Avoid floating GPIO inputs.
-9. Confirm power and ground connections before energizing the circuit.
-10. Test one new control at a time.
+**Not yet implemented:** Physical action buttons, encoder drivers, room selector GPIO, physical CONFIG/RUN switch, SYSTEM MASTER wake/ignition, battery management, OLED, audio feedback, and final enclosure.
 
-Never connect a 12 V or 24 V illumination supply directly to a Pico GPIO.
+**Not finalized:** Toggle ON/OFF runtime direction logic, physical BOTH semantics, mechanical switch assignments, complete GPIO map, and rechargeable power design.
 
-The optical volume encoder deserves particular attention because its interface may require more than the wiring used for a mechanical encoder.
+For dated tests, use [Development History](DEVELOPMENT_HISTORY.md). The historical October 19 logging-only dispatcher snapshot should **not** be treated as current firmware status.
 
----
+## 16. Related documents
 
-## 19. Future Hardware Inventory Updates
-
-This document intentionally reserves room for additional switch and enclosure decisions.
-
-### Newly acquired switches
-
-**Awaiting user photographs and identification.**
-
-For each new component, record:
-
-- Manufacturer and model.
-- Photographs.
-- Quantity.
-- Purchased / received / tested status.
-- Momentary or maintained operation.
-- Contact arrangement.
-- Illumination requirements, if applicable.
-- Mounting diameter and depth.
-- Guard compatibility.
-- Proposed Clonker function.
-- Final GPIO assignment when decided.
-
-### Open mechanical decisions
-
-- Final enclosure material.
-- Enclosure dimensions.
-- Volume and selector knob spacing.
-- Navigation cluster design.
-- Power guard and button pairing.
-- CONFIG/RUN switch style and placement.
-- Room selector location.
-- OLED mounting.
-- Speaker grille or sound opening.
-- Rechargeable battery selection and physical mounting.
-- Charging, current measurement, and sleep/wake power management.
-- SYSTEM MASTER wake-capable GPIO and ignition-guard clearance.
-- USB maintenance access.
-
-No final enclosure or PCB design is implied by this document.
-
----
-
-## 20. Hardware Development Sequence
-
-Recommended sequence after the initial outbound HTTP action milestone:
-
-1. Confirm real device commands work through the browser Test Remote.
-2. Finalize the initial GPIO allocation.
-3. Wire and test one simple momentary button.
-4. Connect that button to the shared action dispatcher.
-5. Verify responsive behavior during HTTP requests.
-6. Wire and test the Bourns selector encoder.
-7. Verify the Grayhill optical encoder electrical requirements.
-8. Wire and test the volume encoder.
-9. Implement the physical room selector.
-10. Implement and test CONFIG/RUN switching.
-11. Evaluate mute, playback, and navigation button arrangements.
-12. Finalize the guarded system-power control.
-13. Integrate OLED and audio feedback if desired.
-14. Refine the enclosure and permanent wiring.
-
-This sequence is a recommendation, not a commitment to a fixed build order.
-
-The new switch inventory may change priorities.
-
----
-
-## 21. Current Hardware Milestone
-
-> **Historical hardware snapshot — October 19, 2026:**
-> The following inventory and implementation status describe
-> the project at that date. Outbound HTTP execution was
-> subsequently completed and verified on October 21.
-> Physical action controls remain unintegrated.
-> See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md)
-> for current network functionality.
-
-**As of October 19, 2026:**
-
-### Working
-
-- Pico 2 W running CircuitPython.
-- Wi-Fi connectivity.
-- USB serial / REPL.
-- GP17 SERVICE/DEVICE jumper.
-- JSON v2 configuration.
-- Browser management interface.
-- Browser Test Remote.
-- Logging-only action dispatcher.
-
-### Available or previously ordered for evaluation
-
-- Grayhill optical volume encoder.
-- Kilo large volume knob.
-- Bourns selector encoder.
-- Kilo small selector knob.
-- Adafruit metal tactile buttons.
-- FILN illuminated momentary switches.
-- uxcell three-position slide switches.
-- Piezo element.
-- MAX98357A amplifier.
-- Mini speakers.
-- Breadboard and wiring supplies.
-
-### Pending
-
-- Newly acquired switch identification.
-- Final switch assignments.
-- GPIO mapping.
-- Physical button and encoder integration.
-- Real outbound HTTP commands.
-- Power-control hardware decision.
-- OLED integration.
-- Audio feedback.
-- Final enclosure.
-
-**The electronics architecture is taking shape. The physical monster is still being assembled.**
-
----
-
-## 22. Related Documents
-
-- [Architecture](ARCHITECTURE.md)
-- [Configuration & Recovery](CONFIGURATION.md)
-- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md)
-- [Operating Modes](OPERATING_MODES.md)
-- [Development & Deployment](DEVELOPMENT.md)
-- [Development History](DEVELOPMENT_HISTORY.md)
-- [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md)
+- [Architecture](ARCHITECTURE.md) — system boundaries and common action dispatcher.
+- [Configuration & Recovery](CONFIGURATION.md) — authoritative Config v4 schema and persistence.
+- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) — live queue, scheduler, networking, and test evidence.
+- [Operating Modes](OPERATING_MODES.md) — SERVICE/DEVICE and CONFIG/RUN.
+- [Development & Deployment](DEVELOPMENT.md) — iPad-first workflow and bench deployment.
+- [Development History](DEVELOPMENT_HISTORY.md) — historical decisions and dated verification.
 
 ---
 
