@@ -252,6 +252,8 @@ A controlled five-command queue burst reached a peak depth of five and drained t
 
 Browser configuration, persistence, and actual multi-step execution were exercised using the Pico and Denon/Roku equipment. The Roku Home → 3000 ms wait → Denon Quick Select 1 sequence returned HTTP 200 for both steps and completed. This supersedes earlier statements that custom actions were merely planned or illustrative.
 
+**October 27, 2026 cooperative interleaving test:** During the Sunroom Movie custom action's 3000 ms wait, an independent Sunroom Volume Up request executed successfully (HTTP 200) before the delayed Denon Quick Select 1 request executed (HTTP 200). The custom action subsequently completed. This verifies eligible-task bypass during a cooperative wait, but not simultaneous outbound HTTP or physical encoder responsiveness.
+
 These are **verified functional scenarios**, not exhaustive coverage of malformed responses, extended network outages, simultaneous user inputs, interrupted writes, long uptime, or all power/mute behaviors. Preserve dated raw evidence in [Development History](DEVELOPMENT_HISTORY.md).
 
 ### 12.3 Runtime toggle bench tests — October 27, 2026
@@ -265,14 +267,14 @@ The browser Test Remote exercised the implemented `mute-toggle` and `power-toggl
 
 These tests confirm working direction selection, successful-command advancement, changed-save reset, and independent room histories.
 
-The tests do **not** establish automatic equipment-state detection, nor do they exhaustively verify failure-path history preservation, blank toggle paths, or high-rate input behavior.
+Additional October 27, 2026 negative tests verified direction preservation after repeated unreachable-endpoint failures and repeatable no-ops for blank selected paths and missing endpoints. These tests do **not** establish automatic equipment-state detection, exhaustive network-failure handling, or high-rate physical input behavior.
 
 ## 13. Known limitations and operational boundaries
 
 - **Blocking outbound requests:** temporarily pause the cooperative scheduler; GPIO responsiveness remains to be measured.
 - **One active inbound client:** short silent-client timeout mitigates stalls but does not add concurrency.
 - **Queue-wide cancellation:** one execution failure discards pending tasks; no automatic retries or rollback.
-- **Power/mute toggles:** volatile per-room/action direction history is implemented and bench-tested. It tracks successful commands, not authoritative equipment state; failed HTTP requests and blank toggle paths remain to be deliberately tested.
+- **Power/mute toggles:** Volatile per-room/action direction history tracks successful commands, not authoritative equipment state. October 27, 2026 negative tests confirmed that failed HTTP requests, blank selected paths, and missing endpoints do not advance direction. Broader failure-condition coverage remains incomplete.
 - **HTTP result interpretation:** status 2xx does not establish that the physical equipment changed state.
 - **No response-body interpretation:** the transport reads the status line only.
 - **No connection persistence or TLS:** a new plain-HTTP TCP connection is used per command.
@@ -288,8 +290,8 @@ The immediate priority is to **preserve the working Config v4 baseline** while m
 1. Integrate a small physical input path and verify ordinary action dispatch.
 2. Measure encoder event capture during actual outbound HTTP requests and compound waits.
 3. Explore volume-event accumulation, acceleration, or coalescing only if measurements show a need.
-4. Deliberately test toggle failure handling and blank/unconfigured paths, confirming that direction history does not advance.
-5. Refine the Test Remote's custom-action selection persistence when convenient.
+4. Expand queue-capacity, prolonged-outage, malformed-response, and long-uptime regression coverage.
+5. Revisit browser custom-action selection only if a reproducible usability problem emerges, particularly with multiple actions in one room.
 6. Evaluate custom device slots and additional protocols as separate, explicit design changes.
 
 ### 14.1 Apple TV — explicit future objective
