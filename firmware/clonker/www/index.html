@@ -336,6 +336,10 @@
     // Must match MAX_CONFIG_BYTES in device_config_v2.py.
     const MAX_CONFIG_BYTES = 8192;
  
+    // Must match custom-action limits in device_config_v2.py.
+    const MAX_CUSTOM_ACTION_ID_LENGTH = 40;
+    const MAX_CUSTOM_ACTION_NAME_LENGTH = 60;
+
     // Clonker Config v4 configuration constants.
     const MAX_CONFIG_ATTEMPTS = 5;
 
@@ -1020,7 +1024,7 @@
             const id = action.id;
 
             if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ||
-                    id.length > 48) {
+                    id.length > MAX_CUSTOM_ACTION_ID_LENGTH) {
                 throw new Error(
                     roomName + ": invalid custom action ID: " + id
                 );
@@ -1034,7 +1038,8 @@
 
             ids.add(id);
 
-            if (!action.name.trim() || action.name.length > 80) {
+            if (!action.name.trim() ||
+                    action.name.length > MAX_CUSTOM_ACTION_NAME_LENGTH) {
                 throw new Error(
                     roomName + ": invalid name for " + id
                 );
