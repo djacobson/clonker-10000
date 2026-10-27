@@ -299,7 +299,7 @@ This is an **illustrative** response. Names, queue depth, and configured state d
 
 The dispatcher validates the room and action, admits an eligible task, and resolves the current configuration when the task executes. Configured ordinary actions use outbound HTTP GET/POST. Missing endpoints or blank ordinary paths are intentional logged no-ops.
 
-**Power and mute toggles remain deferred:** their ON/OFF paths exist in the schema, but runtime direction selection is not implemented. Queue acceptance does not mean a toggle command was transmitted.
+**Power and mute toggles are operational:** the dispatcher selects configured ON/OFF paths using independent, volatile histories for each room and toggle action. Direction advances only after successful HTTP execution. Changed configuration saves reset all histories. Sunroom mute and power toggles, configuration-reset behavior, and independent Den/Sunroom histories were bench-tested October 27, 2026. Failed requests and blank paths remain to be deliberately tested.
 
 ### 8.2 Custom and compound actions
 
@@ -358,7 +358,6 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 
 ### 9.3 Not yet implemented
 
-- Runtime power/mute toggle direction history and execution.
 - Physical buttons and rotary encoders connected to action dispatch.
 - Physical CONFIG/RUN switch and room selector.
 - User-defined custom device slots beyond `device-1` through `device-3`.
@@ -383,7 +382,7 @@ When reporting a failure, capture the source commit or changed files, actual dep
 | Browser page stale | Confirm current `index.html` or `remote.html` was deployed; refresh and inspect version/content |
 | Editor loads but Save fails | Check SERVICE/DEVICE ownership, revision conflict, schema validation, and filesystem status |
 | Action reports `queued` but nothing happens | Check queue logs, configured endpoint/path, later execution result, and equipment state |
-| Toggle reports `DEFERRED` | Expected until runtime direction selection is implemented |
+| Toggle does not change equipment state | Check selected room, ON/OFF path, endpoint, HTTP execution result, and volatile direction history; HTTP success does not prove physical equipment state |
 | Fundamental action reports `NO-OP` | Blank path or endpoint may be intentional |
 | Custom action fails | Check every destination endpoint and step; one failure clears pending queue work |
 | Browser feels slow | Consider the single-client inbound listener, silent connections, and blocking outbound calls |
@@ -417,7 +416,7 @@ Use precise labels in documentation and conversation:
 - **Historical:** An earlier implementation, test, or decision superseded by the current baseline.
 - **Deferred:** Intentionally not active, even if some configuration or UI support already exists.
 
-A browser stub from October 19 was **historical**. Today's browser action pipeline is operational. A future Apple TV adapter remains **planned**. Toggle direction execution remains **deferred**.
+A browser stub from October 19 was **historical**. Today's browser action pipeline is operational. A future Apple TV adapter remains **planned**. Runtime power/mute direction execution is **implemented and bench-tested**, while negative-path verification remains incomplete.
 
 Never turn an intended design into a success claim just because its schema fields or UI controls exist.
 
@@ -444,7 +443,7 @@ The working Config v4 baseline should be protected while proceeding in measured 
 
 ### 12.3 Deferred action and protocol capabilities
 
-- Implement per-room power/mute direction selection without pretending command history equals actual device state.
+- Deliberately test failed and unconfigured power/mute requests to verify that volatile direction history does not advance; runtime toggle execution itself is implemented and bench-tested.
 - Add user-defined custom device slots only when the working baseline and requirements justify the extension.
 - Pursue Apple TV compatibility as an explicit objective, recognizing that discovery, pairing, authentication, and session management may require an adapter beyond stateless HTTP GET/POST.
 - Continue OLED, audio feedback, power, and enclosure work according to hardware readiness.
