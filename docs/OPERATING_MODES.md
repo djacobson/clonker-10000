@@ -192,7 +192,7 @@ Three different concepts must remain separate:
 
 The Config v4 schema supports `on_path` and `off_path` for power/mute toggles. Runtime direction selection is **IMPLEMENTED**: the dispatcher maintains independent, volatile ON/OFF command histories per room and action. A successful HTTP request advances the next direction; a changed configuration save resets all histories.
 
-This command history is **not authoritative equipment state**. External remotes, HDMI-CEC, and manual device controls can change equipment independently. Deliberate failure-path and blank-command tests remain outstanding.
+This command history is **not authoritative equipment state**. External remotes, HDMI-CEC, and manual device controls can change equipment independently. October 27, 2026 bench tests confirmed that failed HTTP requests, blank selected command paths, and missing endpoints do not advance toggle direction history. Broader failure-condition and physical-input testing remains outstanding.
 
 Changing SERVICE/DEVICE or CONFIG/RUN must **never** transmit a power command merely because a mode changed.
 
