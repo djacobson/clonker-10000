@@ -690,56 +690,95 @@ The generic destination architecture is intended to support future protocols, in
 
 ---
 
-## 9. Example JSON v3 Configuration
 
-The following example illustrates the current structure of one room.
+## 9. Example Clonker Config v4 Configuration
 
-**This is an incomplete example, not a deployable configuration.**
+Clonker Config v4 uses JSON for storage.
 
-A valid operational configuration requires at least one configured room and all fourteen fundamental actions within each configured room.
+The root `"version": 4` identifies the active configuration schema.
+
+The following excerpt illustrates the structure of a room containing fundamental actions and an executable custom action.
+
+**This is an incomplete illustration, not a deployable configuration.**
+
+A valid operational configuration requires the complete set of fourteen fundamental actions for each configured room.
 
 ```json
 {
-  "version": 3,
-  "rooms": {
-    "room-1": {
-      "name": "Den",
-      "devices": {
-        "device-1": "",
-        "device-2": "192.168.50.44:8080",
-        "device-3": "192.168.50.43:8060"
-      },
-      "actions": {
-        "volume-up": {
-          "target": "device-2",
-          "method": "GET",
-          "path": "/goform/formiPhoneAppDirect.xml?MVUP"
-        },
-        "home": {
-          "target": "device-3",
-          "method": "POST",
-          "path": "/keypress/Home"
-        },
-        "mute-toggle": {
-          "target": "device-2",
-          "method": "GET",
-          "on_path": "/goform/formiPhoneAppDirect.xml?MUON",
-          "off_path": "/goform/formiPhoneAppDirect.xml?MUOFF"
+    "version": 4,
+    "rooms": {
+        "room-1": {
+            "name": "Den",
+            "devices": {
+                "device-1": "",
+                "device-2": "192.168.50.44:8080",
+                "device-3": "192.168.50.43:8060"
+            },
+            "actions": {
+                "volume-up": {
+                    "target": "device-2",
+                    "method": "GET",
+                    "path": "/goform/formiPhoneAppDirect.xml?MVUP"
+                },
+                "home": {
+                    "target": "device-3",
+                    "method": "POST",
+                    "path": "/keypress/Home"
+                }
+            },
+            "custom_actions": [
+                {
+                    "id": "custom-action-1",
+                    "name": "Movie",
+                    "steps": [
+                        {
+                            "target": "device-3",
+                            "method": "POST",
+                            "path": "/keypress/Home",
+                            "wait_after_ms": 3000
+                        },
+                        {
+                            "target": "device-2",
+                            "method": "GET",
+                            "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1",
+                            "wait_after_ms": 0
+                        }
+                    ]
+                }
+            ]
         }
-      },
-      "custom_actions": []
     }
-  }
 }
 ```
 
-The full operational JSON is maintained in:
+### 9.1 Complete Roku/Denon sample
+
+The repository maintains a complete, readable Clonker Config v4 sample at:
+
+`docs/samples/device_config_roku_denon_sample.json`
+
+The sample contains:
+
+- Den and Sunroom configurations.
+- Fourteen fundamental actions per room.
+- Three Den custom actions: Movie, Music, and Vinyl.
+- Two Sunroom custom actions: Movie and Music.
+- Ten custom-action command steps across the two rooms.
+- Real Roku and Denon HTTP command mappings.
+
+Unlike the abbreviated illustration above, the complete sample includes all required fundamental actions.
+
+The Pico's operational configuration is stored at:
+
+`/clonker/device_config.json`
+
+The corresponding repository file is:
 
 `firmware/clonker/device_config.json`
 
-Readable samples are maintained separately under `docs/samples/`.
+Operational JSON is normally serialized compactly to conserve storage and remain within the 8,192-byte configuration limit.
 
-The operational file is normally stored in compact form.
+Readable documentation samples may be formatted with indentation and whitespace and are not intended for direct deployment without checking their serialized size.
 
 ---
 
@@ -1061,23 +1100,33 @@ The configuration editor is served from:
 
 It operates through the Pico's HTTP management service.
 
+
 ### 16.1 Current capabilities
 
-The editor supports:
+The Clonker Config v4 browser editor supports:
 
-- Display of one to three configured rooms; unused room slots are omitted.
+- Display of configured rooms within the three supported room slots.
 - Editable room names.
 - Built-in device endpoint addresses.
-- Fourteen fundamental actions per room.
-- Target selection.
-- GET/POST selection.
-- Ordinary command paths.
-- Separate toggle ON/OFF paths.
-- Configuration loading.
-- Revision-aware saving.
+- Fourteen fixed fundamental actions per room.
+- Fundamental-action target and HTTP method selection.
+- Ordinary command paths and separate toggle ON/OFF paths.
+- Creation and deletion of custom actions.
+- Editing custom-action names and IDs before their first successful save.
+- Stable custom-action IDs after saving.
+- Adding, editing, removing, and ordering custom-action command steps.
+- Built-in device target selection for each custom-action step.
+- HTTP GET/POST selection and command paths.
+- Configurable post-command waits.
+- Browser-side validation and configuration-size checking.
+- Configuration loading and refresh.
+- Revision-aware saving and stale-tab conflict detection.
 - Filesystem writability reporting.
-- Save error messages.
-- Configuration refresh.
+- Save validation and error messages.
+
+The separate browser Test Remote, served from `/clonker/www/remote.html`, loads saved room-specific custom actions and provides a dropdown and explicit Run button.
+
+The editor and Test Remote operate through the Pico's HTTP management service.
 
 ### 16.2 Fixed device labels
 
@@ -1118,18 +1167,22 @@ This prevents separate hardcoded load and save versions from drifting apart.
 
 The Python and JavaScript constants must still be updated together during a future schema change.
 
+
 ### 16.4 Browser limitations
 
 The current editor does not support:
 
-- Adding custom devices.
-- Editing custom actions.
-- Constructing compound action sequences.
-- Editing built-in device labels.
-- Adding rooms.
-- Adding fundamental action IDs.
+- Adding user-defined custom devices.
+- Editing built-in device display labels.
+- Adding new room IDs beyond the three supported slots.
+- Adding or changing the fourteen fundamental action IDs.
+- Nested custom actions, loops, conditional branches, or scripting.
 
-These capabilities are not implied by the existing placeholders.
+The editor does support creating and editing custom actions with multiple ordered command steps.
+
+Custom actions currently target the three built-in device slots.
+
+Runtime power/mute direction selection remains unimplemented, even though the editor supports configuring separate ON/OFF paths.
 
 ---
 
