@@ -483,54 +483,49 @@ For toggle actions, runtime direction selection remains deferred. They currently
 
 ---
 
-## 7. Toggle Direction — Agreed Future Behavior
+## 7. Toggle Direction — Runtime Command History
 
 **Schema:** Implemented  
 **Browser fields:** Implemented  
-**Runtime direction selection:** Pending
+**Runtime direction selection:** Pending implementation
 
-The intended initial toggle implementation uses small, volatile command-direction history.
+Power and mute toggles use small, volatile command-direction histories. Each room maintains independent histories for `power-toggle` and `mute-toggle`.
 
-History is independent for each room and each toggle action.
+| Situation | Behavior |
+|---|---|
+| First press after boot | Send ON |
+| Next press after successful ON | Send OFF |
+| Next press after successful OFF | Send ON |
+| HTTP request fails | Do not advance history |
+| Command path or endpoint is blank | Do not advance history |
+| Pico restarts | Reset history to unknown |
+| Changed configuration is saved | Reset all toggle histories to unknown |
+| Unchanged configuration is saved | Preserve existing history |
+| Another remote changes equipment state | Clonker does not automatically know |
 
-Conceptually:
+### Direction and execution rules
 
-```text
-room-1:
-    power-toggle: unknown
-    mute-toggle:  unknown
+1. Unknown history selects the configured `on_path`.
+2. Direction is selected when the queued action executes, not when the browser submits it.
+3. History advances only after successful outbound HTTP execution according to the transport's success criteria.
+4. A failed or unconfigured command does not advance history.
+5. Histories are maintained separately for each room and toggle action.
+6. History is held only in RAM and is not persisted.
+7. A successful changed configuration save clears pending actions and resets all toggle histories. An unchanged save does neither.
 
-room-2:
-    power-toggle: unknown
-    mute-toggle:  unknown
+### Important limitation
 
-room-3:
-    power-toggle: unknown
-    mute-toggle:  unknown
-```
+This is **command history, not equipment-state detection**.
 
-Agreed behavior:
+Other remotes, HDMI-CEC, applications, or physical controls may change equipment state without Clonker knowing. An HTTP success response also does not prove the equipment reached the requested state.
 
-1. Unknown history initially selects ON.
-2. Successful ON submission makes OFF the next direction.
-3. Successful OFF submission makes ON the next direction.
-4. Failed requests do not advance history.
-5. Blank paths and endpoints do not advance history.
-6. History is not persisted.
-7. Restart resets history to unknown.
+Devices with a native toggle command may configure the same path for both `on_path` and `off_path`. In that case, the direction history still alternates, but the transmitted command is identical.
 
-This is command history, not equipment-state detection.
+The initial implementation will not query equipment state or reconcile external changes. If a command reaches equipment but its response is lost, Clonker may repeat the same direction on the next press.
 
-Other remotes, HDMI-CEC, applications, or physical controls may change equipment state without Clonker knowing.
-
-Devices with a native toggle command may use the same path for both `on_path` and `off_path`.
-
-The first implementation will not query equipment state or reconcile external changes.
-
-The dispatcher owns direction selection; the HTTP transport owns transmission and errors.
+The action dispatcher owns direction selection and history. The HTTP transport owns transmission and error reporting.
 
 ---
-
 
 ## 8. Custom Actions and Compound Actions
 
