@@ -54,6 +54,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 20, 2026 | 7. Dumb Queue and HTTP responsiveness | Logging-only queue validated; HTTP recovery improved |
 | Oct 21, 2026 | 8. Outbound HTTP and burst execution | Real Denon/Roku commands verified; five-command burst passed |
 | Oct 27, 2026 | 9. Runtime power/mute toggles | Denon/Roku ON/OFF, HDMI-CEC, configuration reset, and independent room histories verified |
+| Oct 27, 2026 | 10. Chapter 4 firmware closeout | Toggle negative tests, cooperative scheduler interleaving, and Test Remote regression passed; no code changes required |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -1713,6 +1714,97 @@ The existing dispatcher now handles ordinary fundamental actions, custom multi-s
 Physical buttons, rotary encoders, and the guarded SYSTEM MASTER remain future hardware work.
 
 **The Clonker can now remember which command direction comes next, without pretending it knows whether the television is actually on.**
+
+---
+
+# Milestone 10 — Chapter 4 Firmware Closeout
+
+**Date:** October 27, 2026  
+**Status:** PASS — negative tests, scheduler interleaving, and browser regression verified
+
+## Goal
+
+Complete the remaining focused Chapter 4 firmware tests before beginning physical-control development in Chapter 5.
+
+The existing Pico 2 W / CircuitPython 10.3.1 firmware was tested without introducing new features or changing the execution architecture.
+
+## Toggle failure and no-op verification
+
+| Test | Observed result |
+|---|---|
+| Unreachable Sunroom Denon endpoint | HTTP connection failure reported as `OSError(119,)` |
+| Repeated request after failure | Selected `MUON` again; direction history preserved |
+| Failure recovery | Dumb Queue accepted the subsequent request |
+| Blank toggle ON path | Two successive presses produced `NO-OP` |
+| Missing device endpoint | Two successive presses produced `NO-OP` |
+| Restore original Denon endpoint and paths | `MUON` and `MUOFF` both returned HTTP 200 |
+| Restored direction alternation | ON → OFF → ON confirmed |
+
+The unreachable endpoint was `192.168.50.250:8080`. Both failed connection attempts completed in approximately 500 ms.
+
+The tests demonstrated that unsuccessful requests and unconfigured fundamental toggle actions do not advance volatile command-direction history.
+
+After restoring the Sunroom Denon endpoint to `192.168.50.40:8080`, successful mute ON/OFF requests completed in approximately 109 ms and 106 ms.
+
+## Cooperative scheduler verification
+
+The existing Sunroom **Movie** custom action was used:
+
+1. Roku Home via HTTP POST.
+2. Cooperative wait of 3000 ms.
+3. Denon Quick Select 1 via HTTP GET.
+
+During the wait, an independent Sunroom Volume Up action was requested.
+
+Observed execution order:
+
+| Event | Approximate REPL timestamp | Result |
+|---|---|---|
+| Roku Home completed | +6853.0 s | HTTP 200 |
+| Independent Volume Up completed | +6854.8 s | HTTP 200 |
+| Denon Quick Select 1 completed | +6856.1 s | HTTP 200 |
+| Custom action completed | +6856.1 s | PASS |
+
+Volume Up executed during the custom action's wait, approximately 1.3 seconds before Quick Select 1.
+
+This verified that a waiting custom action does not prevent the shared dispatcher from executing another eligible fundamental action.
+
+## Browser Test Remote regression
+
+The Sunroom Movie custom action remained selected and its Run button remained enabled after execution.
+
+Switching from Sunroom to Den and back also left Movie selected and Run enabled.
+
+Because Movie was the first available custom action, these observations do not establish selection preservation among multiple custom actions. No demonstrated defect justified a JavaScript change.
+
+## Chapter 4 outcome
+
+**No firmware changes were required during these closeout tests.**
+
+The verified baseline includes:
+
+- Runtime fundamental HTTP actions.
+- Volatile per-room/action power and mute direction history.
+- Successful-command-only toggle advancement.
+- Failed-request recovery and unconfigured toggle no-ops.
+- Executable multi-step custom actions.
+- Cooperative queue interleaving during custom waits.
+- Working browser Test Remote behavior for the tested configuration.
+
+## Remaining boundaries
+
+The following are not claimed as fully verified:
+
+- Sustained queue pressure and long-duration Wi-Fi outages.
+- Malformed device responses across all failure conditions.
+- Extended memory and uptime stability.
+- High-rate physical encoder and button events.
+- Browser selection preservation with multiple custom actions.
+- Physical GPIO integration and hardware power management.
+
+These remain future engineering or regression tasks, not Chapter 4 firmware blockers.
+
+**Chapter 4 closes with a working, tested firmware foundation. The next challenge is to give the monster physical controls.**
 
 ---
 
