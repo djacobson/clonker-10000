@@ -1339,7 +1339,21 @@ A poll executes at most one eligible task.
 
 Future-dated tasks do not block independent eligible tasks.
 
-### 18.3 Current queue behavior
+### 18.3 Custom-action execution
+
+Clonker Config v4 custom actions share the same queue and outbound HTTP transport as fundamental actions.
+
+A custom-action request identifies the room and stable custom-action ID. The dispatcher executes its ordered command steps, applying each configured `wait_after_ms` before the next step becomes eligible.
+
+Post-command waits are cooperative. Other eligible queued actions may execute while a custom action is waiting.
+
+Each poll performs at most one eligible unit of work.
+
+Custom actions do not require a separate macro executor, nested action dispatch, or scripting engine.
+
+See Section 8 for the configuration structure, validation limits, execution model, and verified Roku/Denon test.
+
+### 18.4 Current queue behavior
 
 | Property | Behavior |
 |---|---|
@@ -1356,7 +1370,7 @@ The queue's name is deliberately descriptive.
 
 It does not need to know whether a destination is a Denon, Roku, television, or future custom device.
 
-### 18.4 Outbound HTTP transport
+### 18.5 Outbound HTTP transport
 
 The transport sends simple GET or POST requests to configured IPv4 endpoints.
 
@@ -1366,7 +1380,7 @@ It uses bounded network timeouts and reports HTTP status and elapsed time.
 
 Connection reuse and advanced protocol support are deferred until actual requirements justify them.
 
-### 18.5 HTTP success versus equipment success
+### 18.6 HTTP success versus equipment success
 
 An HTTP 200 response establishes that the remote HTTP endpoint responded successfully.
 
