@@ -38,7 +38,7 @@ The Clonker currently provides:
 
 Custom devices remain planned but are not yet implemented.
 
-Runtime power/mute toggle direction selection also remains pending. Although the configuration stores separate ON/OFF paths, the dispatcher currently defers these toggle actions.
+Runtime power/mute toggle direction selection is implemented. The dispatcher maintains independent, volatile ON/OFF command histories for each room and toggle action. This behavior has been bench-tested through the browser Test Remote.
 
 The active firmware loads:
 
@@ -479,7 +479,7 @@ And:
 
 **HTTP success does not prove equipment state changed.**
 
-For toggle actions, runtime direction selection remains deferred. They currently do not transmit ON/OFF commands.
+For toggle actions, the dispatcher selects the configured ON or OFF path using volatile command-direction history. A blank selected path or missing endpoint remains an unconfigured no-op, without advancing history.
 
 ---
 
@@ -487,7 +487,7 @@ For toggle actions, runtime direction selection remains deferred. They currently
 
 **Schema:** Implemented  
 **Browser fields:** Implemented  
-**Runtime direction selection:** Pending implementation
+**Runtime direction selection:** Implemented; bench-tested October 27, 2026
 
 Power and mute toggles use small, volatile command-direction histories. Each room maintains independent histories for `power-toggle` and `mute-toggle`.
 
@@ -1191,7 +1191,6 @@ This prevents separate hardcoded load and save versions from drifting apart.
 
 The Python and JavaScript constants must still be updated together during a future schema change.
 
-
 ### 16.4 Browser limitations
 
 The current editor does not support:
@@ -1206,7 +1205,7 @@ The editor does support creating and editing custom actions with multiple ordere
 
 Custom actions currently target the three built-in device slots.
 
-Runtime power/mute direction selection remains unimplemented, even though the editor supports configuring separate ON/OFF paths.
+Runtime power/mute direction selection is operational through the shared dispatcher. The browser editor supports configuring separate ON/OFF paths; the Test Remote invokes the same fundamental actions used by future physical controls.
 
 ---
 
@@ -1359,7 +1358,7 @@ See Section 8 for the configuration structure, validation limits, execution mode
 | Automatic retries | None |
 | Network failure | Clear remaining queue |
 | Configuration change | Clear remaining queue |
-| Toggle execution | Deferred |
+| Toggle execution | Operational; per-room, per-action volatile direction history |
 
 The queue's name is deliberately descriptive.
 
@@ -1502,9 +1501,13 @@ Custom-device targets remain deferred until optional custom devices are implemen
 
 ### 20.3 Runtime toggles
 
-Implement the agreed volatile ON/OFF command-direction history.
+Runtime power/mute direction selection is implemented and bench-tested using the browser Test Remote.
 
-Avoid treating command history as authoritative equipment state.
+The dispatcher maintains independent, volatile command-direction histories for each room and toggle action. Successful HTTP execution advances the next direction. A changed configuration save resets all histories.
+
+This is command history, not authoritative equipment-state detection. External remotes and HDMI-CEC may change equipment state without Clonker knowing.
+
+Remaining verification includes deliberately failed HTTP requests and unconfigured toggle paths.
 
 ### 20.4 Physical controls
 
@@ -1664,16 +1667,20 @@ A readable sample is maintained at:
 
 The operational configuration is stored as compact JSON and remains subject to the 8,192-byte size limit.
 
-**Supported in configuration, but not yet operational at runtime:**
+**Operational at runtime:**
 
 - Separate ON/OFF command paths for power and mute.
-- Runtime selection of the appropriate toggle direction.
+- Volatile ON/OFF direction history, independently per room and toggle action.
+- Direction selection when queued actions execute.
+- History advancement only after successful outbound HTTP execution.
+- History reset after a changed configuration save or firmware restart.
 
-The configuration editor can store both paths, but the dispatcher currently defers power/mute toggle actions because runtime direction tracking has not been implemented.
+**October 27, 2026 bench verification:** Sunroom Denon mute ON/OFF commands executed successfully. Sunroom Roku Home/PowerOff commands operated the LG G1 and Denon X1800H HDMI-CEC power chain. A changed configuration save reset direction history, the next Sunroom mute selected ON, and the Den room independently selected ON.
+
+Failure-path history preservation and blank-path behavior remain code-reviewed but not deliberately bench-tested.
 
 **Remaining development:**
 
-- Runtime power/mute direction history, without assuming knowledge of actual equipment state.
 - Optional user-defined custom devices.
 - Physical buttons, encoders, and room-selection controls.
 - Apple TV protocol integration.
