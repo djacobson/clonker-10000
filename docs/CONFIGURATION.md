@@ -522,107 +522,171 @@ The dispatcher owns direction selection; the HTTP transport owns transmission an
 
 ---
 
+
 ## 8. Custom Actions and Compound Actions
 
 ### 8.1 Current implementation
 
-Every room currently contains:
+Clonker Config v4 supports executable, user-defined custom actions.
 
-```json
-"custom_actions": []
-```
+Each configured room contains a `custom_actions` array. The array may be empty or contain up to sixteen custom actions.
 
-The active validator requires this array to be empty.
+Custom actions are independent of the fourteen fixed fundamental actions.
 
-Nonempty custom-action arrays are rejected.
+Each custom action has:
 
-Any illustrative custom actions in the browser Test Remote are placeholders, not executable user-defined actions.
+- A stable, room-local action ID.
+- An editable display name.
+- One to sixteen ordered command steps.
 
-### 8.2 Agreed terminology
+A custom action containing multiple command steps is also called a compound action.
+
+A single-step custom action remains a valid custom action.
+
+The browser configuration editor supports creating, editing, deleting, validating, and saving custom actions.
+
+The browser Test Remote loads the selected room's saved custom actions and provides a dropdown and separate Run button.
+
+### 8.2 Terminology
 
 | Term | Meaning |
 |---|---|
 | Fundamental action | One of the fourteen fixed remote-control actions |
 | Custom action | A user-defined, named action |
-| Command step | One HTTP operation within a custom action |
 | Compound action | A custom action containing multiple ordered command steps |
-| Destination | A built-in or custom device endpoint |
+| Command step | One HTTP operation within a custom action |
+| Destination | A configured device endpoint |
+| Post-command wait | Delay before the next step becomes eligible |
 
-A custom action may contain one or more steps.
+Custom actions currently target built-in device slots. Optional user-defined custom devices remain future work.
 
-A single-step custom action is still a custom action.
+### 8.3 Configuration structure
 
-### 8.3 Planned command-step model
+A custom action is represented as an object in the room's `custom_actions` array.
 
-The initial custom-action design is intentionally simple.
+Example:
 
-A custom action will have a stable identity, a display name, and an ordered collection of command steps.
-
-Each step is expected to contain:
-
-- Destination.
-- HTTP method.
-- Command path.
-- Optional wait after the command.
-
-The intended wait field is `wait_ms`, expressed in milliseconds.
-
-The exact JSON field names and limits remain to be finalized.
-
-### 8.4 Planned queue integration
-
-Compound actions should reuse the existing Dumb Queue™ and outbound HTTP transport.
-
-There should not be a separate macro executor.
-
-The agreed direction is to expand a compound action into queued command steps with lightweight predecessor dependencies.
-
-A dependent step becomes eligible only after its predecessor finishes successfully and any requested wait has elapsed.
-
-Independent commands should remain eligible while a compound action waits.
-
-For example:
-
-```text
-Custom Action: Movie Night
-
-Step 1: Send AVR input command
-        Wait 250 ms
-
-Step 2: Send TV command
-        Wait 500 ms
-
-Step 3: Send streaming command
+```json
+{
+    "name": "Movie",
+    "id": "custom-action-1",
+    "steps": [
+        {
+            "target": "device-3",
+            "path": "/keypress/Home",
+            "method": "POST",
+            "wait_after_ms": 3000
+        },
+        {
+            "target": "device-2",
+            "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1",
+            "method": "GET",
+            "wait_after_ms": 0
+        }
+    ]
+}
 ```
 
-The waits begin after the preceding command completes, not when it is originally enqueued.
+The example sends Roku Home, waits three seconds, and then invokes Denon Quick Select 1.
 
-The initial implementation should avoid:
+The fields are:
+
+| Field | Purpose |
+|---|---|
+| `id` | Stable identifier used to dispatch the custom action |
+| `name` | Human-readable display name |
+| `steps` | Ordered list of command-step objects |
+| `target` | Built-in device ID |
+| `method` | HTTP `GET` or `POST` |
+| `path` | HTTP command path |
+| `wait_after_ms` | Nonnegative delay after the step, in milliseconds |
+
+The active field name is `wait_after_ms`, not the earlier proposed `wait_ms`.
+
+### 8.4 Validation and limits
+
+Clonker Config v4 enforces:
+
+- A maximum of sixteen custom actions per room.
+- One to sixteen steps per custom action.
+- Custom-action IDs of no more than forty characters.
+- Custom-action names of no more than sixty characters.
+- Valid, configured built-in device targets.
+- HTTP `GET` or `POST` methods.
+- Required command paths.
+- Post-command waits from 0 through 60,000 milliseconds.
+- A zero wait on the final command step.
+- Unique custom-action IDs within each room.
+- The overall 8,192-byte configuration limit.
+
+Custom-action IDs are stable after their first successful save. Names and steps remain editable.
+
+The firmware validator is authoritative. Browser-side validation provides earlier feedback but must remain aligned with firmware rules.
+
+### 8.5 Runtime execution
+
+Custom actions reuse the existing Dumb Queue™ and outbound HTTP transport.
+
+The implementation does not introduce a separate macro executor.
+
+When a custom action is submitted:
+
+1. The dispatcher resolves the selected room and custom-action ID.
+2. The custom action enters the shared action queue.
+3. The executor processes command steps in their configured order.
+4. Each step sends its configured HTTP request.
+5. Any configured post-command wait delays eligibility of the next step.
+6. The action completes after its final step.
+
+Waiting is cooperative rather than a blocking sleep.
+
+The design allows unrelated eligible actions to be processed while a compound action is waiting. Additional live interleaving regression testing remains on the development checklist.
+
+The queue and transport retain responsibility for command execution, errors, and cancellation behavior.
+
+### 8.6 Verified live execution
+
+During Chapter 4, the Sunroom Movie custom action successfully controlled two different network devices.
+
+The recorded execution was:
+
+```text
+QUEUED: Sunroom / custom-action-1
+Roku Home: HTTP 200
+Next step after 3000 ms
+Denon Quick Select 1: HTTP 200
+CUSTOM COMPLETE: Sunroom / custom-action-1
+```
+
+The Roku returned to Home and the Denon selected its configured Quick Select 1 settings.
+
+This established successful end-to-end execution of a persisted, browser-configured, multi-device custom action.
+
+### 8.7 Deliberate limitations
+
+The initial custom-action implementation does not include:
 
 - Loops.
 - Conditional branches.
-- Nested macros.
-- Scripting.
-- Automatic retries.
-- Rollback/undo.
+- Nested custom actions.
+- Arbitrary scripting.
+- Automatic rollback or undo.
 - Complex dependency graphs.
+- User-defined custom-device destinations.
 
-A failed compound step may trigger the existing queue-wide cancellation policy.
+These omissions are intentional. The implementation favors predictable, bounded command sequences.
 
-These are design intentions, not currently implemented capabilities.
+### 8.8 Future custom-device integration
 
-### 8.5 Custom-device references
+Custom actions currently reference `device-1`, `device-2`, or `device-3`.
 
-Custom action steps should be able to target either:
+Future custom-device support may introduce additional stable destination IDs without changing the fundamental-action identities.
 
-- Built-in devices.
-- User-defined custom devices.
+Fundamental actions remain associated with the three built-in device slots.
 
-Fundamental actions remain restricted to the built-in device slots.
+Custom-device deletion and reference validation must prevent accidental retargeting of existing custom actions.
 
-The browser should distinguish built-in and custom destinations without requiring a complicated editor.
-
-Stable IDs are important: removing one custom device must not silently retarget existing actions.
+The generic destination architecture is intended to support future protocols, including Apple TV, without assuming that every protocol can use the existing HTTP GET/POST transport.
 
 ---
 
