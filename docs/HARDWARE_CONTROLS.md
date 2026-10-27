@@ -182,7 +182,7 @@ The current fourteen fixed action IDs are:
 
 The current Config v4 firmware also supports **room-specific executable custom actions**, including multi-step GET/POST commands and cooperative waits. A future selector or dedicated button may invoke a custom action through the **same dispatcher**. Physical control mapping remains a hardware/UI design decision; exact schema and execution behavior belong in the configuration and firmware references.
 
-**Toggle boundary:** Configured ON/OFF paths exist for mute and power; runtime toggle direction/history remains deferred. Do not mistake a browser action being accepted for a confirmed equipment-state change.
+**Toggle boundary:** Configured ON/OFF paths for mute and power are operational through the shared dispatcher, with independent volatile direction histories per room and action. The browser Test Remote exercised these commands successfully on October 27, 2026. Command history is not authoritative equipment state, and the physical controls remain unimplemented.
 
 ---
 
@@ -199,7 +199,7 @@ SYSTEM MASTER is **not** GP17 filesystem ownership, CONFIG/RUN, the Pico reset c
 
 ### Normal awake operation
 
-A press requests `power-toggle` through the common action dispatcher. Future toggle-history logic will choose the intended ON/OFF path; it must not be mistaken for knowledge of the equipment's actual state. Other remotes, HDMI-CEC, and manual controls can change that state independently.
+A press is intended to request `power-toggle` through the common action dispatcher. The implemented runtime selects the configured ON/OFF path using independent, volatile per-room/action command history. This does **not** establish the equipment's actual state; other remotes, HDMI-CEC, and manual controls can change that state independently. The physical SYSTEM MASTER button itself is not yet wired or tested.
 
 ### Preferred deep-sleep ignition sequence
 
@@ -439,13 +439,13 @@ This is a proposed order, not a fixed commitment. A compelling new switch or mec
 
 ## 15. Current verification snapshot — October 27, 2026
 
-**Implemented and tested:** Pico 2 W / CircuitPython startup, Wi-Fi, USB/REPL, GP17 filesystem ownership, Config v4 browser configuration/persistence, browser Test Remote, fundamental outbound GET/POST actions, executable custom actions, shared cooperative queue, and a real Roku → wait → Denon compound sequence.
+**Implemented and tested:** Pico 2 W / CircuitPython startup, Wi-Fi, USB/REPL, GP17 filesystem ownership, Config v4 browser configuration/persistence, browser Test Remote, fundamental outbound GET/POST actions, executable custom actions, shared cooperative queue, a real Roku → wait → Denon compound sequence, and runtime power/mute ON/OFF direction selection. October 27 bench tests verified Sunroom mute/power execution, HDMI-CEC power behavior, changed-configuration history reset, and independent Den/Sunroom toggle histories.
 
 **Implemented in firmware but not fully hardware-exercised:** CONFIG/RUN listener transitions through simulated state; action dispatch under all network/failure/load scenarios.
 
 **Not yet implemented:** Physical action buttons, encoder drivers, room selector GPIO, physical CONFIG/RUN switch, SYSTEM MASTER wake/ignition, battery management, OLED, audio feedback, and final enclosure.
 
-**Not finalized:** Toggle ON/OFF runtime direction logic, physical BOTH semantics, mechanical switch assignments, complete GPIO map, and rechargeable power design.
+**Not finalized:** Physical BOTH semantics, mechanical switch assignments, complete GPIO map, rechargeable power design, and the guarded SYSTEM MASTER's sleep/wake behavior.
 
 For dated tests, use [Development History](DEVELOPMENT_HISTORY.md). The historical October 19 logging-only dispatcher snapshot should **not** be treated as current firmware status.
 
