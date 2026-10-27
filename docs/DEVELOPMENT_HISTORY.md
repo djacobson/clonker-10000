@@ -53,6 +53,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 19, 2026 | 6. Browser Test Remote | Fourteen logging-only actions verified |
 | Oct 20, 2026 | 7. Dumb Queue and HTTP responsiveness | Logging-only queue validated; HTTP recovery improved |
 | Oct 21, 2026 | 8. Outbound HTTP and burst execution | Real Denon/Roku commands verified; five-command burst passed |
+| Oct 27, 2026 | 9. Runtime power/mute toggles | Denon/Roku ON/OFF, HDMI-CEC, configuration reset, and independent room histories verified |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -1645,6 +1646,73 @@ But something fundamental has changed.
 **It can actually do it.**
 
 And now we're teaching it how to do more without making it unnecessarily complicated.
+
+---
+
+# Milestone 9 — Runtime Power/Mute Toggles Come Alive
+
+**Date:** October 27, 2026  
+**Status:** PASS — implemented and hardware-tested
+
+## Goal
+
+Complete runtime ON/OFF direction selection for the existing `power-toggle` and `mute-toggle` fundamental actions without introducing equipment-state polling or a separate execution framework.
+
+## Implementation
+
+The shared dispatcher in `firmware/clonker/actions.py` now maintains a small, volatile direction-history dictionary keyed by room ID and action ID.
+
+- Unknown history initially selects ON.
+- Direction is selected when a queued action executes.
+- Successful HTTP execution advances ON → OFF or OFF → ON.
+- Failed requests, missing endpoints, and blank selected paths do not advance history.
+- Different rooms and toggle actions maintain independent histories.
+- A firmware restart resets volatile history.
+- A successful changed configuration save clears pending queue work and resets all toggle histories.
+- An unchanged configuration save preserves history.
+
+The existing HTTP transport, configuration schema, and Dumb Queue™ remain the execution foundation.
+
+This is deliberately **command history**, not authoritative knowledge of equipment state.
+
+## Hardware verification
+
+The browser Test Remote exercised real equipment through the Pico.
+
+| Test | Result |
+|---|---|
+| Sunroom Denon X1800H mute ON (`MUON`) | PASS — HTTP 200 |
+| Sunroom Denon X1800H mute OFF (`MUOFF`) | PASS — HTTP 200 |
+| Repeated mute ON/OFF alternation | PASS |
+| Sunroom Roku Home command | PASS — HTTP 200 |
+| Sunroom Roku PowerOff command | PASS — HTTP 200 |
+| LG G1 / Denon X1800H HDMI-CEC power chain | PASS — observed power ON/OFF |
+| Changed configuration save resets histories | PASS |
+| First mute after changed save selects ON | PASS |
+| Den room history independent of Sunroom | PASS — HTTP 200 |
+
+Observed HTTP transaction times were approximately 100–125 ms for Denon mute and 145–188 ms for Roku power commands.
+
+## Verification boundaries
+
+The following remain untested as deliberate negative scenarios:
+
+- Failed HTTP requests preserving toggle history.
+- Blank ON/OFF command paths.
+- Missing destination endpoints.
+- High-rate physical input during toggle execution.
+
+Successful HTTP execution does not prove the resulting equipment state, especially when external remotes or HDMI-CEC participate.
+
+## Architectural significance
+
+Runtime toggles required no new network protocol, no equipment-state database, and no second command scheduler.
+
+The existing dispatcher now handles ordinary fundamental actions, custom multi-step actions, and power/mute direction selection through the same execution path.
+
+Physical buttons, rotary encoders, and the guarded SYSTEM MASTER remain future hardware work.
+
+**The Clonker can now remember which command direction comes next, without pretending it knows whether the television is actually on.**
 
 ---
 
