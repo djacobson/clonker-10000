@@ -1,10 +1,10 @@
 # THE CLONKER 10000
 ## Hardware & Physical Controls
 
-**Design reference:** Updated October 27, 2026  
+**Design reference:** Updated October 28, 2026  
 **Controller:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Firmware baseline:** Chapter 4 / Clonker Config v4  
-**Hardware baseline:** GP17 SERVICE/DEVICE jumper tested; physical action controls not yet integrated
+**Firmware baseline:** Chapter 5 / physical GPIO scheduler shell operational  
+**Hardware baseline:** GP17 SERVICE/DEVICE jumper tested; physical action controls not yet wired
 
 > A gloriously overengineered, tactile, Wi-Fi home theater remote. Two rotary controls, real buttons, questionable restraint, and absolutely no interest in becoming another touchscreen.
 
@@ -105,6 +105,66 @@ The earlier **Unexpected Maker FeatherS3[D] / ESP32-S3** selection is historical
 `firmware/boot.py` reads GP17 during boot; DEVICE remounts the filesystem writable for the Pico. **Change the jumper only while unpowered and perform a full power cycle.** Ctrl+D is not an ownership-mode change. A removable internal jumper, recessed switch, or internal slide switch could eventually replace the bench jumper; final choice TBD. It must remain distinct from CONFIG/RUN and SYSTEM MASTER.
 
 See [Operating Modes](OPERATING_MODES.md) for precise mode behavior and deployment cautions.
+
+### Physical GPIO subsystem — Chapter 5 foundation
+
+**Status: Implemented and Pico-tested October 28, 2026. Physical switches not yet connected.**
+
+The firmware now includes a dedicated physical-control subsystem:
+
+- `firmware/clonker/controls/physical.py` — initialization and polling interface.
+- `firmware/clonker/main.py` — startup integration and cooperative scheduler.
+- `PHYSICAL_CONTROLS_ENABLED` — development-time enable/disable flag.
+
+The subsystem follows a simple lifecycle:
+
+1. Initialize physical controls once during application startup, if enabled.
+2. Record whether initialization succeeded.
+3. Poll the initialized subsystem ahead of queued-action execution.
+4. Do not repeatedly initialize controls or attempt automatic hot-plug recovery.
+5. Restart the application when hardware connections or GPIO configuration change.
+
+The current physical polling interval is 10 ms. This is a scheduler target, **not a guaranteed input sampling interval**: synchronous outbound HTTP operations can temporarily block the cooperative loop.
+
+#### Brain-only mode
+
+`PHYSICAL_CONTROLS_ENABLED = False` disables physical-control initialization and polling.
+
+The browser configuration interface, Test Remote, shared Dumb Queue, outbound HTTP transport, and simulated CONFIG/RUN switch remain operational.
+
+The flag does not affect the GP17 SERVICE/DEVICE boot jumper.
+
+When enabled, the current subsystem initializes successfully but contains no actual GPIO readers or action dispatch. It is intentionally an empty framework.
+
+#### Initialization and failure policy
+
+Subsystem initialization errors must not prevent the rest of Clonker from starting.
+
+Future individual controls should fail independently wherever practical. An initialized GPIO input does not necessarily prove a mechanical switch is connected.
+
+Ordinary switches and encoders do not require hot-plug support. Initial input states must not generate unintended actions.
+
+Debouncing, encoder decoding, event capture, and per-control fault isolation remain future work.
+
+#### Pico verification — October 28, 2026
+
+| Test | Result |
+|---|---|
+| Physical controls disabled | PASS — brain-only startup confirmed |
+| CONFIG listener with controls disabled | PASS |
+| Sunroom Home with controls disabled | PASS — HTTP 200 |
+| Physical controls enabled | PASS — startup without GPIO errors |
+| CONFIG listener with controls enabled | PASS |
+| Sunroom Home with controls enabled | PASS — HTTP 200 |
+| Unexpected physical actions | None observed |
+
+Both flag settings were deployed and tested on the Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
+
+These tests establish that the empty physical-control subsystem does not disrupt the verified browser and network-control paths. They do **not** establish actual switch or encoder functionality.
+
+**The Monster has a nervous system. The nerve endings are still on order.**
+
+---
 
 ## 4. Proposed control layout
 
