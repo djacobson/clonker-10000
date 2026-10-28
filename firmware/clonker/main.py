@@ -26,7 +26,7 @@ from clonker import device_config_v2 as device_config
 
 # Physical GPIO controls are optional during development.
 # False = brain-only mode; browser controls and action queue still work.
-PHYSICAL_CONTROLS_ENABLED = False
+PHYSICAL_CONTROLS_ENABLED = True
 
 # Cooperative scheduler intervals.
 PHYSICAL_POLL_INTERVAL = 0.01
