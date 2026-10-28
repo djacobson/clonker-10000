@@ -20,10 +20,16 @@ from clonker.system import logger
 from clonker.net import web
 from clonker import actions
 from clonker.controls import switches
+from clonker.controls import physical
 from clonker import device_config_v2 as device_config
 
 
-# Management HTTP service is low priority.
+# Physical GPIO controls are optional during development.
+# False = brain-only mode; browser controls and action queue still work.
+PHYSICAL_CONTROLS_ENABLED = False
+
+# Cooperative scheduler intervals.
+PHYSICAL_POLL_INTERVAL = 0.01
 WEB_POLL_INTERVAL = 0.01
 ACTION_POLL_INTERVAL = 0.01
 
@@ -62,18 +68,37 @@ def main():
             len(room["actions"])
         ))
 
+    # Initialize physical GPIO controls once at startup.
+    physical_ready = False
+    if PHYSICAL_CONTROLS_ENABLED:
+        try:
+            physical_ready = physical.initialize()
+        except Exception as exc:
+            logger.warning("Physical controls initialization failed: {}".format(exc))
+
+    if not PHYSICAL_CONTROLS_ENABLED:
+        logger.info("Physical controls disabled (brain-only mode)")
+
     web_running = False
     next_web_poll = time.monotonic()
     next_action_poll = time.monotonic()
+    next_physical_poll = time.monotonic()
 
     try:
         while True:
-            # Priority 1: Physical GPIO inputs (future).
+
+            # Priority 1: Physical GPIO inputs.
             # Priority 2: Execute one eligible queued action.
             # Priority 3: CONFIG management HTTP.
             #
             # The queue is polled in both CONFIG and RUN modes.
             now = time.monotonic()
+
+            if physical_ready and now >= next_physical_poll:
+                physical.poll()
+                next_physical_poll = (
+                    time.monotonic() + PHYSICAL_POLL_INTERVAL
+                )
 
             if now >= next_action_poll:
                 actions.poll()
