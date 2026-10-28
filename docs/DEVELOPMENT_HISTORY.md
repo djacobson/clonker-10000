@@ -55,6 +55,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 21, 2026 | 8. Outbound HTTP and burst execution | Real Denon/Roku commands verified; five-command burst passed |
 | Oct 27, 2026 | 9. Runtime power/mute toggles | Denon/Roku ON/OFF, HDMI-CEC, configuration reset, and independent room histories verified |
 | Oct 27, 2026 | 10. Chapter 4 firmware closeout | Toggle negative tests, cooperative scheduler interleaving, and Test Remote regression passed; no code changes required |
+| Oct 28, 2026 | 11. Chapter 5 GPIO scheduler foundation | Optional physical-control initialization and polling integrated; both flag settings Pico-tested with successful Roku HTTP execution |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -1805,6 +1806,53 @@ The following are not claimed as fully verified:
 These remain future engineering or regression tasks, not Chapter 4 firmware blockers.
 
 **Chapter 4 closes with a working, tested firmware foundation. The next challenge is to give the monster physical controls.**
+
+---
+
+# Milestone 11 — Chapter 5: The Monster Gets Its Nervous System
+
+**Date:** October 28, 2026  
+**Status:** PASS — empty physical GPIO subsystem integrated and Pico-tested.
+
+Chapter 5 began with the physical-control framework rather than immediately connecting switches.
+
+### Firmware changes
+
+- Added `firmware/clonker/controls/physical.py` with one-time initialization and an empty polling interface.
+- Added `PHYSICAL_CONTROLS_ENABLED` in `firmware/clonker/main.py`.
+- Integrated physical initialization into application startup.
+- Added physical polling ahead of Dumb Queue execution in the cooperative scheduler.
+- Preserved browser CONFIG mode, simulated CONFIG/RUN selection, and outbound HTTP independently of the physical-control flag.
+
+The initial physical polling interval is 10 ms, subject to blocking network operations.
+
+The subsystem does not yet assign GPIO pins, decode encoders, debounce switches, or dispatch physical actions.
+
+### Pico verification
+
+**Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1.
+
+| Test | Observed result |
+|---|---|
+| `PHYSICAL_CONTROLS_ENABLED = False` | Brain-only startup confirmed |
+| CONFIG listener, controls disabled | Operational |
+| Sunroom Roku Home, controls disabled | HTTP 200 |
+| `PHYSICAL_CONTROLS_ENABLED = True` | Startup successful; no GPIO initialization errors |
+| CONFIG listener, controls enabled | Operational |
+| Sunroom Roku Home, controls enabled | HTTP 200 |
+| Unexpected physical actions | None observed |
+
+Both configurations were deployed to the Pico and tested through the browser Test Remote.
+
+The result establishes the scheduler integration and preserves the working network-action baseline. Actual GPIO input behavior remains untested.
+
+### Next boundary
+
+Physical controls will initialize once at startup. Hot-plug detection and automatic reinitialization are not requirements; changing hardware connections may require an application restart.
+
+Future work includes button events, rotary encoder decoding, debounce handling, room selection, physical CONFIG/RUN switching, and resilience to individual input failures.
+
+**The Monster has a nervous system. Actual nerve endings are still pending.**
 
 ---
 
