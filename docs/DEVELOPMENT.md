@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** October 27, 2026  
+**Updated:** October 28, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Current baseline:** Chapter 4 — Clonker Config v4, fundamental actions, custom actions, and cooperative compound execution operational  
+**Current baseline:** Chapter 5 — Config v4, fundamental/custom actions, cooperative compound execution, and empty physical GPIO scheduler shell operational  
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
@@ -93,6 +93,7 @@ The repository's `firmware/` tree is copied to corresponding paths on CIRCUITPY.
 | `firmware/clonker/net/http_transport.py` | Outbound bounded blocking HTTP GET/POST |
 | `firmware/clonker/www/index.html` | Configuration editor and clock UI |
 | `firmware/clonker/www/remote.html` | Browser Test Remote, including custom-action selector |
+| `firmware/clonker/controls/physical.py` | Optional physical GPIO initialization and priority-one polling shell |
 | `firmware/clonker/controls/switches.py` | Simulated CONFIG/RUN state; future physical input |
 | `firmware/clonker/controls/pins.py` | GPIO definitions |
 | `firmware/clonker/system/clock.py` | Clock reference and timestamps |
@@ -333,7 +334,7 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 
 ---
 
-## 9. Verification snapshot — October 27, 2026
+## 9. Verification snapshot — October 28, 2026
 
 ### 9.1 Implemented and exercised
 
@@ -346,7 +347,8 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 - Denon volume and Roku navigation through HTTP GET/POST.
 - Configured custom actions and cooperative compound steps using the shared queue.
 - Verified Sunroom Roku Home → 3000 ms wait → Denon Quick Select 1 sequence.
-
+- Chapter 5 physical-control scheduler shell: verified startup with `PHYSICAL_CONTROLS_ENABLED` both disabled and enabled, CONFIG listener operational, and Sunroom Home returning HTTP 200 in both modes (October 28, 2026).
+ 
 ### 9.2 Implemented but not exhaustively tested
 
 - Interrupted-write and sudden-power-loss recovery paths.
@@ -434,6 +436,7 @@ The working Config v4 baseline should be protected while proceeding in measured 
 
 ### 12.2 Physical-control integration
 
+- The empty GPIO initialization/polling shell is implemented and Pico-tested; see [Hardware & Physical Controls](HARDWARE_CONTROLS.md) for its lifecycle and verification.
 - Establish reliable button and encoder input events.
 - Measure responsiveness during ordinary HTTP requests and compound waits.
 - Begin with straightforward repeated volume actions; optimize only when measured behavior warrants it.
