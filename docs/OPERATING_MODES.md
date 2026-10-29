@@ -297,15 +297,20 @@ For the full deployment checklist, see [Development & Deployment](DEVELOPMENT.md
 
 ## 12. Verification status and remaining work
 
-**Current reference date:** October 27, 2026.
+**Current reference date:** October 29, 2026.
 
 ### Implemented and exercised
 
-- GP17 boot-time SERVICE/DEVICE selection and corresponding filesystem ownership.
-- DEVICE-mode browser saves and SERVICE-mode rejection of persistent writes.
+- GP17 physical boot-mode switch: OFF/open selects SERVICE (USB); ON/grounded selects DEVICE.
+- Boot-time filesystem ownership, DEVICE-mode browser saves, and SERVICE (USB)-mode rejection of persistent writes.
 - Config v4 validation, revision protection, and selected backup/recovery behavior.
-- CONFIG-mode browser management service and Test Remote.
-- Fundamental action dispatch through the shared queue to real Denon/Roku equipment.
+- GP18 physical CONFIG/RUN switch: grounded selects CONFIG; open selects RUN.
+- Live CONFIG → RUN → CONFIG transitions without rebooting.
+- Management HTTP listener stops in RUN and restarts in CONFIG, confirmed through repeated browser refresh tests.
+- Serial diagnostics identifying `App mode source = PHYSICAL` and the effective application mode.
+- GP2 momentary power-button input, debounce, and press/release event logging.
+- Browser responsiveness with physical button polling enabled.
+- Fundamental action dispatch through the shared Dumb Queue™ to real Denon/Roku equipment.
 - Config v4 custom actions and cooperative multi-step execution, including a tested Roku command, wait, and Denon command.
 - Runtime power/mute ON/OFF direction selection through the shared dispatcher, bench-tested October 27, 2026 using the browser Test Remote.
 - Sunroom Denon mute ON/OFF and Roku Home/PowerOff execution, including the LG G1 and Denon X1800H HDMI-CEC power chain.
@@ -313,16 +318,18 @@ For the full deployment checklist, see [Development & Deployment](DEVELOPMENT.md
 
 ### Implemented, not exhaustively verified
 
-- All CONFIG/RUN listener transitions and failure-cleanup paths.
-- Configuration availability across every mode transition and unusual network failure.
+- CONFIG/RUN listener behavior under unusual network failures and extended operation.
+- Configuration availability across every operating-mode combination and transition.
 - All interrupted-write and power-loss recovery cases.
 - Extended load and long-uptime behavior.
 
 ### Not yet implemented or end-to-end tested
 
-- Physical CONFIG/RUN switch and GPIO debounce.
-- Physical room selector, guarded power control, and button/encoder input path.
-- End-to-end physical DEVICE + RUN operation.
+- Physical room selection and room-context propagation to action dispatch.
+- GP2 physical power-button event-to-action dispatch.
+- Complete physical DEVICE + RUN equipment-control operation.
+- Navigation buttons, volume encoder, and custom-action selector encoder.
+- SYSTEM MASTER sleep/wake and ignition behavior.
 - OLED and audible feedback integration.
 - Custom device slots and Apple TV protocol support.
 
