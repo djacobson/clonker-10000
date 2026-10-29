@@ -21,7 +21,7 @@ from clonker.system import logger
 from clonker.controls import pins
 
 
-BUTTON_PIN = getattr(board, "GP{}".format(pins.SYSTEM_POWER_BUTTON_PIN))
+BUTTON_PIN = getattr(board, "GP{}".format(pins.POWER_TOGGLE_PIN))
 DEBOUNCE_SECONDS = 0.03
 
 _initialized = False
@@ -59,7 +59,7 @@ def initialize():
         button.deinit()
         raise
 
-    logger.info("Physical button initialized on GP2")
+    logger.info("Power toggle initialized on GP{}".format(pins.POWER_TOGGLE_PIN))
     return True
 
 
@@ -88,4 +88,4 @@ def poll():
         if _stable_state:
             logger.info("Physical button RELEASED")
         else:
-            logger.info("Physical button PRESSED! CLONK!")
+            logger.info("POWER TOGGLE PRESSED! CLONK!")
