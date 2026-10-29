@@ -56,6 +56,8 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 27, 2026 | 9. Runtime power/mute toggles | Denon/Roku ON/OFF, HDMI-CEC, configuration reset, and independent room histories verified |
 | Oct 27, 2026 | 10. Chapter 4 firmware closeout | Toggle negative tests, cooperative scheduler interleaving, and Test Remote regression passed; no code changes required |
 | Oct 28, 2026 | 11. Chapter 5 GPIO scheduler foundation | Optional physical-control initialization and polling integrated; both flag settings Pico-tested with successful Roku HTTP execution |
+| Oct 28, 2026 | 12. Chapter 5 HTTP scheduler pacing | CONFIG browser responsiveness restored with 1 ms HTTP polling |
+| Oct 29, 2026 | 13. Chapter 5 physical switch and button verification | GP17 SERVICE/DEVICE, GP18 CONFIG/RUN, and GP2 debounced events physically verified |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -1853,6 +1855,151 @@ Physical controls will initialize once at startup. Hot-plug detection and automa
 Future work includes button events, rotary encoder decoding, debounce handling, room selection, physical CONFIG/RUN switching, and resilience to individual input failures.
 
 **The Monster has a nervous system. Actual nerve endings are still pending.**
+
+---
+
+# Milestone 12 — Chapter 5: HTTP Pacing and Browser Responsiveness
+
+**Date:** October 28, 2026  
+**Status:** PASS — scheduler adjustment tested in Chrome and Safari
+
+### Problem
+
+During physical-control development, the CONFIG interface became intermittently slow or incomplete. Windows Chrome exhibited delayed page loading, unfinished requests, `ERR_EMPTY_RESPONSE`, and HTTP response timeouts.
+
+The new GPIO subsystem was initially suspected. Disabling physical controls, however, did not eliminate the symptoms.
+
+### Investigation
+
+The inbound HTTP server advances a bounded amount of work per `web.poll()` call. A large response may require many individual send operations.
+
+With a 512-byte transmission chunk, a roughly 40 KB response requires at least 80 successful send operations. At a 10 ms HTTP polling interval, those operations alone could consume approximately 800 ms of scheduler time, excluding network delays and competing work.
+
+Diagnostics confirmed that some responses began transmitting but timed out before completion.
+
+### Correction
+
+The management HTTP polling interval in `firmware/clonker/main.py` changed from:
+
+```python
+WEB_POLL_INTERVAL = 0.01
+```
+
+to:
+
+```python
+WEB_POLL_INTERVAL = 0.001
+```
+
+Physical-input and action-queue polling remained at 10 ms.
+
+### Verification
+
+Repeated CONFIG page refreshes completed promptly in Windows Chrome and iPad Safari. Physical controls were subsequently re-enabled, and GP2 press/release logging continued while the browser interface remained responsive.
+
+The final browser test also passed with inbound HTTP diagnostics disabled.
+
+### Engineering conclusion
+
+The original 10 ms HTTP polling interval was a significant contributor to the observed delays. The 1 ms interval is the tested working baseline, not proof of optimal scheduler design.
+
+The exact reason the issue became prominent during Chapter 5 remains unproven.
+
+**The Monster wasn't necessarily thinking too slowly. We simply weren't letting it answer the door often enough.**
+
+---
+
+# Milestone 13 — Chapter 5: Physical Switches and First Button Events
+
+**Date:** October 29, 2026  
+**Status:** PASS — GP17, GP18, and GP2 physically verified; equipment-action dispatch pending
+
+### Goal
+
+Move beyond the empty GPIO framework and demonstrate actual physical inputs without disturbing the working configuration, browser, queue, or HTTP subsystems.
+
+### GP17 — SERVICE / DEVICE
+
+A maintained physical switch was connected to GP17 using the internal pull-up.
+
+| Switch condition | Observed boot mode |
+|---|---|
+| OFF / open / HIGH | SERVICE (USB) |
+| ON / grounded / LOW | DEVICE |
+
+The boot diagnostics confirmed:
+
+```text
+CLONKER BOOT: SERVICE (USB) mode (switch OFF)
+CLONKER BOOT: DEVICE mode (switch ON)
+```
+
+SERVICE allows the USB host to own filesystem writes. DEVICE allows firmware-side writes, including browser configuration persistence.
+
+The selection occurs during `boot.py`; changing it requires a complete power cycle.
+
+### GP18 — CONFIG / RUN
+
+The guarded maintained CONFIG/RUN switch was physically connected to GP18, also using an internal pull-up.
+
+| Switch condition | Application mode | Management listener |
+|---|---|---|
+| OFF / open / HIGH | RUN | Stopped |
+| ON / grounded / LOW | CONFIG | Enabled |
+
+The firmware reported the application-mode source as `PHYSICAL` and logged CONFIG/RUN transitions.
+
+Unlike GP17 filesystem ownership, GP18 application-mode switching operates live without rebooting.
+
+The action queue remains available in both application modes.
+
+### GP2 — First momentary button
+
+The momentary power-toggle button was connected to GP2.
+
+The reusable button-input subsystem initialized the control and produced debounced press/release events in serial diagnostics.
+
+This established physical input detection and event reporting through the cooperative scheduler.
+
+**Important boundary:** The GP2 button did not yet send a power command or invoke `actions.dispatch()`. The physical button name identifies its intended function, not a completed equipment-control integration.
+
+### Firmware responsibilities
+
+The Chapter 5 physical-input implementation now uses:
+
+- `controls/pins.py` for central GPIO assignments.
+- `controls/buttons.py` for reusable button handling and debounce.
+- `controls/physical.py` for input initialization, polling, and event reporting.
+- `controls/switches.py` for CONFIG/RUN selection.
+- `main.py` for cooperative scheduling and management-listener lifecycle.
+- `boot.py` for SERVICE/DEVICE filesystem ownership.
+
+Unassigned optional buttons are skipped. Individual button initialization failures are logged rather than treated as reasons to abandon the entire application.
+
+### Verified versus pending
+
+**Verified:**
+
+- GP17 boot-time filesystem mode selection.
+- GP18 live application-mode selection.
+- Management listener responding to CONFIG/RUN state.
+- GP2 debounced button press/release reporting.
+- Continued operation of the established browser/network action pipeline.
+
+**Pending:**
+
+- Physical room selector integration.
+- Mapping GP2 events to room-aware `power-toggle` dispatch.
+- Navigation, Home, Back, and other physical buttons.
+- Volume and custom-action encoder integration.
+- Measurements of input capture during blocking outbound HTTP.
+- OLED, audio feedback, battery, and enclosure integration.
+
+### Engineering conclusion
+
+Chapter 5 now has physically verified mode controls and its first working button-input events. These are meaningful hardware milestones, but they do not yet constitute a fully operational physical remote.
+
+**The Monster has nerve endings. Next, we teach them which muscles to move.**
 
 ---
 
