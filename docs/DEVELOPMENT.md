@@ -144,35 +144,57 @@ The underlying conflict was not conclusively identified. Clonker's own inbound m
 
 ## 5. Two independent operating-mode dimensions
 
-### 5.1 SERVICE / DEVICE — filesystem ownership
+### 5.1 SERVICE (USB) / DEVICE — filesystem ownership
 
-The boot-time GP17 jumper controls who may write CIRCUITPY:
+The physical GP17 boot-mode switch determines who may write to CIRCUITPY.
 
-| GP17 jumper | Mode | Writable owner |
-|---|---|---|
-| Open | SERVICE (USB) | USB host |
-| Grounded | DEVICE | Pico firmware |
+| GP17 switch | Electrical state | Mode | Writable owner |
+|---|---|---|---|
+| OFF | Open / HIGH | SERVICE (USB) | USB host |
+| ON | Grounded / LOW | DEVICE | Pico firmware |
 
 GP17 is physical Pico pin **22**; the adjacent ground connection is pin **23**. GP17 uses an internal pull-up.
 
-**Change procedure:** Disconnect power, change the jumper, reconnect power, and verify the boot mode. Do not move the jumper while powered. A Ctrl+D soft reload does not reliably reselect boot-time filesystem ownership.
+**Change procedure:** Disconnect power completely, change the GP17 switch, reconnect power, and verify the boot diagnostic. A Ctrl+D soft reload does not replace the required cold boot.
 
-SERVICE mode is for USB deployment and host-side file maintenance. Browser inspection and action testing can still be available if CONFIG is enabled, but browser configuration saves must be rejected when the filesystem is read-only to firmware.
+Expected diagnostics:
 
-DEVICE mode permits validated browser configuration saves and recovery writes. The USB host sees the filesystem as read-only.
+```text
+CLONKER BOOT: SERVICE (USB) mode (switch OFF)
+CLONKER BOOT: DEVICE mode (switch ON)
+```
+
+SERVICE (USB) is for firmware deployment and host-side file maintenance. Browser inspection and action testing remain available when CONFIG is enabled, but browser configuration saves are rejected because the filesystem is read-only to firmware.
+
+DEVICE permits validated browser configuration saves and recovery writes. The USB host sees CIRCUITPY as read-only.
+
+**Hardware status:** Both switch positions physically tested October 29, 2026.
 
 ### 5.2 CONFIG / RUN — application management
 
-CONFIG/RUN is independent of SERVICE/DEVICE:
+The physical GP18 guarded switch controls the application management interface independently of GP17.
 
-- **CONFIG:** Starts the inbound HTTP management listener, configuration editor, Test Remote, and clock API. Queued action execution continues.
-- **RUN:** Stops the management listener. The shared action queue still operates; physical inputs will eventually supply actions.
+| GP18 switch | Electrical state | Application mode | Management HTTP listener |
+|---|---|---|---|
+| OFF | Open / HIGH | RUN | Stopped |
+| ON | Grounded / LOW | CONFIG | Enabled on port 9090 |
 
-The application-mode logic exists in `main.py`; the physical CONFIG/RUN switch is **not yet wired**. Development currently uses a simulated switch state. CONFIG/RUN is not an HTTP action and is not the same as an AV device's power toggle.
+GP18 uses an internal pull-up and is monitored by the running application.
+
+- **CONFIG:** Enables the configuration editor, Test Remote, and clock API. Queued action execution continues.
+- **RUN:** Disables the inbound management listener. The shared action queue and physical-input polling continue.
+
+Changing GP18 takes effect **without rebooting**. The running firmware reports the physical mode source and selected application mode through serial diagnostics.
+
+**Hardware status:** GP18 physical input and runtime listener transitions tested October 29, 2026.
+
+CONFIG/RUN is not an HTTP action, an AV equipment power toggle, or a room selector.
 
 The intended normal physical-remote combination is **DEVICE + RUN**. Browser configuration with persistence uses **DEVICE + CONFIG**.
 
-See [Operating Modes](OPERATING_MODES.md) before changing hardware or mode behavior.
+The GP2 momentary power-button input is also operational at the event-detection level, but it is **not yet connected to equipment action dispatch**.
+
+See [Operating Modes](OPERATING_MODES.md) for the authoritative mode behavior, transition rules, and verification details.
 
 ---
 
