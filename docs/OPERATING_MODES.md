@@ -204,21 +204,25 @@ Live CONFIG/RUN transitions and physical CONFIG/RUN switch operation remain pend
 
 ## 6. RUN: management interface disabled
 
-**Status:** Listener transition logic implemented; physical input and end-to-end physical remote behavior not yet verified.
+**Status:** Physical GP18 CONFIG/RUN switching and management-listener transitions implemented and tested October 29, 2026.
 
-RUN is intended to be the normal operating state of the completed remote. In RUN:
+RUN is intended to be the normal operating state of the completed remote.
+
+In RUN:
 
 - The management HTTP listener is stopped.
 - The browser editor, configuration API, clock endpoint, and Test Remote are unavailable.
 - Wi-Fi and the validated in-memory configuration remain available.
-- The shared action poller remains part of the application's cooperative loop.
-- Physical controls are intended to generate actions without needing the management server.
+- The shared Dumb Queue™ and action poller continue operating independently of the management listener.
+- Physical controls can continue to be polled; their eventual action dispatch does not require the management server.
 
-**Important distinction:** Real outbound Denon/Roku command execution **is implemented**. What remains untested is the complete physical-control-to-device experience in RUN, because the physical buttons, encoders, and mode switch are not yet integrated.
+**Verified:** Switching GP18 to RUN stops the management listener. Returning to CONFIG restores browser access without rebooting.
 
-Changing CONFIG/RUN should not reload configuration from flash. The application continues using its active validated RAM snapshot, including a successfully saved change made in CONFIG.
+**Not yet verified:** End-to-end physical button execution against AV equipment in RUN. GP2 press/release events are operational, but physical room selection and event-to-action dispatch remain pending.
 
-The final remote should accept ordinary physical controls in both CONFIG and RUN; CONFIG adds management services rather than disabling the remote. This requirement awaits hardware verification.
+Changing CONFIG/RUN does not reload configuration from flash. The application continues using its active validated RAM snapshot, including successfully saved changes made in CONFIG.
+
+The intended final behavior is that ordinary physical controls work in both CONFIG and RUN. CONFIG adds management services rather than disabling the remote.
 
 ## 7. Four operating combinations
 
