@@ -93,9 +93,9 @@ The repository's `firmware/` tree is copied to corresponding paths on CIRCUITPY.
 | `firmware/clonker/net/http_transport.py` | Outbound bounded blocking HTTP GET/POST |
 | `firmware/clonker/www/index.html` | Configuration editor and clock UI |
 | `firmware/clonker/www/remote.html` | Browser Test Remote, including custom-action selector |
-| `firmware/clonker/controls/physical.py` | Optional physical GPIO initialization and priority-one polling shell |
-| `firmware/clonker/controls/switches.py` | Simulated CONFIG/RUN state; future physical input |
-| `firmware/clonker/controls/pins.py` | GPIO definitions |
+| `firmware/clonker/controls/physical.py` | Physical GPIO initialization, cooperative polling, and button event/debounce handling; GP2 input verified |
+| `firmware/clonker/controls/switches.py` | GP18 physical CONFIG/RUN selection, runtime mode detection, and management-listener control |
+| `firmware/clonker/controls/pins.py` | Centralized GPIO assignments and physical-control pin definitions |
 | `firmware/clonker/system/clock.py` | Clock reference and timestamps |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
 
