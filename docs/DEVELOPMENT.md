@@ -334,12 +334,15 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 
 ---
 
-## 9. Verification snapshot — October 28, 2026
+## 9. Verification snapshot — October 29, 2026
 
 ### 9.1 Implemented and exercised
 
 - Pico 2 W / CircuitPython 10.3.1 startup and Wi-Fi connectivity.
-- GP17 SERVICE/DEVICE selection and firmware-side DEVICE persistence.
+- GP17 physical SERVICE (USB)/DEVICE switch, including boot-time filesystem ownership selection.
+- GP18 guarded CONFIG/RUN switch, including runtime listener startup and shutdown without reboot.
+- GP2 momentary button input, debounce, and press/release event logging.
+- Cooperative physical-control polling alongside browser handling and queued network execution.
 - Config v4 loading, browser editing, revision protection, verified saves, and selected recovery scenarios.
 - Optional configured rooms and generic built-in device identifiers.
 - Browser Test Remote and management API on port 9090.
@@ -347,8 +350,8 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 - Denon volume and Roku navigation through HTTP GET/POST.
 - Configured custom actions and cooperative compound steps using the shared queue.
 - Verified Sunroom Roku Home → 3000 ms wait → Denon Quick Select 1 sequence.
-- Chapter 5 physical-control scheduler shell: verified startup with `PHYSICAL_CONTROLS_ENABLED` both disabled and enabled, CONFIG listener operational, and Sunroom Home returning HTTP 200 in both modes (October 28, 2026).
- 
+- Browser and network-action smoke tests with physical-control polling enabled.
+
 ### 9.2 Implemented but not exhaustively tested
 
 - Interrupted-write and sudden-power-loss recovery paths.
@@ -356,12 +359,15 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 - Sustained queue pressure and extended Wi-Fi failure scenarios.
 - Long-duration monotonic scheduling and memory stability.
 - Physical input responsiveness during synchronous outbound HTTP.
-- All possible CONFIG/RUN listener transitions and operational combinations.
+- Extended operation and repeated transitions across all four SERVICE/DEVICE and CONFIG/RUN combinations.
+- Physical switch and button behavior under electrical noise, rapid operation, and extended use.
 
-### 9.3 Not yet implemented
+### 9.3 Not yet implemented or integrated
 
-- Physical buttons and rotary encoders connected to action dispatch.
-- Physical CONFIG/RUN switch and room selector.
+- Physical room-selector input and selected-room dispatch context.
+- GP2 power-button events connected to the action dispatcher.
+- Physical navigation, Back, Home, and volume controls connected to action dispatch.
+- Custom-action selector encoder integration.
 - User-defined custom device slots beyond `device-1` through `device-3`.
 - Apple TV discovery, pairing, authentication, and command protocol.
 - OLED feedback, audible CLONK, battery management, and final enclosure.
