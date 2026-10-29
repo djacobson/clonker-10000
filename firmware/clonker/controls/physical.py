@@ -4,88 +4,76 @@
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
 
-"""Physical GPIO controls.
+"""Physical control initialization and event polling.
 
-Initialize once at startup; poll from the cooperative scheduler.
-Chapter 5 first input: GP2 momentary pushbutton.
-
+Coordinates reusable input components.
 The CONFIG/RUN switch is managed separately in switches.py.
 """
 
-
-import time
-import board
-import digitalio
-
 from clonker.system import logger
 from clonker.controls import pins
+from clonker.controls.buttons import Button
 
-
-BUTTON_PIN = getattr(board, "GP{}".format(pins.POWER_TOGGLE_PIN))
-DEBOUNCE_SECONDS = 0.03
 
 _initialized = False
-_button = None
-_last_raw_state = True
-_stable_state = True
-_last_change_time = 0.0
+_buttons = []
 
 
 def initialize():
-    """Initialize the first physical button."""
+    """Initialize assigned physical buttons."""
     global _initialized
-    global _button
-    global _last_raw_state
-    global _stable_state
-    global _last_change_time
 
     if _initialized:
         return True
 
-    button = digitalio.DigitalInOut(BUTTON_PIN)
+    definitions = (
+        ("POWER_TOGGLE", pins.POWER_TOGGLE_PIN),
+        ("HOME", pins.HOME_BUTTON_PIN),
+        ("BACK", pins.BACK_BUTTON_PIN),
+        ("UP", pins.UP_BUTTON_PIN),
+        ("DOWN", pins.DOWN_BUTTON_PIN),
+        ("LEFT", pins.LEFT_BUTTON_PIN),
+        ("RIGHT", pins.RIGHT_BUTTON_PIN),
+        ("SELECT", pins.SELECT_BUTTON_PIN),
+        ("VOLUME_MUTE", pins.VOLUME_ENCODER_BUTTON_PIN),
+        ("ACTION_RUN", pins.ACTION_ENCODER_BUTTON_PIN),
+    )
 
-    try:
-        button.direction = digitalio.Direction.INPUT
-        button.pull = digitalio.Pull.UP
+    for name, pin_number in definitions:
+        if pin_number is None:
+            continue
 
-        _last_raw_state = button.value
-        _stable_state = _last_raw_state
-        _last_change_time = time.monotonic()
+        button = Button(name, pin_number)
 
-        _button = button
-        _initialized = True
+        try:
+            button.initialize()
+            _buttons.append(button)
+            logger.info(
+                "{} button initialized on GP{}".format(
+                    name, pin_number
+                )
+            )
+        except Exception as exc:
+            logger.warning(
+                "{} button unavailable: {}".format(name, exc)
+            )
 
-    except Exception:
-        button.deinit()
-        raise
-
-    logger.info("Power toggle initialized on GP{}".format(pins.POWER_TOGGLE_PIN))
+    _initialized = True
     return True
 
 
 def poll():
-    """Detect debounced button presses and releases."""
-    global _last_raw_state
-    global _stable_state
-    global _last_change_time
+    """Poll all initialized buttons for events."""
 
     if not _initialized:
         return
 
-    now = time.monotonic()
-    raw_state = _button.value
+    for button in _buttons:
+        event = button.poll()
 
-    if raw_state != _last_raw_state:
-        _last_raw_state = raw_state
-        _last_change_time = now
+        if event is None:
+            continue
 
-    if (
-        raw_state != _stable_state
-        and now - _last_change_time >= DEBOUNCE_SECONDS
-    ):
-        _stable_state = raw_state
-
-        if _stable_state:
-            logger.info("Physical button RELEASED")
-        else:
-            logger.info("POWER TOGGLE PRESSED! CLONK!")
+        logger.info(
+            "{} {}".format(button.name, event.upper())
+        )
