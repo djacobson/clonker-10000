@@ -436,12 +436,28 @@ The working Config v4 baseline should be protected while proceeding in measured 
 
 ### 12.2 Physical-control integration
 
-- The empty GPIO initialization/polling shell is implemented and Pico-tested; see [Hardware & Physical Controls](HARDWARE_CONTROLS.md) for its lifecycle and verification.
-- Establish reliable button and encoder input events.
-- Measure responsiveness during ordinary HTTP requests and compound waits.
-- Begin with straightforward repeated volume actions; optimize only when measured behavior warrants it.
-- Implement and test room selection and CONFIG/RUN physical controls.
-- Keep GPIO handlers device-independent and feed the same action dispatcher used by the browser.
+**Completed and Pico-tested October 28–29, 2026:**
+
+- Optional physical-control initialization and cooperative GPIO polling.
+- GP2 momentary button input, debounce, and press/release event logging.
+- GP17 physical SERVICE (USB)/DEVICE boot-mode switch.
+- GP18 guarded CONFIG/RUN application-mode switch, including live management-listener transitions without reboot.
+- Browser and network-action smoke tests with physical-control polling enabled.
+
+**Next implementation steps:**
+
+1. Wire and test the physical room selector.
+2. Establish reliable selected-room context for physical input events.
+3. Connect GP2 power-button presses to the existing room-specific `power-toggle` dispatcher.
+4. Verify real equipment response, debounce behavior, and repeated presses.
+5. Add navigation, Back, and Home controls incrementally.
+6. Integrate the Bourns custom-action selector encoder.
+7. Electrically verify the Grayhill volume encoder before implementing volume steps.
+8. Measure physical-input responsiveness during outbound HTTP requests and compound waits.
+
+Keep GPIO handlers device-independent. All physical actions must use the same dispatcher and Dumb Queue™ as the browser Test Remote.
+
+See [Hardware & Physical Controls](HARDWARE_CONTROLS.md) for verified GPIO assignments, component status, and remaining mechanical decisions.
 
 ### 12.3 Deferred action and protocol capabilities
 
