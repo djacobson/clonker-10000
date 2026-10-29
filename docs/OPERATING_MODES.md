@@ -1,10 +1,10 @@
 # The Clonker 10000 — Operating Modes
 
-**Design reference:** Updated October 27, 2026  
+**Design reference:** Updated October 29, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
 **Runtime:** CircuitPython 10.3.1  
-**Current baseline:** Chapter 4 / Clonker Config v4  
-**Status:** SERVICE/DEVICE filesystem selection implemented and tested; CONFIG/RUN application-mode logic implemented with simulated input; physical CONFIG/RUN switch pending.
+**Current baseline:** Chapter 5 / Clonker Config v4  
+**Status:** GP17 SERVICE (USB)/DEVICE boot-mode switch and GP18 CONFIG/RUN application-mode switch physically implemented and tested. GP2 momentary button input verified; room-aware physical action dispatch pending.
 
 > Two switches. Two completely different jobs. One appropriately complicated monster.
 
@@ -14,26 +14,29 @@
 
 Clonker has **two independent operating-mode dimensions**:
 
-1. **SERVICE (USB) / DEVICE** decides whether the USB host or the Pico firmware owns filesystem writes. This is selected at boot.
-2. **CONFIG / RUN** decides whether the application exposes its management HTTP interface. This is an application-level selection intended to change during runtime.
+1. **SERVICE (USB) / DEVICE** determines whether the USB host or Pico firmware owns filesystem writes. GP17 selects this mode at boot.
+2. **CONFIG / RUN** determines whether the application exposes its management HTTP interface. GP18 selects this mode during runtime.
 
 Neither dimension is an AV equipment power command. Neither selects a room. Neither changes the definition of a configured action.
 
-| Property | SERVICE / DEVICE | CONFIG / RUN |
+| Property | SERVICE (USB) / DEVICE | CONFIG / RUN |
 |---|---|---|
 | Responsibility | Filesystem write ownership | Management HTTP availability |
-| Mechanism | GP17 boot jumper | Simulated software state; physical switch planned |
+| Physical control | GP17 maintained boot-mode switch | GP18 guarded maintained switch |
+| Electrical selection | OFF/open = SERVICE; ON/grounded = DEVICE | OFF/open = RUN; ON/grounded = CONFIG |
 | Evaluated by | `firmware/boot.py` | Main loop via `controls/switches.py` |
 | Selection time | At boot | During application operation |
-| Requires full power cycle to change | **Yes** | **No**, by design |
-| Implemented | Yes, tested | Listener logic implemented; physical input not wired |
+| Requires full power cycle to change | **Yes** | **No** |
+| Hardware verification | **Tested October 29, 2026** | **Tested October 29, 2026** |
 | Changes external equipment power | No | No |
 
-**Normal eventual operation:** DEVICE + RUN.  
+**Normal remote operation:** DEVICE + RUN.  
 **Normal browser configuration:** DEVICE + CONFIG.  
-**USB firmware deployment:** SERVICE, generally with CONFIG available for inspection.
+**USB firmware deployment:** SERVICE (USB), with CONFIG available when browser inspection is desired.
 
-The application can execute configured outbound actions through the shared Dumb Queue™ while CONFIG is enabled. The action poller is not inherently dependent on the management listener. Physical-input operation in RUN remains unverified because physical controls have not been integrated.
+The application can execute configured outbound actions through the shared Dumb Queue™ while CONFIG is enabled. The action poller is independent of the management listener.
+
+**Current physical-control boundary:** GP2 button press/release events are operational, but room selection and physical event-to-action dispatch remain pending. The complete physical remote experience in RUN has therefore not yet been verified.
 
 ## 2. SERVICE (USB): host-owned filesystem
 
