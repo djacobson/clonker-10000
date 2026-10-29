@@ -133,16 +133,35 @@ The Test Remote is **operational**, not a logging-only stub. It can enqueue conf
 
 The authoritative application-mode interface is `switches.config_enabled()` in `firmware/clonker/controls/switches.py`.
 
-The GPIO assignment in `controls/pins.py` determines the normal input source:
+The normal hardware configuration assigns `CONFIG_SWITCH_PIN = 18` in `firmware/clonker/controls/pins.py`.
 
 | `CONFIG_SWITCH_PIN` | Source | Behavior |
 |---|---|---|
-| `None` | SIMULATED | Use the software state |
-| GPIO number | PHYSICAL | Read the maintained hardware switch |
+| `18` | PHYSICAL | Read the maintained GP18 switch |
+| `None` | SIMULATED | Use the software state for development |
+
+### Verified GP18 electrical behavior
+
+The physical switch uses an internal GPIO pull-up.
+
+| GP18 state | Switch position | Application mode |
+|---|---|---|
+| LOW / grounded | ON | CONFIG |
+| HIGH / open | OFF | RUN |
+
+**This polarity was physically tested October 29, 2026.** It is no longer provisional.
+
+The physical switch is the normal source for application-mode selection. Changing its position takes effect during runtime without a reboot.
+
+### Simulated mode
+
+For hardware-free development, setting `CONFIG_SWITCH_PIN = None` selects the simulated source.
 
 The simulated state defaults to CONFIG (`True`) and can be changed with `switches.set_simulated_config(enabled)`.
 
-A separate software override can temporarily supersede either source:
+### Software override
+
+A temporary software override can supersede either physical or simulated mode selection.
 
 | `set_config_override()` value | Effective behavior |
 |---|---|
@@ -162,13 +181,17 @@ switches.set_config_override(None)   # Return to normal selection
 
 The override is **RAM-only** and resets on application restart. It is a development and troubleshooting facility, not a browser-facing control or a persistent configuration setting.
 
-When a physical GPIO is assigned, the proposed electrical convention is **grounded = CONFIG; open/high = RUN**, using an internal pull-up. This polarity is provisional until the actual guarded switch is wired and tested.
+### Hardware-presence limitations
 
-**Schrödinger's switch:** An ordinary GPIO input cannot reliably distinguish an intentionally open switch from a disconnected wire. Therefore, Clonker does not attempt automatic hardware-presence detection. If the physical switch is unavailable, select simulation explicitly by setting `CONFIG_SWITCH_PIN = None`, or use the software override.
+**Schrödinger's switch:** An ordinary GPIO input cannot reliably distinguish an intentionally open switch from a disconnected wire.
+
+Clonker therefore does not attempt automatic hardware-presence detection.
+
+If the physical switch is unavailable, select simulation explicitly by setting `CONFIG_SWITCH_PIN = None`, or use the software override.
 
 GPIO initialization errors are not silently converted into simulated mode.
 
-The CONFIG/RUN selection is independent of SERVICE/DEVICE filesystem ownership and equipment power-toggle actions.
+CONFIG/RUN selection remains independent of GP17 SERVICE (USB)/DEVICE filesystem ownership, physical room selection, and equipment power-toggle actions.
 
 ### Listener lifecycle
 
