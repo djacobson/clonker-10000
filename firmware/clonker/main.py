@@ -123,15 +123,15 @@ def main():
                 web.stop()
                 web_running = False
 
-            # Announce the effective source and mode on startup
+            # Announce the application mode source and state on startup
             # and whenever either changes. Never log every poll.
             if config_source != last_announced_source:
-                logger.info("CONFIG/RUN source: {}".format(config_source))
+                logger.info("App mode source = {}".format(config_source))
                 last_announced_source = config_source
 
             if config_mode != last_announced_mode:
                 logger.info(
-                    "{} mode enabled".format(
+                    "App mode = {}".format(
                         "CONFIG" if config_mode else "RUN"
                     )
                 )
