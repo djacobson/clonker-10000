@@ -110,7 +110,7 @@ Do not change the jumper while powered. Do not attempt host writes while the Pic
 
 ## 5. CONFIG: management interface enabled
 
-**Status:** Implemented at application level; physical mode switch pending.
+**Status:** Implemented and physically verified October 29, 2026. The GP18 guarded switch enables CONFIG mode and starts the management HTTP listener without rebooting.
 
 CONFIG enables the Clonker management HTTP service on **port 9090**. In the documented development network the Pico is normally at `192.168.50.12`:
 
