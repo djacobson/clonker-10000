@@ -209,7 +209,8 @@ def _build_response(first_line, request=None):
         except (ValueError, OverflowError):
             body, status = _json_error("Invalid UTC timestamp")
 
-    # Save only in DEVICE mode. The engine checks schema, expected revision,
+    # Configuration saving requires a writable filesystem (boot mode: DEVICE).
+    # The engine checks schema, expected revision,
     # disk-vs-RAM consistency, and the path bound by the initial load().
     elif first_line.startswith(b"POST /api/config "):
         if storage.getmount("/").readonly:
