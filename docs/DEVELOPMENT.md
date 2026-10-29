@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** October 28, 2026  
+**Updated:** October 29, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Current baseline:** Chapter 5 — Config v4, fundamental/custom actions, cooperative compound execution, and empty physical GPIO scheduler shell operational  
+**Current baseline:** Chapter 5 — Clonker Config v4, operational browser actions and Dumb Queue™, physically verified GP17 SERVICE/DEVICE and GP18 CONFIG/RUN switches, and GP2 debounced button events. Physical room selection and equipment-action dispatch remain pending.
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
@@ -283,7 +283,7 @@ Do not delete backup files casually. See [Configuration & Recovery](CONFIGURATIO
 ### 7.4 Schema regression checklist
 
 - Clonker Config v4 version and required root keys.
-- One to three configured rooms with supported stable IDs.
+- One to three configured rooms (the current default sample uses two: Den and Sunroom; additional room support may evolve in future versions), with supported stable IDs.
 - Generic built-in slots `device-1`, `device-2`, and `device-3`.
 - Fourteen fundamental actions per room.
 - Optional custom actions with stable IDs and ordered steps.
