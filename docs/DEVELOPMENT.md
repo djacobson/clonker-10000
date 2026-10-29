@@ -375,7 +375,9 @@ These lists are a development snapshot, **not** a certification or exhaustive re
 
 **One small change. One clear test. One recorded result.**
 
-When reporting a failure, capture the source commit or changed files, actual deployed version, jumper and application modes, browser URL and request, relevant REPL logs, response/error, and observed equipment behavior. Note whether a cold power cycle changes the result.
+When reporting a failure, capture the source commit or changed files, actual deployed version, **GP17 SERVICE (USB)/DEVICE switch position**, **GP18 CONFIG/RUN switch position**, selected room (when relevant), browser URL and request, relevant REPL logs, response/error, and observed equipment behavior. Note whether a cold power cycle changes the result.
+
+For physical-input problems, also record the GPIO pin, expected electrical state, observed press/release events, and whether the event reached the action dispatcher. A logged button press does not by itself prove that an outbound command was queued or executed.
 
 ### 10.1 Common traps
 
