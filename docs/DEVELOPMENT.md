@@ -183,13 +183,16 @@ Use this procedure for ordinary source changes. Do not combine it with unplanned
 1. **Edit on iPad.** Review the diff in Working Copy; keep changes focused.
 2. **Commit and push.** Confirm the intended files appear on GitHub.
 3. **Update Windows checkout.** In GitHub Desktop, fetch and pull; verify the local checkout is current.
-4. **Enter SERVICE mode.** Power down, open GP17, reconnect, and verify host-writable CIRCUITPY.
+4. **Enter SERVICE (USB) mode.** Disconnect Pico power completely, set the **GP17 boot-mode switch OFF**, reconnect power, and verify `CLONKER BOOT: SERVICE (USB) mode (switch OFF)`. Confirm CIRCUITPY is writable from the USB host.
 5. **Copy only changed files.** Preserve the `clonker/` package tree and its `__init__.py` files. Do not overwrite `settings.toml` or the active `device_config.json` by default.
 6. **Verify deployed files.** Confirm file names, paths, and intended versions on CIRCUITPY. Remove stale module copies when appropriate.
-7. **Restart appropriately.** Use a soft reload for suitable code changes; perform a full power cycle for boot-time mode changes or when the test explicitly requires cold startup.
-8. **Inspect serial logs.** Confirm Wi-Fi, Config v4 loading, configured rooms, expected CONFIG/RUN behavior, and no unexpected exceptions.
-9. **Smoke-test the browser.** Open the configuration editor and Test Remote in CONFIG mode; confirm actual current data, not stale UI assets.
-10. **Test the changed behavior.** Verify queued actions, HTTP results, and equipment behavior as relevant. Record observations.
+7. **Return to DEVICE mode.** Disconnect Pico power, set the **GP17 switch ON**, reconnect power, and verify `CLONKER BOOT: DEVICE mode (switch ON)`.
+8. **Select application mode.** Set the **GP18 guarded switch ON** for CONFIG when browser testing is needed, or OFF for RUN. GP18 changes application mode without requiring another reboot.
+9. **Inspect serial logs.** Confirm Wi-Fi, Config v4 loading, configured rooms, expected CONFIG/RUN behavior, and no unexpected exceptions.
+10. **Smoke-test the browser in CONFIG.** Open the configuration editor and Test Remote; confirm actual current data, not stale UI assets.
+11. **Test the changed behavior.** Verify queued actions, HTTP results, physical-input events, and equipment behavior as relevant. Record observations.
+
+**Deployment distinction:** GP17 selects filesystem ownership at boot and requires a full power cycle. GP18 controls management-interface availability during runtime. Neither switch sends an AV equipment power command.
 
 ### 6.1 Typical copy map
 
