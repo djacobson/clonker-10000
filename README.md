@@ -315,8 +315,8 @@ Physical GPIO inputs             Browser Test Remote
    (implemented)                         |
          |                               |
          v                               |
- Physical dispatch                      |
-    (planned)                           |
+ Physical dispatch                       |
+    (planned)                            |
          |                               |
          +---------------+---------------+
                          |
