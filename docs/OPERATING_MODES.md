@@ -222,14 +222,22 @@ The final remote should accept ordinary physical controls in both CONFIG and RUN
 
 ## 7. Four operating combinations
 
+The GP17 boot-mode switch and GP18 application-mode switch operate independently, providing four possible combinations.
+
 | Filesystem mode | Application mode | Expected behavior |
 |---|---|---|
-| **SERVICE** | **CONFIG** | USB host can deploy files; browser can inspect/test; configuration writes rejected |
-| **SERVICE** | **RUN** | USB host owns writes; management server off; action engine remains available, but physical-input operation is pending |
-| **DEVICE** | **CONFIG** | Pico owns writes; browser configuration, guarded saves, and Test Remote available |
-| **DEVICE** | **RUN** | Pico owns writes; management server off; intended normal physical remote mode, not yet end-to-end hardware-tested |
+| **SERVICE (USB)** | **CONFIG** | USB host can deploy files; browser can inspect and test actions; configuration writes rejected |
+| **SERVICE (USB)** | **RUN** | USB host owns filesystem writes; management listener stopped; action engine remains available |
+| **DEVICE** | **CONFIG** | Pico owns filesystem writes; browser configuration, guarded saves, and Test Remote available |
+| **DEVICE** | **RUN** | Pico owns filesystem writes; management listener stopped; intended normal physical-remote operating mode |
 
-The mode combinations describe filesystem and management behavior, **not** a guarantee that every planned physical feature is implemented.
+**Verified October 29, 2026:** The physical GP18 switch changes CONFIG/RUN during runtime without rebooting. Browser refresh tests confirmed management-listener shutdown and restart.
+
+GP17 filesystem ownership remains a boot-time selection requiring a full power cycle.
+
+The action engine and validated RAM configuration are independent of management-listener availability. However, the complete physical-button-to-equipment path in RUN remains untested because room selection and physical action dispatch are not yet connected.
+
+These combinations describe filesystem ownership and management-interface behavior, **not** four different equipment-power states.
 
 ## 8. Configuration persistence and mode permissions
 
