@@ -259,29 +259,62 @@ Changing SERVICE/DEVICE or CONFIG/RUN must **never** transmit a power command me
 
 ## 10. Physical controls and GPIO integration
 
-The current pin plan is in `firmware/clonker/controls/pins.py`. The physical CONFIG/RUN switch, room selector, volume encoder, and selector encoder have not yet been assigned operational GPIO inputs.
+The current application GPIO assignments are maintained in `firmware/clonker/controls/pins.py`. Boot-time GP17 handling is separate, in `firmware/boot.py`.
 
-### CONFIG/RUN switch requirements
+### GP17 — SERVICE (USB)/DEVICE boot switch
 
-The eventual switch should:
+**Implemented and tested.**
 
-- Be a maintained, clearly identifiable two-position control.
-- Be read during runtime, without a power cycle.
-- Have a defined electrical default and stable-state/debounce behavior.
-- Avoid interference with the GP17 maintenance jumper.
-- Start or stop the management listener only on state transitions.
-- Leave the active RAM configuration intact.
-- Generate no external AV equipment command.
+A maintained physical switch selects filesystem ownership at boot:
+
+- OFF/open/high = SERVICE (USB), host-owned filesystem writes.
+- ON/grounded/low = DEVICE, Pico-owned filesystem writes.
+- A full power cycle is required to change ownership.
+
+This switch does not change the application's CONFIG/RUN state.
+
+### GP18 — CONFIG/RUN application switch
+
+**Implemented and tested.**
+
+A guarded maintained switch uses GP18 with an internal pull-up:
+
+- OFF/open/high = RUN.
+- ON/grounded/low = CONFIG.
+
+The application polls this switch during runtime. Mode transitions start or stop the management HTTP listener without rebooting.
+
+Repeated browser tests confirmed that CONFIG restores management access and RUN disables it.
+
+The active validated configuration remains in RAM. Switching modes does not itself execute an AV command.
+
+### GP2 — momentary power-button input
+
+**Input implemented and tested; action dispatch pending.**
+
+The GP2 momentary button produces debounced press/release events through the physical-control subsystem.
+
+These events are currently logged, not dispatched as `power-toggle` commands.
+
+The next dependency is physical room selection, so the dispatcher knows which configured room should receive the action.
 
 ### Room selection
 
-The proposed room selector is a separate physical control. Den, Sunroom, and a possible Both selection are design candidates; group-command semantics remain to be finalized. Room selection is **not** an operating-mode dimension.
+The physical room selector is not yet wired or implemented.
 
-### Guarded power input
+Den and Sunroom are the current operational rooms. A possible BOTH selection remains a design question, not an implemented command-broadcast feature.
 
-The guarded SYSTEM MASTER concept is distinct from both operating-mode controls. Its final physical hardware and GPIO integration remain under development. The underlying `power-toggle` software action is already implemented and bench-tested through the browser Test Remote.
+Room selection is independent of SERVICE/DEVICE and CONFIG/RUN.
 
-For component inventory, GPIO planning, and mechanical design, see [Hardware & Controls](HARDWARE_CONTROLS.md).
+### Guarded SYSTEM MASTER
+
+The guarded SYSTEM MASTER concept is distinct from both operating-mode switches.
+
+Its intended awake behavior is to invoke the selected room's `power-toggle` action. Its possible deep-sleep wake/ignition behavior remains experimental and unimplemented.
+
+The underlying `power-toggle` software action is already implemented and bench-tested through the browser Test Remote.
+
+For component inventory, GPIO assignments, and mechanical design, see [Hardware & Controls](HARDWARE_CONTROLS.md).
 
 ## 11. Deployment, recovery, and security cautions
 
