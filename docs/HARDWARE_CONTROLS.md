@@ -417,6 +417,27 @@ A soldering iron and miscellaneous personal parts may also be available; this is
 
 The existing placeholders live in `firmware/clonker/controls/pins.py`. Do not assign pins for the sake of completing a diagram. Review electrical requirements, supply voltage, pin conflicts, wake capability, and enclosure wiring first.
 
+### Physical-controls software modules
+
+Physical-control responsibilities are separated by input type and function. Each module has one primary job, keeping GPIO assignments, electrical behavior, and Clonker actions independent.
+
+| Module | Responsibility | Examples |
+|---|---|---|
+| `pins.py` | Central GPIO assignments | GP2 = Power Toggle |
+| `buttons.py` | Momentary button inputs, debounce, and press/release events | Power Toggle, Back, Home, navigation |
+| `switches.py` | Maintained switch states and CONFIG/RUN mode selection | Guarded CONFIG/RUN switch |
+| `encoders.py` *(planned)* | Rotary encoder movement and direction | Volume, custom-action selector |
+| `selectors.py` *(planned)* | Multi-position selection and validation | Room selector |
+| `physical.py` | Initialize, poll, and coordinate physical inputs | Button events and eventual action dispatch |
+
+**Buttons produce events; maintained switches represent states.**
+
+For example, pressing a momentary button generates a `POWER_TOGGLE PRESSED` event. A maintained CONFIG/RUN switch instead represents the current application operating mode.
+
+The `physical.py` coordinator connects generic hardware events to Clonker behavior. Individual input drivers should not contain Roku commands, Denon commands, or device-specific network logic.
+
+`pins.py` remains the authoritative GPIO assignment map. Planned modules should not be described as implemented until their code and hardware behavior have been verified.
+
 ### Intended event path
 
 ```text

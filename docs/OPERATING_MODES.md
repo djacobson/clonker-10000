@@ -129,15 +129,50 @@ CONFIG makes available:
 
 The Test Remote is **operational**, not a logging-only stub. It can enqueue configured actions which the shared Dumb Queue™ executes using the outbound HTTP transport. An enqueue acknowledgment does not itself prove successful execution or an equipment-state change.
 
-### Simulated mode selection
+### CONFIG/RUN source selection and software override
 
-The mode-selection module is `firmware/clonker/controls/switches.py`; GPIO placeholders live in `firmware/clonker/controls/pins.py`.
+The authoritative application-mode interface is `switches.config_enabled()` in `firmware/clonker/controls/switches.py`.
 
-The current CONFIG/RUN input is simulated with CONFIG enabled by default. The development helper `switches.set_simulated_config(enabled)` can change the simulated state in RAM. This is **not** a browser-facing mode switch, and the physical CONFIG/RUN GPIO is not yet assigned.
+The GPIO assignment in `controls/pins.py` determines the normal input source:
+
+| `CONFIG_SWITCH_PIN` | Source | Behavior |
+|---|---|---|
+| `None` | SIMULATED | Use the software state |
+| GPIO number | PHYSICAL | Read the maintained hardware switch |
+
+The simulated state defaults to CONFIG (`True`) and can be changed with `switches.set_simulated_config(enabled)`.
+
+A separate software override can temporarily supersede either source:
+
+| `set_config_override()` value | Effective behavior |
+|---|---|
+| `None` | Follow configured source |
+| `True` | Force CONFIG |
+| `False` | Force RUN |
+
+For example:
+
+```python
+switches.set_config_override(True)   # Force CONFIG
+switches.set_config_override(False)  # Force RUN
+switches.set_config_override(None)   # Return to normal selection
+```
+
+`switches.config_source()` reports `SIMULATED`, `PHYSICAL`, or `OVERRIDE` for diagnostics.
+
+The override is **RAM-only** and resets on application restart. It is a development and troubleshooting facility, not a browser-facing control or a persistent configuration setting.
+
+When a physical GPIO is assigned, the proposed electrical convention is **grounded = CONFIG; open/high = RUN**, using an internal pull-up. This polarity is provisional until the actual guarded switch is wired and tested.
+
+**Schrödinger's switch:** An ordinary GPIO input cannot reliably distinguish an intentionally open switch from a disconnected wire. Therefore, Clonker does not attempt automatic hardware-presence detection. If the physical switch is unavailable, select simulation explicitly by setting `CONFIG_SWITCH_PIN = None`, or use the software override.
+
+GPIO initialization errors are not silently converted into simulated mode.
+
+The CONFIG/RUN selection is independent of SERVICE/DEVICE filesystem ownership and equipment power-toggle actions.
 
 ### Listener lifecycle
 
-The main loop checks the selected application mode and starts the management listener on entry to CONFIG, or stops it on entry to RUN. The listener is not recreated every iteration. While CONFIG is enabled, `web.poll()` is scheduled cooperatively at approximately 10 ms intervals.
+The main loop checks the selected application mode and starts the management listener on entry to CONFIG, or stops it on entry to RUN. The listener is not recreated every iteration. While CONFIG is enabled, `web.poll()` is scheduled cooperatively at approximately 1 ms intervals.
 
 That interval is **not** a guaranteed browser response time. Outbound HTTP execution is currently blocking and can temporarily pause other cooperative work. See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md).
 
