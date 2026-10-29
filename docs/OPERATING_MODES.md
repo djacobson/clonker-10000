@@ -176,6 +176,32 @@ The main loop checks the selected application mode and starts the management lis
 
 That interval is **not** a guaranteed browser response time. Outbound HTTP execution is currently blocking and can temporarily pause other cooperative work. See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md).
 
+### CONFIG/RUN mode diagnostics
+
+The main scheduler announces the effective CONFIG/RUN source and operating mode at startup and whenever either changes.
+
+Example normal startup:
+
+```text
+CONFIG/RUN source: SIMULATED
+CONFIG mode enabled
+```
+
+Example forced-RUN startup:
+
+```text
+CONFIG/RUN source: OVERRIDE
+RUN mode enabled
+```
+
+The source and mode are tracked independently. A source change is logged even when the effective operating mode remains unchanged.
+
+Announcements are transition-based, not emitted on every scheduler iteration.
+
+**Verified October 28, 2026:** Normal CONFIG startup announcements, responsive browser configuration pages, and GP2 button events. Forced-RUN startup and continued GP2 operation were also verified using the temporary software override.
+
+Live CONFIG/RUN transitions and physical CONFIG/RUN switch operation remain pending hardware testing.
+
 ## 6. RUN: management interface disabled
 
 **Status:** Listener transition logic implemented; physical input and end-to-end physical remote behavior not yet verified.
