@@ -14,7 +14,7 @@ This is developer configuration, not user-editable.
 
 # System and mode controls
 POWER_TOGGLE_PIN = 2  # GP2 -- tested momentary pushbutton
-CONFIG_SWITCH_PIN = None
+CONFIG_SWITCH_PIN = 18
 
 # Room selector
 ROOM_SELECTOR_A_PIN = None
