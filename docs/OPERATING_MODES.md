@@ -178,29 +178,36 @@ That interval is **not** a guaranteed browser response time. Outbound HTTP execu
 
 ### CONFIG/RUN mode diagnostics
 
-The main scheduler announces the effective CONFIG/RUN source and operating mode at startup and whenever either changes.
+The main scheduler announces the effective application-mode source and operating mode at startup and whenever either changes.
 
-Example normal startup:
+Example normal startup with the GP18 physical switch in CONFIG:
 
 ```text
-CONFIG/RUN source: SIMULATED
-CONFIG mode enabled
+App mode source = PHYSICAL
+App mode = CONFIG
 ```
 
-Example forced-RUN startup:
+Moving the switch to RUN produces:
 
 ```text
-CONFIG/RUN source: OVERRIDE
-RUN mode enabled
+App mode = RUN
+```
+
+Returning to CONFIG produces:
+
+```text
+App mode = CONFIG
 ```
 
 The source and mode are tracked independently. A source change is logged even when the effective operating mode remains unchanged.
 
 Announcements are transition-based, not emitted on every scheduler iteration.
 
-**Verified October 28, 2026:** Normal CONFIG startup announcements, responsive browser configuration pages, and GP2 button events. Forced-RUN startup and continued GP2 operation were also verified using the temporary software override.
+**Verified October 28, 2026:** Simulated CONFIG startup, responsive browser pages, GP2 button events, and forced-RUN operation using the temporary software override.
 
-Live CONFIG/RUN transitions and physical CONFIG/RUN switch operation remain pending hardware testing.
+**Verified October 29, 2026:** GP18 physical CONFIG/RUN selection and repeated live transitions. Browser refresh tests confirmed that RUN stops the management listener and CONFIG restores it, without restarting the application.
+
+The physical switch is now the normal mode-selection source. Simulation and software override remain available for development and troubleshooting.
 
 ## 6. RUN: management interface disabled
 
