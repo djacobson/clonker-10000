@@ -247,15 +247,15 @@ Do not infer that backup rotation is a fully atomic transaction under sudden pow
 
 Three different concepts must remain separate:
 
-1. **GP17 SERVICE/DEVICE jumper:** boot-time filesystem ownership.
-2. **CONFIG/RUN switch:** application management-interface availability.
-3. **Guarded SYSTEM MASTER / `power-toggle`:** a planned physical equipment-control input and a fundamental action identifier.
+1. **GP17 SERVICE (USB)/DEVICE boot-mode switch:** Selects filesystem write ownership at startup. A full power cycle is required to change modes.
+2. **GP18 CONFIG/RUN application-mode switch:** Enables or disables the management HTTP listener during runtime, without rebooting.
+3. **GP2 momentary power button / SYSTEM MASTER concept:** Intended to request the selected room's configured `power-toggle` action. Physical button events are verified, but room-aware action dispatch and future sleep/wake behavior are not yet implemented.
 
 The Config v4 schema supports `on_path` and `off_path` for power/mute toggles. Runtime direction selection is **IMPLEMENTED**: the dispatcher maintains independent, volatile ON/OFF command histories per room and action. A successful HTTP request advances the next direction; a changed configuration save resets all histories.
 
 This command history is **not authoritative equipment state**. External remotes, HDMI-CEC, and manual device controls can change equipment independently. October 27, 2026 bench tests confirmed that failed HTTP requests, blank selected command paths, and missing endpoints do not advance toggle direction history. Broader failure-condition and physical-input testing remains outstanding.
 
-Changing SERVICE/DEVICE or CONFIG/RUN must **never** transmit a power command merely because a mode changed.
+**Changing GP17 or GP18 must never transmit an equipment power command merely because an operating mode changed.**
 
 ## 10. Physical controls and GPIO integration
 
