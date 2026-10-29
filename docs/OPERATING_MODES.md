@@ -94,19 +94,27 @@ The exact schema, limits, validation, backup rotation, and recovery rules belong
 
 **DEVICE does not mean RUN.** Filesystem ownership and application management availability remain independent.
 
-## 4. Changing SERVICE / DEVICE safely
+## 4. Changing SERVICE (USB) / DEVICE safely
 
-The GP17 jumper is a **boot-time selection**. A Ctrl+D soft reload is not a substitute for changing filesystem ownership.
+The GP17 physical switch selects filesystem ownership **at boot**. Changing its position while the application is running does not transfer filesystem ownership.
+
+A Ctrl+D soft reload is not a substitute for a full power cycle.
 
 To change ownership:
 
 1. Finish and save any host-side file edits.
-2. Disconnect Pico power.
-3. Set GP17 **open** for SERVICE or **grounded** for DEVICE.
-4. Reconnect power and observe the boot message.
-5. Confirm the expected filesystem write ownership before copying files or saving configuration.
+2. Disconnect Pico power completely.
+3. Set the GP17 switch:
+   - **OFF / open:** SERVICE (USB) — USB host owns filesystem writes.
+   - **ON / grounded:** DEVICE — Pico firmware owns filesystem writes.
+4. Reconnect power and observe the boot diagnostic.
+5. Confirm the expected filesystem write ownership before copying firmware files or saving browser configuration.
 
-Do not change the jumper while powered. Do not attempt host writes while the Pico owns the filesystem. Do not assume a browser's ability to display configuration means that it can save it.
+**Do not change the GP17 switch while powered.**
+
+Do not attempt USB-host file writes while the Pico owns the filesystem. Likewise, do not assume that a browser's ability to display configuration means the Pico can save changes.
+
+The GP17 switch is independent of the GP18 CONFIG/RUN switch. For example, DEVICE + CONFIG permits browser configuration saves, while SERVICE (USB) + CONFIG permits browser inspection but rejects persistent saves.
 
 ## 5. CONFIG: management interface enabled
 
