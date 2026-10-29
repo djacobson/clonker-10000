@@ -102,6 +102,46 @@ During browser testing, accepted connections sometimes supplied no request data.
 
 This improved observed browser behavior on iPad Safari and Windows Chrome. The precise origin of every silent connection was not conclusively identified. The timeout adjustment does not make the server concurrent.
 
+### 5.2 HTTP scheduler pacing and CONFIG responsiveness — October 28, 2026
+
+During Chapter 5 physical-button integration, the CONFIG page began loading slowly or incompletely, particularly in Windows Chrome. Symptoms included delayed room configuration, unfinished filesystem-status requests, `ERR_EMPTY_RESPONSE`, and HTTP client timeouts during response transmission.
+
+The problem initially appeared related to the new GPIO subsystem. However, disabling physical controls did not eliminate it. Safari sometimes performed better than Chrome, but the underlying issue was not isolated to one browser.
+
+HTTP diagnostics revealed that Clonker was accepting requests and beginning to transmit responses, but occasionally timing out before completing them. One observed timeout occurred after approximately 16 KB of a 40 KB response had been sent.
+
+**The key discovery was scheduler pacing.**
+
+The inbound HTTP server advances only a small amount of work per `web.poll()` call. With a 512-byte send chunk, a roughly 40 KB response requires at least 80 successful send operations.
+
+At the original 10 ms polling interval, those operations require approximately 800 ms of scheduling time under ideal conditions, excluding network delays, unsuccessful sends, and competing work.
+
+Changing the scheduler interval in `main.py` from:
+
+```python
+WEB_POLL_INTERVAL = 0.01
+```
+
+to:
+
+```python
+WEB_POLL_INTERVAL = 0.001
+```
+
+produced a dramatic improvement in observed responsiveness.
+
+Repeated CONFIG page refreshes completed quickly in both Chrome and Safari. Physical controls were subsequently re-enabled, and the GP2 power-toggle button continued producing clean press/release events while the CONFIG page remained responsive.
+
+The final test also succeeded with inbound HTTP diagnostics disabled.
+
+**Conclusion:** The 10 ms polling interval was a significant contributor to the observed HTTP transmission delays. More frequent servicing allowed the existing HTTP implementation to complete responses reliably in these tests.
+
+**Why the problem surfaced at this particular stage remains unproven.** Growth in page size, browser request behavior, Wi-Fi timing, and changes in scheduler workload are possible contributing factors.
+
+The 1 ms interval is the current tested baseline, not a claim of optimal scheduling efficiency. A future improvement could prioritize HTTP servicing while an active response is being transmitted, without requiring equally frequent idle polling.
+
+The fix required no changes to the reusable GPIO button implementation, HTTP socket lifecycle, or response timeout.
+
 ## 6. Management API and browser interfaces
 
 | Request | Current behavior |
