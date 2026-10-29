@@ -37,12 +37,14 @@ The application can execute configured outbound actions through the shared Dumb 
 
 ## 2. SERVICE (USB): host-owned filesystem
 
-**Status:** Implemented and tested.
+**Status:** Implemented and physically tested October 29, 2026.
 
-`boot.py` configures GP17 with an internal pull-up. With the jumper **open**, GP17 reads HIGH and selects SERVICE mode.
+Setting the GP17 boot-mode switch to **OFF** leaves GP17 open. Its internal pull-up reads HIGH and selects SERVICE (USB) mode during startup.
+
+Expected boot diagnostic:
 
 ```text
-CLONKER BOOT: SERVICE (USB) mode (jumper OPEN)
+CLONKER BOOT: SERVICE (USB) mode (switch OFF)
 ```
 
 In SERVICE:
