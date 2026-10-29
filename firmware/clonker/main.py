@@ -80,6 +80,12 @@ def main():
         logger.info("Physical controls disabled (brain-only mode)")
 
     web_running = False
+
+    # Track announced mode and source independently.
+    # None ensures both are announced on startup.
+    last_announced_mode = None
+    last_announced_source = None
+
     next_web_poll = time.monotonic()
     next_action_poll = time.monotonic()
     next_physical_poll = time.monotonic()
@@ -106,17 +112,30 @@ def main():
 
             # CONFIG/RUN is an application mode, not an HTTP command.
             config_mode = switches.config_enabled()
+            config_source = switches.config_source()
 
-            # Start/stop listener only on a mode transition.
+            # Start/stop the management listener only when needed.
             if config_mode and not web_running:
                 web.start()
                 web_running = True
-                logger.info("CONFIG mode enabled")
 
             elif not config_mode and web_running:
                 web.stop()
                 web_running = False
-                logger.info("RUN mode enabled")
+
+            # Announce the effective source and mode on startup
+            # and whenever either changes. Never log every poll.
+            if config_source != last_announced_source:
+                logger.info("CONFIG/RUN source: {}".format(config_source))
+                last_announced_source = config_source
+
+            if config_mode != last_announced_mode:
+                logger.info(
+                    "{} mode enabled".format(
+                        "CONFIG" if config_mode else "RUN"
+                    )
+                )
+                last_announced_mode = config_mode
 
             # Advance at most one inbound network operation per poll.
             if web_running:
