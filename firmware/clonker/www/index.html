@@ -973,8 +973,8 @@
                 document.getElementById("save-status");
 
             saveStatus.textContent = configWritable
-                ? "DEVICE mode -- filesystem writable. Configuration saving available."
-                : "SERVICE (USB) mode -- filesystem read-only. Configuration saving unavailable.";
+                ? "Boot mode: DEVICE -- filesystem writable. Configuration saving available."
+                : "Boot mode: SERVICE (USB) -- filesystem read-only. Configuration saving unavailable.";
 
             configAttempts = 0;
 
