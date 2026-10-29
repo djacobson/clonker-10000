@@ -227,13 +227,17 @@ Use **DEVICE + CONFIG** for tests requiring writes from the Pico.
 ### 7.1 Basic edit/save/reload
 
 1. Preserve the working configuration.
-2. Power down, ground GP17, and cold-start in DEVICE mode.
-3. Confirm firmware filesystem writability in the browser.
-4. Make a small reversible change, then Save.
-5. Verify the response reports the appropriate revision and whether the file changed.
-6. Refresh the editor and confirm the saved value.
-7. Cold power-cycle when testing persistence and verify the value again.
-8. Restore the intended setting if the edit was only a test.
+2. Disconnect Pico power completely.
+3. Set the **GP17 boot-mode switch ON** (DEVICE) and the **GP18 application-mode switch ON** (CONFIG).
+4. Reconnect power and confirm the `CLONKER BOOT: DEVICE mode (switch ON)` diagnostic.
+5. Confirm that the management interface is available and the firmware filesystem is writable.
+6. Make a small reversible configuration change, then Save.
+7. Verify the response reports the appropriate revision and whether the file changed.
+8. Refresh the editor and confirm the saved value.
+9. Cold power-cycle when testing persistence and verify the value again.
+10. Restore the intended setting if the edit was only a test.
+
+**Note:** GP17 requires a full power cycle to change filesystem ownership. GP18 can switch CONFIG/RUN during normal operation without rebooting.
 
 ### 7.2 Revision-conflict regression
 
