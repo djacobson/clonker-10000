@@ -64,12 +64,16 @@ SERVICE is a filesystem-maintenance state, not an instruction to disable the app
 
 ## 3. DEVICE: Pico-owned filesystem
 
-**Status:** Implemented and tested.
+**Status:** Implemented and physically tested October 29, 2026.
 
-Grounding GP17 at boot selects DEVICE mode. On the Pico 2 W, the documented jumper uses **GP17 physical pin 22** and adjacent **GND physical pin 23**.
+Setting the GP17 boot-mode switch to **ON** grounds GP17 and selects DEVICE mode during startup.
+
+On the Pico 2 W, the switch connects **GP17 physical pin 22** to adjacent **GND physical pin 23**. GP17 uses an internal pull-up.
+
+Expected boot diagnostic:
 
 ```text
-CLONKER BOOT: DEVICE mode (jumper GROUNDED)
+CLONKER BOOT: DEVICE mode (switch ON)
 ```
 
 The boot code remounts the filesystem for firmware writes:
