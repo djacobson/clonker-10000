@@ -1,747 +1,378 @@
 # The Clonker 10000 — System Architecture
 
-**Design reference:** Updated October 27, 2026  
+**Design reference:** Updated October 29, 2026  
 **Active platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
-**Current milestone:** Chapter 4 — Clonker Config v4, executable custom actions, and cooperative compound execution operational  
-**Next direction:** Close small Chapter 4 refinements, then advance physical controls and remaining action behavior without prematurely implementing custom devices or new protocols.
+**Current milestone:** Chapter 5 — physical GP17/GP18 mode switches and GP2 input events verified; physical action dispatch next  
+**Configuration:** Clonker Config v4
 
 > **Clonker controls actions, not brands. Controlled devices own their own state.**
 
 ---
 
-## 1. Mission
+## 1. Mission and principles
 
-The Clonker 10000 is a tactile, Wi-Fi-first home-theater remote: substantial knobs, satisfying switches, guarded power controls, and eventually an audible **CLONK!**
+The Clonker 10000 is a tactile, Wi-Fi-first home-theater remote: substantial knobs, satisfying switches, guarded controls, and eventually an audible **CLONK!** It turns a user intention into a configured command without pretending to be a home-automation server or an authoritative equipment-state tracker.
 
-Its job is to turn user intentions into configured equipment commands. It is not intended to become a universal home-automation server, a comprehensive equipment-state tracker, or a general-purpose workflow engine.
+The intended end-to-end path is:
 
-The essential sequence is:
+1. Capture an input and determine its selected room.
+2. Identify a generic fundamental or custom action.
+3. Admit that action to the shared Dumb Queue™.
+4. Resolve its destination and command from the active configuration.
+5. Execute eligible work through the appropriate transport.
+6. Record an outcome, without confusing HTTP success with equipment state.
 
-1. Recognize an action.
-2. Identify the selected room.
-3. Resolve the configured command and destination.
-4. Admit the action to the shared queue.
-5. Execute eligible work.
-6. Report the outcome.
-7. Get out of the way.
+**Be resilient in our dumbness.** Favor a predictable, recoverable, measurable system over unnecessary abstraction.
 
-External equipment remains authoritative for its actual state. The Clonker does not pretend to know every power, volume, input, playback, or HDMI-CEC change made outside its own commands.
+**One queue. One poller. One shared execution path.** Browser actions already use this path; physical actions will join it rather than creating a parallel execution system.
 
-### 1.1 Guiding philosophy
-
-**Be resilient in our dumbness.**
-
-The system should be responsive, predictable, recoverable, small enough to understand, and straightforward to test incrementally.
-
-**One queue. One poller. One shared execution path.**
-
-The architecture favors explicit responsibilities and simple interfaces over abstractions that merely look extensible.
-
-### 1.2 Development priorities
-
-1. Preserve the working configuration and action pipeline.
-2. Keep fundamental actions lightweight.
-3. Support practical multi-step commands without a separate macro engine.
-4. Introduce physical controls with measured responsiveness.
-5. Add protocol and device flexibility when real hardware requirements justify it.
-6. Preserve a clear distinction between implemented behavior, tested behavior, and future design.
-
----
-
-## 2. Architecture at a Glance
+## 2. Architecture at a glance
 
 ```text
                   THE CLONKER 10000
 
-          BROWSER TEST REMOTE       PHYSICAL INPUTS
-             IMPLEMENTED              PLANNED
-                   |                      |
-                   v                      v
-              /api/action             GPIO EVENTS
-                   |                      |
-                   +-----------+----------+
-                               |
-                               v
-                         actions.dispatch()
-                      Validate and enqueue
-                               |
-                               v
-                         DUMB QUEUE™
-                    Fundamental / Custom
-                               |
-                               v
-                          actions.poll()
+       BROWSER TEST REMOTE        PHYSICAL CONTROLS
+           OPERATIONAL           GPIO INPUTS TESTED
+                 |                  |          |
+                 |                  |          +-- GP2 press/release
+                 |                  |              (dispatch pending)
+                 v                  v
+           /api/action        room + action event
+                 |                  |
+                 +---------+--------+
+                           |
+                           v
+                    actions.dispatch()
+                     Validate / admit
+                           |
+                           v
+                      DUMB QUEUE™
+                  Fundamental / Custom
+                           |
+                           v
+                      actions.poll()
                     First eligible task
-                               |
-                               v
-                     ACTIVE CONFIGURATION
-                       Clonker Config v4
-                               |
-                               v
-                       COMMAND RESOLUTION
-                     Fundamental: one step
-                     Custom: ordered steps
-                       Toggles: ON/OFF history
-                               |
-                               v
-                       HTTP GET / POST
-                               |
-                               v
-                         DENON / ROKU
-                               |
-                               v
-                     EXTERNAL EQUIPMENT
+                           |
+                           v
+                 ACTIVE CONFIGURATION
+                    Clonker Config v4
+                           |
+                           v
+                 COMMAND RESOLUTION
+             Ordinary / toggle / custom step
+                           |
+                           v
+                 HTTP GET / POST
+                           |
+                           v
+                     DENON / ROKU
 
-                 CONFIGURATION MANAGEMENT
+           CONFIG MANAGEMENT (CONFIG MODE ONLY)
 
-                Browser editor / port 9090
-                               |
-                               v
-                     Strict v4 validation
-                               |
-                               v
-                     Revision protection
-                               |
-                               v
-                    Verified file persistence
-                               |
-                               v
-                     Active RAM snapshot
-                    (queue cleared on change)
+           Browser editor / HTTP port 9090
+                           |
+                           v
+              Validate + revision check
+                           |
+                           v
+             Verified filesystem persistence
+                           |
+                           v
+               Publish active RAM config
+               Clear queue on changed save
+               Reset toggle histories
 ```
 
-The browser action path, shared queue, custom-action steps, and outbound HTTP transport are implemented. Physical GPIO-driven action dispatch is not yet implemented.
+The physical-control branch is **not yet connected to `actions.dispatch()`**. The diagram shows the intended common interface, not a completed physical remote.
 
 ### 2.1 Architectural invariants
 
-- Input sources express generic actions rather than device-specific URLs.
+- Inputs express generic actions, never Denon/Roku URLs.
 - Configuration owns destinations and command definitions.
-- The action dispatcher owns acceptance, scheduling, sequencing, and execution policy.
-- The transport owns outbound HTTP operations, not action meaning.
-- The browser editor is a configuration client, not the runtime source of truth.
-- A single validated configuration snapshot is authoritative in RAM.
-- A successful changed save clears pending queued work.
-- Failed external commands are not automatically retried.
-- External devices own their actual state.
-- Future protocols may require adapters; generic actions must not assume all equipment speaks HTTP.
+- The dispatcher owns admission, eligibility, sequencing, cancellation, and execution policy.
+- Transport owns the network exchange, not the meaning of an action.
+- The active validated RAM configuration is authoritative at runtime.
+- Changed saves clear pending work and reset volatile toggle-direction histories.
+- External devices, not Clonker, own actual power, input, playback, and volume state.
+- New protocols may require adapters; generic action names do not imply a universal wire protocol.
 
 ---
 
-## 3. Current Implementation Status
+## 3. Verified implementation boundary — October 29, 2026
 
-**Status reference: October 27, 2026.** This section is the current-state summary. Historical design proposals elsewhere should not override it.
+### 3.1 Operational and exercised
 
-### 3.1 Implemented and tested
+- Pico 2 W, CircuitPython 10.3.1, Wi-Fi, serial logging, and cooperative scheduler.
+- **GP17 SERVICE (USB)/DEVICE maintained boot switch:** OFF/open selects USB-host filesystem writes; ON/grounded selects Pico firmware writes. Requires a cold power cycle to change.
+- **GP18 guarded CONFIG/RUN maintained switch:** OFF/open selects RUN and stops management HTTP; ON/grounded selects CONFIG and enables it. Runtime transitions tested without reboot.
+- **GP2 momentary button:** initialized, debounced, and producing logged press/release events.
+- Browser configuration editor, Test Remote, Clonker Config v4 validation, revision protection, persistence, and selected recovery cases.
+- Fundamental and custom actions through a shared queue, with real Denon/Roku GET/POST execution.
+- Volatile per-room power/mute command-direction histories, including success, failure, no-op, and changed-save behavior.
+- A Sunroom custom action: Roku Home, cooperative 3000 ms wait, Denon Quick Select 1; both requests returned HTTP 200.
+- Independent eligible Volume Up action executed during that compound-action wait.
+- CONFIG page responsiveness restored by changing HTTP polling from 10 ms to 1 ms; browser tests succeeded with GPIO polling enabled.
 
-- Raspberry Pi Pico 2 W running CircuitPython 10.3.1, with Wi-Fi and serial diagnostics.
-- GP17-selected SERVICE/DEVICE filesystem ownership.
-- Clonker Config v4 in JSON, with strict validation and an active RAM snapshot.
-- One to three supported room IDs, with Den and Sunroom currently configured.
-- Three generic built-in device slots per configured room.
-- Fourteen fixed fundamental actions per room.
-- Up to sixteen custom actions per room, with stable IDs, editable names, and one to sixteen ordered steps.
-- GET/POST commands and `wait_after_ms` cooperative post-command delays.
-- Browser configuration editor and room-specific custom-action Test Remote controls.
-- Revision-protected saves, verified temporary writes, backup rotation, and reboot persistence.
-- Shared Dumb Queue™, eligible-task scheduling, bounded capacity, and queue-wide failure cancellation.
-- Outbound HTTP commands to real Denon and Roku devices.
-- A real two-command Sunroom custom-action sequence: Roku Home, three-second cooperative wait, then Denon Quick Select 1; both commands returned HTTP 200 and the custom action completed.
-- Den and Sunroom configurations containing multiple named custom actions.
+### 3.2 Not yet integrated or not exhaustively verified
 
-### 3.2 Implemented but not exhaustively tested
+- Physical room selector, room-aware GPIO dispatch, and GP2-to-`power-toggle` dispatch.
+- Navigation, Back, Home, volume encoder, and custom-action selector wired into action dispatch.
+- Physical event capture under blocking outbound HTTP or high-rate encoder input.
+- OLED, audio feedback, battery/sleep behavior, and final enclosure.
+- User-defined custom destinations beyond the three built-in slots.
+- Apple TV discovery, pairing, authentication, and command transport.
+- Long-duration load, all malformed HTTP inputs, extended outages, and every sudden-power-loss scenario.
 
-- Recovery across every possible interrupted-write or power-loss point.
-- Extended network-failure and timeout behavior under sustained traffic.
-- Malformed or fragmented inbound HTTP requests beyond exercised cases.
-- Long-uptime scheduling and monotonic-clock edge cases.
-- Interleaving of rapid physical encoder input during custom-action waits.
-- Physical input capture during a blocking outbound HTTP request.
-
-An HTTP 200 response confirms an HTTP result, **not** the equipment's actual resulting state. Source inspection and browser success messages are not substitutes for physical tests.
-
-### 3.3 Not yet implemented
-
-- User-defined custom device destinations (`device-4` onward).
-- Physical buttons and encoders connected to the dispatcher.
-- Physical CONFIG/RUN and room selectors.
-- OLED status display and audible feedback.
-- Battery management and sleep/wake behavior.
-- Apple TV protocol integration, pairing, or authentication.
-- General scripting, nested custom actions, conditional branching, or equipment-state reconciliation.
-
-### 3.4 Immediate development direction
-
-Chapter 4 established the generic device slots and operational Config v4 custom actions. The next phase should protect this baseline, address small proven UI/runtime gaps, and progress toward tactile controls. Custom devices and Apple TV remain explicit objectives, not prerequisites for initial physical control work.
+A detected press is **not** an admitted action. An admitted action is **not** an executed HTTP request. HTTP 200 is **not** proof that the equipment reached the desired state.
 
 ---
 
-## 4. Firmware Component Map
+## 4. Firmware component ownership
 
 | Component | Responsibility |
 |---|---|
-| `firmware/boot.py` | GP17-selected filesystem ownership at boot |
+| `firmware/boot.py` | GP17 boot-time filesystem ownership selection |
 | `firmware/code.py` | CircuitPython entry point |
-| `firmware/clonker/main.py` | Startup and cooperative service scheduling |
-| `firmware/clonker/device_config_v2.py` | Config v4 validation, RAM snapshot, revision, persistence, and recovery |
-| `firmware/clonker/device_config.json` | Device-side operational configuration |
-| `firmware/clonker/actions.py` | Fundamental/custom dispatch, shared queue, step execution, failure policy |
-| `firmware/clonker/net/http_transport.py` | Bounded, synchronous outbound HTTP GET/POST |
-| `firmware/clonker/net/web.py` | Inbound management HTTP server and action/config APIs |
+| `firmware/clonker/main.py` | Startup, mode transitions, cooperative polling |
+| `firmware/clonker/device_config_v2.py` | Config v4 validation, RAM snapshot, revision, persistence, recovery |
+| `firmware/clonker/device_config.json` | Active device configuration when deployed |
+| `firmware/clonker/actions.py` | Fundamental/custom dispatch, Dumb Queue™, step execution, cancellation |
+| `firmware/clonker/net/http_transport.py` | Bounded synchronous outbound HTTP GET/POST |
+| `firmware/clonker/net/web.py` | CONFIG-mode management HTTP and browser APIs |
 | `firmware/clonker/www/index.html` | Browser configuration editor |
-| `firmware/clonker/www/remote.html` | Browser Test Remote |
-| `firmware/clonker/controls/switches.py` | Current simulated application mode; future switches |
-| `firmware/clonker/controls/pins.py` | GPIO assignments |
-| `firmware/clonker/system/clock.py` | Clock services |
+| `firmware/clonker/www/remote.html` | Browser Test Remote and custom-action runner |
+| `firmware/clonker/controls/pins.py` | Developer-maintained GPIO assignments |
+| `firmware/clonker/controls/switches.py` | GP18 CONFIG/RUN source, physical read, simulated fallback and override |
+| `firmware/clonker/controls/physical.py` | Optional physical-button initialization and polling; currently logs events |
+| `firmware/clonker/controls/buttons.py` | Reusable debounced button input |
+| `firmware/clonker/system/clock.py` | UTC reference and monotonic-based timestamps |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
 | `firmware/clonker/legacy/` | Historical XML implementation |
 
-The filename `device_config_v2.py` is historical. **Its active schema constant is `CONFIG_VERSION = 4`.** Renaming the module offers no functional benefit at present.
+The filename `device_config_v2.py` is historical; the active schema constant is `CONFIG_VERSION = 4`. Avoid cosmetic renames that risk disrupting a working deployment.
 
-The configuration, dispatcher, management service, and transport should remain independently understandable and testable.
+### 4.1 Separation of concerns
 
----
-
-## 5. Operating Modes
-
-Clonker has **two independent mode dimensions**.
-
-### 5.1 SERVICE / DEVICE — filesystem ownership
-
-GP17 selects filesystem ownership at boot:
-
-| Mode | GP17 | Writable filesystem owner |
-|---|---|---|
-| SERVICE | Open | USB host |
-| DEVICE | Grounded | Pico firmware |
-
-Changing filesystem ownership requires a full power cycle; a soft reload is not a reliable substitute.
-
-### 5.2 CONFIG / RUN — application behavior
-
-In **CONFIG**, the management HTTP listener, browser editor, Test Remote, and clock synchronization are available. The action queue continues operating.
-
-In **RUN**, the management listener stops; the loaded configuration and action queue continue operating. Future physical controls must work independently of the browser.
-
-The physical CONFIG/RUN switch has not yet been wired; development currently uses a simulated mode input.
-
-### 5.3 Independent consequences
-
-An accessible configuration editor does not imply that the Pico owns a writable filesystem. Save permission depends on actual filesystem ownership. The browser and server must report and enforce that distinction.
-
-See [Operating Modes](OPERATING_MODES.md).
+**Configuration** says where and how to send a command. **Action** says what the user wants. **Queue** decides when eligible work executes. **Transport** performs the exchange. **Physical controls** should only capture intent and room context.
 
 ---
 
-## 6. Configuration Architecture
+## 5. Two independent operating-mode dimensions
 
-### 6.1 Versioned schema, JSON storage
+### 5.1 GP17: SERVICE (USB) / DEVICE
 
-The active configuration schema is **Clonker Config v4**. JSON is its storage format, not its product name. The root has `"version": 4` and a `rooms` object.
+| Switch | Electrical state | Mode | Filesystem write owner |
+|---|---|---|---|
+| OFF | Open / pulled HIGH | SERVICE (USB) | USB host |
+| ON | Grounded / LOW | DEVICE | Pico firmware |
 
-A room has a stable ID (`room-1` through `room-3`), an editable display name, built-in devices, fundamental actions, and a `custom_actions` array.
+GP17 is physical Pico pin 22, with adjacent ground at pin 23. `boot.py` selects the mode before the application starts. **A full power cycle is required** to change ownership; Ctrl+D is not equivalent. Browser inspection can work in SERVICE + CONFIG, but configuration saves are rejected when the Pico filesystem is read-only.
 
-The full schema, field validation, size limits, sample, and recovery procedures belong in [Configuration & Recovery](CONFIGURATION.md). This document focuses on component boundaries and behavior.
+### 5.2 GP18: CONFIG / RUN
 
-### 6.2 Stable rooms and generic destinations
+| Switch | Electrical state | Application mode | Management HTTP |
+|---|---|---|---|
+| OFF | Open / pulled HIGH | RUN | Stopped |
+| ON | Grounded / LOW | CONFIG | Enabled, port 9090 |
 
-Configured rooms are an optional nonempty subset of the three supported IDs. The browser currently renders configured rooms; it does not yet provide general add/remove room controls.
+`switches.py` reads GP18 with an internal pull-up. The application starts/stops the listener as the switch changes, without rebooting. A simulated source and explicit software override remain available for development. An open circuit is not proof that a switch is physically present.
 
-Built-in destination IDs are stable:
+The queue continues to be polled in both modes. **DEVICE + RUN** is the intended ordinary remote combination; **DEVICE + CONFIG** permits persistent browser edits. Neither switch is an AV equipment power command or a room selector.
 
-| ID | Browser label |
+For operating procedures, see [Operating Modes](OPERATING_MODES.md).
+
+---
+
+## 6. Configuration architecture
+
+The active schema is **Clonker Config v4**, stored as JSON. A room has a stable ID, display name, three built-in device slots, fourteen fundamental actions, and optional custom actions. The current sample configures **Den and Sunroom**; additional room support may evolve independently of the sample.
+
+### 6.1 Generic built-in destinations
+
+| Stable ID | Default browser label |
 |---|---|
 | `device-1` | TV |
 | `device-2` | AVR |
 | `device-3` | Streaming |
 
-The labels are conveniences, not enforced equipment types. Endpoints and action mappings determine behavior. Renaming a room does not change its identity.
+Labels do not enforce device types. Endpoints and mappings determine actual behavior. The browser editor is a client of the validated configuration engine, not an alternative source of truth.
 
-### 6.3 One authoritative RAM snapshot
+### 6.2 RAM snapshot, revision, and recovery
 
-Startup loads and validates the configuration. Runtime actions resolve against the active in-memory configuration, not repeated JSON file reads.
+Startup loads and validates the active file at `/clonker/device_config.json`. Runtime dispatch resolves definitions from the in-memory configuration rather than rereading JSON per action.
 
-The browser reads a copy with response-only metadata, including the revision and filesystem-writability state. Those metadata fields are not persisted as schema fields.
+The browser receives revision and filesystem-writability metadata. Saves validate the submitted schema and expected revision, protect against stale tabs, verify temporary writes, and manage backups. On a successful **changed** save, the management layer clears pending actions and resets toggle histories. An unchanged save preserves both.
 
-### 6.4 Save and recovery boundaries
-
-The configuration engine validates, serializes, verifies temporary writes, manages backups, and publishes a new active configuration. A save is revision-protected to reject stale browser tabs. A changed save clears queued actions through the management server.
-
-Backup rotation reduces risk but is not a fully atomic multi-file transaction against sudden power loss. Recovery requires a schema-compatible backup. The Pico's working filesystem is not automatically synchronized with GitHub.
-
-### 6.5 Why configuration is separate from actions
-
-Configuration says **where and how** a command should be sent. An action says **what the user wants**. The dispatcher decides **when** work is eligible. The transport performs the HTTP exchange.
-
-This separation makes the physical interface independent of particular Denon or Roku URLs and leaves room for future protocol-specific adapters.
+Backup rotation is risk reduction, not a guarantee against every interrupted-write or power-loss scenario. The Pico filesystem does not automatically synchronize with the GitHub repository. See [Configuration & Recovery](CONFIGURATION.md) for the authoritative schema, limits, and recovery procedures.
 
 ---
 
-## 7. Fundamental Action Model
+## 7. Fundamental actions and toggles
 
-Each configured room contains fourteen fixed fundamental action IDs. Their identities remain stable even when their targets and command paths change.
+Each configured room defines fourteen stable fundamental action IDs. Ordinary actions resolve a destination, method, and command path. Missing ordinary endpoints or blank paths produce intentional logged no-ops.
 
-### 7.1 Ordinary actions
+`power-toggle` and `mute-toggle` use configured ON/OFF paths and independent volatile direction histories for each room and action. An unknown history starts with ON. History advances **only after successful HTTP execution**; failures and no-ops do not advance it. A reboot resets history; a changed configuration save also resets it.
 
-Ordinary actions carry a destination, HTTP method, and command path. The dispatcher queues a compact task and resolves the current command when it executes.
-
-A blank endpoint or path is a safe fundamental-action no-op rather than an attempted request. An HTTP success response is diagnostic, not proof of equipment state.
-
-### 7.2 Power and mute toggles
-
-`power-toggle` and `mute-toggle` store one target and method plus separate `on_path` and `off_path`. The schema and browser editor support both directions.
-
-**Runtime direction selection is implemented.** The dispatcher selects ON or OFF from independent, volatile per-room/action histories when a queued task executes. A successful HTTP request advances the next direction; failed or unconfigured requests do not.
-
-### 7.3 Physical mapping
-
-Future buttons and encoders should generate action IDs and room context. GPIO handlers should not contain HTTP paths, device-brand assumptions, JSON parsing, or network requests.
+This is **last-successful-command direction**, not device-state discovery. HDMI-CEC, other remotes, and device applications may change equipment state without Clonker knowing.
 
 ---
 
 ## 8. The Dumb Queue™
 
-**Status:** Implemented for both fundamental and custom actions.
+**One queue. One poller. One shared execution path.** `actions.py` owns admission and execution of both fundamental and custom actions.
 
-**One queue. One poller. One shared execution path.** The queue lives in `firmware/clonker/actions.py` and has a capacity of **128 task entries**.
+### 8.1 Admission and representation
 
-### 8.1 Admission and task representation
-
-`actions.dispatch(room_id, action_id, delay_seconds=0)` validates the room and either a fixed fundamental ID or a saved custom-action ID. It checks capacity and appends a task.
-
-Current tasks carry the room ID, action ID, kind (`fundamental` or `custom`), step index, and due time. A multi-step custom action occupies **one queue entry**, which is updated and requeued as its steps progress; the dispatcher does not enqueue all steps up front.
-
-Conceptually:
-
-```python
-{
-    "room": "room-2",
-    "action": "movie",
-    "kind": "custom",
-    "step": 0,
-    "due": 0,
-}
-```
-
-The sample is illustrative; the saved custom-action ID must match an ID in the active configuration.
+`actions.dispatch(room_id, action_id, delay_seconds=0)` validates the room, action, delay, and capacity, then queues a compact task. The queue holds up to **128 entries**. Tasks carry identifiers and scheduling metadata rather than copies of endpoint definitions. A compound custom action occupies **one entry**, not one entry per step.
 
 ### 8.2 Eligibility and ordering
 
-Due times use `time.monotonic()`. Zero means immediately eligible; a positive value is an absolute monotonic deadline.
-
-Each `poll()` scans for the **first eligible task**, removes it, and processes at most **one HTTP command or eligible no-op**. A future-dated task does not block an immediately eligible task behind it. Among currently eligible tasks, queue order matters.
-
-This is intentionally **not strict FIFO**.
+The poller scans for the **first eligible** task. Immediate work can bypass a future-dated task; among currently eligible tasks, queue order matters. This is not strict FIFO across delayed work. Due times use `time.monotonic()`.
 
 > **A future task must not hold an immediate button press hostage.**
 
-### 8.3 Fundamental execution
+### 8.3 Compound custom actions
 
-A fundamental task resolves its current configuration at execution time. An ordinary configured command is sent through the HTTP transport. A blank command becomes a no-op. Toggle actions select the configured ON or OFF path using volatile command history and advance that history only after successful HTTP execution.
+A custom action has a stable ID, name, and one to sixteen ordered steps; up to sixteen custom actions per room are supported in Config v4. Each step resolves a built-in destination, GET/POST method, path, and `wait_after_ms`.
 
-### 8.4 Custom-step execution
+One eligible `actions.poll()` executes at most one outbound command. After a successful step, the task is requeued with a due time calculated **after that request completes**. Independent eligible actions can execute during the wait. No separate macro thread, nested scripts, branching, or rollback exists.
 
-A custom task resolves the saved action and its current step. It resolves the step destination and sends one HTTP request.
+### 8.4 Failure and consistency policy
 
-If more steps remain, the task's step index advances and its next due time is calculated **after the previous HTTP request completes**, using that step's `wait_after_ms`. The task is appended back to the shared queue.
+One execution failure clears the remaining queue, including unfinished compound work; the dispatcher remains available for new requests. There are no automatic retries. A successful changed configuration save also clears pending tasks so they cannot silently execute under a new mapping.
 
-Other eligible tasks may run while this custom task is waiting. There is no second executor, blocking sleep for the post-command wait, nested dispatch, or separate macro thread.
-
-A custom step with an unconfigured destination is an execution failure, unlike the ordinary fundamental no-op rule.
-
-### 8.5 Capacity and diagnostics
-
-Capacity applies to queued task entries, not to the total number of steps represented by those entries. Admission rejects new tasks when the queue is full; it does not evict valid tasks to make room.
-
-Diagnostics expose current depth, peak depth, capacity, last result, and last error.
-
-### 8.6 Configuration consistency
-
-Queued tasks retain identifiers, not copies of HTTP command definitions. Commands resolve against the active configuration at execution time. A successful changed configuration save clears pending work so old intentions are not silently redirected by a new configuration.
+Queue admission is not network completion, and network completion is not equipment-state verification.
 
 ---
 
-## 9. Failure Policy
+## 9. Cooperative scheduler and HTTP
 
-**One failed external command cancels pending work, not the remote itself.**
+`main.py` currently uses:
 
-The dispatcher catches execution errors, records a diagnostic, and discards remaining queued tasks. There is no automatic retry, rollback, or equipment-state reconciliation.
-
-A failure within a custom action prevents its remaining steps from executing. The system remains available to accept new work afterward.
-
-An unconfigured ordinary fundamental action is a safe no-op; an unconfigured custom destination is a failure. These are deliberate, different policies.
-
-### 9.1 Why queue-wide cancellation
-
-After a network or command failure, subsequent queued steps may no longer make sense. Continuing blindly can produce a confusing partial sequence. Clearing the queue favors predictable recovery over speculative completion.
-
-### 9.2 What is not guaranteed
-
-HTTP completion does not guarantee the intended equipment behavior. The Clonker does not verify input selection, volume, power, playback, or HDMI-CEC state after a command. More sophisticated state-aware behavior would require explicit future design.
-
----
-
-## 10. Cooperative Scheduling and Network Blocking
-
-The main loop polls the action dispatcher and, in CONFIG mode, the inbound management server.
-
-Current development intervals in `main.py` are:
-
-| Setting | Value |
+| Service | Poll interval |
 |---|---:|
-| Action polling | 0.01 seconds |
-| Management HTTP polling | 0.01 seconds |
-| Main-loop idle sleep | 0.001 seconds |
+| Physical input | 10 ms (`0.01` seconds) |
+| Action queue | 10 ms (`0.01` seconds) |
+| CONFIG management HTTP | 1 ms (`0.001` seconds) |
+| Main-loop yield | 1 ms (`time.sleep(0.001)`) |
 
-These are polling settings, **not guaranteed response latencies**.
+These are target polling intervals, **not hard real-time guarantees**. Each service performs bounded work and returns to the loop. `physical.poll()` currently logs button events; it does not dispatch actions.
 
-### 10.1 Cooperative work
+### 9.1 Inbound versus outbound network behavior
 
-Each service should do bounded work and return. The queue does not sleep until a future deadline; a delayed custom step is requeued with a due time. This allows other eligible actions and the management server to make progress between requests.
+The inbound management service is a cooperative, nonblocking, single-active-client listener on port 9090. It services accept, receive, and send work incrementally. It is available only in CONFIG mode.
 
-### 10.2 Important limitation: outbound HTTP is synchronous
+Outbound HTTP is **bounded but blocking**: one fresh TCP socket per GET/POST, with status-line inspection and HTTP 2xx acceptance. A blocking socket call temporarily pauses browser servicing, queue polling, and physical-input polling. A queue buffers admitted work; it cannot capture GPIO transitions the scheduler never sees.
 
-The outbound transport performs a bounded **blocking** HTTP request. While it is in progress, the cooperative main loop cannot service other Python-level tasks. The queue does not magically make network I/O asynchronous.
+### 9.2 October 28 browser pacing investigation
 
-That distinction matters for rapid rotary encoders. Hardware event capture and any required buffering must be measured on the actual Pico before selecting a more complex solution.
+The CONFIG page intermittently loaded slowly or incompletely. Disabling GPIO polling did not remove the problem. HTTP diagnostics showed response transmissions sometimes timing out partway through large pages. Because the inbound server sends bounded chunks, 10 ms between web polls could add substantial scheduling delay.
 
-### 10.3 Required responsiveness tests
+Changing `WEB_POLL_INTERVAL` from `0.01` to `0.001` substantially improved observed Chrome and Safari page loading. Repeated browser tests succeeded with physical polling re-enabled and diagnostics off. The precise reason the problem surfaced at that development stage remains unproven; the 1 ms interval is a tested baseline, not a proven optimum.
 
-- Repeated volume commands during normal Denon/Roku traffic.
-- Encoder rotation while an outbound HTTP request is in progress.
-- Queue behavior near capacity.
-- Extended endpoint timeout and queue cancellation scenarios.
-- Long-running monotonic scheduling.
-
-**Verified October 27, 2026:** An independent Sunroom Volume Up action executed successfully during the Movie custom action's three-second cooperative wait, before the Denon Quick Select step resumed.
-
-This confirms cooperative interleaving for the tested browser-submitted actions. It does **not** establish physical encoder responsiveness under load or eliminate the blocking behavior of outbound HTTP requests.
+Detailed limits, diagnostics, and evidence belong in [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md).
 
 ---
 
-## 11. Volume Encoder Strategy
+## 10. Browser and management interface
 
-The initial physical volume implementation should generate ordinary repeated `volume-up` and `volume-down` actions, using the existing dispatcher and queue. It should not introduce a second networking path.
+The CONFIG-mode service provides the editor, Test Remote, configuration API, clock API, and action submission.
 
-Possible later optimizations include acceleration, coalescing, and bounded accumulation, but these should be driven by measured event loss, latency, or equipment behavior.
-
-The Grayhill volume encoder is part of the planned hardware audition. Electrical behavior, contact bounce, and CircuitPython event capture still require bench testing.
-
-**First make it correct. Then make it feel good. Then optimize only what needs optimizing.**
-
----
-
-## 12. Toggle Actions and Command History
-
-**Status:** Implemented; bench-tested October 27, 2026.
-
-The dispatcher maintains small, **volatile command-direction histories**, independently for each room and each toggle action (`power-toggle` and `mute-toggle`).
-
-Runtime rules:
-
-1. Unknown history initially selects ON.
-2. Direction is selected when the queued action executes.
-3. Successful ON execution makes OFF the next direction.
-4. Successful OFF execution makes ON the next direction.
-5. Failed, blank, or unconfigured requests do not advance history.
-6. History is not persisted; reboot resets it to unknown.
-7. A changed configuration save clears queued actions and resets all toggle histories. An unchanged save preserves them.
-
-The dispatcher advances history only after the HTTP transport reports successful execution. This is **command history, not equipment-state detection**. Other remotes, HDMI-CEC, applications, and physical controls may change equipment state without Clonker knowing.
-
-**Bench verification:** Sunroom Denon mute ON/OFF and Roku Home/PowerOff executed successfully. Roku power commands operated the LG G1 and Denon X1800H HDMI-CEC chain. Changed-configuration reset and independent Sunroom/Den room histories were verified.
-
-**October 27, 2026 negative tests:** Repeated requests to an unreachable Sunroom Denon endpoint preserved the pending ON direction. Blank selected toggle paths and missing endpoints produced repeatable no-ops without advancing history. Restoring the endpoint and command paths produced successful HTTP 200 ON/OFF execution. Broader network-failure coverage remains outstanding.
-
----
-
-## 13. Custom Devices — Agreed Future Extension
-
-**Status:** Planned, not implemented in Clonker Config v4.
-
-The existing built-in destination IDs remain stable. Additional user-defined destinations are envisioned as `device-4`, `device-5`, and so on, with stable IDs, editable names, and validated endpoints.
-
-The agreed conceptual location is an optional per-room `custom_devices` collection, separate from the existing `devices` object. This preserves the current home-theater editor and avoids unnecessary migration of built-in device definitions.
-
-### 13.1 Identity versus behavior
-
-A destination has an identity, a name, and connection information. Actions contain behavior. Deleting or changing a destination must not silently retarget existing actions.
-
-### 13.2 Scope discipline
-
-Do not implement custom devices solely because the schema is extensible. First preserve the working fundamental/custom action pipeline, then add a concrete custom-device requirement and test it end to end.
-
-**KISS principle:** A destination has an identity and an address. Behavior belongs to actions, not device definitions.
-
----
-
-## 14. Custom and Compound Actions
-
-**Status:** Implemented in Clonker Config v4 and tested with real Denon/Roku commands.
-
-A custom action is a saved, named action containing one or more ordered command steps. A multi-step custom action is a compound action. The same shared dispatcher and queue execute both fundamentals and custom actions.
-
-### 14.1 Saved structure
-
-Each custom action has a stable `id`, editable `name`, and ordered `steps` array. Each step has:
-
-- `target` — currently one of the three built-in destination IDs.
-- `method` — GET or POST.
-- `path` — outbound command path.
-- `wait_after_ms` — cooperative wait after the command completes.
-
-The validator supports up to sixteen custom actions per room, with one to sixteen steps each. The final step must have a zero wait. Detailed field and size limits belong in [Configuration & Recovery](CONFIGURATION.md).
-
-### 14.2 Execution lifecycle
-
-1. A browser or future physical input dispatches a stable custom-action ID.
-2. The dispatcher validates the action and queues one custom task.
-3. The poller selects an eligible task.
-4. The current step resolves its destination and command.
-5. One outbound HTTP request executes.
-6. If another step remains, the task advances and is requeued after its post-command wait.
-7. After the last successful step, the dispatcher logs `CUSTOM COMPLETE`.
-
-The wait begins **after the preceding HTTP request completes**, not when the overall action was first queued. Actual successor execution can occur later than the requested interval because the scheduler and transport are cooperative.
-
-### 14.3 Interleaving and dependencies
-
-A later step depends on the successful completion of its predecessor and the expiration of that predecessor's wait. The current implementation represents this dependency using a single advancing task, **not** a general-purpose dependency graph.
-
-During a wait, independent eligible tasks may run. A custom action does not own an exclusive queue lock.
-
-### 14.4 Failure and capacity
-
-A failed custom step invokes the queue-wide failure policy. Remaining steps and other pending work are discarded; no automatic retry or rollback occurs.
-
-Because one custom action occupies one queue entry, acceptance is bounded by the normal 128-entry queue capacity. The implementation does not reserve one entry per step.
-
-### 14.5 Verified equipment test
-
-The Sunroom test executed:
-
-```text
-Roku:  POST /keypress/Home                -> HTTP 200
-       cooperative wait: 3000 ms
-Denon: GET /goform/formiPhoneAppDirect.xml?MSQUICK1
-                                             -> HTTP 200
-CUSTOM COMPLETE
-```
-
-This establishes a working two-device, two-step custom-action path. Subsequent October 27, 2026 testing also confirmed that an independent Sunroom Volume Up command could execute during the three-second cooperative wait, before the Denon Quick Select step. These tests do not establish every device state change, failure scenario, or physical-input responsiveness.
-
-### 14.6 Browser configuration and testing
-
-The browser editor can create, rename, edit, and remove custom actions and their steps. It validates and persists them through the same revision-protected configuration pipeline.
-
-The Test Remote loads saved custom actions for the selected room and exposes an explicit Run control. October 27, 2026 browser testing confirmed that the Sunroom Movie action remained selected and Run remained enabled after execution and after switching rooms. Selection persistence among multiple custom actions remains unverified; no browser change was necessary.
-
-### 14.7 Deliberate scope limits
-
-The current engine does **not** provide loops, conditions, nested custom actions, arbitrary scripting, automatic retries, rollback, equipment-state queries, or a separate macro executor.
-
-**A command sequence is not permission to invent a workflow engine.**
-
----
-
-## 15. Outbound HTTP Transport
-
-`firmware/clonker/net/http_transport.py` owns simple GET/POST communication with configured endpoints. It handles the network exchange and reports transport/HTTP diagnostics.
-
-It does not know whether an action means Volume Up, Home, Movie, or Vinyl. It does not infer equipment state from HTTP responses.
-
-Current testing covers real Denon and Roku endpoints. Authentication-heavy or persistent-session protocols may need different future adapters; they should not be forced through this simple transport merely to preserve an abstraction.
-
----
-
-## 16. Inbound Management HTTP Service
-
-`firmware/clonker/net/web.py` provides the CONFIG-mode browser/API service on port **9090**.
-
-Its responsibilities include serving the editor and Test Remote, returning the active configuration with revision and filesystem metadata, accepting revision-protected configuration saves, handling browser clock synchronization, and dispatching browser action requests.
-
-### 16.1 Relevant routes
-
-| Route | Purpose |
+| Route | Responsibility |
 |---|---|
-| `GET /` | Browser interface / clock page |
-| `GET /api/config` | Active configuration plus response-only metadata |
-| `POST /api/config` | Validate and save a submitted configuration |
+| `GET /` | Browser configuration editor |
 | `GET /remote.html` | Browser Test Remote |
-| `POST /api/action?room=...&action=...` | Dispatch a fundamental or saved custom action |
-| `GET /api/clock` | Clock status |
-| `POST /api/clock?utc=...` | Browser clock synchronization |
+| `GET /api/config` | Validated configuration, revision, filesystem metadata |
+| `POST /api/config` | Revision-protected validated save |
+| `GET /api/clock` | Clock source and timestamp |
+| `POST /api/clock?utc=...` | Browser UTC reference update |
+| `POST /api/action?room=...&action=...` | Admit fundamental or saved custom action |
 
-The action API uses stable room/action IDs. It does not embed device-specific command paths in the URL.
+An accepted action API request acknowledges queue admission only. The Test Remote uses the same dispatcher and queue as the eventual physical controls.
 
-### 16.2 Cooperative inbound handling
-
-The server accepts and advances network operations incrementally through its `poll()` function. Request sizes and client timeouts are bounded. This prevents an idle browser connection from intentionally becoming a permanent service dependency.
-
-Outbound HTTP requests remain synchronous, so inbound progress can still pause briefly while the dispatcher transmits.
-
-### 16.3 Browser and filesystem boundaries
-
-CONFIG mode exposes the editor, but persistence requires the Pico to own a writable filesystem. A stale revision must be rejected rather than silently overwriting newer changes. A changed save clears pending queue work.
-
-The iPad browser is an important development client, not a separate configuration authority.
+The management API has **no application-level authentication**. Keep it on a trusted LAN; do not forward port 9090 to the public internet.
 
 ---
 
-## 17. Physical Controls
+## 11. Physical controls — Chapter 5
 
-The long-term identity of the Clonker is tactile: a substantial volume encoder, selector encoder, guarded SYSTEM MASTER control, satisfying buttons, room selection, a tiny OLED, and sound feedback.
+### 11.1 Current input foundation
 
-Planned or auditioned hardware includes the Grayhill volume encoder, Bourns selector encoder, illuminated momentary switch, slide selector, SSD1306 OLED, piezo, I2S amplifier, and speaker options. Hardware inventory and pin assignments belong in [Hardware & Controls](HARDWARE_CONTROLS.md).
+`controls/pins.py` assigns **GP2** to `POWER_TOGGLE_PIN` and **GP18** to `CONFIG_SWITCH_PIN`; the other physical buttons, encoders, and room-selector inputs are currently unassigned (`None`). GP17 is handled separately in `boot.py`.
 
-### 17.1 Input requirements
+`physical.initialize()` constructs reusable debounced buttons for assigned inputs, with optional initialization so absent or faulty controls need not prevent the application from starting. `physical.poll()` reports events to serial diagnostics. GP2 press/release detection has been tested; there is no physical event-to-action bridge yet.
 
-- Produce generic room/action events.
-- Keep GPIO handlers free of HTTP and JSON logic.
-- Debounce and buffer only as measurements require.
-- Preserve useful tactile responsiveness during network activity.
-- Allow safe behavior when a destination is unconfigured.
-- Avoid letting browser CONFIG mode become a prerequisite for physical operation.
+`switches.py` owns GP18 separately from the general button poller. This separation preserves CONFIG/RUN mode semantics independently of room-specific commands.
 
-### 17.2 Guarded SYSTEM MASTER
+### 11.2 Next integration boundary
 
-The guarded control is a deliberate, prominent physical interface element. Its exact electrical behavior and semantics remain subject to hardware audition. Do not conflate the guard or illumination with implemented power-toggle state tracking.
+The next sequence is to test the room selector, establish room context, and connect a GP2 press to the existing `power-toggle` action. After that, add navigation and shortcut buttons, the custom-action selector, and the volume encoder. Physical input should supply only `(room_id, action_id)` or equivalent generic intent to `actions.dispatch()`.
 
----
+**Do not put Denon/Roku HTTP paths in GPIO code. Do not add a second queue.**
 
-## 18. Room Selection
+The Grayhill volume encoder may generate events faster than one new TCP connection per HTTP command can process. Measure capture and responsiveness during actual network activity before designing acceleration, accumulation, coalescing, or connection reuse.
 
-Room IDs are stable configuration identities. The physical room selector should choose which room's action mappings apply without duplicating device-specific command logic.
+### 11.3 Hardware scope and deferred feedback
 
-Den and Sunroom are currently configured; a third room ID is supported. Physical room selection and simultaneous/multi-room behavior remain design work, not tested runtime capabilities.
+The mechanical concept includes substantial encoders, a guarded master control, navigation buttons, room selection, a tiny SSD1306 OLED, and optional sound feedback. Specific enclosure, power, sleep/wake, and display behavior remain hardware-dependent. Do not document speculative OLED behavior as implemented.
 
-A selector's mechanical positions, software representation, and any future BOTH behavior must be explicitly defined before implementation.
+See [Hardware & Physical Controls](HARDWARE_CONTROLS.md) for component inventory, verified pin assignments, and mechanical decisions.
 
 ---
 
-## 19. Clock and Timing
+## 12. Room selection and custom destinations
 
-Wall-clock time supports display and diagnostics. Browser synchronization may update it.
+Stable room IDs belong to configuration. The room selector should choose which configured room receives physical actions without duplicating mappings. Den and Sunroom are the current sample rooms. A future BOTH or multi-room behavior is **not implemented** and must not be inferred from selector hardware.
 
-Action scheduling uses `time.monotonic()` and is therefore independent of wall-clock corrections. Delayed tasks have **earliest eligible** times, not guaranteed precise execution timestamps.
+The existing three built-in destination slots remain stable. Additional user-defined custom destinations (`device-4` onward) are a future extension, not a Config v4 feature. The conceptual design places them in an optional per-room collection, separate from built-in slots; actual schema, migration, and deletion behavior require a concrete implementation decision.
 
-For custom actions, post-command waits start after the previous HTTP request completes. Actual execution may be delayed by other eligible work, blocking HTTP operations, and scheduler timing.
-
----
-
-## 20. Apple TV and Future Protocols
-
-**Apple TV compatibility is an explicit future objective. It is not implemented.**
-
-Generic intentions such as `nav-up`, `home`, `back`, and `play-pause` should remain independent of equipment brands. However, generic intentions do **not** imply generic wire protocols.
-
-Apple TV may require discovery, pairing, authentication, session management, and protocol-specific command transmission. Those requirements must be investigated against a concrete implementation before introducing adapters or dependencies.
-
-Do not force Apple TV into an unsuitable stateless HTTP GET/POST model. Equally, do not build speculative protocol infrastructure before there is a testable requirement.
-
-No Apple TV protocol module is committed at this stage. The current Denon/Roku HTTP path remains the working baseline.
+A destination has identity and connection information. Behavior belongs to actions. Never silently retarget actions when a destination changes.
 
 ---
 
-## 21. Security and Network Boundaries
+## 13. Apple TV and other future protocols
 
-The Clonker is a local-network device. The management interface and action API should be treated as trusted-LAN facilities, **not** as internet-facing services.
+Apple TV compatibility is an explicit objective, **not an implemented feature**. Discovery, pairing, authentication, session management, and a protocol-specific adapter may be required. The present stateless Denon/Roku HTTP transport should not be assumed suitable.
 
-Current architecture does not provide a general authentication, authorization, TLS termination, or secure remote-access framework. Do not expose port 9090 directly to the public internet.
-
-Future authenticated protocols must keep credentials and pairing/session handling out of generic action definitions where possible. Any security model change should be designed explicitly rather than inferred from the existence of a browser editor.
+Keep generic intentions such as Home, Back, navigation, and Play/Pause independent of equipment brands. Do not add a speculative `apple_tv.py` module or configuration schema before concrete requirements and tests justify them.
 
 ---
 
-## 22. Development and Test Discipline
+## 14. Clock, diagnostics, and verification discipline
 
-### 22.1 One meaningful change at a time
+Browser synchronization supplies a UTC reference for readable timestamps. Queue deadlines and compound waits use `time.monotonic()` and do not shift when wall-clock time is adjusted. Automated NTP synchronization is not established by the tested baseline.
 
-Preserve a working Pico baseline. Change one architectural concern, test it, document the result, then proceed. Do not simultaneously refactor configuration, transport, and physical input behavior without a compelling reason.
+Use evidence labels precisely:
 
-### 22.2 Browser-first functional tests
+- **Implemented and verified:** observed on the Pico, browser, or equipment as specified.
+- **Implemented, not exhaustively tested:** working code with remaining untested conditions.
+- **Planned:** a future design or requirement, not a running feature.
+- **Historical:** an earlier stage superseded by the current baseline.
 
-The browser Test Remote is a valuable bridge before physical hardware is wired. It exercises the real dispatcher and queue, not a separate simulation of command behavior.
+A commit proves source changed; deployment proves files were copied; HTTP 200 proves a transport acknowledgment; equipment observation supports a physical-behavior claim. These are different evidence levels.
 
-Test both ordinary and custom actions against actual equipment where appropriate. Keep the distinction between HTTP success and equipment-state verification.
-
-### 22.3 Configuration regression tests
-
-Verify loading, editing, revision conflict rejection, valid and invalid saves, backup creation, restart persistence, and correct active room/action rendering. Preserve an external copy of a known-good configuration before risky changes.
-
-### 22.4 Queue regression tests
-
-Verify capacity rejection, eligibility ordering, future-task bypass, one eligible command per poll, failure cancellation, changed-save clearing, and normal operation after a failure.
-
-### 22.5 Custom-action tests
-
-Verify single- and multi-step sequences, wait-after-completion semantics, interleaving, missing destinations, network failures, final-step completion, and repeated runs. The verified Sunroom Roku/Denon sequence is the initial baseline, not exhaustive coverage.
-
-### 22.6 Documentation and source discipline
-
-Read current GitHub source before claiming implementation details. Read the latest documentation before editing it. Keep source code, live Pico tests, and historical intentions distinct.
-
-Use exact current line numbers for targeted edits; prefer complete replacement only when extensive drift makes incremental patching more dangerous than rewriting.
+Preserve the known-good configuration and record test conditions before risky changes. Keep dated experiments in [Development History](DEVELOPMENT_HISTORY.md) rather than duplicating an entire test diary here.
 
 ---
 
-## 23. Historical Development Milestones
+## 15. Historical milestones
 
-This section records *how the architecture evolved*, not what an older schema currently does. Detailed chronology belongs in [Development History](DEVELOPMENT_HISTORY.md).
-
-### 23.1 XML v1
-
-The original XML implementation established early browser editing and persistence concepts. It remains historical.
-
-### 23.2 Clonker Config v2 — JSON foundation
-
-The JSON transition established strict validation, compact serialization, revision-protected browser saves, verified temporary writes, backup rotation, and a shared configuration model for CircuitPython and JavaScript.
-
-### 23.3 Dumb Queue™ — October 20, 2026
-
-The initial logging-only queue established fixed action dispatch, bounded capacity, eligible-task scheduling, delayed-task bypass, cancellation policy, and cooperative polling.
-
-### 23.4 Outbound HTTP — October 21, 2026
-
-The queue gained real GET/POST execution. Denon and Roku commands were tested, including a five-command volume burst returning HTTP 200 responses.
-
-### 23.5 Clonker Config v3 — October 22, 2026
-
-Built-in device identifiers changed from `tv`, `avr`, and `streaming` to `device-1`, `device-2`, and `device-3`. Browser display labels were retained. Configuration, persistence, and real action execution were regression-tested.
-
-### 23.6 Clonker Config v4 — October 2026
-
-The schema and browser gained user-defined custom actions with stable IDs and ordered command steps. The shared queue gained single-entry custom-task progression and cooperative post-command waits. A real Sunroom Roku/Denon sequence completed successfully.
-
-The firmware module retains the historical `device_config_v2.py` filename; the active schema is v4.
-
----
-
-## 24. Architectural Ownership
-
-| Component | Owns |
+| Milestone | Architectural result |
 |---|---|
-| Configuration engine | Validated configuration, revision, persistence, recovery |
-| Action dispatcher / Dumb Queue™ | Acceptance, eligibility, sequencing, execution policy, cancellation, diagnostics |
-| HTTP transport | Outbound network exchange, timeout handling, HTTP results |
-| Management server | Browser/API requests, save orchestration, listener lifecycle |
-| Browser editor | User-facing configuration editing and submission |
-| Browser Test Remote | User-facing action submission |
-| Physical controls (future) | Input capture and generic action generation |
-| External equipment | Actual power, input, playback, and volume state |
-
-### 24.1 Non-negotiable boundaries
-
-- Do not embed Denon/Roku URLs in physical control handlers.
-- Do not add a second queue or macro engine for custom actions.
-- Do not let a browser tab become the authoritative runtime configuration.
-- Do not silently retarget actions when a custom destination changes or disappears.
-- Do not treat command history as equipment-state truth.
-- Do not make the Clonker more complicated merely because we can.
+| XML v1 | Early browser editing and persistence concepts; historical |
+| Config v2 | JSON validation, revisions, verified writes, backup rotation |
+| Dumb Queue™, October 20 | Bounded admission, eligible-task scheduling, failure cancellation |
+| Outbound HTTP, October 21 | Real Denon/Roku GET/POST execution |
+| Config v3, October 22 | Stable generic `device-1`/`device-2`/`device-3` IDs |
+| Config v4, October 2026 | Named custom actions and cooperative ordered steps |
+| Chapter 4 completion, October 27 | Verified custom actions, toggles, interleaving |
+| Chapter 5, October 28 | GPIO scheduler foundation and HTTP pacing correction |
+| Chapter 5, October 29 | GP17/GP18 physical mode switches and GP2 input events verified |
 
 ---
 
-## 25. Design Principles Worth Remembering
+## 16. Design principles worth remembering
 
 **Less sleek. More CLONK.**
 
@@ -763,35 +394,31 @@ The firmware module retains the historical `device_config_v2.py` filename; the a
 
 > **Do not make the Clonker more complicated merely because we are capable of making it more complicated.**
 
-### 25.1 Future objective — Clonker Recipe Library
+### 16.1 Future objective — Clonker Recipe Library
 
-**Status:** Conceptual, not implemented. Custom actions are operational; custom devices and the recipe distribution experience remain future work.
+**Status:** Conceptual, not implemented. Custom actions are operational; custom destinations and recipe distribution remain future work.
 
-A future recipe library may provide downloadable configuration examples for common equipment combinations and named command sequences. Recipes could live on the Clonker website or in a GitHub-hosted catalog.
-
-A future editor workflow could retrieve a catalog, show equipment and compatibility notes, load a selected recipe for review, and require an explicit Save before persistence.
-
-Recipes must never bypass validation, revision protection, or save safeguards. The Pico must remain fully operational without internet access or a recipe catalog.
+A future recipe library could provide downloadable configuration examples for equipment combinations and named sequences. A future editor might retrieve a catalog, display compatibility notes, and load a recipe for review before an explicit Save. Recipes must never bypass validation, revision protection, or persistence safeguards.
 
 **Recipes help configure the Clonker; they do not become a runtime dependency.**
 
 ---
 
-## 26. Reference Documents
+## 17. Reference documents
 
-- [Configuration & Recovery](CONFIGURATION.md) — authoritative Clonker Config v4 schema, validation, browser behavior, persistence, and recovery.
-- [Firmware & Network](FIRMWARE_NETWORK.md) — networking, clock services, HTTP behavior, and testing.
-- [Operating Modes](OPERATING_MODES.md) — filesystem ownership and application modes.
-- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical controls, GPIO planning, and power behavior.
-- [Development & Deployment](DEVELOPMENT.md) — development workflow and deployment.
+- [Configuration & Recovery](CONFIGURATION.md) — schema, validation, revisions, persistence, recovery.
+- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) — networking, scheduler details, transport, evidence.
+- [Operating Modes](OPERATING_MODES.md) — GP17 and GP18 mode behavior.
+- [Hardware & Physical Controls](HARDWARE_CONTROLS.md) — parts, GPIO assignments, mechanical plans.
+- [Development & Deployment](DEVELOPMENT.md) — iPad-first workflow and tests.
 - [Development History](DEVELOPMENT_HISTORY.md) — chronological engineering milestones.
-- [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — historical handoff reference.
+- [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — historical reference.
 - [Terminology Audit](TERMINOLOGY_AUDIT.md) — historical terminology reconciliation.
-- [Old Architecture](OLD_ARCHITECTURE.md) — historical reference, not the active architecture.
-- [`samples/device_config_roku_denon_sample.json`](../samples/device_config_roku_denon_sample.json) — readable two-room Config v4 example.
+- [Old Architecture](OLD_ARCHITECTURE.md) — historical reference.
+- [`samples/device_config_roku_denon_sample.json`](../samples/device_config_roku_denon_sample.json) — readable two-room sample.
 
 ---
 
+**THE CLONKER 10000**  
+*Less sleek. More CLONK.*  
 **CLONK! ⚡🔩**
-
-*The Clonker 10000 — because apparently a normal remote control wasn't complicated enough.*

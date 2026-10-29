@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** October 28, 2026  
+**Updated:** October 29, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Current baseline:** Chapter 5 — Config v4, fundamental/custom actions, cooperative compound execution, and empty physical GPIO scheduler shell operational  
+**Current baseline:** Chapter 5 — Clonker Config v4, operational browser actions and Dumb Queue™, physically verified GP17 SERVICE/DEVICE and GP18 CONFIG/RUN switches, and GP2 debounced button events. Physical room selection and equipment-action dispatch remain pending.
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
@@ -93,9 +93,9 @@ The repository's `firmware/` tree is copied to corresponding paths on CIRCUITPY.
 | `firmware/clonker/net/http_transport.py` | Outbound bounded blocking HTTP GET/POST |
 | `firmware/clonker/www/index.html` | Configuration editor and clock UI |
 | `firmware/clonker/www/remote.html` | Browser Test Remote, including custom-action selector |
-| `firmware/clonker/controls/physical.py` | Optional physical GPIO initialization and priority-one polling shell |
-| `firmware/clonker/controls/switches.py` | Simulated CONFIG/RUN state; future physical input |
-| `firmware/clonker/controls/pins.py` | GPIO definitions |
+| `firmware/clonker/controls/physical.py` | Physical GPIO initialization, cooperative polling, and button event/debounce handling; GP2 input verified |
+| `firmware/clonker/controls/switches.py` | GP18 physical CONFIG/RUN selection, runtime mode detection, and management-listener control |
+| `firmware/clonker/controls/pins.py` | Centralized GPIO assignments and physical-control pin definitions |
 | `firmware/clonker/system/clock.py` | Clock reference and timestamps |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
 
@@ -144,35 +144,57 @@ The underlying conflict was not conclusively identified. Clonker's own inbound m
 
 ## 5. Two independent operating-mode dimensions
 
-### 5.1 SERVICE / DEVICE — filesystem ownership
+### 5.1 SERVICE (USB) / DEVICE — filesystem ownership
 
-The boot-time GP17 jumper controls who may write CIRCUITPY:
+The physical GP17 boot-mode switch determines who may write to CIRCUITPY.
 
-| GP17 jumper | Mode | Writable owner |
-|---|---|---|
-| Open | SERVICE (USB) | USB host |
-| Grounded | DEVICE | Pico firmware |
+| GP17 switch | Electrical state | Mode | Writable owner |
+|---|---|---|---|
+| OFF | Open / HIGH | SERVICE (USB) | USB host |
+| ON | Grounded / LOW | DEVICE | Pico firmware |
 
 GP17 is physical Pico pin **22**; the adjacent ground connection is pin **23**. GP17 uses an internal pull-up.
 
-**Change procedure:** Disconnect power, change the jumper, reconnect power, and verify the boot mode. Do not move the jumper while powered. A Ctrl+D soft reload does not reliably reselect boot-time filesystem ownership.
+**Change procedure:** Disconnect power completely, change the GP17 switch, reconnect power, and verify the boot diagnostic. A Ctrl+D soft reload does not replace the required cold boot.
 
-SERVICE mode is for USB deployment and host-side file maintenance. Browser inspection and action testing can still be available if CONFIG is enabled, but browser configuration saves must be rejected when the filesystem is read-only to firmware.
+Expected diagnostics:
 
-DEVICE mode permits validated browser configuration saves and recovery writes. The USB host sees the filesystem as read-only.
+```text
+CLONKER BOOT: SERVICE (USB) mode (switch OFF)
+CLONKER BOOT: DEVICE mode (switch ON)
+```
+
+SERVICE (USB) is for firmware deployment and host-side file maintenance. Browser inspection and action testing remain available when CONFIG is enabled, but browser configuration saves are rejected because the filesystem is read-only to firmware.
+
+DEVICE permits validated browser configuration saves and recovery writes. The USB host sees CIRCUITPY as read-only.
+
+**Hardware status:** Both switch positions physically tested October 29, 2026.
 
 ### 5.2 CONFIG / RUN — application management
 
-CONFIG/RUN is independent of SERVICE/DEVICE:
+The physical GP18 guarded switch controls the application management interface independently of GP17.
 
-- **CONFIG:** Starts the inbound HTTP management listener, configuration editor, Test Remote, and clock API. Queued action execution continues.
-- **RUN:** Stops the management listener. The shared action queue still operates; physical inputs will eventually supply actions.
+| GP18 switch | Electrical state | Application mode | Management HTTP listener |
+|---|---|---|---|
+| OFF | Open / HIGH | RUN | Stopped |
+| ON | Grounded / LOW | CONFIG | Enabled on port 9090 |
 
-The application-mode logic exists in `main.py`; the physical CONFIG/RUN switch is **not yet wired**. Development currently uses a simulated switch state. CONFIG/RUN is not an HTTP action and is not the same as an AV device's power toggle.
+GP18 uses an internal pull-up and is monitored by the running application.
+
+- **CONFIG:** Enables the configuration editor, Test Remote, and clock API. Queued action execution continues.
+- **RUN:** Disables the inbound management listener. The shared action queue and physical-input polling continue.
+
+Changing GP18 takes effect **without rebooting**. The running firmware reports the physical mode source and selected application mode through serial diagnostics.
+
+**Hardware status:** GP18 physical input and runtime listener transitions tested October 29, 2026.
+
+CONFIG/RUN is not an HTTP action, an AV equipment power toggle, or a room selector.
 
 The intended normal physical-remote combination is **DEVICE + RUN**. Browser configuration with persistence uses **DEVICE + CONFIG**.
 
-See [Operating Modes](OPERATING_MODES.md) before changing hardware or mode behavior.
+The GP2 momentary power-button input is also operational at the event-detection level, but it is **not yet connected to equipment action dispatch**.
+
+See [Operating Modes](OPERATING_MODES.md) for the authoritative mode behavior, transition rules, and verification details.
 
 ---
 
@@ -183,13 +205,16 @@ Use this procedure for ordinary source changes. Do not combine it with unplanned
 1. **Edit on iPad.** Review the diff in Working Copy; keep changes focused.
 2. **Commit and push.** Confirm the intended files appear on GitHub.
 3. **Update Windows checkout.** In GitHub Desktop, fetch and pull; verify the local checkout is current.
-4. **Enter SERVICE mode.** Power down, open GP17, reconnect, and verify host-writable CIRCUITPY.
+4. **Enter SERVICE (USB) mode.** Disconnect Pico power completely, set the **GP17 boot-mode switch OFF**, reconnect power, and verify `CLONKER BOOT: SERVICE (USB) mode (switch OFF)`. Confirm CIRCUITPY is writable from the USB host.
 5. **Copy only changed files.** Preserve the `clonker/` package tree and its `__init__.py` files. Do not overwrite `settings.toml` or the active `device_config.json` by default.
 6. **Verify deployed files.** Confirm file names, paths, and intended versions on CIRCUITPY. Remove stale module copies when appropriate.
-7. **Restart appropriately.** Use a soft reload for suitable code changes; perform a full power cycle for boot-time mode changes or when the test explicitly requires cold startup.
-8. **Inspect serial logs.** Confirm Wi-Fi, Config v4 loading, configured rooms, expected CONFIG/RUN behavior, and no unexpected exceptions.
-9. **Smoke-test the browser.** Open the configuration editor and Test Remote in CONFIG mode; confirm actual current data, not stale UI assets.
-10. **Test the changed behavior.** Verify queued actions, HTTP results, and equipment behavior as relevant. Record observations.
+7. **Return to DEVICE mode.** Disconnect Pico power, set the **GP17 switch ON**, reconnect power, and verify `CLONKER BOOT: DEVICE mode (switch ON)`.
+8. **Select application mode.** Set the **GP18 guarded switch ON** for CONFIG when browser testing is needed, or OFF for RUN. GP18 changes application mode without requiring another reboot.
+9. **Inspect serial logs.** Confirm Wi-Fi, Config v4 loading, configured rooms, expected CONFIG/RUN behavior, and no unexpected exceptions.
+10. **Smoke-test the browser in CONFIG.** Open the configuration editor and Test Remote; confirm actual current data, not stale UI assets.
+11. **Test the changed behavior.** Verify queued actions, HTTP results, physical-input events, and equipment behavior as relevant. Record observations.
+
+**Deployment distinction:** GP17 selects filesystem ownership at boot and requires a full power cycle. GP18 controls management-interface availability during runtime. Neither switch sends an AV equipment power command.
 
 ### 6.1 Typical copy map
 
@@ -227,13 +252,17 @@ Use **DEVICE + CONFIG** for tests requiring writes from the Pico.
 ### 7.1 Basic edit/save/reload
 
 1. Preserve the working configuration.
-2. Power down, ground GP17, and cold-start in DEVICE mode.
-3. Confirm firmware filesystem writability in the browser.
-4. Make a small reversible change, then Save.
-5. Verify the response reports the appropriate revision and whether the file changed.
-6. Refresh the editor and confirm the saved value.
-7. Cold power-cycle when testing persistence and verify the value again.
-8. Restore the intended setting if the edit was only a test.
+2. Disconnect Pico power completely.
+3. Set the **GP17 boot-mode switch ON** (DEVICE) and the **GP18 application-mode switch ON** (CONFIG).
+4. Reconnect power and confirm the `CLONKER BOOT: DEVICE mode (switch ON)` diagnostic.
+5. Confirm that the management interface is available and the firmware filesystem is writable.
+6. Make a small reversible configuration change, then Save.
+7. Verify the response reports the appropriate revision and whether the file changed.
+8. Refresh the editor and confirm the saved value.
+9. Cold power-cycle when testing persistence and verify the value again.
+10. Restore the intended setting if the edit was only a test.
+
+**Note:** GP17 requires a full power cycle to change filesystem ownership. GP18 can switch CONFIG/RUN during normal operation without rebooting.
 
 ### 7.2 Revision-conflict regression
 
@@ -254,7 +283,7 @@ Do not delete backup files casually. See [Configuration & Recovery](CONFIGURATIO
 ### 7.4 Schema regression checklist
 
 - Clonker Config v4 version and required root keys.
-- One to three configured rooms with supported stable IDs.
+- One to three configured rooms (the current default sample uses two: Den and Sunroom; additional room support may evolve in future versions), with supported stable IDs.
 - Generic built-in slots `device-1`, `device-2`, and `device-3`.
 - Fourteen fundamental actions per room.
 - Optional custom actions with stable IDs and ordered steps.
@@ -334,12 +363,15 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 
 ---
 
-## 9. Verification snapshot — October 28, 2026
+## 9. Verification snapshot — October 29, 2026
 
 ### 9.1 Implemented and exercised
 
 - Pico 2 W / CircuitPython 10.3.1 startup and Wi-Fi connectivity.
-- GP17 SERVICE/DEVICE selection and firmware-side DEVICE persistence.
+- GP17 physical SERVICE (USB)/DEVICE switch, including boot-time filesystem ownership selection.
+- GP18 guarded CONFIG/RUN switch, including runtime listener startup and shutdown without reboot.
+- GP2 momentary button input, debounce, and press/release event logging.
+- Cooperative physical-control polling alongside browser handling and queued network execution.
 - Config v4 loading, browser editing, revision protection, verified saves, and selected recovery scenarios.
 - Optional configured rooms and generic built-in device identifiers.
 - Browser Test Remote and management API on port 9090.
@@ -347,8 +379,8 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 - Denon volume and Roku navigation through HTTP GET/POST.
 - Configured custom actions and cooperative compound steps using the shared queue.
 - Verified Sunroom Roku Home → 3000 ms wait → Denon Quick Select 1 sequence.
-- Chapter 5 physical-control scheduler shell: verified startup with `PHYSICAL_CONTROLS_ENABLED` both disabled and enabled, CONFIG listener operational, and Sunroom Home returning HTTP 200 in both modes (October 28, 2026).
- 
+- Browser and network-action smoke tests with physical-control polling enabled.
+
 ### 9.2 Implemented but not exhaustively tested
 
 - Interrupted-write and sudden-power-loss recovery paths.
@@ -356,12 +388,15 @@ See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and schedu
 - Sustained queue pressure and extended Wi-Fi failure scenarios.
 - Long-duration monotonic scheduling and memory stability.
 - Physical input responsiveness during synchronous outbound HTTP.
-- All possible CONFIG/RUN listener transitions and operational combinations.
+- Extended operation and repeated transitions across all four SERVICE/DEVICE and CONFIG/RUN combinations.
+- Physical switch and button behavior under electrical noise, rapid operation, and extended use.
 
-### 9.3 Not yet implemented
+### 9.3 Not yet implemented or integrated
 
-- Physical buttons and rotary encoders connected to action dispatch.
-- Physical CONFIG/RUN switch and room selector.
+- Physical room-selector input and selected-room dispatch context.
+- GP2 power-button events connected to the action dispatcher.
+- Physical navigation, Back, Home, and volume controls connected to action dispatch.
+- Custom-action selector encoder integration.
 - User-defined custom device slots beyond `device-1` through `device-3`.
 - Apple TV discovery, pairing, authentication, and command protocol.
 - OLED feedback, audible CLONK, battery management, and final enclosure.
@@ -375,7 +410,9 @@ These lists are a development snapshot, **not** a certification or exhaustive re
 
 **One small change. One clear test. One recorded result.**
 
-When reporting a failure, capture the source commit or changed files, actual deployed version, jumper and application modes, browser URL and request, relevant REPL logs, response/error, and observed equipment behavior. Note whether a cold power cycle changes the result.
+When reporting a failure, capture the source commit or changed files, actual deployed version, **GP17 SERVICE (USB)/DEVICE switch position**, **GP18 CONFIG/RUN switch position**, selected room (when relevant), browser URL and request, relevant REPL logs, response/error, and observed equipment behavior. Note whether a cold power cycle changes the result.
+
+For physical-input problems, also record the GPIO pin, expected electrical state, observed press/release events, and whether the event reached the action dispatcher. A logged button press does not by itself prove that an outbound command was queued or executed.
 
 ### 10.1 Common traps
 
@@ -436,12 +473,28 @@ The working Config v4 baseline should be protected while proceeding in measured 
 
 ### 12.2 Physical-control integration
 
-- The empty GPIO initialization/polling shell is implemented and Pico-tested; see [Hardware & Physical Controls](HARDWARE_CONTROLS.md) for its lifecycle and verification.
-- Establish reliable button and encoder input events.
-- Measure responsiveness during ordinary HTTP requests and compound waits.
-- Begin with straightforward repeated volume actions; optimize only when measured behavior warrants it.
-- Implement and test room selection and CONFIG/RUN physical controls.
-- Keep GPIO handlers device-independent and feed the same action dispatcher used by the browser.
+**Completed and Pico-tested October 28–29, 2026:**
+
+- Optional physical-control initialization and cooperative GPIO polling.
+- GP2 momentary button input, debounce, and press/release event logging.
+- GP17 physical SERVICE (USB)/DEVICE boot-mode switch.
+- GP18 guarded CONFIG/RUN application-mode switch, including live management-listener transitions without reboot.
+- Browser and network-action smoke tests with physical-control polling enabled.
+
+**Next implementation steps:**
+
+1. Wire and test the physical room selector.
+2. Establish reliable selected-room context for physical input events.
+3. Connect GP2 power-button presses to the existing room-specific `power-toggle` dispatcher.
+4. Verify real equipment response, debounce behavior, and repeated presses.
+5. Add navigation, Back, and Home controls incrementally.
+6. Integrate the Bourns custom-action selector encoder.
+7. Electrically verify the Grayhill volume encoder before implementing volume steps.
+8. Measure physical-input responsiveness during outbound HTTP requests and compound waits.
+
+Keep GPIO handlers device-independent. All physical actions must use the same dispatcher and Dumb Queue™ as the browser Test Remote.
+
+See [Hardware & Physical Controls](HARDWARE_CONTROLS.md) for verified GPIO assignments, component status, and remaining mechanical decisions.
 
 ### 12.3 Deferred action and protocol capabilities
 

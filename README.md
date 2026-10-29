@@ -226,23 +226,27 @@ Apple TV support has not yet been implemented or tested. Its protocol, pairing, 
 
 The current controller is a **Raspberry Pi Pico 2 W (RP2350)** running **CircuitPython 10.3.1**.
 
-The planned physical design includes:
+### Physical controls already verified
+
+- **GP17 SERVICE/DEVICE switch:** Selects USB filesystem ownership or firmware write access at boot. Requires a complete power cycle to change modes.
+- **GP18 CONFIG/RUN switch:** Enables or disables the browser management listener live, without rebooting.
+- **GP2 momentary button:** Produces debounced press/release events. Intended for Power Toggle; actual equipment-command dispatch remains pending.
+
+### Hardware still being integrated
 
 - **Grayhill optical rotary encoder** with a large Kilo metallic VOLUME knob.
-- **Bourns rotary encoder** with a smaller Kilo SELECTOR knob.
-- Substantial tactile navigation and playback buttons.
-- A prominent system-power button, potentially protected by a flip-up guard.
-- A physical room selector.
-- A separate CONFIG/RUN control.
-- A tiny OLED status display.
+- **Bourns rotary encoder** with a smaller Kilo metallic SELECTOR knob.
+- Substantial tactile navigation and shortcut buttons.
+- Physical room selector.
+- Tiny OLED status display.
 - Optional piezo or I2S-powered audible feedback.
-- A serviceable enclosure with enough personality to frighten a product-design committee.
+- Rechargeable power and a serviceable enclosure with enough personality to frighten a product-design committee.
 
 The Pico 2 W is the active development platform.
 
 An earlier ESP32-S3 Feather board was part of the original hardware exploration, but is not the current firmware target.
 
-**Hardware reality check:** Most of the physical controls are still being evaluated and have not yet been wired into the running firmware.
+**Hardware reality check:** Three GPIO-connected controls have now been physically tested. The complete remote-control panel, room selection, and physical equipment-command dispatch are still under development.
 
 See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed inventory, proposed layout, GPIO status, and ongoing design decisions.
 
@@ -285,7 +289,7 @@ The project also includes a browser Test Remote for exercising the same fundamen
 
 This allows the software architecture to be tested before committing to a final enclosure and GPIO wiring arrangement.
 
-**The knobs aren't wired yet. The brains are already talking to the equipment.**
+**The knobs aren't wired yet, but the first switches and button are alive. The brains are already talking to the equipment. Now we just need to connect the two conversations.**
 
 ---
 
@@ -303,31 +307,38 @@ This allows the software architecture to be tested before committing to a final 
 The Clonker uses a small, intentionally straightforward software architecture.
 
 ```text
-Physical controls (planned)       Browser Test Remote
-             |                             |
-             v                             v
-        Input events                 HTTP action API
-             |                             |
-             +--------------+--------------+
-                            |
-                            v
-                     Action dispatcher
-                            |
-                            v
-                    THE DUMB QUEUE
-                     (implemented)
-                            |
-                            v
-                  Config v4 resolution
-                            |
-                            v
-                  Outbound HTTP transport
-                     (implemented)
-                            |
-                            v
-                  Home theater equipment
-                    Denon AVR / Roku
+Physical GPIO inputs             Browser Test Remote
+     (partial)                      (operational)
+         |                               |
+         v                               v
+  Debounced events                 HTTP action API
+   (implemented)                         |
+         |                               |
+         v                               |
+ Physical dispatch                       |
+    (planned)                            |
+         |                               |
+         +---------------+---------------+
+                         |
+                         v
+                  Action dispatcher
+                         |
+                         v
+                    DUMB QUEUE
+                   (operational)
+                         |
+                         v
+                 Config v4 resolution
+                         |
+                         v
+                Outbound HTTP transport
+                   (operational)
+                         |
+                         v
+                Home theater equipment
+                   Denon AVR / Roku
 ```
+The physical-input subsystem currently detects and reports button events. Its connection to the action dispatcher is not yet implemented. Browser actions already travel through the complete dispatcher, queue, configuration, and HTTP transport path.
 
 The shared **Dumb Queue™** accepts generic actions and executes eligible work through the outbound HTTP transport.
 
@@ -341,7 +352,7 @@ Configuration is stored in JSON and edited through the Clonker's browser interfa
 
 The current **Clonker Config v4** system supports:
 
-- Three fixed rooms with editable names.
+- One to three configured rooms using supported stable IDs; the current sample configures Den and Sunroom.
 - TV, AVR, and streaming-device endpoints per room.
 - IPv4 addresses with optional HTTP ports.
 - Fourteen fundamental actions per room.
@@ -380,56 +391,59 @@ The Test Remote uses the same shared action dispatcher and Dumb Queue™ intende
 
 The browser receives an acknowledgment when an action is queued. Actual device execution occurs subsequently through the cooperative scheduler.
 
-The next major development phase will focus on integrating and measuring physical controls while protecting the verified firmware baseline.
+Chapter 5 is integrating physical controls while preserving the verified browser and network-action baseline. GP17 and GP18 mode switches are operational, and GP2 button events are detected and logged. Room-aware physical action dispatch remains the next development step.
 
 ---
 
 ## Project Status
 
-**October 27, 2026 — Chapter 4 complete. Extreme beta, but the little monster has a tested network-control brain.**
+**October 29, 2026 — Chapter 5 underway. Extreme beta, but the Monster now has a working network-control brain and its first physical nerve endings.**
 
 ### Working and tested
 
 - Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
 - Wi-Fi connectivity and browser management interface.
-- Config v4 JSON configuration loading, validation, and persistence.
+- Clonker Config v4 JSON configuration loading, validation, and persistence.
 - Browser configuration editing and saving.
-- Revision checking and stale-edit rejection.
-- No-change detection and backup rotation.
-- SERVICE/DEVICE jumper controlling filesystem write ownership.
-- Browser Test Remote with fourteen fundamental action controls and custom-action execution.
+- Revision checking, stale-edit rejection, no-change detection, and backup rotation.
+- Physical GP17 SERVICE/DEVICE switch controlling filesystem write ownership at boot.
+- Physical GP18 CONFIG/RUN switch controlling the management listener without rebooting.
+- Browser Test Remote with fourteen fundamental actions and custom-action execution.
 - Shared Dumb Queue™ with bounded capacity and cooperative scheduling.
 - Outbound HTTP GET/POST transport using bounded blocking socket operations.
-- Real Denon AVR Volume Up and Volume Down commands.
-- Real Roku Home and Back commands.
-- Controlled five-command burst test, with all five commands completing successfully and returning HTTP 200.
-- Runtime mute and power toggle direction selection, including successful ON/OFF commands and independent room histories.
-- Configuration-change reset of toggle direction histories.
-- Failed-request direction preservation and no-op behavior for blank paths or missing endpoints.
+- Real Denon AVR and Roku control, including a successful five-command burst.
+- Runtime mute and power toggle direction selection, including independent room histories.
+- Failed-request direction preservation and unconfigured-action no-op behavior.
 - Multi-step Sunroom Movie custom action: Roku Home, three-second wait, then Denon Quick Select 1.
-- Independent Volume Up command executing successfully during that custom action's cooperative wait.
-
-The queue can accept multiple commands and execute eligible work in order. Network operations temporarily block the cooperative loop, and physical encoder responsiveness has not yet been measured.
+- Independent Volume Up command executing during the custom action's cooperative wait.
+- Physical GPIO subsystem initialization and cooperative polling.
+- GP2 momentary button with verified debounced press/release event reporting.
+- Improved browser responsiveness following the 1 ms management HTTP polling adjustment, tested in Chrome and Safari.
 
 ### Not yet implemented or fully tested
 
-- Physical button and rotary encoder integration.
-- Physical room selection and CONFIG/RUN switching.
+- Dispatching physical GP2 button events to actual equipment commands.
+- Physical room-selector integration.
+- Navigation buttons, Home/Back buttons, and rotary encoders.
 - OLED display and audible feedback.
-- Final enclosure and power architecture.
+- Final enclosure and rechargeable power architecture.
 - Apple TV protocol support and other future device adapters.
 - Comprehensive network failure, malformed-response, and prolonged-outage recovery tests.
 - Sustained high-rate command workloads and long-uptime stability.
 - Additional configuration failure-injection tests.
 - Custom-action selection persistence with multiple actions in one room.
 
+The queue can accept multiple commands and execute eligible work in order. Outbound network operations temporarily block the cooperative loop; physical input responsiveness during these operations has not yet been fully characterized.
+
 The earlier XML configuration implementation remains in the repository as historical and rollback reference.
 
-**Next major phase: Give the working Clonker its physical controls.**
+**Next milestone: Connect the physical room selector and GP2 button to the shared action dispatcher.**
 
-The software has learned to communicate.
+The software already talks to the equipment.
 
-Now the big metal switches get their turn.
+The switches now talk to the software.
+
+Next, we introduce them to each other.
 
 ---
 

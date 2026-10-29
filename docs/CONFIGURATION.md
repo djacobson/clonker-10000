@@ -1,11 +1,11 @@
 
 # The Clonker 10000 — Configuration, Persistence & Recovery
 
-**Design reference:** Updated October 27, 2026  
+**Design reference:** Updated October 29, 2026  
 **Hardware:** Raspberry Pi Pico 2 W  
 **Runtime:** CircuitPython 10.3.1  
 **Active configuration:** Clonker Config v4 (JSON format)  
-**Status:** Fundamental actions, executable custom actions, browser configuration, revision-protected persistence, Dumb Queue™, and outbound HTTP execution operational.
+**Status:** Chapter 5 — configuration, browser actions, persistence, Dumb Queue™, and outbound HTTP operational; physical mode switches verified, with GPIO-to-action dispatch pending.
 
 > **Clonker controls actions, not brands. Configuration determines where those actions go.**
 
@@ -414,7 +414,7 @@ Both directions share one target and HTTP method.
 
 The schema and browser editor support these fields.
 
-Runtime ON/OFF direction selection is not yet implemented.
+Runtime ON/OFF direction selection is implemented and bench-tested through the shared dispatcher.
 
 ### 5.3 Targets
 
@@ -1511,9 +1511,11 @@ Failure-path verification completed October 27, 2026: repeated unreachable-endpo
 
 ### 20.4 Physical controls
 
-Connect the existing fundamental-action dispatcher to physical buttons, encoders, and room-selection hardware.
+GP17 SERVICE/DEVICE and GP18 CONFIG/RUN switches have been physically verified. The GP2 momentary button produces debounced press/release events through the physical-input subsystem.
 
-Keep hardware input handling separate from HTTP command construction.
+These GP2 events are not yet connected to the action dispatcher. Physical room selection, additional buttons, and encoders remain pending.
+
+Keep hardware input handling separate from configuration validation and HTTP command construction.
 
 ### 20.5 Future protocols
 
@@ -1623,7 +1625,7 @@ Even apparently cosmetic startup changes deserve a smoke test.
 
 ## 23. Current Engineering Position
 
-**As of October 27, 2026 — Chapter 4, Clonker Config v4 operational.**
+**As of October 29, 2026 — Chapter 5, Clonker Config v4 operational; physical-control integration underway.**
 
 Clonker Config v4 is the active versioned configuration schema. JSON remains its storage format, and the root `"version": 4` identifies the schema version.
 
@@ -1684,7 +1686,8 @@ A Sunroom Volume Up command executed successfully during the Movie custom action
 **Remaining development:**
 
 - Optional user-defined custom devices.
-- Physical buttons, encoders, and room-selection controls.
+- Physical room selection and GPIO-to-action dispatch.
+- Additional physical buttons and rotary encoders.
 - Apple TV protocol integration.
 - Extended load, malformed-response, network-outage, and long-uptime regression testing.
 - Additional browser Test Remote refinements only if reproducible issues warrant them.
