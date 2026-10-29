@@ -5,6 +5,7 @@
 # GitHub: https://github.com/djacobson/clonker-10000
 
 CONFIG_SWITCH_PIN = None  # TBD
+SYSTEM_POWER_BUTTON_PIN = 2  # GP2 -- first physical button prototype
 ROOM_SELECTOR_A_PIN = None
 ROOM_SELECTOR_B_PIN = None
 
