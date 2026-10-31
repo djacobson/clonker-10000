@@ -602,8 +602,11 @@ When adding parts, record manufacturer/model, quantity, photo, received/tested s
 |---|---|---|
 | SERVICE (USB)/DEVICE boot switch | **GP17** | Implemented/tested |
 | CONFIG/RUN application switch | **GP18** | Implemented/tested |
-| Power-toggle momentary input | **GP2** | Press/release tested; dispatch pending |
-| Room selector A/B | TBD (`None`) | Unwired |
+| Power-toggle momentary input | **GP2** | Press/release tested |
+| Room selector — LEFT (yellow) | **GP3** | Wired; standalone test PASS |
+| Room selector — MIDDLE (green) | **GP4** | Wired; standalone test PASS |
+| Room selector — RIGHT (blue) | **GP5** | Wired; standalone test PASS |
+| Room selector common (black) | **GND** | WAGO ground distribution |
 | Volume encoder A/B/press | TBD (`None`) | Unwired |
 | Custom-action encoder A/B/press | TBD (`None`) | Unwired |
 | Navigation, Back, Home, playback | TBD | Unwired |
@@ -612,6 +615,10 @@ When adding parts, record manufacturer/model, quantity, photo, received/tested s
 | Indicator LEDs | TBD | Not integrated |
 
 `firmware/clonker/controls/pins.py` is the authoritative assignment map for application physical inputs.
+
+The room selector uses three independent GPIO inputs with internal pull-up resistors. The selected position grounds its corresponding input, producing a LOW reading.
+
+**Room-selector hardware verification is complete. Application-level initialization, polling, and room-context integration remain pending for Chapter 6.**
 
 GP17 boot-mode handling is implemented separately in `firmware/boot.py`.
 
