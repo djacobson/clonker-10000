@@ -500,31 +500,117 @@ GP18 determines whether the HTTP management interface is available.
 
 The application-mode switch can be changed without rebooting; changing boot-mode filesystem ownership requires a power cycle.
 
-### Physical room selector — pending
+### Physical room selector — hardware verified, integration pending
 
-The room selector will establish the room context for physical action dispatch.
+The physical room selector will establish the room context for hardware-generated actions.
 
-The current operational rooms are Den and Sunroom.
+The current configured rooms are Den and Sunroom. A third selector position is available for future behavior, but its application-level meaning has not been decided.
 
-An earlier candidate used a three-position arrangement:
+#### Selected hardware
 
-```text
-DEN  /  BOTH  /  SUNROOM
+A three-position, two-pole rotary selector has been installed in the prototype wiring and successfully tested with the Raspberry Pi Pico 2 W.
+
+Only one pole is currently used.
+
+The selector's terminals were initially undocumented, requiring manual continuity testing to identify the common terminal and individual position contacts.
+
+#### Verified terminal mapping
+
+**Orientation:** Viewed from the rear of the selector, with its metal crossbar horizontal. Knob positions are described as viewed from the front.
+
+| Knob position | Common terminal | Connected terminal |
+|---|---|---|
+| 1 — full left | 9 o'clock | 6 o'clock |
+| 2 — middle | 9 o'clock | 5 o'clock |
+| 3 — full right | 9 o'clock | 4 o'clock |
+
+These connections were established through multimeter continuity testing.
+
+The selector's other pole is unused.
+
+#### Prototype wiring
+
+| Connection | Wire color | Breadboard | Pico connection |
+|---|---|---|---|
+| Common, 9 o'clock | Black | WAGO ground distribution | GND |
+| Position 1, 6 o'clock | Yellow | Row 15 | GP3 |
+| Position 2, 5 o'clock | Green | Row 16 | GP4 |
+| Position 3, 4 o'clock | Blue | Row 17 | GP5 |
+
+The assignments are defined in `firmware/clonker/controls/pins.py`:
+
+```python
+ROOM_SELECTOR_A_PIN = 3
+ROOM_SELECTOR_B_PIN = 4
+ROOM_SELECTOR_C_PIN = 5
 ```
 
-The **uxcell three-position DPDT slide switch assortment** was ordered for evaluation. Additional selector hardware is being considered.
+Each input uses the Pico's internal pull-up resistor.
 
-No final selector type, GPIO wiring, or multiroom broadcast behavior has been committed.
+The selected rotary position connects one GPIO input to ground, producing a LOW reading. The remaining inputs should remain HIGH.
 
-**BOTH is not a configured room.** It is a possible future physical-selection behavior requiring explicit semantics.
+No external pull-up resistors or selector power supply are required.
 
-Open decisions include whether BOTH should exist, which commands could target multiple rooms, command ordering, error behavior, and independent power/mute history.
+#### Live hardware verification — October 31, 2026
 
-The immediate objective is simpler: establish reliable room selection so a physical control event can be dispatched to the correct configured room.
+A standalone CircuitPython test was executed from the REPL:
 
-`ROOM_SELECTOR_A_PIN` and `ROOM_SELECTOR_B_PIN` remain unassigned.
+```python
+exec(open("/tests/test_room_selector.py").read())
+```
 
-Room selection should not itself transmit AV commands.
+The test monitored all three GPIO inputs and reported changes in the selected position.
+
+Observed results:
+
+```text
+SELECTED: LEFT
+SELECTED: MIDDLE
+SELECTED: RIGHT
+```
+
+Additional rotations confirmed transitions back through previously selected positions.
+
+No unexpected combinations were visible in the successful test output.
+
+**Result: PASS — all three rotary positions correctly detected through Pico GPIO.**
+
+This establishes that the selector's contact mapping, ground connection, signal wiring, and GPIO input configuration work together.
+
+#### Permanent wiring preparation
+
+The prototype currently uses temporary component-side connections.
+
+Before further integration:
+
+1. Disconnect the Pico and other electrical connections before soldering.
+2. Solder the selector's component-side wire connections.
+3. Insulate individual terminals with heat-shrink tubing.
+4. Provide appropriate wire strain relief.
+5. Repeat continuity and GPIO tests after soldering.
+
+Permanent enclosure mounting and cable routing remain future work.
+
+#### Application integration — Chapter 6
+
+The selector has **not yet been integrated into the running Clonker application**.
+
+Planned work includes:
+
+- Implement selector initialization and cooperative polling.
+- Detect and report changes in selected position.
+- Establish the current room context for physical action dispatch.
+- Define appropriate behavior for the third position.
+- Handle invalid or transitional readings without issuing unintended commands.
+- Preserve responsive HTTP handling and optional physical-control startup.
+
+An earlier concept proposed `DEN / BOTH / SUNROOM`, but BOTH remains only a possible future behavior.
+
+**BOTH is not a configured room**, and no multiroom broadcast semantics have been implemented.
+
+Changing the physical room selection should not itself transmit AV commands.
+
+**Chapter 5 status: Hardware verified. Chapter 6 objective: Software integration.**
 
 ## 9. OLED and audible feedback
 
