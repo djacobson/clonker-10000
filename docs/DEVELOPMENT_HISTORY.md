@@ -58,6 +58,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 28, 2026 | 11. Chapter 5 GPIO scheduler foundation | Optional physical-control initialization and polling integrated; both flag settings Pico-tested with successful Roku HTTP execution |
 | Oct 28, 2026 | 12. Chapter 5 HTTP scheduler pacing | CONFIG browser responsiveness restored with 1 ms HTTP polling |
 | Oct 29, 2026 | 13. Chapter 5 physical switch and button verification | GP17 SERVICE/DEVICE, GP18 CONFIG/RUN, and GP2 debounced events physically verified |
+| Oct 31, 2026 | 14. Chapter 5 room selector verification and closeout | Three-position rotary selector mapped, wired to GP3/GP4/GP5, and standalone GPIO-tested; Chapter 6 integration pending |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -2000,6 +2001,81 @@ Unassigned optional buttons are skipped. Individual button initialization failur
 Chapter 5 now has physically verified mode controls and its first working button-input events. These are meaningful hardware milestones, but they do not yet constitute a fully operational physical remote.
 
 **The Monster has nerve endings. Next, we teach them which muscles to move.**
+
+---
+
+# Milestone 14 — Chapter 5 Room Selector Hardware Verification
+
+**Date:** October 31, 2026  
+**Status:** PASS — physical hardware and standalone GPIO test
+
+### Goal
+
+Characterize and electrically verify a three-position rotary room selector before integrating it into the Clonker's running application.
+
+### Hardware discovery
+
+The selector arrived without a usable terminal diagram. Its contacts were identified through multimeter continuity testing.
+
+One pole was mapped successfully:
+
+- Common terminal: 9 o'clock, viewed from the rear.
+- LEFT position: common connected to 6 o'clock.
+- MIDDLE position: common connected to 5 o'clock.
+- RIGHT position: common connected to 4 o'clock.
+
+The common terminal was connected to ground through the prototype WAGO distribution.
+
+Three position contacts were wired to the Pico:
+
+| Position | Wire | GPIO |
+|---|---|---|
+| LEFT | Yellow | GP3 |
+| MIDDLE | Green | GP4 |
+| RIGHT | Blue | GP5 |
+
+The assignments were added to `firmware/clonker/controls/pins.py`.
+
+### Verification
+
+A standalone CircuitPython test monitored all three GPIO inputs using internal pull-up resistors.
+
+The test was launched through the REPL:
+
+```python
+exec(open("/tests/test_room_selector.py").read())
+```
+
+Rotating the selector produced the expected LEFT, MIDDLE, and RIGHT readings, including reverse transitions.
+
+**Result: PASS.**
+
+The selector's electrical behavior and Pico GPIO connections were successfully verified.
+
+### Chapter 5 closeout
+
+Chapter 5 established:
+
+- A working physical GPIO initialization and polling foundation.
+- A verified GP2 momentary power-button input.
+- A verified GP17 SERVICE/DEVICE boot-mode switch.
+- A verified GP18 CONFIG/RUN application-mode switch.
+- A verified three-position rotary room selector using GP3, GP4, and GP5.
+- Continued browser responsiveness alongside physical-input handling.
+
+The room selector has not yet been integrated into the running Clonker application.
+
+The next chapter will begin with permanent selector-terminal soldering and insulation, followed by application-level room-selection integration.
+
+Detailed wiring and terminal mapping are maintained in [Hardware Controls](HARDWARE_CONTROLS.md).
+
+### Engineering conclusion
+
+The Monster now has working physical switches, a button, and a three-position sense of direction.
+
+It still needs to learn what to do with that information.
+
+**Chapter 5 complete. Chapter 6 awaits.**
 
 ---
 
