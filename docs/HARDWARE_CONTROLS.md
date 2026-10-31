@@ -721,30 +721,39 @@ These are **open decisions**, not omissions to fill with guesses.
 
 The browser-controlled firmware already executes real Denon/Roku commands and compound custom actions.
 
-Chapter 5 has now completed its first physical-input milestones:
+### Chapter 5 — completed physical-input milestones
 
 1. **DONE:** Establish optional physical-control initialization and cooperative polling.
 2. **DONE:** Wire GP2 and verify momentary press/release events.
 3. **DONE:** Replace the GP17 boot jumper with a maintained physical switch.
 4. **DONE:** Wire GP18 and verify live CONFIG/RUN transitions without reboot.
+5. **DONE:** Characterize the three-position rotary room selector using multimeter continuity testing.
+6. **DONE:** Wire the selector to GP3, GP4, and GP5 with common ground.
+7. **DONE:** Verify LEFT, MIDDLE, and RIGHT selector positions using a standalone CircuitPython GPIO test.
+8. **DONE:** Record the selector assignments in `pins.py`.
 
-The next suggested sequence:
+Chapter 5 established the physical GPIO foundation and demonstrated that real switches can be connected, read, and tested without sacrificing the responsiveness of the browser-controlled firmware.
 
-1. Evaluate and connect the physical room selector.
-2. Establish selected-room context for physical controls.
-3. Connect GP2 power-button events to the existing room-specific `power-toggle` dispatcher.
-4. Verify physical power execution, debounce, and repeat behavior.
-5. Add navigation, Back, and Home buttons incrementally.
-6. Wire and characterize the Bourns custom-action selector encoder.
-7. Verify the Grayhill volume encoder electrically, then implement volume steps.
-8. Measure responsiveness and queue behavior under rapid/repeated input.
-9. Evaluate SYSTEM MASTER sleep/wake behavior and rechargeable power.
-10. Experiment with optional OLED and audio hardware.
-11. Refine permanent wiring, mechanical mounting, and enclosure construction.
+### Chapter 6 — proposed next steps
 
-This is a proposed order, not a fixed commitment.
+1. Solder and individually insulate the room selector's component-side connections; repeat electrical verification.
+2. Implement room-selector initialization, polling, and state reporting in the physical-controls subsystem.
+3. Establish selected-room context for physical action dispatch.
+4. Connect GP2 power-button events to the existing room-specific `power-toggle` dispatcher, if not already integrated.
+5. Verify physical power execution, debounce, and repeat behavior.
+6. Add navigation, Back, and Home buttons incrementally.
+7. Wire and characterize the Bourns custom-action selector encoder.
+8. Verify the Grayhill volume encoder electrically, then implement volume steps.
+9. Measure responsiveness and queue behavior under rapid/repeated input.
+10. Evaluate SYSTEM MASTER sleep/wake behavior and rechargeable power.
+11. Experiment with optional OLED and audio hardware.
+12. Refine permanent wiring, mechanical mounting, and enclosure construction.
+
+This is a proposed sequence, not a fixed commitment. Hardware discoveries, mechanical considerations, and software architecture may change the order.
 
 The guiding principle remains: **one meaningful hardware or firmware change at a time, followed by real Pico verification**.
+
+The room selector is electrically operational but is not yet integrated into the running Clonker application.
 
 ## 15. Current verification snapshot — October 31, 2026
 
