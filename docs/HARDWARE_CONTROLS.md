@@ -746,23 +746,53 @@ This is a proposed order, not a fixed commitment.
 
 The guiding principle remains: **one meaningful hardware or firmware change at a time, followed by real Pico verification**.
 
-## 15. Current verification snapshot — October 29, 2026
+## 15. Current verification snapshot — October 31, 2026
 
 **Implemented and tested:** Pico 2 W / CircuitPython startup, Wi-Fi, USB/REPL, GP17 filesystem ownership, Config v4 browser configuration/persistence, browser Test Remote, fundamental outbound GET/POST actions, executable custom actions, shared cooperative Dumb Queue™, a real Roku → wait → Denon compound sequence, and runtime power/mute ON/OFF direction selection.
 
-**Chapter 5 physical hardware verified:**
+### Chapter 5 physical hardware verified
 
 - **GP17 boot-mode switch:** Maintained toggle selects SERVICE (USB) when OFF/open and DEVICE when ON/grounded.
-- **GP2 momentary power button:** Physical input initialization, debounce, and press/release event logging verified. No action dispatch yet.
-- **GP18 CONFIG/RUN switch:** Maintained guarded switch controls the application mode.
+- **GP2 momentary power button:** Physical input initialization, debounce, and press/release event logging verified.
+- **GP18 CONFIG/RUN switch:** Maintained guarded switch controls application mode.
 - **CONFIG/RUN HTTP behavior:** RUN stops the management listener; CONFIG restores it. Live transitions tested without reboot.
 - **Serial diagnostics:** Application-mode messages standardized to `App mode source = PHYSICAL` and `App mode = CONFIG` or `App mode = RUN`.
+- **GP3/GP4/GP5 room selector:** Three-position rotary selector electrically verified using internal GPIO pull-ups. LEFT, MIDDLE, and RIGHT positions correctly identified in a standalone CircuitPython test.
+- **Ground distribution:** WAGO lever connectors used for prototype ground distribution.
 
-**Implemented in firmware but not fully hardware-exercised:** Shared action dispatch under all network/failure/load scenarios; interaction between future room-aware physical controls and the existing dispatcher.
+### Room-selector verification — October 31, 2026
 
-**Not yet implemented:** Physical room selection, physical-button-to-action dispatch, encoder drivers, navigation-button integration, SYSTEM MASTER wake/ignition, battery management, OLED integration, audio feedback, and final enclosure.
+A three-position rotary selector was characterized using a multimeter and connected to the Pico.
 
-**Not finalized:** Physical room-selector behavior, complete GPIO map, rechargeable power design, and guarded SYSTEM MASTER sleep/wake behavior.
+| Position | Signal | GPIO | Test result |
+|---|---|---|---|
+| LEFT | Yellow | GP3 | PASS |
+| MIDDLE | Green | GP4 | PASS |
+| RIGHT | Blue | GP5 | PASS |
+
+The common terminal connects to GND through the WAGO ground distribution.
+
+The standalone test was executed through the CircuitPython REPL:
+
+```python
+exec(open("/tests/test_room_selector.py").read())
+```
+
+The serial console correctly reported selector transitions through all three positions, including reverse transitions.
+
+**Result: PASS.** The physical selector and its GPIO connections work.
+
+### Remaining integration work
+
+**Implemented in firmware but not fully hardware-exercised:** Shared action dispatch under all network/failure/load scenarios and interaction between future room-aware physical controls and the existing dispatcher.
+
+**Not yet implemented:** Room-selector application integration, encoder drivers, navigation-button integration, SYSTEM MASTER wake/ignition, battery management, OLED integration, audio feedback, and final enclosure.
+
+**Not finalized:** Permanent room-selector wiring, third-position semantics, complete GPIO allocation, rechargeable power design, and guarded SYSTEM MASTER sleep/wake behavior.
+
+The selector's component-side connections are scheduled for soldering and individual heat-shrink insulation. Electrical verification should be repeated afterward.
+
+The room selector's next development milestone is integration with the physical-controls subsystem in Chapter 6.
 
 For dated tests, use [Development History](DEVELOPMENT_HISTORY.md). Historical implementation snapshots should not be mistaken for current firmware status.
 
