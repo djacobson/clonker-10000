@@ -60,6 +60,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 29, 2026 | 13. Chapter 5 physical switch and button verification | GP17 SERVICE/DEVICE, GP18 CONFIG/RUN, and GP2 debounced events physically verified |
 | Oct 31, 2026 | 14. Chapter 5 room selector verification and closeout | Three-position rotary selector mapped, wired to GP3/GP4/GP5, and standalone GPIO-tested; Chapter 6 integration pending |
 | Nov 2, 2026 | 15. Chapter 6 physical room selection and Power Toggle | Integrated GP3/GP4/GP5 room selection, safe Room 3 no-op, and GP2 Power ON/OFF verified on actual equipment in Den and Sunroom |
+| Nov 2, 2026 | 16. Room selector GPIO reassignment | Moved selector from GP3/GP4/GP5 to GP3/GP6/GP7; all three positions retested successfully; GP4/GP5 reserved for STEMMA QT/I²C |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -2262,6 +2263,59 @@ Chapter 6 established:
 The next development objective is integrating the two Bourns rotary encoders, beginning with reliable movement detection and volume control.
 
 **The Monster has learned which room it's in. And how to turn the lights on. Well, the television, anyway.**
+
+---
+
+# Milestone 16 — Room Selector GPIO Reassignment
+
+**Date:** November 2, 2026  
+**Status:** PASS — hardware retested
+
+### Goal
+
+Preserve the Pico Cowbell Terminal board's STEMMA QT/I²C connection for future peripherals, particularly the planned OLED status display, without sacrificing the operational three-position room selector.
+
+### Implementation
+
+The original room-selector assignments were GP3, GP4, and GP5.
+
+The green and blue selector wires were relocated to GP6 and GP7 on the Cowbell screw terminals. The yellow wire remained on GP3, and the black common remained connected to the WAGO ground bus.
+
+The resulting assignments are:
+
+| Position | Wire | GPIO | Room |
+|---|---|---|---|
+| LEFT | Yellow | GP3 | `room-1` — Den |
+| MIDDLE | Green | GP6 | `room-2` — Sunroom |
+| RIGHT | Blue | GP7 | `room-3` — Reserved |
+
+`firmware/clonker/controls/pins.py` was updated:
+
+```python
+ROOM_SELECTOR_A_PIN = 3
+ROOM_SELECTOR_B_PIN = 6
+ROOM_SELECTOR_C_PIN = 7
+```
+
+No changes were required in `selectors.py`, `physical.py`, or the action dispatcher.
+
+GP4 and GP5 are now reserved for the Cowbell's STEMMA QT/I²C connector. The OLED remains a planned peripheral, not an installed device.
+
+### Verification
+
+After reconnecting the Pico, the room selector was tested with its new GPIO assignments.
+
+**Result: PASS — all three positions operated correctly.**
+
+The reassignment preserved the existing room-selection behavior.
+
+### Engineering conclusion
+
+The working room selector now uses GP3/GP6/GP7, while GP4/GP5 remain available for future I²C peripherals.
+
+This was a small hardware change made early enough to avoid more disruptive rewiring during enclosure assembly.
+
+**Two wires moved. Three rooms still recognized. The Monster barely noticed.**
 
 ---
 
