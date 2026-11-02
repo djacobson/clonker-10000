@@ -30,7 +30,7 @@ Historical experiments belong in [Development History](DEVELOPMENT_HISTORY.md); 
 - GP17 SERVICE (USB)/DEVICE boot switch.
 - GP18 guarded CONFIG/RUN switch.
 - GP2 debounced momentary Power Toggle.
-- Three-position physical room selector on GP3/GP4/GP5.
+- Three-position physical room selector on GP3/GP6/GP7, reassigned and retested November 2.
 - Debounced room-selection state.
 - Shared physical-event-to-action mapping.
 - Room-aware physical action dispatch.
@@ -240,8 +240,12 @@ The GP2 Power Toggle now uses the same dispatcher as the browser Test Remote.
 | Position | GPIO grounded | Room |
 |---|---|---|
 | LEFT | GP3 | `room-1` |
-| MIDDLE | GP4 | `room-2` |
-| RIGHT | GP5 | `room-3` |
+| MIDDLE | GP6 | `room-2` |
+| RIGHT | GP7 | `room-3` |
+
+The selector originally used GP3/GP4/GP5. On November 2, 2026, the green and blue inputs were reassigned to GP6 and GP7, respectively, and all three positions were successfully retested.
+
+GP4/GP5 are reserved for the Cowbell's STEMMA QT/I²C interface. The OLED is not yet integrated.
 
 Each input uses an internal pull-up.
 
