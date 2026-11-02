@@ -1,10 +1,10 @@
 # THE CLONKER 10000
 ## Hardware & Physical Controls
 
-**Design reference:** Updated November 2, 2026  
+**Design reference:** Updated November 2, 2026 — room selector reassigned and retested
 **Controller:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
 **Firmware baseline:** Chapter 6 — physical room selection and room-aware Power Toggle operational  
-**Hardware baseline:** GP17, GP18, GP2, and three-position GP3/GP4/GP5 selector verified  
+**Hardware baseline:** GP17, GP18, GP2, and three-position GP3/GP6/GP7 selector verified 
 **Current development focus:** Two Bourns rotary encoders and remaining physical controls
 
 > A gloriously overengineered, tactile, Wi-Fi home theater remote. Two rotary controls, real buttons, questionable restraint, and absolutely no interest in becoming another touchscreen.
@@ -806,8 +806,8 @@ The current mapping is:
 | Knob position | GPIO | Wire | Room |
 |---|---|---|---|
 | LEFT | GP3 | Yellow | `room-1` — Den |
-| MIDDLE | GP4 | Green | `room-2` — Sunroom |
-| RIGHT | GP5 | Blue | `room-3` — Reserved |
+| MIDDLE | GP6 | Green | `room-2` — Sunroom |
+| RIGHT | GP7 | Blue | `room-3` — Reserved |
 
 Room 3 is a harmless no-op until configured.
 
@@ -841,21 +841,23 @@ The selector's other pole remains unused.
 
 ### 8.5 Wiring
 
-| Connection | Wire | Earlier breadboard reference | Pico |
+| Connection | Wire | Earlier breadboard reference | Current Pico GPIO |
 |---|---|---|---|
 | Common, 9 o'clock | Black | WAGO ground bus | GND |
 | Position 1, 6 o'clock | Yellow | Row 15 | GP3 |
-| Position 2, 5 o'clock | Green | Row 16 | GP4 |
-| Position 3, 4 o'clock | Blue | Row 17 | GP5 |
+| Position 2, 5 o'clock | Green | Row 16 | GP6 |
+| Position 3, 4 o'clock | Blue | Row 17 | GP7 |
 
-The breadboard row numbers are historical test references, not permanent wiring requirements.
+The breadboard row numbers are historical test references, not permanent wiring requirements. The active assembly uses the Pico Cowbell Terminal board.
+
+The original selector wiring used GP3/GP4/GP5. On November 2, the green and blue signals were moved to GP6 and GP7, reserving GP4/GP5 for the Cowbell's STEMMA QT/I²C connector. All three selector positions were successfully retested.
 
 The current application GPIO assignments are:
 
 ```python
 ROOM_SELECTOR_A_PIN = 3
-ROOM_SELECTOR_B_PIN = 4
-ROOM_SELECTOR_C_PIN = 5
+ROOM_SELECTOR_B_PIN = 6
+ROOM_SELECTOR_C_PIN = 7
 ```
 
 Each GPIO input uses the Pico's internal pull-up resistor.
@@ -909,7 +911,7 @@ The later Cowbell-based runtime test confirms that the installed GPIO connection
 
 `controls/selectors.py` now owns the physical room-selection state.
 
-It initializes GP3, GP4, and GP5 as active-low inputs with internal pull-ups.
+It initializes the room selector's configured GPIO inputs (currently GP3, GP6, and GP7) as active-low inputs with internal pull-ups.
 
 A valid position requires exactly one grounded input.
 
@@ -1075,8 +1077,8 @@ When adding parts, record manufacturer/model, quantity, received/tested status, 
 | CONFIG/RUN switch | GP18 | Implemented; verified |
 | Power Toggle momentary input | GP2 | Operational |
 | Room selector LEFT, yellow | GP3 | Operational |
-| Room selector MIDDLE, green | GP4 | Operational |
-| Room selector RIGHT, blue | GP5 | Operational |
+| Room selector MIDDLE, green | GP6 | Operational |
+| Room selector RIGHT, blue | GP7 | Operational |
 | Room selector common, black | GND | WAGO distribution |
 | Volume encoder A/B/press | TBD (`None`) | Not integrated |
 | Action encoder A/B/press | TBD (`None`) | Not integrated |
@@ -1348,7 +1350,7 @@ The guiding principle remains:
 - GP17 SERVICE/DEVICE switch.
 - GP18 CONFIG/RUN switch.
 - GP2 momentary Power Toggle.
-- GP3/GP4/GP5 room selector.
+- GP3/GP6/GP7 room selector (reassigned and retested November 2).
 - Common-ground wiring.
 - Cowbell-based GPIO connections.
 - Room-selection debounce.
@@ -1357,17 +1359,19 @@ The guiding principle remains:
 
 ### 15.3 Room selector
 
-| Position | Wire | GPIO | Result |
+| Position | Wire | Current GPIO | Result |
 |---|---|---|---|
 | LEFT | Yellow | GP3 | PASS — Room 1 |
-| MIDDLE | Green | GP4 | PASS — Room 2 |
-| RIGHT | Blue | GP5 | PASS — Room 3 |
+| MIDDLE | Green | GP6 | PASS — Room 2 |
+| RIGHT | Blue | GP7 | PASS — Room 3 |
 
 The common terminal connects to GND.
 
-Standalone electrical verification occurred October 31.
+Standalone electrical verification occurred October 31 using GP3/GP4/GP5.
 
-Integrated runtime verification occurred November 2.
+Integrated runtime verification occurred November 2. Later that day, the green and blue signals were moved to GP6 and GP7 respectively, and the room selector was successfully retested.
+
+GP4 and GP5 are reserved for the Cowbell's STEMMA QT/I²C connection.
 
 **Result: PASS.**
 
