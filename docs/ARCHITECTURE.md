@@ -159,7 +159,7 @@ The following capabilities have been implemented and exercised on the Pico, thro
 
 - GP2 momentary Power Toggle button.
 - Reusable debounced button driver.
-- Three-position room selector on GP3, GP4, and GP5.
+- Three-position room selector on GP3, GP6, and GP7 (reassigned and retested November 2).
 - Debounced room-selection state.
 - Shared physical-event-to-action mapping.
 - Shared `dispatch_selected()` helper.
@@ -656,18 +656,21 @@ Keep it on a trusted LAN. Do not expose port 9090 to the public internet.
 |---|---|---|
 | GP2 | Momentary Power Toggle | Operational, live action dispatch |
 | GP3 | Room selector LEFT | Operational — Room 1 |
-| GP4 | Room selector MIDDLE | Operational — Room 2 |
-| GP5 | Room selector RIGHT | Operational — Room 3 |
+| GP4/GP5 | STEMMA QT / I²C | Reserved for future OLED and I²C devices |
+| GP6 | Room selector MIDDLE | Operational — Room 2 |
+| GP7 | Room selector RIGHT | Operational — Room 3 |
 | GP17 | SERVICE/DEVICE boot switch | Operational |
 | GP18 | CONFIG/RUN switch | Operational |
 
 All listed selector and button inputs use active-low wiring with internal pull-ups.
 
-The three-position selector connects exactly one of GP3, GP4, or GP5 to common ground.
+The three-position selector connects exactly one of GP3, GP6, or GP7 to common ground.
 
 The current hardware uses the Adafruit Pico Cowbell Terminal board for screw-terminal GPIO connections.
 
 The WAGO ground bus provides a shared ground reference.
+
+On November 2, 2026, the room selector was reassigned from GP3/GP4/GP5 to GP3/GP6/GP7 and successfully retested. This preserves GP4/GP5 for the Cowbell's STEMMA QT/I²C connector.
 
 Other physical-control GPIO assignments remain pending.
 
@@ -680,8 +683,8 @@ The hardware mapping is:
 | Mechanical position | GPIO grounded | Selected room |
 |---|---|---|
 | LEFT | GP3 | `room-1` |
-| MIDDLE | GP4 | `room-2` |
-| RIGHT | GP5 | `room-3` |
+| MIDDLE | GP6 | `room-2` |
+| RIGHT | GP7 | `room-3` |
 
 At initialization, the selector captures its current physical position.
 
