@@ -4,24 +4,72 @@
 # Clonker Designed by David Jacobson
 # GitHub: https://github.com/djacobson/clonker-10000
 
-"""Physical control initialization and event polling.
+"""Physical control initialization, polling, and action routing.
 
-Coordinates reusable input components.
+Hardware modules detect events.
+This module maps physical events to Clonker actions.
+
 The CONFIG/RUN switch is managed separately in switches.py.
+The room selector maintains its own selected-room state.
 """
 
 from clonker.system import logger
-from clonker.controls import selectors
+from clonker import actions
+from clonker import device_config_v2 as device_config
 from clonker.controls import pins
+from clonker.controls import selectors
 from clonker.controls.buttons import Button
+
+
+# Physical button names -> fundamental action IDs.
+# Only assigned GPIO buttons are initialized.
+BUTTON_ACTIONS = {
+    "POWER_TOGGLE": "power-toggle",
+    "HOME": "home",
+    "BACK": "back",
+    "UP": "nav-up",
+    "DOWN": "nav-down",
+    "LEFT": "nav-left",
+    "RIGHT": "nav-right",
+    "SELECT": "select",
+    "VOLUME_MUTE": "mute-toggle",
+}
 
 
 _initialized = False
 _buttons = []
 
 
+def dispatch_selected(action_id):
+    """Dispatch an action to the currently selected room.
+
+    Unconfigured rooms are harmless no-ops.
+    All physical controls can reuse this helper.
+    """
+    room_id = selectors.selected_room()
+
+    if room_id not in device_config.current()["rooms"]:
+        logger.info(
+            "PHYSICAL NO-OP: {} / {} (room unavailable)".format(
+                room_id, action_id
+            )
+        )
+        return False
+
+    try:
+        actions.dispatch(room_id, action_id)
+        return True
+    except Exception as exc:
+        logger.warning(
+            "PHYSICAL dispatch failed: {} / {}: {}".format(
+                room_id, action_id, exc
+            )
+        )
+        return False
+
+
 def initialize():
-    """Initialize assigned physical buttons."""
+    """Initialize assigned physical buttons and room selector."""
     global _initialized
 
     if _initialized:
@@ -76,10 +124,16 @@ def initialize():
 
 
 def poll():
-    """Poll all initialized buttons for events."""
+    """Poll physical inputs and route button presses."""
 
     if not _initialized:
         return
+
+    # Update room state before handling button events.
+    room_id = selectors.poll()
+
+    if room_id is not None:
+        logger.info("ROOM SELECTED: {}".format(room_id))
 
     for button in _buttons:
         event = button.poll()
@@ -91,8 +145,14 @@ def poll():
             "{} {}".format(button.name, event.upper())
         )
 
-    room_id = selectors.poll()
+        # Only stable presses trigger actions.
+        if event != "pressed":
+            continue
 
-    if room_id is not None:
-        logger.info("ROOM SELECTED: {}".format(room_id))
+        action_id = BUTTON_ACTIONS.get(button.name)
 
+        if action_id is not None:
+            dispatch_selected(action_id)
+
+        # ACTION_RUN will use the custom-action selection
+        # maintained by the future encoder integration.
