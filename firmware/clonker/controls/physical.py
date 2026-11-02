@@ -11,6 +11,7 @@ The CONFIG/RUN switch is managed separately in switches.py.
 """
 
 from clonker.system import logger
+from clonker.controls import selectors
 from clonker.controls import pins
 from clonker.controls.buttons import Button
 
@@ -58,6 +59,18 @@ def initialize():
                 "{} button unavailable: {}".format(name, exc)
             )
 
+    try:
+        if selectors.initialize():
+            logger.info(
+                "Room selector initialized; selected = {}".format(
+                    selectors.selected_room()
+                )
+            )
+        else:
+            logger.warning("Room selector not assigned")
+    except Exception as exc:
+        logger.warning("Room selector unavailable: {}".format(exc))
+
     _initialized = True
     return True
 
@@ -77,3 +90,9 @@ def poll():
         logger.info(
             "{} {}".format(button.name, event.upper())
         )
+
+    room_id = selectors.poll()
+
+    if room_id is not None:
+        logger.info("ROOM SELECTED: {}".format(room_id))
+
