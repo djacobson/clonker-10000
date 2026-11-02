@@ -35,7 +35,8 @@ And perhaps a case that opens with actual lunchbox latches.
     <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (future)<br>
     <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
     <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<br>
-    <b>Configuration:</b> Browser-based editor · Wi-Fi HTTP commands · Executable custom action sequences
+    <b>Configuration:</b> Browser-based editor · Wi-Fi HTTP commands · Executable custom action sequences<br>
+    <b>Physical controls:</b> Three-position room selector and room-aware Power Toggle operational
   </sub>
 </p>
 
@@ -204,9 +205,13 @@ Each configured room supports fourteen standard action IDs:
 
 Each action can be mapped to a configured TV, AV receiver, or streaming device.
 
-The current configuration supports three rooms, each with its own devices and command mappings.
+Clonker Config v4 supports up to three rooms, each with its own devices and command mappings. The current installation configures Den and Sunroom.
 
-**Custom actions are now operational in firmware.** They can combine ordered device commands and cooperative waits for equipment-specific functions such as listening modes or a simple movie-start sequence. The browser Test Remote can execute them today; physical buttons and selectors are still to come.
+**Custom actions are operational in firmware.** They can combine ordered device commands and cooperative waits for equipment-specific functions such as listening modes or a simple movie-start sequence.
+
+The browser Test Remote can execute custom actions today.
+
+The physical room selector and Power Toggle are also operational. The custom-action encoder and remaining physical controls are still being integrated.
 
 ### Device Compatibility Roadmap
 
@@ -226,27 +231,31 @@ Apple TV support has not yet been implemented or tested. Its protocol, pairing, 
 
 The current controller is a **Raspberry Pi Pico 2 W (RP2350)** running **CircuitPython 10.3.1**.
 
+A Pico Cowbell Terminal board provides screw-terminal GPIO connections, and a WAGO ground bus distributes common ground to the controls.
+
 ### Physical controls already verified
 
 - **GP17 SERVICE/DEVICE switch:** Selects USB filesystem ownership or firmware write access at boot. Requires a complete power cycle to change modes.
 - **GP18 CONFIG/RUN switch:** Enables or disables the browser management listener live, without rebooting.
-- **GP2 momentary button:** Produces debounced press/release events. Intended for Power Toggle; actual equipment-command dispatch remains pending.
+- **GP3/GP4/GP5 rotary room selector:** Selects Den, Sunroom, or reserved Room 3. Integrated with firmware and verified.
+- **GP2 momentary Power Toggle:** Dispatches the selected room's configured power action. Actual ON/OFF equipment behavior verified in Den and Sunroom.
 
 ### Hardware still being integrated
 
-- **Grayhill optical rotary encoder** with a large Kilo metallic VOLUME knob.
-- **Bourns rotary encoder** with a smaller Kilo metallic SELECTOR knob.
+- **Two Bourns PEC11R rotary encoders:** One for volume and push-to-mute; the other for custom-action selection and push-to-run.
 - Substantial tactile navigation and shortcut buttons.
-- Physical room selector.
 - Tiny OLED status display.
 - Optional piezo or I2S-powered audible feedback.
-- Rechargeable power and a serviceable enclosure with enough personality to frighten a product-design committee.
+- Rechargeable power.
+- Final enclosure and aluminum faceplate.
+
+The earlier Grayhill volume-encoder plan has been superseded by the two-Bourns approach.
 
 The Pico 2 W is the active development platform.
 
-An earlier ESP32-S3 Feather board was part of the original hardware exploration, but is not the current firmware target.
+An earlier ESP32-S3 Feather board was part of the original hardware exploration but is not the current firmware target.
 
-**Hardware reality check:** Three GPIO-connected controls have now been physically tested. The complete remote-control panel, room selection, and physical equipment-command dispatch are still under development.
+**Hardware reality check:** The room selector and Power Toggle now form a working physical-control path all the way to real home-theater equipment. The complete control panel is still under construction.
 
 See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed inventory, proposed layout, GPIO status, and ongoing design decisions.
 
@@ -256,10 +265,7 @@ See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed i
 
 The Clonker 10000 is still very much a work in progress.
 
-The final enclosure hasn't materialized yet, but the knobs,
-switches, and assorted electronic organs are beginning to
-assemble into something that might eventually resemble
-a remote control.
+The final enclosure hasn't materialized yet, but the knobs, switches, and assorted electronic organs are beginning to assemble into something that might eventually resemble a remote control.
 
 Or possibly the control panel of a very small submarine.
 
@@ -269,8 +275,7 @@ Or possibly the control panel of a very small submarine.
        alt="The Clonker 10000 hardware prototype">
 </p>
 
-*Actual prototype. Industrial design department still missing.
-Marketing department still disbanded.*
+*Actual prototype. Industrial design department still missing. Marketing department still disbanded.*
 
 ---
 
@@ -285,11 +290,13 @@ The configuration interface already exists and runs on the Pico.
        style="vertical-align: top;">
 </p>
 
-The project also includes a browser Test Remote for exercising the same fundamental action IDs that future physical controls will invoke. It can also run configured custom actions, including multi-step sequences across different devices.
+The project also includes a browser Test Remote for exercising the same fourteen fundamental action IDs that physical controls invoke.
 
-This allows the software architecture to be tested before committing to a final enclosure and GPIO wiring arrangement.
+It can also run configured custom actions, including multi-step sequences across different devices.
 
-**The knobs aren't wired yet, but the first switches and button are alive. The brains are already talking to the equipment. Now we just need to connect the two conversations.**
+This allows the software architecture to be tested before committing to the final enclosure and GPIO wiring arrangement.
+
+**The knobs aren't integrated yet, but the first physical controls now talk to the equipment. The Monster has officially learned to reach outside its own box.**
 
 ---
 
@@ -308,15 +315,16 @@ The Clonker uses a small, intentionally straightforward software architecture.
 
 ```text
 Physical GPIO inputs             Browser Test Remote
-     (partial)                      (operational)
+   (operational)                    (operational)
          |                               |
          v                               v
-  Debounced events                 HTTP action API
-   (implemented)                         |
+ Buttons + Room Selector           HTTP action API
          |                               |
          v                               |
- Physical dispatch                       |
-    (planned)                            |
+  Physical coordinator                   |
+         |                               |
+         v                               |
+  Room-aware dispatch                    |
          |                               |
          +---------------+---------------+
                          |
@@ -325,26 +333,35 @@ Physical GPIO inputs             Browser Test Remote
                          |
                          v
                     DUMB QUEUE
-                   (operational)
                          |
                          v
                  Config v4 resolution
                          |
                          v
                 Outbound HTTP transport
-                   (operational)
                          |
                          v
                 Home theater equipment
                    Denon AVR / Roku
 ```
-The physical-input subsystem currently detects and reports button events. Its connection to the action dispatcher is not yet implemented. Browser actions already travel through the complete dispatcher, queue, configuration, and HTTP transport path.
 
-The shared **Dumb Queue™** accepts generic actions and executes eligible work through the outbound HTTP transport.
+**Both input paths now converge on the same action dispatcher.**
 
-Custom actions reuse that same queue. A cooperative wait lets an unrelated eligible command execute before a delayed custom-action step resumes. The outbound HTTP requests themselves remain synchronous and blocking; the queue does not make network I/O nonblocking.
+The physical room selector establishes context, and the GP2 Power Toggle produces a generic action. The dispatcher resolves the selected room's configured command and submits it to the shared queue.
 
-Real Denon and Roku commands were successfully executed from the Pico on October 21, 2026. Runtime toggles, multi-step custom actions, and independent command interleaving during a custom-action wait were subsequently verified on October 27.
+Room 3 is reserved. If it is selected without a configured room, physical action dispatch safely does nothing rather than controlling another room.
+
+The shared **Dumb Queue™** accepts generic actions and executes eligible work through outbound HTTP.
+
+Custom actions reuse that same queue. A cooperative wait lets an unrelated eligible command execute before a delayed custom-action step resumes.
+
+Outbound HTTP requests themselves remain synchronous and blocking. The queue does not make network I/O nonblocking.
+
+Real Denon and Roku commands were successfully executed from the Pico on October 21, 2026.
+
+Runtime toggles, multi-step custom actions, and independent command interleaving during a custom-action wait were subsequently verified on October 27.
+
+On November 2, physical room selection and actual Power Toggle ON/OFF operation were verified in both Den and Sunroom.
 
 ### Configuration
 
@@ -369,7 +386,9 @@ The current **Clonker Config v4** system supports:
 - Validated startup recovery.
 - Filesystem write protection during USB SERVICE mode.
 
-**Runtime toggle direction selection is implemented and tested.** The next ON/OFF direction advances only after a successful HTTP request. It is command history, not authoritative knowledge of the equipment's actual power or mute state.
+**Runtime toggle direction selection is implemented and tested.** The next ON/OFF direction advances only after a successful HTTP request.
+
+It is command history, not authoritative knowledge of the equipment's actual power or mute state.
 
 ### Management Interface
 
@@ -385,19 +404,21 @@ The interface currently provides:
 - A clock synchronization interface.
 - SERVICE/DEVICE filesystem ownership protection.
 
-The Test Remote uses the same shared action dispatcher and Dumb Queue™ intended for the future physical controls.
+The browser Test Remote and physical controls use the same shared action dispatcher and Dumb Queue™.
 
 **Real outbound HTTP control is operational.** The Pico has successfully executed configured Denon AVR and Roku commands over Wi-Fi, including a two-device custom action.
 
 The browser receives an acknowledgment when an action is queued. Actual device execution occurs subsequently through the cooperative scheduler.
 
-Chapter 5 is integrating physical controls while preserving the verified browser and network-action baseline. GP17 and GP18 mode switches are operational, and GP2 button events are detected and logged. Room-aware physical action dispatch remains the next development step.
+Chapter 6 connected the physical room selector and GP2 Power Toggle to this same command path.
+
+The remaining buttons and rotary encoders can reuse the established architecture rather than introducing another execution mechanism.
 
 ---
 
 ## Project Status
 
-**October 29, 2026 — Chapter 5 underway. Extreme beta, but the Monster now has a working network-control brain and its first physical nerve endings.**
+**November 2, 2026 — Chapter 6 underway. Extreme beta, but the Monster now has working physical room selection and a Power Toggle that controls real equipment.**
 
 ### Working and tested
 
@@ -417,33 +438,48 @@ Chapter 5 is integrating physical controls while preserving the verified browser
 - Multi-step Sunroom Movie custom action: Roku Home, three-second wait, then Denon Quick Select 1.
 - Independent Volume Up command executing during the custom action's cooperative wait.
 - Physical GPIO subsystem initialization and cooperative polling.
-- GP2 momentary button with verified debounced press/release event reporting.
+- GP2 momentary button with debounced press/release event reporting.
+- Three-position physical room selector integrated with firmware.
+- Room selection for Den, Sunroom, and reserved Room 3.
+- Safe no-op for physical actions when Room 3 is not configured.
+- GP2 Power Toggle dispatched through the shared action queue.
+- Actual Power ON and OFF verified in Den.
+- Actual Power ON and OFF verified in Sunroom.
+- Independent physical power-toggle histories for both rooms.
 - Improved browser responsiveness following the 1 ms management HTTP polling adjustment, tested in Chrome and Safari.
 
 ### Not yet implemented or fully tested
 
-- Dispatching physical GP2 button events to actual equipment commands.
-- Physical room-selector integration.
-- Navigation buttons, Home/Back buttons, and rotary encoders.
+- Rotary encoder drivers and application integration.
+- Physical volume control and push-to-mute.
+- Physical custom-action selection and execution.
+- Navigation buttons and Home/Back buttons.
+- Playback buttons.
 - OLED display and audible feedback.
 - Final enclosure and rechargeable power architecture.
+- Deep-sleep ignition behavior.
 - Apple TV protocol support and other future device adapters.
 - Comprehensive network failure, malformed-response, and prolonged-outage recovery tests.
 - Sustained high-rate command workloads and long-uptime stability.
 - Additional configuration failure-injection tests.
 - Custom-action selection persistence with multiple actions in one room.
+- Reliable high-rate encoder capture during blocking HTTP.
 
-The queue can accept multiple commands and execute eligible work in order. Outbound network operations temporarily block the cooperative loop; physical input responsiveness during these operations has not yet been fully characterized.
+The queue can accept multiple commands and execute eligible work in order.
+
+Outbound network operations temporarily block the cooperative loop. Physical input responsiveness during those operations has not yet been fully characterized.
 
 The earlier XML configuration implementation remains in the repository as historical and rollback reference.
 
-**Next milestone: Connect the physical room selector and GP2 button to the shared action dispatcher.**
+**Next milestone: Integrate the two Bourns rotary encoders, beginning with reliable movement detection and volume control.**
 
-The software already talks to the equipment.
+The software talks to the equipment.
 
-The switches now talk to the software.
+The switches talk to the software.
 
-Next, we introduce them to each other.
+And now, finally, **the switches talk to the equipment.**
+
+The knobs are next.
 
 ---
 
