@@ -59,6 +59,7 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 28, 2026 | 12. Chapter 5 HTTP scheduler pacing | CONFIG browser responsiveness restored with 1 ms HTTP polling |
 | Oct 29, 2026 | 13. Chapter 5 physical switch and button verification | GP17 SERVICE/DEVICE, GP18 CONFIG/RUN, and GP2 debounced events physically verified |
 | Oct 31, 2026 | 14. Chapter 5 room selector verification and closeout | Three-position rotary selector mapped, wired to GP3/GP4/GP5, and standalone GPIO-tested; Chapter 6 integration pending |
+| Nov 2, 2026 | 15. Chapter 6 physical room selection and Power Toggle | Integrated GP3/GP4/GP5 room selection, safe Room 3 no-op, and GP2 Power ON/OFF verified on actual equipment in Den and Sunroom |
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -2076,6 +2077,191 @@ The Monster now has working physical switches, a button, and a three-position se
 It still needs to learn what to do with that information.
 
 **Chapter 5 complete. Chapter 6 awaits.**
+
+---
+
+# Milestone 15 — Chapter 6 Physical Room Selection and Power Toggle
+
+**Date:** November 2, 2026  
+**Status:** PASS — integrated GPIO, shared action dispatch, and actual equipment operation
+
+### Goal
+
+Connect the verified three-position physical room selector and GP2 momentary Power Toggle to Clonker's existing action dispatcher, without introducing device-specific commands into the GPIO subsystem.
+
+Prove that physical input can select a room, enqueue a generic action, and operate real home-theater equipment.
+
+### Room selector integration
+
+A new `firmware/clonker/controls/selectors.py` module was integrated into the application.
+
+The selector uses three active-low inputs with internal pull-ups:
+
+| Position | GPIO | Wire | Room |
+|---|---|---|---|
+| LEFT | GP3 | Yellow | `room-1` — Den |
+| MIDDLE | GP4 | Green | `room-2` — Sunroom |
+| RIGHT | GP5 | Blue | `room-3` — Reserved |
+
+The selector's common terminal connects to the WAGO ground distribution.
+
+A valid reading requires exactly one grounded input.
+
+Zero or multiple grounded inputs are treated as transitional or invalid, preserving the last valid selection.
+
+A changed position must remain stable for 50 ms before acceptance.
+
+The module provides initialization, polling, current room selection, and cleanup without performing any network operations.
+
+### Runtime room-selection verification
+
+The integrated application initialized the selector and reported room changes through PuTTY.
+
+Representative diagnostics:
+
+```text
+Room selector initialized; selected = room-1
+ROOM SELECTED: room-2
+ROOM SELECTED: room-3
+ROOM SELECTED: room-1
+```
+
+All three positions were recognized.
+
+**Result: PASS — physical room selection operational in the running application.**
+
+### Shared physical-action dispatch
+
+`controls/physical.py` was extended to translate debounced physical button presses into generic action IDs.
+
+The GP2 button maps to `power-toggle`.
+
+The shared helper `dispatch_selected(action_id)`:
+
+1. Reads the current physical room selection.
+2. Verifies that the room exists in the active configuration.
+3. Logs a safe no-op when the room is unavailable.
+4. Invokes `actions.dispatch(room_id, action_id)` for configured rooms.
+5. Allows the existing Dumb Queue™ and HTTP transport to execute the action.
+
+No Roku or Denon command paths were added to GPIO modules.
+
+The physical controls and browser Test Remote now use the same dispatcher.
+
+### Reserved Room 3 safety test
+
+The physical selector supports a third position even though the current configuration contains only Den and Sunroom.
+
+With Room 3 selected, pressing GP2 produced:
+
+```text
+PHYSICAL NO-OP: room-3 / power-toggle (room unavailable)
+```
+
+No equipment command was queued or transmitted.
+
+The system did not fall back to another room.
+
+**Result: PASS — unconfigured physical room selection safely ignored.**
+
+### Actual equipment verification
+
+The GP2 Power Toggle was tested with the selector positioned for each configured room.
+
+| Selected room | Physical action | Result |
+|---|---|---|
+| Room 2 — Sunroom | Power ON | PASS |
+| Room 2 — Sunroom | Power OFF | PASS |
+| Room 1 — Den | Power ON | PASS |
+| Room 1 — Den | Power OFF | PASS |
+
+These were actual equipment observations, not merely HTTP 200 responses.
+
+PuTTY diagnostics confirmed physical button events, action queue admission, execution, and toggle-direction behavior.
+
+Independent volatile power-toggle histories were observed for both rooms.
+
+As established in earlier milestones, these histories represent successfully transmitted command directions, not authoritative equipment-state feedback.
+
+### Architecture verified
+
+```text
+Physical room selector
+         |
+         v
+  selectors.py
+         |
+         v
+GP2 Power Toggle press
+         |
+         v
+    buttons.py
+         |
+         v
+    physical.py
+         |
+         v
+dispatch_selected()
+         |
+         v
+ actions.dispatch()
+         |
+         v
+    Dumb Queue
+         |
+         v
+ Outbound HTTP
+         |
+         v
+ Denon / Roku / CEC
+         |
+         v
+ Actual equipment
+```
+
+This completed the first verified end-to-end physical hardware-to-equipment command path.
+
+### Hardware and encoder direction
+
+The prototype uses the Pico Cowbell Terminal board for screw-terminal GPIO connections and WAGO connectors for common-ground distribution.
+
+The room selector and Power Toggle are working, but final enclosure wiring, strain relief, and mounting remain ongoing tasks.
+
+The volume and custom-action controls will use two **Bourns PEC11R-4215F-S0024** rotary encoders.
+
+The earlier Grayhill volume-encoder plan was superseded.
+
+The custom-action Bourns encoder has undergone standalone electrical and mechanical testing, but neither encoder is yet integrated into the production physical-control scheduler.
+
+### Remaining technical question
+
+Outbound HTTP remains synchronous and blocking.
+
+The physical scheduler targets approximately 10 ms polling, but this is not a guaranteed maximum interval.
+
+The tested momentary button and maintained selector operate successfully.
+
+Fast quadrature encoder movement may generate transitions while the cooperative loop is blocked by HTTP.
+
+Encoder capture reliability must therefore be measured before selecting a more elaborate polling, buffering, or hardware-assisted strategy.
+
+### Engineering conclusion
+
+Chapter 6 established:
+
+- Integrated physical room selection.
+- Debounced, valid-only selector state.
+- Room-aware physical action dispatch.
+- Safe no-op behavior for reserved Room 3.
+- Actual Power ON/OFF operation in both configured rooms.
+- Independent per-room power-toggle command histories.
+- Reuse of the existing dispatcher, Dumb Queue™, and HTTP transport.
+
+**The Clonker no longer merely senses its physical controls. It uses them to operate real equipment.**
+
+The next development objective is integrating the two Bourns rotary encoders, beginning with reliable movement detection and volume control.
+
+**The Monster has learned which room it's in. And how to turn the lights on. Well, the television, anyway.**
 
 ---
 
