@@ -237,8 +237,9 @@ A Pico Cowbell Terminal board provides screw-terminal GPIO connections, and a WA
 
 - **GP17 SERVICE/DEVICE switch:** Selects USB filesystem ownership or firmware write access at boot. Requires a complete power cycle to change modes.
 - **GP18 CONFIG/RUN switch:** Enables or disables the browser management listener live, without rebooting.
-- **GP3/GP4/GP5 rotary room selector:** Selects Den, Sunroom, or reserved Room 3. Integrated with firmware and verified.
+- **GP3/GP6/GP7 rotary room selector:** Selects Den, Sunroom, or reserved Room 3. Integrated with firmware and verified after GPIO reassignment.
 - **GP2 momentary Power Toggle:** Dispatches the selected room's configured power action. Actual ON/OFF equipment behavior verified in Den and Sunroom.
+GP4/GP5 are reserved for the Cowbell's STEMMA QT/I²C connector, potentially for the planned OLED status display.
 
 ### Hardware still being integrated
 
