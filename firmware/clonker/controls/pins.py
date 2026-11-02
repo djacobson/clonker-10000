@@ -18,9 +18,9 @@ CONFIG_SWITCH_PIN = 18
 
 # Room selector (three-position rotary switch)
 # Each position connects one GPIO input to GND.
-ROOM_SELECTOR_A_PIN = 3  # GP3 -- yellow, breadboard row 15
-ROOM_SELECTOR_B_PIN = 4  # GP4 -- green, breadboard row 16
-ROOM_SELECTOR_C_PIN = 5  # GP5 -- blue, breadboard row 17
+ROOM_SELECTOR_A_PIN = 3  # GP3 -- yellow, Den
+ROOM_SELECTOR_B_PIN = 6  # GP6 -- green, Sunroom
+ROOM_SELECTOR_C_PIN = 7  # GP7 -- blue, reserved Room 3
 
 # Volume encoder (press for mute)
 VOLUME_ENCODER_A_PIN = None
