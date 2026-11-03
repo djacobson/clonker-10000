@@ -40,7 +40,7 @@ def read_messages(sock, wait_seconds=0.15):
 
     while time.monotonic() < deadline:
         remaining = deadline - time.monotonic()
-        sock.settimeout(min(0.05, max(0.001, remaining)))
+        sock.settimeout(SOCKET_TIMEOUT)
 
         try:
             count = sock.recv_into(chunk)
