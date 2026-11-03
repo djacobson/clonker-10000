@@ -1,530 +1,258 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** October 29, 2026  
+**Updated:** November 3, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Current baseline:** Chapter 5 — Clonker Config v4, operational browser actions and Dumb Queue™, physically verified GP17 SERVICE/DEVICE and GP18 CONFIG/RUN switches, and GP2 debounced button events. Physical room selection and equipment-action dispatch remain pending.
+**Baseline:** Chapter 6 — Config v4, physical room selector and Power Toggle, operational Bourns volume encoder, shared Dumb Queue™, and Denon TCP volume adapter  
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
 
 ---
 
-## 1. Purpose
+## 1. Purpose and rules of evidence
 
-This is the **working development and deployment guide** for The Clonker 10000. It explains how to edit, deploy, operate, test, troubleshoot, and document the running firmware. It is not a complete schema specification or a chronological development diary.
+This is the **practical working guide** for editing, deploying, operating, testing, and debugging Clonker firmware. It is not the configuration schema, complete network specification, or chronological history. Those belong in [Configuration](CONFIGURATION.md), [Firmware, Network & Clock](FIRMWARE_NETWORK.md), and [Development History](DEVELOPMENT_HISTORY.md).
 
-Use the other references for their respective jobs:
+A Git commit, a file copied to CIRCUITPY, a queued action, a successful network write, and a visible equipment change are **different levels of evidence**. State exactly which was observed. Prefer one meaningful change and one clear test at a time.
 
-- [Architecture](ARCHITECTURE.md) — component responsibilities, boundaries, and design rationale.
-- [Configuration & Recovery](CONFIGURATION.md) — authoritative Clonker Config v4 schema, validation, revisions, persistence, and recovery.
-- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) — current scheduler, queue, network behavior, APIs, and transport limits.
-- [Operating Modes](OPERATING_MODES.md) — filesystem ownership and application modes.
-- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical input plans and component decisions.
-- [Development History](DEVELOPMENT_HISTORY.md) — dated experiments, milestones, and observed results.
-
-**Development rule:** A repository commit, a successful deployment, an accepted HTTP request, an HTTP 200 response, and a physical equipment change are **five different kinds of evidence**.
-
-## 2. Source of truth and working workflow
-
-The public repository is `djacobson/clonker-10000`.
+## 2. Source of truth and development workflow
 
 ```text
-Working Copy on iPad
-        |
-        v
-Edit and review a focused change
-        |
-        v
-Commit and push to GitHub
-        |
-        v
-Windows GitHub Desktop: fetch / pull
-        |
-        v
-Copy changed firmware files to CIRCUITPY
-        |
-        v
-Restart or power-cycle the Pico as appropriate
-        |
-        v
-Inspect REPL logs and browser behavior
-        |
-        v
-Verify actual equipment response when relevant
-        |
-        v
-Record evidence and update documentation
+iPad / Working Copy: edit, review, commit, push
+              |
+              v
+GitHub: maintained source and documentation
+              |
+              v
+Windows / GitHub Desktop: fetch and pull
+              |
+              v
+Pico in SERVICE (USB): copy selected changed files
+              |
+              v
+Pico in DEVICE: restart, inspect logs, test
+              |
+              v
+Observe real equipment, record results, update docs
 ```
 
-GitHub is authoritative for **maintained source and documentation**. The deployed Pico is authoritative for **what is actually running**. Neither automatically proves the other is current.
+GitHub establishes the maintained source. **The actual Pico filesystem establishes the deployed code**, which may differ until copied. Browser-edited configuration on the Pico may also differ from the repository example.
 
-Prefer one meaningful change and one clear test at a time. Preserve useful code comments, avoid speculative refactors, and do not mix unrelated hardware, browser, networking, and schema changes in a single experiment.
+- **iPad:** Working Copy, GitHub review, browser configuration and Test Remote, documentation drafting.
+- **Windows laptop:** GitHub Desktop, USB file transfer, and serial diagnostics. PuTTY is useful for sustained serial sessions; the CircuitPython browser console may become unresponsive during long sessions.
+- **CircuitPython REPL:** Use for inspection and deliberately scoped tests. Ctrl+C interrupts the running application; Ctrl+D soft-reloads. Neither substitutes for a cold power cycle when changing GP17 filesystem ownership.
 
-### 2.1 Development equipment
+The former ESP32-S3 and XML designs are historical. `device_config_v2.py` is the active module despite its historical filename: its schema is **Clonker Config v4**.
 
-**iPad first:** Working Copy for repository editing and commits; browser for GitHub review and Clonker's configuration and Test Remote interfaces; ChatGPT for review and documentation.
+## 3. Active firmware map
 
-**Windows Lenovo Yoga:** GitHub Desktop, File Explorer, USB connection, and the CircuitPython serial console when deployment or low-level debugging requires them. The Windows machine is primarily a deployment bridge.
-
-**CircuitPython console:** https://code.circuitpython.org/ can provide REPL access and startup/exception logs. Connecting or interrupting the console can stop the running application. Use Ctrl+D when a soft reload is appropriate; do **not** treat it as a substitute for a full power cycle when changing boot-time filesystem ownership.
-
-### 2.2 Historical implementations
-
-The repository retains earlier XML configuration code and architecture notes. The older ESP32-S3 hardware plan is also historical. The active target is the Pico 2 W, and the active configuration schema is **Clonker Config v4** serialized as JSON.
-
-The file `device_config_v2.py` retains its historical name; its active constant is `CONFIG_VERSION = 4`. Do not rename it merely to match the schema version, or accidentally deploy legacy code over the current implementation.
-
----
-
-## 3. Current firmware layout
-
-The repository's `firmware/` tree is copied to corresponding paths on CIRCUITPY. Repository-relative paths are **not** runtime absolute paths.
-
-| Repository path | Runtime responsibility |
+| Repository path | Role |
 |---|---|
-| `firmware/boot.py` | GP17 boot-time filesystem ownership |
-| `firmware/code.py` | CircuitPython application entry point |
-| `firmware/clonker/main.py` | Startup and cooperative scheduling |
-| `firmware/clonker/device_config_v2.py` | Config v4 validation, RAM state, revisions, persistence, recovery |
-| `firmware/clonker/device_config.json` | Repository configuration example / deployable configuration |
-| `firmware/clonker/actions.py` | Fundamental/custom dispatch, Dumb Queue™, execution and failure policy |
-| `firmware/clonker/net/web.py` | CONFIG-mode inbound HTTP management service |
-| `firmware/clonker/net/http_transport.py` | Outbound bounded blocking HTTP GET/POST |
-| `firmware/clonker/www/index.html` | Configuration editor and clock UI |
-| `firmware/clonker/www/remote.html` | Browser Test Remote, including custom-action selector |
-| `firmware/clonker/controls/physical.py` | Physical GPIO initialization, cooperative polling, and button event/debounce handling; GP2 input verified |
-| `firmware/clonker/controls/switches.py` | GP18 physical CONFIG/RUN selection, runtime mode detection, and management-listener control |
-| `firmware/clonker/controls/pins.py` | Centralized GPIO assignments and physical-control pin definitions |
-| `firmware/clonker/system/clock.py` | Clock reference and timestamps |
+| `firmware/boot.py` | GP17 filesystem ownership at boot |
+| `firmware/code.py` | Application entry point |
+| `firmware/clonker/main.py` | Startup and cooperative scheduler |
+| `firmware/clonker/device_config_v2.py` | Config v4 validation, RAM snapshot, revisions, persistence and recovery |
+| `firmware/clonker/device_adapters.py` | Specialized adapter selection and cached mapping |
+| `firmware/clonker/actions.py` | Shared queue, action dispatch, toggles, compound steps and failure handling |
+| `firmware/clonker/devices/denon.py` | Persistent Denon TCP volume connection and pacing |
+| `firmware/clonker/net/http_transport.py` | Generic bounded blocking HTTP GET/POST |
+| `firmware/clonker/net/web.py` | CONFIG-only inbound HTTP management |
+| `firmware/clonker/www/index.html` | Browser configuration editor |
+| `firmware/clonker/www/remote.html` | Browser Test Remote |
+| `firmware/clonker/controls/pins.py` | GPIO assignment source of truth |
+| `firmware/clonker/controls/buttons.py` | Debounced momentary inputs |
+| `firmware/clonker/controls/switches.py` | GP18 CONFIG/RUN input and override |
+| `firmware/clonker/controls/selectors.py` | Three-position room selector |
+| `firmware/clonker/controls/encoders.py` | Reusable quadrature encoder decoder |
+| `firmware/clonker/controls/physical.py` | Physical initialization, polling and room-aware action mapping |
+| `firmware/clonker/system/clock.py` | Clock reference |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
 
-Preserve Python package directories and their `__init__.py` files. When a module moves, remove obsolete copies from the Pico so imports cannot resolve against stale files.
+Preserve package directories and `__init__.py` files. Remove stale duplicate modules when refactoring; a successful copy does not guarantee Python imported the intended version.
 
-### 3.1 Runtime configuration is not a disposable build artifact
+### Preserve the active configuration
 
-The Pico's active file is:
+`/clonker/device_config.json` is a **runtime asset, not disposable build output**. It may contain newer browser changes than `firmware/clonker/device_config.json`. Back it up before any intentional replacement. Do not overwrite it as part of routine firmware deployment. The sample at [`samples/device_config_roku_denon_sample.json`](../samples/device_config_roku_denon_sample.json) is reference material.
 
-`/clonker/device_config.json`
+## 4. Private settings and development LAN
 
-It may contain newer browser edits and a newer revision than the checked-in repository copy. **Never blindly overwrite it during a firmware deployment.** Back it up first, verify schema compatibility, and make any deliberate replacement separately from routine source updates.
+Keep credentials in the Pico's private `settings.toml`; never commit them or overwrite a working copy during routine deployment. The documented development addresses are installation-specific:
 
-The readable two-room example is maintained at [`samples/device_config_roku_denon_sample.json`](../samples/device_config_roku_denon_sample.json). It is an example, not an instruction to overwrite a running device.
-
----
-
-## 4. Private settings and development network
-
-Environment-specific Wi-Fi credentials and settings belong in the Pico's private `settings.toml`. **Never commit credentials**, and do not replace a working `settings.toml` with a repository example during routine deployment.
-
-Documented development addresses:
-
-| Service | Development address |
+| Endpoint | Development address |
 |---|---|
-| Pico management UI | `http://192.168.50.12:9090/` |
+| Clonker CONFIG UI | `http://192.168.50.12:9090/` |
 | Browser Test Remote | `http://192.168.50.12:9090/remote.html` |
-| Den AVR-X3700H | `192.168.50.44:8080` |
-| Den Roku | `192.168.50.43:8060` |
-| Sunroom AVR-X1800H | `192.168.50.40:8080` |
-| Sunroom Roku | `192.168.50.28:8060` |
+| Den AVR-X3700H HTTP | `192.168.50.44:8080` |
+| Den Roku ECP | `192.168.50.43:8060` |
+| Sunroom AVR-X1800H HTTP | `192.168.50.40:8080` |
+| Sunroom Roku ECP | `192.168.50.28:8060` |
 
-These are **specific to the development LAN**, not universal firmware defaults. Endpoint configuration is authoritative for the running device.
+The Denon **specialized volume adapter uses TCP port 23** on the configured receiver host; the HTTP endpoint above remains relevant to other Denon commands.
 
-CircuitPython's built-in Web Workflow was disabled in this development environment after observed interference with Clonker's own management service. The private setting is:
+The development setup disables CircuitPython Web Workflow using `CIRCUITPY_WEB_API_PORT = 0` in private settings following observed interference. The precise cause was not established. Clonker's own management server listens on port 9090 and has **no application-level authentication**: trusted LAN only, never public port forwarding.
 
-```toml
-CIRCUITPY_WEB_API_PORT = 0
-```
+## 5. Two independent mode switches
 
-The underlying conflict was not conclusively identified. Clonker's own inbound management server uses port **9090**.
-
-**Security:** The management interface has no application-level authentication. Use it on a trusted LAN; do not expose port 9090 through public port forwarding.
-
----
-
-## 5. Two independent operating-mode dimensions
-
-### 5.1 SERVICE (USB) / DEVICE — filesystem ownership
-
-The physical GP17 boot-mode switch determines who may write to CIRCUITPY.
-
-| GP17 switch | Electrical state | Mode | Writable owner |
+| Switch | OFF / open / HIGH | ON / grounded / LOW | Change timing |
 |---|---|---|---|
-| OFF | Open / HIGH | SERVICE (USB) | USB host |
-| ON | Grounded / LOW | DEVICE | Pico firmware |
+| **GP17** filesystem ownership | SERVICE (USB): host writes | DEVICE: Pico writes | **Cold boot only** |
+| **GP18** application mode | RUN: management listener stopped | CONFIG: listener enabled | **Live, no reboot** |
 
-GP17 is physical Pico pin **22**; the adjacent ground connection is pin **23**. GP17 uses an internal pull-up.
+Normal standalone remote: **DEVICE + RUN**. Browser editing and persistent saves: **DEVICE + CONFIG**. USB deployment: **SERVICE (USB)**, regardless of CONFIG/RUN selection.
 
-**Change procedure:** Disconnect power completely, change the GP17 switch, reconnect power, and verify the boot diagnostic. A Ctrl+D soft reload does not replace the required cold boot.
+The action engine and physical controls operate in CONFIG and RUN. SERVICE + CONFIG allows browser inspection and Test Remote commands, but persistent browser saves are rejected (HTTP 403) because firmware cannot write the filesystem.
 
-Expected diagnostics:
+GP17's boot diagnostics are:
 
 ```text
 CLONKER BOOT: SERVICE (USB) mode (switch OFF)
 CLONKER BOOT: DEVICE mode (switch ON)
 ```
 
-SERVICE (USB) is for firmware deployment and host-side file maintenance. Browser inspection and action testing remain available when CONFIG is enabled, but browser configuration saves are rejected because the filesystem is read-only to firmware.
+**Always disconnect power completely before changing GP17.** Ctrl+D is not a replacement. GP18 can be changed while the program runs. The GP2 Power Toggle and GP3/GP6/GP7 room selector are separate from both mode switches.
 
-DEVICE permits validated browser configuration saves and recovery writes. The USB host sees CIRCUITPY as read-only.
-
-**Hardware status:** Both switch positions physically tested October 29, 2026.
-
-### 5.2 CONFIG / RUN — application management
-
-The physical GP18 guarded switch controls the application management interface independently of GP17.
-
-| GP18 switch | Electrical state | Application mode | Management HTTP listener |
-|---|---|---|---|
-| OFF | Open / HIGH | RUN | Stopped |
-| ON | Grounded / LOW | CONFIG | Enabled on port 9090 |
-
-GP18 uses an internal pull-up and is monitored by the running application.
-
-- **CONFIG:** Enables the configuration editor, Test Remote, and clock API. Queued action execution continues.
-- **RUN:** Disables the inbound management listener. The shared action queue and physical-input polling continue.
-
-Changing GP18 takes effect **without rebooting**. The running firmware reports the physical mode source and selected application mode through serial diagnostics.
-
-**Hardware status:** GP18 physical input and runtime listener transitions tested October 29, 2026.
-
-CONFIG/RUN is not an HTTP action, an AV equipment power toggle, or a room selector.
-
-The intended normal physical-remote combination is **DEVICE + RUN**. Browser configuration with persistence uses **DEVICE + CONFIG**.
-
-The GP2 momentary power-button input is also operational at the event-detection level, but it is **not yet connected to equipment action dispatch**.
-
-See [Operating Modes](OPERATING_MODES.md) for the authoritative mode behavior, transition rules, and verification details.
-
----
+See [Operating Modes](OPERATING_MODES.md) for the complete mode matrix, override and recovery procedures.
 
 ## 6. Standard firmware deployment
 
-Use this procedure for ordinary source changes. Do not combine it with unplanned configuration migration.
+1. Edit and review a focused change in Working Copy; commit and push.
+2. Fetch/pull the intended commit in Windows GitHub Desktop.
+3. Preserve the Pico's current `device_config.json` and private `settings.toml` as appropriate.
+4. Disconnect Pico power; set **GP17 OFF** for SERVICE (USB); reconnect and verify the boot message and host-writable CIRCUITPY volume.
+5. Copy **only the intended changed firmware files**, maintaining directory structure. Do not casually replace the active configuration, settings, or backups.
+6. Verify filenames and paths on CIRCUITPY; remove superseded module copies only when certain they are obsolete.
+7. Disconnect power; set **GP17 ON** for DEVICE; reconnect and verify the boot message.
+8. Set **GP18 ON** for CONFIG browser tests, or OFF for RUN operation.
+9. Inspect serial logs for startup, Wi-Fi, loaded rooms, GPIO initialization, adapter and queue errors.
+10. Test the affected feature, including real equipment behavior where relevant. Record observed evidence and update the appropriate documentation.
 
-1. **Edit on iPad.** Review the diff in Working Copy; keep changes focused.
-2. **Commit and push.** Confirm the intended files appear on GitHub.
-3. **Update Windows checkout.** In GitHub Desktop, fetch and pull; verify the local checkout is current.
-4. **Enter SERVICE (USB) mode.** Disconnect Pico power completely, set the **GP17 boot-mode switch OFF**, reconnect power, and verify `CLONKER BOOT: SERVICE (USB) mode (switch OFF)`. Confirm CIRCUITPY is writable from the USB host.
-5. **Copy only changed files.** Preserve the `clonker/` package tree and its `__init__.py` files. Do not overwrite `settings.toml` or the active `device_config.json` by default.
-6. **Verify deployed files.** Confirm file names, paths, and intended versions on CIRCUITPY. Remove stale module copies when appropriate.
-7. **Return to DEVICE mode.** Disconnect Pico power, set the **GP17 switch ON**, reconnect power, and verify `CLONKER BOOT: DEVICE mode (switch ON)`.
-8. **Select application mode.** Set the **GP18 guarded switch ON** for CONFIG when browser testing is needed, or OFF for RUN. GP18 changes application mode without requiring another reboot.
-9. **Inspect serial logs.** Confirm Wi-Fi, Config v4 loading, configured rooms, expected CONFIG/RUN behavior, and no unexpected exceptions.
-10. **Smoke-test the browser in CONFIG.** Open the configuration editor and Test Remote; confirm actual current data, not stale UI assets.
-11. **Test the changed behavior.** Verify queued actions, HTTP results, physical-input events, and equipment behavior as relevant. Record observations.
+A repository `firmware/clonker/...` path deploys to `/clonker/...` on CIRCUITPY. `firmware/boot.py` and `firmware/code.py` deploy to `/boot.py` and `/code.py`. Newly added modules such as `device_adapters.py`, `devices/denon.py`, and `controls/encoders.py` **must also be copied** when required by the running code.
 
-**Deployment distinction:** GP17 selects filesystem ownership at boot and requires a full power cycle. GP18 controls management-interface availability during runtime. Neither switch sends an AV equipment power command.
+### Deliberate configuration replacement
 
-### 6.1 Typical copy map
+Before intentionally replacing `/clonker/device_config.json`, preserve primary and backup files, verify Config v4 schema compatibility, check room/device addresses and custom actions, and test cold-start loading. Do not mix a configuration migration with an unrelated GPIO or transport change.
 
-| From repository | To CIRCUITPY |
-|---|---|
-| `firmware/boot.py` | `/boot.py` |
-| `firmware/code.py` | `/code.py` |
-| `firmware/clonker/main.py` | `/clonker/main.py` |
-| `firmware/clonker/actions.py` | `/clonker/actions.py` |
-| `firmware/clonker/device_config_v2.py` | `/clonker/device_config_v2.py` |
-| `firmware/clonker/net/web.py` | `/clonker/net/web.py` |
-| `firmware/clonker/net/http_transport.py` | `/clonker/net/http_transport.py` |
-| `firmware/clonker/www/index.html` | `/clonker/www/index.html` |
-| `firmware/clonker/www/remote.html` | `/clonker/www/remote.html` |
+## 7. Configuration regression in DEVICE + CONFIG
 
-### 6.2 Configuration replacement requires a separate decision
+Use a reversible edit and record both browser behavior and cold-start persistence.
 
-Before deliberately replacing `/clonker/device_config.json`:
+- **Save/reload:** Confirm GP17 DEVICE, GP18 CONFIG; make a small change, Save, refresh, cold power-cycle, and verify it persisted. Restore the intended value afterward.
+- **Revision conflict:** Open two browser tabs; save from one; confirm a stale save from the other is rejected rather than overwriting newer data.
+- **No-change save:** Confirm unchanged data avoids an unnecessary rewrite and preserves pending queue and toggle history.
+- **Changed save:** Confirm pending queue work and volatile toggle-direction histories are reset; the active validated configuration and adapter selection cache are rebuilt as designed.
+- **Read-only check:** In SERVICE + CONFIG, verify that persistent Save is rejected with HTTP 403 while inspection and Test Remote remain available.
+- **Validation:** Exercise supported room IDs, generic device slots, fourteen fundamental actions, custom-action IDs/steps, methods, paths, wait limits and JSON size constraints as appropriate. Verify malformed data cannot replace the active valid configuration.
 
-1. Preserve the current Pico file and relevant backups.
-2. Confirm that the replacement is **Clonker Config v4** and within the configured size limit.
-3. Confirm room identities, device addresses, and custom actions.
-4. Ensure the firmware and configuration schema are compatible.
-5. Perform a cold-start load check and inspect the browser configuration.
-6. Confirm any expected revision changes and persistence behavior.
+Backup rotation and recovery are safeguards, **not a promise of atomicity under sudden power loss**. The exact schema, file naming and recovery policy belong in [Configuration](CONFIGURATION.md).
 
-Do not confuse a successful copy with successful validation, recovery, or persistence.
+## 8. Action and network regression
 
----
+### Browser Test Remote
 
-## 7. DEVICE-mode configuration regression testing
+In CONFIG, open `/remote.html`, select a room, then run a fundamental or configured custom action. `POST /api/action?room=room-1&action=volume-up` submits a request to the shared dispatcher.
 
-Use **DEVICE + CONFIG** for tests requiring writes from the Pico.
+A response indicating **queued** proves admission, not successful network delivery or equipment state. Watch subsequent serial diagnostics and the actual receiver or streamer.
 
-### 7.1 Basic edit/save/reload
+### Generic HTTP versus Denon TCP
 
-1. Preserve the working configuration.
-2. Disconnect Pico power completely.
-3. Set the **GP17 boot-mode switch ON** (DEVICE) and the **GP18 application-mode switch ON** (CONFIG).
-4. Reconnect power and confirm the `CLONKER BOOT: DEVICE mode (switch ON)` diagnostic.
-5. Confirm that the management interface is available and the firmware filesystem is writable.
-6. Make a small reversible configuration change, then Save.
-7. Verify the response reports the appropriate revision and whether the file changed.
-8. Refresh the editor and confirm the saved value.
-9. Cold power-cycle when testing persistence and verify the value again.
-10. Restore the intended setting if the edit was only a test.
+- Generic commands use `net/http_transport.py` with bounded synchronous GET/POST, a new socket per command, and HTTP status-line checking.
+- The adapter resolver recognizes **specific configured Denon HTTP volume-up/down command signatures** and routes them to `devices/denon.py` instead.
+- The specialized Denon adapter uses a persistent TCP connection on **port 23**, sends native `MVUP`/`MVDOWN` commands, and enforces **50 ms minimum spacing**. It does not parse receiver state or automatically retry failed commands.
+- Other Denon commands and Roku ECP remain on generic HTTP. A device's configured endpoint and the exact command path matter to adapter selection; do not assume every volume mapping uses TCP.
+- The in-memory specialized adapter selection cache is rebuilt when configuration is loaded or successfully changed.
 
-**Note:** GP17 requires a full power cycle to change filesystem ownership. GP18 can switch CONFIG/RUN during normal operation without rebooting.
+### Dumb Queue™ and compound actions
 
-### 7.2 Revision-conflict regression
+The shared queue admits at most **128 entries**. A custom action occupies one entry and advances through ordered steps with cooperative monotonic waits. A future-dated task does not block unrelated eligible work. A paced Denon TCP command that is not ready remains queued and must not be overtaken by later eligible work. One execution failure clears remaining queued work; there are no automatic retries or rollback.
 
-1. Open the editor in Tab A and Tab B.
-2. Save a change from Tab A.
-3. Attempt to save stale data from Tab B.
-4. Confirm the stale save is rejected rather than silently overwriting the newer revision.
-5. Refresh Tab B and verify it loads the current configuration.
+Regression checks should cover:
 
-### 7.3 No-change and backup checks
+1. Roku GET/POST and ordinary Denon HTTP requests.
+2. Slow and rapid volume movement through the **physical Bourns encoder**.
+3. Denon TCP connection reuse and approximately 50 ms minimum command spacing.
+4. Mixed TCP/HTTP queue order, including a paced volume command ahead of another eligible action.
+5. Custom action with a wait while unrelated immediate work runs.
+6. Unreachable endpoints, network errors, queue-wide cancellation, and subsequent recovery.
+7. Configuration change while work is pending.
 
-Saving unchanged data should report no change without unnecessary flash writes. A changed successful save clears pending action work; an unchanged save should not need to do so.
+**Known-good Chapter 6 evidence:** A Sunroom physical Bourns volume encoder drove the Denon X1800H through TCP. Five slow detents each direction returned to the starting level; moderate and aggressive twisting were also exercised. A ten-command Denon queue test and five mixed-queue regression scenarios were reported passing. These are observed test results, not exhaustive long-uptime certification.
 
-The configuration engine validates saves, checks revisions and disk consistency, writes verified temporary content, and maintains rotating backups. **These safeguards are not a guarantee against every sudden-power-loss failure.** Test recovery separately and record exactly which failure scenarios were exercised.
+### Timing and limitations
 
-Do not delete backup files casually. See [Configuration & Recovery](CONFIGURATION.md) for authoritative file naming and recovery details.
+The main scheduler targets **1 ms physical polling**, **1 ms CONFIG web polling**, **10 ms action polling**, and a **1 ms loop yield**. These are cooperative targets, not guaranteed latencies. Synchronous HTTP and TCP operations temporarily interrupt GPIO polling; fast encoder transitions may be missed during a blocking call. Queue buffering cannot recover a physical transition never sampled.
 
-### 7.4 Schema regression checklist
+See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for precise transport, pacing, ordering and diagnostic behavior.
 
-- Clonker Config v4 version and required root keys.
-- One to three configured rooms (the current default sample uses two: Den and Sunroom; additional room support may evolve in future versions), with supported stable IDs.
-- Generic built-in slots `device-1`, `device-2`, and `device-3`.
-- Fourteen fundamental actions per room.
-- Optional custom actions with stable IDs and ordered steps.
-- Valid target, method, path, and `wait_after_ms` fields.
-- Custom-action and step-count limits, wait limits, and total JSON byte limit.
-- Missing or malformed fields rejected without corrupting active RAM configuration.
-- Revision conflicts and filesystem read-only saves rejected.
+## 9. Physical-control verification
 
-Do not replicate the entire schema here; use [Configuration & Recovery](CONFIGURATION.md) as the specification.
+| Control | GPIO | Current status |
+|---|---|---|
+| SERVICE/DEVICE boot switch | GP17 | Physically verified |
+| CONFIG/RUN switch | GP18 | Physically verified; live listener transitions |
+| Power Toggle button | GP2 | Room-aware equipment ON/OFF verified |
+| Room selector | GP3 / GP6 / GP7 | Three positions verified; Room 3 safely unavailable |
+| Bourns volume encoder A/B | GP8 / GP9 | Rotation integrated; real Denon TCP volume verified |
+| Volume encoder press | Unassigned | Mute press pending |
+| Custom-action encoder | Unassigned | Rotation and Run press pending |
+| Navigation, Back, Home | Unassigned | Pending |
+| OLED, sound, battery and enclosure completion | Not assigned | Planned |
 
----
+The room selector chooses context; it does not transmit commands. A physical press or completed encoder detent maps to a generic action through `physical.py`, then the shared dispatcher and queue. An unconfigured Room 3 action is a safe no-op, **not** an automatic fallback to another room.
 
-## 8. Browser Test Remote and real action execution
+Do not confuse the operational Bourns **volume rotation** with its not-yet-integrated pushbutton or the separate custom-action encoder. The Grayhill encoder was considered earlier but is not the active volume plan.
 
-**Status:** Operational for fundamental and custom actions. It is **not** a logging-only stub.
+## 10. Debugging and serial discipline
 
-Open `http://192.168.50.12:9090/remote.html` while CONFIG is enabled.
-
-The page supports room selection, fourteen fixed fundamental controls, and selection/execution of configured custom actions for the selected room. Room and action identifiers are submitted through the shared action endpoint:
-
-```text
-POST /api/action?room=room-1&action=volume-up
-```
-
-The server calls `actions.dispatch(room_id, action_id)`. A successful response reports **queue acceptance**, typically `status: "queued"`; it does not wait for outbound network completion.
-
-```json
-{
-  "ok": true,
-  "status": "queued",
-  "room": "room-1",
-  "room_name": "Den",
-  "action": "volume-up",
-  "configured": true,
-  "queue_depth": 1,
-  "message": "QUEUED: Den / volume-up (depth 1)"
-}
-```
-
-This is an **illustrative** response. Names, queue depth, and configured state depend on the running configuration.
-
-### 8.1 Fundamental actions
-
-The dispatcher validates the room and action, admits an eligible task, and resolves the current configuration when the task executes. Configured ordinary actions use outbound HTTP GET/POST. Missing endpoints or blank ordinary paths are intentional logged no-ops.
-
-**Power and mute toggles are operational:** the dispatcher selects configured ON/OFF paths using independent, volatile histories for each room and toggle action. Direction advances only after successful HTTP execution. Changed configuration saves reset all histories. October 27, 2026 bench tests verified Sunroom mute and power toggles, configuration-reset behavior, independent Den/Sunroom histories, failed-request direction preservation, and repeatable no-ops for blank paths and missing endpoints. This is command-direction history, not authoritative equipment-state detection.
-
-### 8.2 Custom and compound actions
-
-Clonker Config v4 supports up to **16 custom actions per room**, each with **1–16 ordered steps**. Steps use a built-in destination, GET/POST, path, and `wait_after_ms`.
-
-A custom action is admitted as **one queue entry**. Each successful step sends one HTTP command. If another step remains, the task is requeued with a due time calculated **after** the completed HTTP request. Other eligible work can run during that wait. One `actions.poll()` executes at most one eligible HTTP command.
-
-A verified Sunroom custom action:
-
-```text
-Roku: POST /keypress/Home
-    -> HTTP 200
-Wait 3000 ms cooperatively
-Denon: GET /goform/formiPhoneAppDirect.xml?MSQUICK1
-    -> HTTP 200
-CUSTOM COMPLETE
-```
-
-The custom-action engine does **not** provide nested macros, branching, rollback, automatic retries, or a second execution thread. Custom actions currently target the three built-in device slots, not user-defined custom devices.
-
-### 8.3 Queue and error semantics
-
-- Queue capacity is **128 entries**.
-- Future-dated work does not block an unrelated immediately eligible action.
-- A failed outbound execution clears the remaining queue; the Clonker remains available for later commands.
-- Configuration changes clear pending work.
-- HTTP 2xx means an HTTP-level acknowledgment, **not guaranteed physical equipment state**.
-- Outbound HTTP is bounded but synchronous; it temporarily pauses the cooperative scheduler.
-
-See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) for exact transport and scheduler behavior.
-
----
-
-## 9. Verification snapshot — October 29, 2026
-
-### 9.1 Implemented and exercised
-
-- Pico 2 W / CircuitPython 10.3.1 startup and Wi-Fi connectivity.
-- GP17 physical SERVICE (USB)/DEVICE switch, including boot-time filesystem ownership selection.
-- GP18 guarded CONFIG/RUN switch, including runtime listener startup and shutdown without reboot.
-- GP2 momentary button input, debounce, and press/release event logging.
-- Cooperative physical-control polling alongside browser handling and queued network execution.
-- Config v4 loading, browser editing, revision protection, verified saves, and selected recovery scenarios.
-- Optional configured rooms and generic built-in device identifiers.
-- Browser Test Remote and management API on port 9090.
-- Shared Dumb Queue™ admission, capacity, scheduling, and real outbound execution.
-- Denon volume and Roku navigation through HTTP GET/POST.
-- Configured custom actions and cooperative compound steps using the shared queue.
-- Verified Sunroom Roku Home → 3000 ms wait → Denon Quick Select 1 sequence.
-- Browser and network-action smoke tests with physical-control polling enabled.
-
-### 9.2 Implemented but not exhaustively tested
-
-- Interrupted-write and sudden-power-loss recovery paths.
-- Every malformed inbound HTTP request and network cleanup case.
-- Sustained queue pressure and extended Wi-Fi failure scenarios.
-- Long-duration monotonic scheduling and memory stability.
-- Physical input responsiveness during synchronous outbound HTTP.
-- Extended operation and repeated transitions across all four SERVICE/DEVICE and CONFIG/RUN combinations.
-- Physical switch and button behavior under electrical noise, rapid operation, and extended use.
-
-### 9.3 Not yet implemented or integrated
-
-- Physical room-selector input and selected-room dispatch context.
-- GP2 power-button events connected to the action dispatcher.
-- Physical navigation, Back, Home, and volume controls connected to action dispatch.
-- Custom-action selector encoder integration.
-- User-defined custom device slots beyond `device-1` through `device-3`.
-- Apple TV discovery, pairing, authentication, and command protocol.
-- OLED feedback, audible CLONK, battery management, and final enclosure.
-- Specialized volume-encoder event accumulation, acceleration, or transport optimization.
-
-These lists are a development snapshot, **not** a certification or exhaustive regression report. Preserve dated evidence in [Development History](DEVELOPMENT_HISTORY.md).
-
----
-
-## 10. Debugging and diagnostic discipline
-
-**One small change. One clear test. One recorded result.**
-
-When reporting a failure, capture the source commit or changed files, actual deployed version, **GP17 SERVICE (USB)/DEVICE switch position**, **GP18 CONFIG/RUN switch position**, selected room (when relevant), browser URL and request, relevant REPL logs, response/error, and observed equipment behavior. Note whether a cold power cycle changes the result.
-
-For physical-input problems, also record the GPIO pin, expected electrical state, observed press/release events, and whether the event reached the action dispatcher. A logged button press does not by itself prove that an outbound command was queued or executed.
-
-### 10.1 Common traps
+**Record:** commit/deployed version, GP17 and GP18 positions, selected room, GPIO mapping, exact test action, queue/transport logs, and observed equipment behavior. If a cold power cycle changes the result, note it.
 
 | Symptom | First checks |
 |---|---|
-| Browser page stale | Confirm current `index.html` or `remote.html` was deployed; refresh and inspect version/content |
-| Editor loads but Save fails | Check SERVICE/DEVICE ownership, revision conflict, schema validation, and filesystem status |
-| Action reports `queued` but nothing happens | Check queue logs, configured endpoint/path, later execution result, and equipment state |
-| Toggle does not change equipment state | Check selected room, ON/OFF path, endpoint, HTTP execution result, and volatile direction history; HTTP success does not prove physical equipment state |
-| Fundamental action reports `NO-OP` | Blank path or endpoint may be intentional |
-| Custom action fails | Check every destination endpoint and step; one failure clears pending queue work |
-| Browser feels slow | Consider the single-client inbound listener, silent connections, and blocking outbound calls |
-| Wrong device responds | Confirm active Pico configuration, selected room, generic device slot, and command path |
-| Changes vanish after reboot | Confirm DEVICE mode, save success, revision, active file, and cold-start recovery logs |
-| Unexpected import behavior | Check stale or duplicate Pico modules and preserve package `__init__.py` files |
+| Browser unavailable | GP18 CONFIG, Wi-Fi, port 9090, listener diagnostics |
+| Browser stalls | Single-client listener, silent connections, blocking outbound operations, web polling cadence |
+| Save rejected | GP17 DEVICE, stale revision, schema/size validation, filesystem state |
+| Action queued but equipment unchanged | Actual queue execution, configured endpoint/path, adapter choice, transport result, equipment state |
+| Volume turns but nothing changes | GP8/GP9 wiring, detent events, selected room, Denon path signature, TCP connection/pacing |
+| Wrong room responds | GP3/GP6/GP7 selection, active configuration, room-aware dispatch |
+| No-op logged | Unconfigured room or deliberately blank ordinary mapping |
+| Unexpected import behavior | Stale Pico files, missing `__init__.py`, incomplete deployment |
+| Serial console seems frozen | Verify application state; consider PuTTY or a fresh serial session |
+| Ctrl+C / `KeyboardInterrupt` | Often intentional interruption, not a firmware crash |
 
-A deliberate `KeyboardInterrupt` from stopping the application is not necessarily a firmware crash.
+For a narrowly scoped test file on CIRCUITPY, a REPL invocation may look like:
 
-The inbound HTTP service sends `Cache-Control: no-store`, but still verify deployed assets when debugging browser behavior.
+```python
+exec(open("/tests/test_room_selector.py").read())
+```
 
-### 10.2 Understand HTTP success
+Only run tests that **actually exist on the Pico**. Test filenames and results should be documented as observed, not assumed from the repository. If importing the running application holds resources, interrupt it deliberately before a standalone GPIO test, and restore normal operation afterward.
 
-The outbound transport reads the HTTP status line and accepts 2xx results. It does **not** parse a device's response body or prove the receiver, television, or streamer changed state. An accepted queue request proves even less: it only proves admission.
+**Network success is not equipment-state confirmation.** An HTTP 2xx or completed TCP write proves only its respective communication boundary. Clonker does not currently query authoritative power, mute, or volume state.
 
-For physical behavior claims, observe the equipment directly. For failure claims, capture the relevant serial logs and distinguish expected unreachable-endpoint tests from regressions.
+## 11. Verification vocabulary and handoff
 
-### 10.3 Preserve configuration during diagnosis
+- **Verified on hardware:** Observed on the actual Pico and, where relevant, actual AV equipment.
+- **Implemented, not exhaustively verified:** Code exists and works in some conditions; broader cases remain untested.
+- **Planned:** Proposed design or integration not yet working.
+- **Historical:** Superseded design, test or implementation; keep the dated record without presenting it as current.
+- **Deferred:** Deliberately outside the present implementation scope.
 
-Avoid editing the JSON file behind the running application's back. Prefer browser changes through the validated save path in DEVICE mode. Before recovery experiments, preserve the primary file and backups. Never casually delete the current configuration or private settings while troubleshooting.
+After meaningful work, record the date, changed files, deployed version if known, exact test and observed outcome. Update the current reference document and add dated milestones to [Development History](DEVELOPMENT_HISTORY.md) without repeatedly duplicating entire technical specifications.
 
----
+### Remaining work
 
-## 11. Testing vocabulary
-
-Use precise labels in documentation and conversation:
-
-- **Verified on hardware:** Observed on the actual Pico, browser, and/or external equipment, with the observation stated.
-- **Implemented, not exhaustively verified:** Code exists but some relevant conditions remain untested.
-- **Planned:** An objective or design proposal, not working firmware.
-- **Historical:** An earlier implementation, test, or decision superseded by the current baseline.
-- **Deferred:** Intentionally not active, even if some configuration or UI support already exists.
-
-A browser stub from October 19 was **historical**. The current browser action pipeline is operational. A future Apple TV adapter remains **planned**. Runtime power/mute direction execution, negative-path direction preservation, and cooperative custom-action interleaving were bench-tested October 27, 2026. Broader stress and physical-input verification remain incomplete.
-
-Never turn an intended design into a success claim just because its schema fields or UI controls exist.
-
----
-
-## 12. Next development work
-
-The working Config v4 baseline should be protected while proceeding in measured steps.
-
-### 12.1 Small refinements
-
-- Expand queue-capacity, malformed-request, prolonged-network-failure, and long-uptime regression coverage where useful.
-- Revisit Test Remote selection persistence if a reproducible issue appears with multiple custom actions in one room.
-- Avoid speculative performance changes without measurements.
-
-### 12.2 Physical-control integration
-
-**Completed and Pico-tested October 28–29, 2026:**
-
-- Optional physical-control initialization and cooperative GPIO polling.
-- GP2 momentary button input, debounce, and press/release event logging.
-- GP17 physical SERVICE (USB)/DEVICE boot-mode switch.
-- GP18 guarded CONFIG/RUN application-mode switch, including live management-listener transitions without reboot.
-- Browser and network-action smoke tests with physical-control polling enabled.
-
-**Next implementation steps:**
-
-1. Wire and test the physical room selector.
-2. Establish reliable selected-room context for physical input events.
-3. Connect GP2 power-button presses to the existing room-specific `power-toggle` dispatcher.
-4. Verify real equipment response, debounce behavior, and repeated presses.
-5. Add navigation, Back, and Home controls incrementally.
-6. Integrate the Bourns custom-action selector encoder.
-7. Electrically verify the Grayhill volume encoder before implementing volume steps.
-8. Measure physical-input responsiveness during outbound HTTP requests and compound waits.
-
-Keep GPIO handlers device-independent. All physical actions must use the same dispatcher and Dumb Queue™ as the browser Test Remote.
-
-See [Hardware & Physical Controls](HARDWARE_CONTROLS.md) for verified GPIO assignments, component status, and remaining mechanical decisions.
-
-### 12.3 Deferred action and protocol capabilities
-
-- Add user-defined custom device slots only when the working baseline and requirements justify the extension.
-- Pursue Apple TV compatibility as an explicit objective, recognizing that discovery, pairing, authentication, and session management may require an adapter beyond stateless HTTP GET/POST.
-- Continue OLED, audio feedback, power, and enclosure work according to hardware readiness.
-
-Do not create a separate macro executor or a general-purpose home automation framework merely because the Clonker can run a command sequence.
-
----
-
-## 13. Documentation and handoff discipline
-
-After a meaningful change:
-
-1. Record the date and changed source files.
-2. State the test environment and deployed firmware version when known.
-3. Describe what was actually tested and what was observed.
-4. Note failures, deferred items, and untested assumptions.
-5. Update the current reference document if runtime behavior changed.
-6. Append dated evidence to [Development History](DEVELOPMENT_HISTORY.md) rather than rewriting old milestones.
-7. Keep cross-references accurate and avoid duplicating entire schema or transport specifications across documents.
-
-A new development conversation should be able to reconstruct the working baseline by reading the current repository documentation and relevant firmware, without relying on undocumented memory or inventing results.
+- Integrate volume encoder press-to-mute and the second custom-action selector/Run encoder.
+- Add physical navigation, Back, Home and playback controls.
+- Integrate OLED and audible CLONK feedback.
+- Develop battery management, guarded ignition/deep sleep and final enclosure.
+- Expand regression coverage for rapid input during blocking network operations, network failures, long uptime and interrupted writes.
+- Pursue custom destination slots and Apple TV discovery/pairing/authentication **later**, without speculative protocol modules.
 
 ### Reference map
 
 - [Architecture](ARCHITECTURE.md)
 - [Configuration & Recovery](CONFIGURATION.md)
-- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md)
+- [Firmware, Network & Clock](FIRMWARE_NETWORK.md)
 - [Operating Modes](OPERATING_MODES.md)
 - [Hardware & Physical Controls](HARDWARE_CONTROLS.md)
 - [Development History](DEVELOPMENT_HISTORY.md)
@@ -532,28 +260,10 @@ A new development conversation should be able to reconstruct the working baselin
 
 ---
 
-## 14. Development principles worth keeping
-
-**Readable beats clever.**
-
-**One queue. One poller. One shared execution path.**
-
-**The configuration describes equipment; the action describes intent; the transport delivers the command.**
-
-**A successful HTTP response is not proof of physical equipment state.**
-
-**Never sacrifice a known-good configuration to save a minute of deployment work.**
-
-**Be resilient in our dumbness.**
-
-And finally:
+**Readable beats clever. One queue. One poller. One shared execution path.**
 
 > Do not spend three hours engineering a solution to save four seconds unless the resulting mechanism makes an exceptionally satisfying CLONK.
 
 Actually, scratch that last part. That's probably the entire reason this project exists.
 
----
-
-**THE CLONKER 10000**  
-*Less sleek. More CLONK.*  
-**CLONK! ⚡🔩**
+**THE CLONKER 10000 — Less sleek. More CLONK.** ⚡🔩
