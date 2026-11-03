@@ -19,6 +19,7 @@ from clonker import device_config_v2 as device_config
 from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button
+from clonker.controls.encoders import Encoder
 
 # Physical button names -> fundamental action IDs.
 # Only assigned GPIO buttons are initialized.
@@ -67,6 +68,8 @@ BUTTON_ACTIONS = {
 _initialized = False
 _buttons = []
 
+_volume_encoder = None
+
 
 def dispatch_selected(action_id):
     """Dispatch an action to the currently selected room.
@@ -99,6 +102,7 @@ def dispatch_selected(action_id):
 def initialize():
     """Initialize assigned physical buttons and room selector."""
     global _initialized
+    global _volume_encoder
 
     if _initialized:
         return True
@@ -147,6 +151,25 @@ def initialize():
     except Exception as exc:
         logger.warning("Room selector unavailable: {}".format(exc))
 
+    # Initialize the volume rotary encoder.
+    if (
+        pins.VOLUME_ENCODER_A_PIN is not None
+        and pins.VOLUME_ENCODER_B_PIN is not None
+    ):
+        try:
+            encoder = Encoder(
+                "VOLUME",
+                pins.VOLUME_ENCODER_A_PIN,
+                pins.VOLUME_ENCODER_B_PIN,
+            )
+            encoder.initialize()
+            _volume_encoder = encoder
+            logger.info("Volume encoder initialized")
+        except Exception as exc:
+            logger.warning(
+                "Volume encoder unavailable: {}".format(exc)
+            )
+
     _initialized = True
     return True
 
@@ -184,3 +207,14 @@ def poll():
 
         # ACTION_RUN will use the custom-action selection
         # maintained by the future encoder integration.
+
+    # Volume encoder: one completed detent -> one action.
+    if _volume_encoder is not None:
+        step = _volume_encoder.poll()
+
+        if step:
+            action_id = (
+                "vol-up" if step > 0 else "vol-down"
+            )
+            dispatch_selected(action_id)
+

@@ -29,7 +29,7 @@ from clonker import device_config_v2 as device_config
 PHYSICAL_CONTROLS_ENABLED = True
 
 # Cooperative scheduler intervals.
-PHYSICAL_POLL_INTERVAL = 0.01
+PHYSICAL_POLL_INTERVAL = 0.001
 WEB_POLL_INTERVAL = 0.001
 ACTION_POLL_INTERVAL = 0.01
 
