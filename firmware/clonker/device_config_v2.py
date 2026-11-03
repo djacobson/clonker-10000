@@ -18,6 +18,7 @@ A successful load binds the file path for all subsequent save() operations.
 
 import json
 import os
+from clonker import device_adapters
 
 
 # Clonker Config v4 (JSON): optional rooms, three reserved built-in destinations,
@@ -363,6 +364,7 @@ def load(path=None):
     for candidate in (path, path + ".bak", path + ".bak.old"):
         try:
             loaded = _load_existing(candidate)
+            device_adapters.rebuild(loaded)
             _current = loaded
             _current_path = path
             return loaded
@@ -506,6 +508,7 @@ def save(config, expected_revision, path=None):
         return False
 
     _replace_with_backup(path, serialized)
+    device_adapters.rebuild(validated)
     _current = validated
     return True
 
