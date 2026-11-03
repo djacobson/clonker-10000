@@ -34,9 +34,9 @@ And perhaps a case that opens with actual lunchbox latches.
     <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython<br>
     <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (future)<br>
     <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
-    <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<br>
-    <b>Configuration:</b> Browser-based editor · Wi-Fi HTTP commands · Executable custom action sequences<br>
-    <b>Physical controls:</b> Three-position room selector and room-aware Power Toggle operational
+    <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<
+    <b>Configuration:</b> Browser editor · HTTP and Denon TCP control · Executable custom actions<br>
+    <b>Physical controls:</b> Room selector · Power Toggle · Rotary volume encoder operational
   </sub>
 </p>
 
@@ -211,7 +211,7 @@ Clonker Config v4 supports up to three rooms, each with its own devices and comm
 
 The browser Test Remote can execute custom actions today.
 
-The physical room selector and Power Toggle are also operational. The custom-action encoder and remaining physical controls are still being integrated.
+The physical room selector, Power Toggle, and Bourns volume encoder are operational. The custom-action encoder and remaining physical controls are still being integrated.
 
 ### Device Compatibility Roadmap
 
@@ -240,23 +240,25 @@ A Pico Cowbell Terminal board provides screw-terminal GPIO connections, and a WA
 - **GP3/GP6/GP7 rotary room selector:** Selects Den, Sunroom, or reserved Room 3. Integrated with firmware and verified after GPIO reassignment.
 - **GP2 momentary Power Toggle:** Dispatches the selected room's configured power action. Actual ON/OFF equipment behavior verified in Den and Sunroom.
 GP4/GP5 are reserved for the Cowbell's STEMMA QT/I²C connector, potentially for the planned OLED status display.
+- **GP8/GP9 Bourns volume encoder:** Physical rotation dispatches room-aware volume commands. Slow, moderate, and aggressive rotation verified against the Sunroom Denon.
 
 ### Hardware still being integrated
 
-- **Two Bourns PEC11R rotary encoders:** One for volume and push-to-mute; the other for custom-action selection and push-to-run.
+- **Bourns PEC11R volume encoder:** Rotation is integrated and operational; push-to-mute remains pending.
+- **Second Bourns PEC11R encoder:** Planned for custom-action selection and push-to-run.
 - Substantial tactile navigation and shortcut buttons.
 - Tiny OLED status display.
 - Optional piezo or I2S-powered audible feedback.
 - Rechargeable power.
 - Final enclosure and aluminum faceplate.
 
-The earlier Grayhill volume-encoder plan has been superseded by the two-Bourns approach.
+The working Bourns encoder is now the selected volume-control hardware. The previously considered Grayhill encoder is being saved for another project.
 
 The Pico 2 W is the active development platform.
 
 An earlier ESP32-S3 Feather board was part of the original hardware exploration but is not the current firmware target.
 
-**Hardware reality check:** The room selector and Power Toggle now form a working physical-control path all the way to real home-theater equipment. The complete control panel is still under construction.
+**Hardware reality check:** Room selection, Power Toggle, and rotary volume control now work against actual home-theater equipment. The complete control panel is still under construction.
 
 See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed inventory, proposed layout, GPIO status, and ongoing design decisions.
 
@@ -297,7 +299,7 @@ It can also run configured custom actions, including multi-step sequences across
 
 This allows the software architecture to be tested before committing to the final enclosure and GPIO wiring arrangement.
 
-**The knobs aren't integrated yet, but the first physical controls now talk to the equipment. The Monster has officially learned to reach outside its own box.**
+**The first rotary knob is operational!** The physical Bourns volume encoder now controls the Denon through a persistent TCP connection. The Monster has learned to turn things up without waiting for an HTTP connection on every click.
 
 ---
 
@@ -316,18 +318,16 @@ The Clonker uses a small, intentionally straightforward software architecture.
 
 ```text
 Physical GPIO inputs             Browser Test Remote
-   (operational)                    (operational)
-         |                               |
-         v                               v
- Buttons + Room Selector           HTTP action API
-         |                               |
-         v                               |
-  Physical coordinator                   |
-         |                               |
-         v                               |
-  Room-aware dispatch                    |
-         |                               |
-         +---------------+---------------+
+  (room selector, buttons,             |
+   volume encoder)                     |
+         |                             v
+         v                       HTTP action API
+  Physical coordinator                 |
+         |                             |
+         v                             |
+  Room-aware dispatch                  |
+         |                             |
+         +---------------+-------------+
                          |
                          v
                   Action dispatcher
@@ -336,33 +336,38 @@ Physical GPIO inputs             Browser Test Remote
                     DUMB QUEUE
                          |
                          v
-                 Config v4 resolution
+              Cached adapter selection
                          |
-                         v
-                Outbound HTTP transport
-                         |
-                         v
-                Home theater equipment
-                   Denon AVR / Roku
+                  +------+------+
+                  |             |
+                  v             v
+             Generic HTTP    Denon TCP
+              transport       adapter
+                  |             |
+                  v             v
+             Roku / AVR      Denon AVR
+               commands       volume
 ```
 
-**Both input paths now converge on the same action dispatcher.**
+**Both input paths converge on the same action dispatcher and Dumb Queue™.**
 
-The physical room selector establishes context, and the GP2 Power Toggle produces a generic action. The dispatcher resolves the selected room's configured command and submits it to the shared queue.
+The physical room selector establishes context. Buttons and encoder movements produce generic actions that are resolved using the selected room's configuration.
 
-Room 3 is reserved. If it is selected without a configured room, physical action dispatch safely does nothing rather than controlling another room.
+Room 3 is reserved. If selected without a configured room, physical action dispatch safely does nothing.
 
-The shared **Dumb Queue™** accepts generic actions and executes eligible work through outbound HTTP.
+The queue preserves command ordering, schedules delayed work, and cancels pending commands when execution fails.
 
-Custom actions reuse that same queue. A cooperative wait lets an unrelated eligible command execute before a delayed custom-action step resumes.
+A device-adapter resolver recognizes supported fundamental-command patterns. Its selections are cached when configuration is loaded or successfully changed, rather than repeatedly analyzing the commands during execution.
 
-Outbound HTTP requests themselves remain synchronous and blocking. The queue does not make network I/O nonblocking.
+Currently, recognized Denon volume-up and volume-down commands use a persistent TCP connection with 50 ms minimum transmission spacing. Other commands retain the existing generic HTTP transport.
 
-Real Denon and Roku commands were successfully executed from the Pico on October 21, 2026.
+The adapter architecture allows additional device protocols to be introduced without making the queue responsible for manufacturer-specific behavior.
 
-Runtime toggles, multi-step custom actions, and independent command interleaving during a custom-action wait were subsequently verified on October 27.
+Custom actions reuse the same queue and currently execute through the existing HTTP transport. Cooperative waits permit unrelated eligible commands to execute while a custom action is delayed.
 
-On November 2, physical room selection and actual Power Toggle ON/OFF operation were verified in both Den and Sunroom.
+Outbound HTTP remains synchronous and blocking. The Denon TCP adapter also uses synchronous socket operations, but avoids repeatedly establishing connections for individual volume commands.
+
+The architecture has been verified with actual equipment, physical encoder operation, mixed HTTP/TCP command ordering, delayed custom actions, and failure-cancellation regression tests.
 
 ### Configuration
 
@@ -407,13 +412,13 @@ The interface currently provides:
 
 The browser Test Remote and physical controls use the same shared action dispatcher and Dumb Queue™.
 
-**Real outbound HTTP control is operational.** The Pico has successfully executed configured Denon AVR and Roku commands over Wi-Fi, including a two-device custom action.
+**Real network control is operational.** The Pico executes configured Roku and Denon HTTP commands, while recognized Denon fundamental volume commands use a persistent TCP connection.
 
 The browser receives an acknowledgment when an action is queued. Actual device execution occurs subsequently through the cooperative scheduler.
 
-Chapter 6 connected the physical room selector and GP2 Power Toggle to this same command path.
+Chapter 6 connected the physical room selector, Power Toggle, and Bourns volume encoder to this shared execution path.
 
-The remaining buttons and rotary encoders can reuse the established architecture rather than introducing another execution mechanism.
+The remaining physical controls can reuse the established architecture rather than introducing another execution mechanism.
 
 ---
 
