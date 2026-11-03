@@ -20,9 +20,37 @@ from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button
 
-
 # Physical button names -> fundamental action IDs.
 # Only assigned GPIO buttons are initialized.
+#
+# FUTURE DESIGN NOTE -- optional panel orientation:
+#
+# Keep physical button identity separate from logical actions.
+# A future configuration setting could select between predefined
+# BUTTON_ACTIONS_NORMAL and BUTTON_ACTIONS_ROTATED dictionaries.
+#
+# For a 180-degree panel rotation, the alternate mapping would
+# exchange these logical actions:
+#
+#   nav-up       <-> nav-down
+#   nav-left     <-> nav-right
+#   skip-back    <-> skip-forward
+#
+# Other controls (Power, Home, Back, Select, Mute) can retain
+# their original logical meanings regardless of orientation.
+#
+# The event loop should continue using:
+#
+#   action_id = BUTTON_ACTIONS.get(button.name)
+#
+# Selecting a different dictionary reference would require
+# no changes to event processing or action dispatch.
+#
+# Future rotary encoder drivers should independently support
+# an optional reverse=False parameter, applied to decoded
+# rotation direction rather than raw quadrature signals.
+#
+# No orientation feature is currently implemented.
 BUTTON_ACTIONS = {
     "POWER_TOGGLE": "power-toggle",
     "HOME": "home",

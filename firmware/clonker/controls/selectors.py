@@ -7,8 +7,8 @@
 """Physical three-position room selector.
 
 LEFT   (GP3) = room-1
-MIDDLE (GP4) = room-2
-RIGHT  (GP5) = room-3
+MIDDLE (GP6) = room-2
+RIGHT  (GP7) = room-3
 
 The selected room is application state, not an action.
 
