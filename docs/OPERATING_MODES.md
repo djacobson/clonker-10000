@@ -1,441 +1,246 @@
 # The Clonker 10000 — Operating Modes
 
-**Design reference:** Updated October 29, 2026  
-**Hardware:** Raspberry Pi Pico 2 W  
-**Runtime:** CircuitPython 10.3.1  
-**Current baseline:** Chapter 5 / Clonker Config v4  
-**Status:** GP17 SERVICE (USB)/DEVICE boot-mode switch and GP18 CONFIG/RUN application-mode switch physically implemented and tested. GP2 momentary button input verified; room-aware physical action dispatch pending.
+**Design reference:** November 3, 2026  
+**Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
+**Baseline:** Chapter 6 — physical controls, room selection, volume encoder, and shared action execution operational  
+**Scope:** Boot-time filesystem ownership, runtime management mode, deployment, recovery, and verified behavior.
 
 > Two switches. Two completely different jobs. One appropriately complicated monster.
 
 ---
 
-## 1. Purpose and mode boundaries
+## 1. The two independent switches
 
-Clonker has **two independent operating-mode dimensions**:
+Clonker has two operating-mode dimensions. They are independent of each other, the selected room, and the equipment's power state.
 
-1. **SERVICE (USB) / DEVICE** determines whether the USB host or Pico firmware owns filesystem writes. GP17 selects this mode at boot.
-2. **CONFIG / RUN** determines whether the application exposes its management HTTP interface. GP18 selects this mode during runtime.
+| Dimension | Switch | OFF / open / HIGH | ON / grounded / LOW | When evaluated |
+|---|---|---|---|---|
+| Filesystem ownership | GP17 | **SERVICE (USB):** USB host writes | **DEVICE:** Pico firmware writes | At cold boot |
+| Application management | GP18 | **RUN:** management HTTP stopped | **CONFIG:** management HTTP available | During application runtime |
 
-Neither dimension is an AV equipment power command. Neither selects a room. Neither changes the definition of a configured action.
+**Normal standalone remote:** DEVICE + RUN.  
+**Browser configuration:** DEVICE + CONFIG.  
+**USB file deployment:** SERVICE (USB), with CONFIG or RUN as appropriate.
 
-| Property | SERVICE (USB) / DEVICE | CONFIG / RUN |
-|---|---|---|
-| Responsibility | Filesystem write ownership | Management HTTP availability |
-| Physical control | GP17 maintained boot-mode switch | GP18 guarded maintained switch |
-| Electrical selection | OFF/open = SERVICE; ON/grounded = DEVICE | OFF/open = RUN; ON/grounded = CONFIG |
-| Evaluated by | `firmware/boot.py` | Main loop via `controls/switches.py` |
-| Selection time | At boot | During application operation |
-| Requires full power cycle to change | **Yes** | **No** |
-| Hardware verification | **Tested October 29, 2026** | **Tested October 29, 2026** |
-| Changes external equipment power | No | No |
+The physical room selector (GP3/GP6/GP7) is a third, unrelated control. The momentary Power Toggle (GP2) sends an equipment action; it does not change either operating mode.
 
-**Normal remote operation:** DEVICE + RUN.  
-**Normal browser configuration:** DEVICE + CONFIG.  
-**USB firmware deployment:** SERVICE (USB), with CONFIG available when browser inspection is desired.
+## 2. GP17 — SERVICE (USB) and DEVICE
 
-The application can execute configured outbound actions through the shared Dumb Queue™ while CONFIG is enabled. The action poller is independent of the management listener.
+**Implementation:** `firmware/boot.py`. GP17 is read once at boot using an internal pull-up. The boot switch is physically verified.
 
-**Current physical-control boundary:** GP2 button press/release events are operational, but room selection and physical event-to-action dispatch remain pending. The complete physical remote experience in RUN has therefore not yet been verified.
+### SERVICE (USB): switch OFF
 
-## 2. SERVICE (USB): host-owned filesystem
+An open GP17 reads HIGH. The default CircuitPython filesystem arrangement lets the connected USB host write CIRCUITPY, while the running Pico application treats the filesystem as read-only.
 
-**Status:** Implemented and physically tested October 29, 2026.
-
-Setting the GP17 boot-mode switch to **OFF** leaves GP17 open. Its internal pull-up reads HIGH and selects SERVICE (USB) mode during startup.
-
-Expected boot diagnostic:
+Expected boot message:
 
 ```text
 CLONKER BOOT: SERVICE (USB) mode (switch OFF)
 ```
 
-In SERVICE:
+In SERVICE, the USB host can deploy firmware, tests, and documentation-related files to CIRCUITPY. Serial console and REPL remain available. The application can still load configuration, join Wi-Fi, process physical controls, and send configured commands.
 
-- The USB host can write the CIRCUITPY filesystem.
-- The Pico application sees that filesystem as read-only.
-- Firmware and other files can be deployed from the host.
-- The Pico cannot persist browser configuration changes.
-- Serial console and REPL access remain available.
-- The application may still run, connect to Wi-Fi, and execute configured actions.
+**SERVICE does not mean the remote is disabled.** It means the Pico cannot persist browser configuration changes to its filesystem.
 
-### SERVICE + CONFIG browser behavior
+### DEVICE: switch ON
 
-With CONFIG enabled, the browser can inspect the active **Config v4** JSON, review room/device/action mappings, synchronize the RAM clock, and use the Test Remote to submit fundamental or custom actions.
-
-A configuration save through `POST /api/config` is rejected with **HTTP 403** when the filesystem is read-only. CONFIG availability does **not** imply write permission.
-
-SERVICE is a filesystem-maintenance state, not an instruction to disable the application or its outbound equipment-control capability.
-
-## 3. DEVICE: Pico-owned filesystem
-
-**Status:** Implemented and physically tested October 29, 2026.
-
-Setting the GP17 boot-mode switch to **ON** grounds GP17 and selects DEVICE mode during startup.
-
-On the Pico 2 W, the switch connects **GP17 physical pin 22** to adjacent **GND physical pin 23**. GP17 uses an internal pull-up.
-
-Expected boot diagnostic:
-
-```text
-CLONKER BOOT: DEVICE mode (switch ON)
-```
-
-The boot code remounts the filesystem for firmware writes:
+Grounding GP17 selects DEVICE. `boot.py` executes:
 
 ```python
 storage.remount("/", readonly=False)
 ```
 
-In DEVICE:
+Expected boot message:
 
-- The Pico application can persist validated configuration changes.
-- The USB host sees CIRCUITPY as read-only.
-- The configuration engine can perform its guarded save and backup process.
-- A successful changed save publishes the new validated configuration into RAM.
-- Serial and REPL access remain available.
-
-### DEVICE + CONFIG browser behavior
-
-This is the normal browser-editing combination. The user can edit configured rooms, generic built-in device slots, fundamental mappings, and custom actions; save valid Config v4 data with revision protection; synchronize the clock; and exercise the Test Remote.
-
-The exact schema, limits, validation, backup rotation, and recovery rules belong in [Configuration & Recovery](CONFIGURATION.md).
-
-**DEVICE does not mean RUN.** Filesystem ownership and application management availability remain independent.
-
-## 4. Changing SERVICE (USB) / DEVICE safely
-
-The GP17 physical switch selects filesystem ownership **at boot**. Changing its position while the application is running does not transfer filesystem ownership.
-
-A Ctrl+D soft reload is not a substitute for a full power cycle.
-
-To change ownership:
-
-1. Finish and save any host-side file edits.
-2. Disconnect Pico power completely.
-3. Set the GP17 switch:
-   - **OFF / open:** SERVICE (USB) — USB host owns filesystem writes.
-   - **ON / grounded:** DEVICE — Pico firmware owns filesystem writes.
-4. Reconnect power and observe the boot diagnostic.
-5. Confirm the expected filesystem write ownership before copying firmware files or saving browser configuration.
-
-**Do not change the GP17 switch while powered.**
-
-Do not attempt USB-host file writes while the Pico owns the filesystem. Likewise, do not assume that a browser's ability to display configuration means the Pico can save changes.
-
-The GP17 switch is independent of the GP18 CONFIG/RUN switch. For example, DEVICE + CONFIG permits browser configuration saves, while SERVICE (USB) + CONFIG permits browser inspection but rejects persistent saves.
-
-## 5. CONFIG: management interface enabled
-
-**Status:** Implemented and physically verified October 29, 2026. The GP18 guarded switch enables CONFIG mode and starts the management HTTP listener without rebooting.
-
-CONFIG enables the Clonker management HTTP service on **port 9090**. In the documented development network the Pico is normally at `192.168.50.12`:
-
-- Configuration page: `http://192.168.50.12:9090/`
-- Test Remote: `http://192.168.50.12:9090/remote.html`
-
-These addresses are development-specific, not firmware defaults.
-
-CONFIG makes available:
-
-- The Config v4 editor and configuration API.
-- Revision-aware saves **only** when the filesystem is writable.
-- Clock status and browser-supplied UTC synchronization.
-- The browser Test Remote.
-- Fundamental and custom-action submission through `POST /api/action`.
-
-The Test Remote is **operational**, not a logging-only stub. It can enqueue configured actions which the shared Dumb Queue™ executes using the outbound HTTP transport. An enqueue acknowledgment does not itself prove successful execution or an equipment-state change.
-
-### CONFIG/RUN source selection and software override
-
-The authoritative application-mode interface is `switches.config_enabled()` in `firmware/clonker/controls/switches.py`.
-
-The normal hardware configuration assigns `CONFIG_SWITCH_PIN = 18` in `firmware/clonker/controls/pins.py`.
-
-| `CONFIG_SWITCH_PIN` | Source | Behavior |
-|---|---|---|
-| `18` | PHYSICAL | Read the maintained GP18 switch |
-| `None` | SIMULATED | Use the software state for development |
-
-### Verified GP18 electrical behavior
-
-The physical switch uses an internal GPIO pull-up.
-
-| GP18 state | Switch position | Application mode |
-|---|---|---|
-| LOW / grounded | ON | CONFIG |
-| HIGH / open | OFF | RUN |
-
-**This polarity was physically tested October 29, 2026.** It is no longer provisional.
-
-The physical switch is the normal source for application-mode selection. Changing its position takes effect during runtime without a reboot.
-
-### Simulated mode
-
-For hardware-free development, setting `CONFIG_SWITCH_PIN = None` selects the simulated source.
-
-The simulated state defaults to CONFIG (`True`) and can be changed with `switches.set_simulated_config(enabled)`.
-
-### Software override
-
-A temporary software override can supersede either physical or simulated mode selection.
-
-| `set_config_override()` value | Effective behavior |
-|---|---|
-| `None` | Follow configured source |
-| `True` | Force CONFIG |
-| `False` | Force RUN |
-
-For example:
-
-```python
-switches.set_config_override(True)   # Force CONFIG
-switches.set_config_override(False)  # Force RUN
-switches.set_config_override(None)   # Return to normal selection
+```text
+CLONKER BOOT: DEVICE mode (switch ON)
 ```
 
-`switches.config_source()` reports `SIMULATED`, `PHYSICAL`, or `OVERRIDE` for diagnostics.
+The Pico can now save validated configuration and rotate backups. The USB host sees CIRCUITPY as read-only. The serial console and REPL remain available.
 
-The override is **RAM-only** and resets on application restart. It is a development and troubleshooting facility, not a browser-facing control or a persistent configuration setting.
+On the Pico 2 W, the documented switch wiring uses GP17 (physical pin 22) and adjacent GND (physical pin 23). Verify the board's printed pin labels before changing wiring.
 
-### Hardware-presence limitations
+### Changing filesystem ownership
 
-**Schrödinger's switch:** An ordinary GPIO input cannot reliably distinguish an intentionally open switch from a disconnected wire.
+**A full power cycle is required.** Moving GP17 while powered does not change the current filesystem ownership, and Ctrl+D is not a substitute for cold boot.
 
-Clonker therefore does not attempt automatic hardware-presence detection.
+1. Finish and save host-side edits; allow outstanding writes to complete.
+2. Disconnect all Pico power sources, including USB and any external supply.
+3. Move GP17 to OFF for SERVICE or ON for DEVICE.
+4. Reconnect power and confirm the `CLONKER BOOT` message.
+5. Verify expected write permissions before copying files or saving browser configuration.
 
-If the physical switch is unavailable, select simulation explicitly by setting `CONFIG_SWITCH_PIN = None`, or use the software override.
+Do not change GP17 as a live operating control. Never assume that a browser page loading successfully means the Pico has write access.
 
-GPIO initialization errors are not silently converted into simulated mode.
+## 3. GP18 — CONFIG and RUN
 
-CONFIG/RUN selection remains independent of GP17 SERVICE (USB)/DEVICE filesystem ownership, physical room selection, and equipment power-toggle actions.
+**Implementation:** `firmware/clonker/controls/switches.py`, read by `firmware/clonker/main.py`. The maintained GP18 switch uses an internal pull-up and has been physically verified.
 
-### Listener lifecycle
+| GP18 electrical state | Effective mode | Management HTTP |
+|---|---|---|
+| Grounded / LOW | CONFIG | Started on port 9090 |
+| Open / HIGH | RUN | Stopped |
 
-The main loop checks the selected application mode and starts the management listener on entry to CONFIG, or stops it on entry to RUN. The listener is not recreated every iteration. While CONFIG is enabled, `web.poll()` is scheduled cooperatively at approximately 1 ms intervals.
+The switch is evaluated during the running application's cooperative loop. **CONFIG ↔ RUN transitions do not require rebooting.** A mode transition does not reload the active configuration, alter room selection, or issue an equipment power command.
 
-That interval is **not** a guaranteed browser response time. Outbound HTTP execution is currently blocking and can temporarily pause other cooperative work. See [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md).
+### CONFIG
 
-### CONFIG/RUN mode diagnostics
+CONFIG enables the Clonker browser management service on the trusted local network. The development installation has used these addresses:
 
-The main scheduler announces the effective application-mode source and operating mode at startup and whenever either changes.
+- `http://192.168.50.12:9090/` — configuration editor
+- `http://192.168.50.12:9090/remote.html` — Test Remote
 
-Example normal startup with the GP18 physical switch in CONFIG:
+The IP address is installation-specific, not a firmware default.
+
+CONFIG exposes validated Config v4 inspection, revision-protected saves when the Pico filesystem is writable, browser clock synchronization, and the Test Remote. The browser can enqueue fundamental and custom actions; the shared Dumb Queue™ executes them using the appropriate transport. **Queued is not the same as executed**, and a network acknowledgment does not establish actual equipment state.
+
+Physical controls continue operating in CONFIG. Enabling the browser does not disable the remote.
+
+### RUN
+
+RUN stops the Clonker management HTTP listener. The editor, Test Remote, and management APIs are unavailable while RUN is selected.
+
+The active validated configuration stays in RAM. Wi-Fi, physical room selection, the GP2 Power Toggle, the GP8/GP9 volume encoder, and the shared action queue remain part of the running application. The action poller operates in both CONFIG and RUN.
+
+**The management listener is not the command engine.** Turning off the browser does not turn off the remote.
+
+### Listener lifecycle and diagnostics
+
+`main.py` starts the listener on entry to CONFIG and stops it on entry to RUN; it does not recreate the listener every iteration. CONFIG-mode `web.poll()` targets a 1 ms service interval, subject to cooperative scheduling and blocking outbound operations.
+
+Representative serial messages:
 
 ```text
 App mode source = PHYSICAL
 App mode = CONFIG
-```
-
-Moving the switch to RUN produces:
-
-```text
 App mode = RUN
-```
-
-Returning to CONFIG produces:
-
-```text
 App mode = CONFIG
 ```
 
-The source and mode are tracked independently. A source change is logged even when the effective operating mode remains unchanged.
+Source and effective mode are logged on startup and on changes, not on every poll.
 
-Announcements are transition-based, not emitted on every scheduler iteration.
+## 4. Simulation and development override
 
-**Verified October 28, 2026:** Simulated CONFIG startup, responsive browser pages, GP2 button events, and forced-RUN operation using the temporary software override.
+`controls/pins.py` normally sets:
 
-**Verified October 29, 2026:** GP18 physical CONFIG/RUN selection and repeated live transitions. Browser refresh tests confirmed that RUN stops the management listener and CONFIG restores it, without restarting the application.
+```python
+CONFIG_SWITCH_PIN = 18
+```
 
-The physical switch is now the normal mode-selection source. Simulation and software override remain available for development and troubleshooting.
+The application-mode source is selected as follows:
 
-## 6. RUN: management interface disabled
-
-**Status:** Physical GP18 CONFIG/RUN switching and management-listener transitions implemented and tested October 29, 2026.
-
-RUN is intended to be the normal operating state of the completed remote.
-
-In RUN:
-
-- The management HTTP listener is stopped.
-- The browser editor, configuration API, clock endpoint, and Test Remote are unavailable.
-- Wi-Fi and the validated in-memory configuration remain available.
-- The shared Dumb Queue™ and action poller continue operating independently of the management listener.
-- Physical controls can continue to be polled; their eventual action dispatch does not require the management server.
-
-**Verified:** Switching GP18 to RUN stops the management listener. Returning to CONFIG restores browser access without rebooting.
-
-**Not yet verified:** End-to-end physical button execution against AV equipment in RUN. GP2 press/release events are operational, but physical room selection and event-to-action dispatch remain pending.
-
-Changing CONFIG/RUN does not reload configuration from flash. The application continues using its active validated RAM snapshot, including successfully saved changes made in CONFIG.
-
-The intended final behavior is that ordinary physical controls work in both CONFIG and RUN. CONFIG adds management services rather than disabling the remote.
-
-## 7. Four operating combinations
-
-The GP17 boot-mode switch and GP18 application-mode switch operate independently, providing four possible combinations.
-
-| Filesystem mode | Application mode | Expected behavior |
+| Condition | Source | Meaning |
 |---|---|---|
-| **SERVICE (USB)** | **CONFIG** | USB host can deploy files; browser can inspect and test actions; configuration writes rejected |
-| **SERVICE (USB)** | **RUN** | USB host owns filesystem writes; management listener stopped; action engine remains available |
-| **DEVICE** | **CONFIG** | Pico owns filesystem writes; browser configuration, guarded saves, and Test Remote available |
-| **DEVICE** | **RUN** | Pico owns filesystem writes; management listener stopped; intended normal physical-remote operating mode |
+| `CONFIG_SWITCH_PIN = 18` and no override | `PHYSICAL` | Follow the GP18 switch |
+| `CONFIG_SWITCH_PIN = None` and no override | `SIMULATED` | Follow RAM-only simulated state |
+| Override explicitly set | `OVERRIDE` | Force CONFIG or RUN |
 
-**Verified October 29, 2026:** The physical GP18 switch changes CONFIG/RUN during runtime without rebooting. Browser refresh tests confirmed management-listener shutdown and restart.
+Simulation defaults to CONFIG (`True`) and can be changed using `switches.set_simulated_config(enabled)` when the pin is unassigned.
 
-GP17 filesystem ownership remains a boot-time selection requiring a full power cycle.
+The temporary override accepts:
 
-The action engine and validated RAM configuration are independent of management-listener availability. However, the complete physical-button-to-equipment path in RUN remains untested because room selection and physical action dispatch are not yet connected.
+```python
+switches.set_config_override(True)   # Force CONFIG
+switches.set_config_override(False)  # Force RUN
+switches.set_config_override(None)   # Follow normal source
+```
 
-These combinations describe filesystem ownership and management-interface behavior, **not** four different equipment-power states.
+`switches.config_enabled()` returns the effective mode; `switches.config_source()` reports its source. Overrides are RAM-only and reset with the application. They do not change GP17 filesystem ownership.
 
-## 8. Configuration persistence and mode permissions
+**Schrödinger's switch:** A GPIO reading HIGH cannot distinguish a deliberately open switch from a disconnected wire. Clonker does not pretend to detect physical switch presence. For hardware-free testing, explicitly select simulation or an override; GPIO initialization failures are not silently treated as simulation.
 
-Persistent browser configuration saves require **both** a writable Pico filesystem and an available CONFIG management endpoint.
+## 5. The four operating combinations
 
-- **SERVICE + CONFIG:** `POST /api/config` is rejected with HTTP 403 because the Pico filesystem is read-only.
-- **DEVICE + CONFIG:** A save can proceed if schema validation, revision checks, disk consistency checks, and persistence safeguards pass.
-- **Either RUN combination:** The browser save endpoint is unavailable because the management listener is stopped.
+| GP17 filesystem mode | GP18 application mode | USB host writes | Pico configuration saves | Management HTTP | Action engine |
+|---|---|---|---|---|---|
+| SERVICE (USB) | CONFIG | Yes | No — HTTP 403 | Available | Active |
+| SERVICE (USB) | RUN | Yes | No | Stopped | Active |
+| DEVICE | CONFIG | No | Yes, if validation and revision checks pass | Available | Active |
+| DEVICE | RUN | No | Not through browser | Stopped | Active |
 
-A successful **changed** save updates persistent configuration, performs the engine's backup safeguards, publishes the new validated RAM configuration, **clears pending queue work, and resets all volatile toggle-direction histories** to avoid carrying stale requests or command history across a configuration change. An **unchanged** save avoids an unnecessary flash rewrite and preserves the existing queue and toggle histories.
+This table describes permissions and service availability, **not four different equipment-power states**.
 
-Do not infer that backup rotation is a fully atomic transaction under sudden power loss. See [Configuration & Recovery](CONFIGURATION.md) for exact guarantees and remaining limits.
+The physical GP17 and GP18 behavior was verified October 29, 2026. Chapter 6 subsequently verified room-aware Power Toggle operation on actual Den and Sunroom equipment and the physical volume encoder through the shared dispatcher. Do not infer that every combination, failure mode, or extended-duration workload has been exhaustively tested.
 
-## 9. Operating modes are not equipment power controls
+## 6. Configuration persistence and safe saves
 
-Three different concepts must remain separate:
+The active schema is **Clonker Config v4**, despite the historical implementation filename `device_config_v2.py`.
 
-1. **GP17 SERVICE (USB)/DEVICE boot-mode switch:** Selects filesystem write ownership at startup. A full power cycle is required to change modes.
-2. **GP18 CONFIG/RUN application-mode switch:** Enables or disables the management HTTP listener during runtime, without rebooting.
-3. **GP2 momentary power button / SYSTEM MASTER concept:** Intended to request the selected room's configured `power-toggle` action. Physical button events are verified, but room-aware action dispatch and future sleep/wake behavior are not yet implemented.
+Browser saves require DEVICE + CONFIG. In SERVICE + CONFIG, inspection and Test Remote actions remain possible, but `POST /api/config` rejects persistence with HTTP 403 because the Pico filesystem is read-only.
 
-The Config v4 schema supports `on_path` and `off_path` for power/mute toggles. Runtime direction selection is **IMPLEMENTED**: the dispatcher maintains independent, volatile ON/OFF command histories per room and action. A successful HTTP request advances the next direction; a changed configuration save resets all histories.
+A valid changed save checks the expected revision, validates the configuration, performs guarded filesystem writes and backup handling, publishes the new RAM configuration, rebuilds the in-memory specialized adapter selection cache, clears pending queued actions, and resets volatile power/mute direction histories. An unchanged save avoids unnecessary persistence and preserves pending work and toggle histories.
 
-This command history is **not authoritative equipment state**. External remotes, HDMI-CEC, and manual device controls can change equipment independently. October 27, 2026 bench tests confirmed that failed HTTP requests, blank selected command paths, and missing endpoints do not advance toggle direction history. Broader failure-condition and physical-input testing remains outstanding.
+A revision conflict should be resolved by refreshing the editor and reconciling changes, not bypassing the check. Backup rotation reduces risk; it does not promise recovery from every interrupted write or sudden power loss.
 
-**Changing GP17 or GP18 must never transmit an equipment power command merely because an operating mode changed.**
+**Deployment caution:** The Pico's browser-edited `/clonker/device_config.json` may be newer than the repository example. Do not overwrite it blindly while copying firmware in SERVICE mode. Likewise, keep private `settings.toml` credentials out of GitHub.
 
-## 10. Physical controls and GPIO integration
+See [Configuration & Recovery](CONFIGURATION.md) for detailed validation, revision, and backup semantics.
 
-The current application GPIO assignments are maintained in `firmware/clonker/controls/pins.py`. Boot-time GP17 handling is separate, in `firmware/boot.py`.
+## 7. Physical controls are not operating-mode controls
 
-### GP17 — SERVICE (USB)/DEVICE boot switch
+| Control | Current purpose | Status |
+|---|---|---|
+| GP17 maintained switch | SERVICE (USB) / DEVICE filesystem ownership | Operational |
+| GP18 guarded maintained switch | CONFIG / RUN management mode | Operational |
+| GP3/GP6/GP7 three-position selector | Den, Sunroom, reserved Room 3 | Operational |
+| GP2 momentary Power Toggle | Selected room's `power-toggle` action | Operational; real equipment verified |
+| GP8/GP9 Bourns encoder rotation | Selected room's `volume-up` / `volume-down` | Operational; real equipment verified |
+| Volume encoder shaft press | `mute-toggle` | Not yet wired/integrated |
+| Second Bourns encoder | Custom-action selection and press-to-run | Planned integration |
+| Navigation, Back, Home, playback | Generic physical actions | Pending |
+| Guarded ignition / sleep-wake | Future power-management concept | Not implemented |
 
-**Implemented and tested.**
+The selected physical room is independent of both operating-mode switches. Room 3 is a valid physical position but not currently a configured room; attempts to dispatch there are safe no-ops rather than commands redirected to Den or Sunroom.
 
-A maintained physical switch selects filesystem ownership at boot:
+Power and mute toggles maintain **volatile last-successful-command direction**, not verified receiver state. Other remotes, HDMI-CEC, and equipment controls may change actual state independently. A mode switch must never transmit an equipment power command simply because its position changed.
 
-- OFF/open/high = SERVICE (USB), host-owned filesystem writes.
-- ON/grounded/low = DEVICE, Pico-owned filesystem writes.
-- A full power cycle is required to change ownership.
+For wiring, layout, parts, and mechanical plans, see [Hardware & Physical Controls](HARDWARE_CONTROLS.md).
 
-This switch does not change the application's CONFIG/RUN state.
+## 8. Deployment and recovery checklist
 
-### GP18 — CONFIG/RUN application switch
+### To update firmware from USB
 
-**Implemented and tested.**
+1. Confirm which files changed and preserve the current Pico configuration and private settings.
+2. Complete any pending browser configuration work.
+3. Disconnect Pico power, set GP17 **OFF / SERVICE**, and reconnect.
+4. Verify `CLONKER BOOT: SERVICE (USB)` and host write access.
+5. Copy only the intended firmware files to CIRCUITPY; avoid replacing `device_config.json` or `settings.toml` unintentionally.
+6. Allow writes to finish. Disconnect power completely.
+7. Set GP17 **ON / DEVICE**, reconnect, and verify the DEVICE boot message.
+8. Use GP18 CONFIG to inspect the editor and Test Remote; verify expected configuration and action behavior.
+9. Return GP18 to RUN for ordinary standalone use.
 
-A guarded maintained switch uses GP18 with an internal pull-up:
+### If a browser configuration save fails
 
-- OFF/open/high = RUN.
-- ON/grounded/low = CONFIG.
+Check GP18 first: RUN disables the endpoint. If CONFIG is active, check GP17 ownership: SERVICE makes the filesystem read-only to the Pico. Then inspect validation, revision, and filesystem diagnostics. Do not treat a rejected save as a successful deployment.
 
-The application polls this switch during runtime. Mode transitions start or stop the management HTTP listener without rebooting.
+### If browser pages are unavailable
 
-Repeated browser tests confirmed that CONFIG restores management access and RUN disables it.
+Check that GP18 selects CONFIG, that the Pico has booted and joined Wi-Fi, and that the correct local IP/port is being used. RUN intentionally stops the listener. CONFIG-mode management is a cooperative single-client service; network failures can still affect availability.
 
-The active validated configuration remains in RAM. Switching modes does not itself execute an AV command.
+### If a physical action does nothing
 
-### GP2 — momentary power-button input
+Confirm the selected room is configured, its destination and action mapping are present, and the device is reachable. Room 3 currently rejects actions intentionally. Inspect queue and transport logs before assuming the GPIO input is defective. A successful TCP write or HTTP response does not guarantee equipment-state change.
 
-**Input implemented and tested; action dispatch pending.**
+## 9. Security, timing, and verification limits
 
-The GP2 momentary button produces debounced press/release events through the physical-control subsystem.
+- The management HTTP service has no application-level authentication. Keep port 9090 on a trusted LAN; do not forward it to the public internet.
+- CircuitPython Web Workflow is separate from Clonker management HTTP. The development configuration disabled Web Workflow with `CIRCUITPY_WEB_API_PORT = 0` after observed interference; the exact cause was not conclusively established.
+- Outbound generic HTTP remains bounded but blocking. Recognized fundamental Denon volume commands use a persistent TCP adapter with nonblocking 50 ms pacing eligibility, but socket connection and transmission still involve synchronous operations.
+- The physical poller targets 1 ms, the action queue 10 ms, and CONFIG management HTTP 1 ms. These are target intervals, not hard real-time deadlines.
+- Physical Power Toggle, room selector, and Bourns volume encoder have passed scoped real-equipment tests. Long uptime, disconnected hardware, network recovery, and all mode combinations have not been exhaustively certified.
+- A commit proves source changed; deployment proves files were copied; a transport acknowledgment is not the same as observed equipment response.
 
-These events are currently logged, not dispatched as `power-toggle` commands.
+## 10. Related documents
 
-The next dependency is physical room selection, so the dispatcher knows which configured room should receive the action.
-
-### Room selection
-
-The physical room selector is not yet wired or implemented.
-
-Den and Sunroom are the current operational rooms. A possible BOTH selection remains a design question, not an implemented command-broadcast feature.
-
-Room selection is independent of SERVICE/DEVICE and CONFIG/RUN.
-
-### Guarded SYSTEM MASTER
-
-The guarded SYSTEM MASTER concept is distinct from both operating-mode switches.
-
-Its intended awake behavior is to invoke the selected room's `power-toggle` action. Its possible deep-sleep wake/ignition behavior remains experimental and unimplemented.
-
-The underlying `power-toggle` software action is already implemented and bench-tested through the browser Test Remote.
-
-For component inventory, GPIO assignments, and mechanical design, see [Hardware & Controls](HARDWARE_CONTROLS.md).
-
-## 11. Deployment, recovery, and security cautions
-
-- Preserve the Pico's current `device_config.json` before replacing it from a repository copy; the running device may contain newer browser edits.
-- Keep private Wi-Fi credentials in `settings.toml`; do not commit them or overwrite them during routine firmware deployment.
-- Confirm the intended GP17 mode before copying files or testing persistence.
-- Refresh stale browser tabs after a revision conflict rather than bypassing the conflict protection.
-- Treat a successful HTTP action acknowledgment as queue admission, not proof that equipment changed state.
-- CircuitPython Web Workflow is separate from Clonker's management service. The documented development setup disables Web Workflow with `CIRCUITPY_WEB_API_PORT = 0` following observed networking interference; the precise cause was not conclusively established.
-- The Clonker management service has no application-level authentication. Use it on a trusted LAN only; do not expose port 9090 through internet-facing port forwarding.
-
-For the full deployment checklist, see [Development & Deployment](DEVELOPMENT.md).
-
-## 12. Verification status and remaining work
-
-**Current reference date:** October 29, 2026.
-
-### Implemented and exercised
-
-- GP17 physical boot-mode switch: OFF/open selects SERVICE (USB); ON/grounded selects DEVICE.
-- Boot-time filesystem ownership, DEVICE-mode browser saves, and SERVICE (USB)-mode rejection of persistent writes.
-- Config v4 validation, revision protection, and selected backup/recovery behavior.
-- GP18 physical CONFIG/RUN switch: grounded selects CONFIG; open selects RUN.
-- Live CONFIG → RUN → CONFIG transitions without rebooting.
-- Management HTTP listener stops in RUN and restarts in CONFIG, confirmed through repeated browser refresh tests.
-- Serial diagnostics identifying `App mode source = PHYSICAL` and the effective application mode.
-- GP2 momentary power-button input, debounce, and press/release event logging.
-- Browser responsiveness with physical button polling enabled.
-- Fundamental action dispatch through the shared Dumb Queue™ to real Denon/Roku equipment.
-- Config v4 custom actions and cooperative multi-step execution, including a tested Roku command, wait, and Denon command.
-- Runtime power/mute ON/OFF direction selection through the shared dispatcher, bench-tested October 27, 2026 using the browser Test Remote.
-- Sunroom Denon mute ON/OFF and Roku Home/PowerOff execution, including the LG G1 and Denon X1800H HDMI-CEC power chain.
-- Changed-configuration toggle-history reset and independent Den/Sunroom histories.
-
-### Implemented, not exhaustively verified
-
-- CONFIG/RUN listener behavior under unusual network failures and extended operation.
-- Configuration availability across every operating-mode combination and transition.
-- All interrupted-write and power-loss recovery cases.
-- Extended load and long-uptime behavior.
-
-### Not yet implemented or end-to-end tested
-
-- Physical room selection and room-context propagation to action dispatch.
-- GP2 physical power-button event-to-action dispatch.
-- Complete physical DEVICE + RUN equipment-control operation.
-- Navigation buttons, volume encoder, and custom-action selector encoder.
-- SYSTEM MASTER sleep/wake and ignition behavior.
-- OLED and audible feedback integration.
-- Custom device slots and Apple TV protocol support.
-
-Historical October 19 mode tests and subsequent Chapter 3/4 networking milestones remain in [Development History](DEVELOPMENT_HISTORY.md). They should not be mistaken for the current implementation status.
-
-## 13. Related documents
-
-- [Architecture](ARCHITECTURE.md) — overall design boundaries and ownership.
-- [Configuration & Recovery](CONFIGURATION.md) — authoritative Config v4 schema, persistence, and recovery.
-- [Firmware, HTTP & Clock](FIRMWARE_NETWORK.md) — current networking, scheduler, queue, and transport.
-- [Hardware & Controls](HARDWARE_CONTROLS.md) — physical design and GPIO planning.
-- [Development & Deployment](DEVELOPMENT.md) — iPad-first development and deployment workflow.
-- [Development History](DEVELOPMENT_HISTORY.md) — dated engineering milestones and tests.
+- [Architecture](ARCHITECTURE.md) — ownership boundaries, shared action path, adapter architecture.
+- [Firmware, Network & Clock](FIRMWARE_NETWORK.md) — scheduler, HTTP/TCP transports, queue pacing, and tests.
+- [Hardware & Physical Controls](HARDWARE_CONTROLS.md) — GPIO, wiring, mechanical design, and inventory.
+- [Configuration & Recovery](CONFIGURATION.md) — schema, persistence, revision protection, backups.
+- [Development & Deployment](DEVELOPMENT.md) — development workflow and deployment procedures.
+- [Development History](DEVELOPMENT_HISTORY.md) — dated experiments and verification records.
 
 ---
 
+**THE CLONKER 10000 — Less sleek. More CLONK.**  
 **CLONK! ⚡🔩**
