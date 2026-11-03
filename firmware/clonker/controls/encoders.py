@@ -37,10 +37,10 @@ import digitalio
 # Index: (previous_AB << 2) | current_AB
 # States are encoded with A as bit 1 and B as bit 0.
 _TRANSITIONS = (
-     0, -1, +1,  0,
-    +1,  0,  0, -1,
-    -1,  0,  0, +1,
      0, +1, -1,  0,
+    -1,  0,  0, +1,
+    +1,  0,  0, -1,
+     0, -1, +1,  0,
 )
 
 
