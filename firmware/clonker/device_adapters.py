@@ -21,6 +21,7 @@ becomes active. No adapter information is persisted to JSON.
 This module performs no network I/O or command execution.
 """
 
+ROKU_HOLD = "roku-hold"
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
 
@@ -34,6 +35,10 @@ DENON_VOLUME_COMMANDS = {
     "/goform/formiPhoneAppDirect.xml?MVDOWN": "MVDOWN",
 }
 
+ROKU_VOLUME_COMMANDS = {
+    "/keypress/VolumeUp": "up",
+    "/keypress/VolumeDown": "down",
+}
 
 # Only specialized adapter selections are stored.
 # Key: (room_id, action_id)
@@ -52,6 +57,14 @@ def resolve(kind, action_id, method, path):
         and path in DENON_VOLUME_COMMANDS
     ):
         return DENON_TCP
+
+    if (
+        kind == "fundamental"
+        and action_id in ("volume-up", "volume-down")
+        and method == "POST"
+        and path in ROKU_VOLUME_COMMANDS
+    ):
+        return ROKU_HOLD
 
     return GENERIC_HTTP
 
