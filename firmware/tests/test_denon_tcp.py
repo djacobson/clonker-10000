@@ -18,8 +18,8 @@ DENON_DEVICE = "device-2"
 DENON_TCP_PORT = 23
 
 SOCKET_TIMEOUT = 1.0
-REPEAT_COUNT = 5
-COMMAND_INTERVAL = 0.10
+REPEAT_COUNT = 10
+COMMAND_INTERVAL = 0.05
 
 
 def elapsed_ms(start):
@@ -33,26 +33,48 @@ def send_command(sock, command):
     return elapsed_ms(start)
 
 
-def query_volume(sock):
-    """Send MV? and read one TCP response."""
-    send_ms = send_command(sock, "MV?")
-
-    response = bytearray(128)
+def read_response(sock):
+    """Read available TCP data using known-working calls."""
+    response = bytearray(256)
     count = sock.recv_into(response)
 
     if count <= 0:
         raise OSError("Denon closed connection")
 
-    data = bytes(response[:count])
+    return bytes(response[:count])
 
-    print("MV? send:", send_ms, "ms")
-    print("MV? response:", repr(data))
 
-    return data
+def query_volume(sock, label):
+    """Query volume and print raw Denon status messages."""
+    print()
+    print(label)
+
+    send_command(sock, "MV?")
+    data = read_response(sock)
+
+    print("RX:", repr(data))
+
+    # TCP can contain multiple status messages.
+    # This is diagnostic, not a guaranteed synchronized
+    # response to the latest MV? query.
+    values = []
+
+    for message in data.split(b"\r"):
+        if (
+            message.startswith(b"MV")
+            and message[2:].isdigit()
+        ):
+            values.append(message[2:].decode("ascii"))
+
+    if values:
+        print("Volume reports:", values)
+    else:
+        print("No complete volume report in this read")
+
+    return values
 
 
 def repeat_commands(sock, command, count):
-    """Send repeated commands on one TCP connection."""
     print()
     print("REPEAT:", command, "x", count)
 
@@ -71,9 +93,7 @@ def repeat_commands(sock, command, count):
 
     total_ms = elapsed_ms(start)
 
-    print(
-        "TOTAL:", total_ms, "ms for", count, "commands"
-    )
+    print("TOTAL:", total_ms, "ms")
     print(
         "AVERAGE:",
         round(total_ms / count, 1),
@@ -119,9 +139,7 @@ def run():
 
         print("Connected in", elapsed_ms(start), "ms")
 
-        print()
-        print("STARTING VOLUME")
-        query_volume(sock)
+        query_volume(sock, "STARTING VOLUME")
 
         print()
         print("BEGINNING REPEAT TEST")
@@ -129,14 +147,12 @@ def run():
         repeat_commands(sock, "MVUP", REPEAT_COUNT)
 
         time.sleep(0.5)
+        query_volume(sock, "AFTER VOLUME UP")
 
         repeat_commands(sock, "MVDOWN", REPEAT_COUNT)
 
         time.sleep(0.5)
-
-        print()
-        print("FINAL VOLUME")
-        query_volume(sock)
+        query_volume(sock, "FINAL VOLUME")
 
         print()
         print("TEST COMPLETE")
