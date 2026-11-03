@@ -420,7 +420,7 @@ Configured endpoints and action mappings determine actual behavior.
 
 The browser editor is a client of the validated configuration engine, not an alternative source of truth.
 
-### 6.2 RAM snapshot, revision, and recovery
+### 6.2 RAM snapshot, revisions, adapter cache, and recovery
 
 Startup loads and validates the active file at:
 
@@ -432,9 +432,29 @@ The browser receives revision and filesystem-writability metadata.
 
 Saves validate the submitted schema and expected revision, protect against stale tabs, verify temporary writes, and manage backups.
 
+**Adapter selection is derived from the active validated configuration.**
+
+`device_adapters.py` recognizes supported fundamental-command signatures and builds an in-memory map keyed by `(room_id, action_id)`.
+
+Only specialized selections are stored. Missing entries use the generic HTTP adapter.
+
+The adapter cache:
+
+- Is rebuilt when a configuration is successfully loaded.
+- Is rebuilt after a successful changed configuration save.
+- Is not persisted to JSON.
+- Does not depend on room names or manufacturer labels.
+- Remains unchanged when a save is rejected.
+
+The cache is constructed before its replacement is published, avoiding partially rebuilt selections.
+
+The current specialized recognition is limited to fundamental Denon volume-up and volume-down commands using known HTTP command signatures.
+
+Custom-action steps continue to use generic HTTP.
+
 On a successful **changed** save, the management layer clears pending actions and resets volatile toggle histories.
 
-An unchanged save preserves both.
+An unchanged save preserves existing queue and toggle state.
 
 Backup rotation reduces risk but does not guarantee recovery from every interrupted write or power-loss scenario.
 
@@ -456,9 +476,11 @@ Missing ordinary endpoints or blank paths produce intentional logged no-ops.
 
 An unknown history begins with ON.
 
-History advances **only after successful HTTP execution**.
+History advances only after successful command transmission through the selected transport.
 
-Failures and no-ops do not advance it.
+For current power and mute toggles, this means successful HTTP execution.
+
+Failures and no-ops do not advance the history.
 
 A reboot resets the histories.
 
@@ -503,7 +525,7 @@ Tasks carry identifiers and scheduling metadata rather than copies of endpoint d
 
 A compound custom action occupies **one queue entry**, not one entry per step.
 
-### 8.2 Eligibility and ordering
+### 8.2 Eligibility, ordering, and pacing
 
 The poller scans for the **first eligible** task.
 
@@ -515,7 +537,19 @@ This is not strict FIFO across delayed work.
 
 Due times use `time.monotonic()`.
 
-> **A future task must not hold an immediate button press hostage.**
+For a recognized Denon TCP volume command, the queue checks adapter pacing eligibility before executing the command.
+
+If the adapter's minimum transmission interval has not elapsed, the eligible task remains in its original queue position and `actions.poll()` returns without executing another command.
+
+This prevents later eligible commands from overtaking a volume command that is waiting for its 50 ms pacing interval.
+
+A future-dated custom-action step remains different: it is not yet eligible, so an unrelated immediate command can execute while that step waits.
+
+Pacing does not use `time.sleep()` inside the action queue.
+
+The queue still executes at most one eligible command per poll.
+
+> **A future task must not hold an immediate button press hostage. A paced eligible task must not be overtaken.**
 
 ### 8.3 Compound custom actions
 
@@ -562,8 +596,6 @@ Network completion is not equipment-state verification.
 |---|---:|
 | Physical controls | 1 ms |
 | Action queue | 10 ms |
-| CONFIG management HTTP | 1 ms |
-| Main-loop yield | 1 ms |
 | CONFIG management HTTP | 1 ms |
 | Main-loop yield | 1 ms |
 
@@ -1026,13 +1058,18 @@ Keep dated experiments in [Development History](DEVELOPMENT_HISTORY.md) rather t
 | Chapter 5, October 28 | GPIO scheduler foundation and HTTP pacing correction |
 | Chapter 5, October 29 | GP17/GP18 mode switches and GP2 input events verified |
 | Chapter 5 closeout, October 31 | Three-position room selector standalone GPIO test passed |
-| Chapter 6, November 2 | Room selector integrated with application state |
-| Chapter 6, November 2 | Reusable physical action routing implemented |
-| Chapter 6, November 2 | Physical Power Toggle ON/OFF passed in Den and Sunroom; Room 3 no-op verified |
+| Chapter 6, November 2 | Physical room selection and shared action routing operational |
+| Chapter 6, November 2 | Power Toggle ON/OFF verified in Den and Sunroom; Room 3 no-op |
+| Chapter 6, November 3 | Bourns physical volume encoder operational |
+| Chapter 6, November 3 | Command-signature recognition and adapter caching implemented |
+| Chapter 6, November 3 | Persistent Denon TCP volume control and 50 ms pacing verified |
+| Chapter 6, November 3 | Mixed-transport queue regression tests passed |
 
-The November 2 milestone establishes the first fully operational physical hardware-to-equipment control path.
+The November 2 milestone established the first operational physical hardware-to-equipment control path.
 
-Future encoder integration will extend this path rather than creating another command system.
+November 3 extended that path to rotary volume control and introduced specialized device communication without changing the generic action vocabulary or adding another queue.
+
+The architectural result is a reusable foundation for additional physical controls and future device adapters.
 
 ---
 
