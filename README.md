@@ -419,68 +419,93 @@ The remaining buttons and rotary encoders can reuse the established architecture
 
 ## Project Status
 
-**November 2, 2026 — Chapter 6 underway. Extreme beta, but the Monster now has working physical room selection and a Power Toggle that controls real equipment.**
+**November 3, 2026 — Chapter 6: Physical volume control and device adapters operational.**
+
+Extreme beta, but the Monster now has working physical room selection, Power Toggle, and a rotary volume knob that controls real Denon receivers.
 
 ### Working and tested
 
+**Core firmware and configuration**
+
 - Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
 - Wi-Fi connectivity and browser management interface.
-- Clonker Config v4 JSON configuration loading, validation, and persistence.
-- Browser configuration editing and saving.
-- Revision checking, stale-edit rejection, no-change detection, and backup rotation.
-- Physical GP17 SERVICE/DEVICE switch controlling filesystem write ownership at boot.
-- Physical GP18 CONFIG/RUN switch controlling the management listener without rebooting.
-- Browser Test Remote with fourteen fundamental actions and custom-action execution.
-- Shared Dumb Queue™ with bounded capacity and cooperative scheduling.
-- Outbound HTTP GET/POST transport using bounded blocking socket operations.
-- Real Denon AVR and Roku control, including a successful five-command burst.
-- Runtime mute and power toggle direction selection, including independent room histories.
-- Failed-request direction preservation and unconfigured-action no-op behavior.
-- Multi-step Sunroom Movie custom action: Roku Home, three-second wait, then Denon Quick Select 1.
-- Independent Volume Up command executing during the custom action's cooperative wait.
-- Physical GPIO subsystem initialization and cooperative polling.
-- GP2 momentary button with debounced press/release event reporting.
-- Three-position physical room selector integrated with firmware.
-- Room selection for Den, Sunroom, and reserved Room 3.
-- Safe no-op for physical actions when Room 3 is not configured.
-- GP2 Power Toggle dispatched through the shared action queue.
-- Actual Power ON and OFF verified in Den.
-- Actual Power ON and OFF verified in Sunroom.
-- Independent physical power-toggle histories for both rooms.
-- Improved browser responsiveness following the 1 ms management HTTP polling adjustment, tested in Chrome and Safari.
+- Clonker Config v4 JSON configuration, validation, persistence, and recovery.
+- Revision checking, stale-edit rejection, no-change detection, and rotating backups.
+- Browser Test Remote supporting fourteen fundamental actions and custom actions.
+- Shared Dumb Queue™ with cooperative scheduling, delayed tasks, and failure cancellation.
+- Independent runtime power/mute toggle command histories.
+- Blank fundamental commands treated as intentional no-ops.
+
+**Physical controls**
+
+- GP17 SERVICE/DEVICE switch for filesystem ownership.
+- GP18 CONFIG/RUN switch for application management mode.
+- Three-position physical room selector for Den, Sunroom, and reserved Room 3.
+- Safe no-op when the selected room is not configured.
+- GP2 momentary Power Toggle, verified against actual equipment in both rooms.
+- Bourns PEC11R rotary encoder integrated as the physical volume control.
+- Physical encoder events routed through the same action dispatcher as the browser Test Remote.
+- Slow, moderate, and aggressive encoder rotation exercised successfully against the Sunroom Denon.
+
+**Networking and device adapters**
+
+- Existing bounded HTTP GET/POST transport for Roku and other configured commands.
+- Device-adapter selection derived from recognized fundamental-command patterns.
+- Cached adapter selections rebuilt during successful configuration loading and saving.
+- Generic HTTP fallback for commands without a specialized adapter.
+- Persistent Denon TCP transport for recognized volume-up and volume-down commands.
+- Cooperative, nonblocking 50 ms minimum interval between Denon TCP volume transmissions.
+- TCP connection reuse and switching between the two configured Denon receivers.
+- No automatic retry of commands whose transmission outcome is uncertain.
+
+**Verified integration and regression behavior**
+
+- Five volume-up and five volume-down commands executed through the Dumb Queue™ and Denon TCP, returning the receiver to its starting volume.
+- Physical encoder tested with five slow detents in each direction.
+- Moderate and aggressive encoder rotation produced responsive, smooth volume changes.
+- Mixed HTTP/TCP command ordering preserved.
+- Denon pacing holds an eligible command without allowing later commands to overtake it.
+- Future-dated commands do not prevent unrelated immediate commands from executing.
+- Delayed custom-action steps allow other eligible commands to run during their wait.
+- Execution failures discard pending queue work.
+- Successful configuration saves update the adapter cache; rejected stale saves leave it unchanged.
+- Production configuration restoration and disposable-test cleanup verified.
 
 ### Not yet implemented or fully tested
 
-- Rotary encoder drivers and application integration.
-- Physical volume control and push-to-mute.
-- Physical custom-action selection and execution.
-- Navigation buttons and Home/Back buttons.
-- Playback buttons.
+- Physical volume-encoder push-to-mute.
+- Second encoder for custom-action selection and execution.
+- Navigation, Home/Back, and playback buttons.
 - OLED display and audible feedback.
-- Final enclosure and rechargeable power architecture.
-- Deep-sleep ignition behavior.
-- Apple TV protocol support and other future device adapters.
-- Comprehensive network failure, malformed-response, and prolonged-outage recovery tests.
-- Sustained high-rate command workloads and long-uptime stability.
-- Additional configuration failure-injection tests.
-- Custom-action selection persistence with multiple actions in one room.
-- Reliable high-rate encoder capture during blocking HTTP.
+- Final enclosure, aluminum faceplate, and rechargeable power architecture.
+- Deep-sleep ignition and wake behavior.
+- Apple TV pairing, authentication, and control.
+- Additional device adapters and configurable adapter overrides.
+- Denon TCP response parsing and unsolicited-status handling.
+- Comprehensive network-disconnect and receiver-restart recovery tests.
+- Long-duration stability and sustained high-rate workloads.
 
-The queue can accept multiple commands and execute eligible work in order.
+### Engineering decisions
 
-Outbound network operations temporarily block the cooperative loop. Physical input responsiveness during those operations has not yet been fully characterized.
+The working Bourns encoder is the current volume-control choice. The previously considered Grayhill encoder is reserved for another project.
 
-The earlier XML configuration implementation remains in the repository as historical and rollback reference.
+No volume batching or software acceleration is currently required. The physical knob already provides smooth, responsive control using ordinary encoder events and paced TCP commands.
 
-**Next milestone: Integrate the two Bourns rotary encoders, beginning with reliable movement detection and volume control.**
+The Dumb Queue™ remains intentionally simple. Device-specific protocol details belong in adapters, not in the generic action scheduler.
+
+Custom actions continue to use the existing HTTP transport. The current Denon TCP specialization applies only to recognized fundamental volume commands.
+
+### Next milestone
+
+Complete the remaining physical controls, document the new adapter architecture, and investigate reliability under network failures and prolonged operation.
 
 The software talks to the equipment.
 
 The switches talk to the software.
 
-And now, finally, **the switches talk to the equipment.**
+**And now the volume knob talks to the Denon—without making us wait for HTTP on every click.**
 
-The knobs are next.
+Less sleek. More CLONK.
 
 ---
 
