@@ -34,7 +34,7 @@ MAX_HEADER_BYTES = 2048
 IO_CHUNK_BYTES = 512
 
 # Abandon silent browser connections quickly.
-IDLE_CLIENT_TIMEOUT_SECONDS = 0.5
+IDLE_CLIENT_TIMEOUT_SECONDS = 0.2
 
 # Allow active requests and responses more time.
 CLIENT_TIMEOUT_SECONDS = 4.0
