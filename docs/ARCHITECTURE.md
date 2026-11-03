@@ -509,14 +509,17 @@ Network completion is not equipment-state verification.
 
 ---
 
-## 9. Cooperative scheduler and HTTP
+
+## 9. Cooperative scheduler and network execution
 
 `main.py` currently uses:
 
 | Service | Poll interval |
 |---|---:|
-| Physical controls | 10 ms |
+| Physical controls | 1 ms |
 | Action queue | 10 ms |
+| CONFIG management HTTP | 1 ms |
+| Main-loop yield | 1 ms |
 | CONFIG management HTTP | 1 ms |
 | Main-loop yield | 1 ms |
 
@@ -556,31 +559,43 @@ The room selector and buttons currently share the same physical polling schedule
 
 This is sufficient for the tested controls.
 
-### 9.2 Encoder polling considerations
+### 9.2 Encoder polling and volume-command pacing
 
-The two planned Bourns rotary encoders may generate electrical transitions substantially faster than the room selector or ordinary buttons.
+The current firmware uses a **1 ms target physical polling interval**.
 
-A maintained room selector only needs its final stable position.
+This is a cooperative scheduling target, not a hardware interrupt or hard real-time guarantee.
 
-An encoder must capture a sequence of quadrature transitions to determine direction and movement.
+The physical volume encoder produces quadrature transitions. The physical coordinator interprets those transitions and dispatches one generic volume action for each recognized movement.
 
-The existing 10 ms physical polling interval may not be adequate for rapid rotation.
+Network execution occurs separately through the Dumb Queue™.
 
-Additionally, outbound HTTP requests can block the cooperative scheduler long enough to miss transitions.
+The earlier HTTP-only volume path required a new connection for each command. Those blocking requests interfered with timely encoder polling and made volume control feel sluggish.
 
-Possible future approaches include:
+Chapter 6 introduced a specialized Denon TCP adapter for recognized fundamental volume commands.
 
-- Faster encoder polling.
-- Separate fast and slow physical polling schedules.
-- Hardware-assisted quadrature decoding where supported.
-- Accumulation or coalescing of volume movement events.
-- A lightweight encoder event buffer independent of network execution.
+The adapter:
 
-These are engineering options, **not implemented features**.
+- Maintains one persistent receiver connection.
+- Reuses the connection for consecutive commands to the same receiver.
+- Closes the previous connection when switching receivers.
+- Translates recognized Denon HTTP volume command signatures into native `MVUP` and `MVDOWN` commands.
+- Enforces a 50 ms minimum interval between transmissions.
+- Reports pacing eligibility without sleeping inside the queue.
+- Does not retry commands automatically after uncertain transmission failures.
 
-The appropriate solution should be selected after bench testing the actual Bourns encoders under realistic HTTP traffic.
+When the first eligible queue command is a Denon volume command awaiting its pacing interval, `actions.poll()` leaves it queued and returns.
 
-Avoid introducing unnecessary scheduling complexity before measurements justify it.
+Later commands cannot overtake that eligible command.
+
+Future-dated tasks remain independently scheduled and do not block otherwise eligible immediate work.
+
+TCP connection establishment and socket writes are still synchronous operations. Persistent connection reuse reduces repeated connection overhead; it does not make the entire networking system asynchronous.
+
+The physical encoder was exercised at slow, moderate, and aggressive rotation rates. Observed receiver behavior was responsive and smooth.
+
+No encoder-event batching, artificial acceleration, or separate high-speed command queue is currently implemented or required.
+
+Further testing should address prolonged operation, receiver restarts, network disconnections, and recovery after a stale TCP connection.
 
 ### 9.3 Inbound versus outbound network behavior
 
@@ -810,26 +825,42 @@ The November 2 tests verified:
 
 The hardware-to-equipment command path is operational.
 
-### 11.7 Planned Bourns encoders
+### 11.7 Rotary encoders — Chapter 6
 
-The current design uses **two Bourns PEC11R-4215F-S0024 rotary encoders**.
+The physical volume encoder is operational.
 
-The earlier Grayhill volume-encoder plan has been superseded.
+The current design uses Bourns PEC11R-4215F-S0024 rotary encoders. The earlier Grayhill volume-encoder plan has been superseded; that component is reserved for another project.
 
-| Encoder | Rotation behavior | Pushbutton behavior |
-|---|---|---|
-| Volume | Volume Up / Down | Mute Toggle |
-| Custom Action | Cycle available custom actions | Execute selected custom action |
+| Encoder | Rotation behavior | Pushbutton behavior | Status |
+|---|---|---|---|
+| Volume | Volume Up / Down | Mute Toggle | Rotation operational; push pending |
+| Custom Action | Cycle available custom actions | Execute selected action | Planned integration |
 
-A future `controls/encoders.py` module should provide a reusable encoder class.
+The volume encoder uses GP8 and GP9 for quadrature inputs.
 
-The class should report hardware movement and direction without knowing the application action.
+`controls/physical.py` polls the encoder and translates completed movements into generic `volume-up` and `volume-down` actions.
 
-The encoder pushbuttons can reuse the existing `Button` class.
+Those actions use the selected room and enter the same dispatcher and Dumb Queue™ as the browser Test Remote.
 
-The custom-action encoder will require separate application selection state.
+The encoder does not know the Denon protocol, receiver IP address, or network command syntax.
 
-Encoder polling and missed-transition behavior remain to be tested.
+For recognized Denon fundamental volume commands, the execution layer selects the Denon TCP adapter. That adapter reuses a persistent receiver connection and enforces a minimum 50 ms interval between transmitted commands.
+
+Physical testing confirmed:
+
+- Five slow detents in each direction.
+- Moderate rotation in both directions.
+- Aggressive rotation with pauses and direction reversals.
+- Smooth receiver volume changes and responsive LG volume-bar movement.
+- Successful return to the starting receiver volume in controlled tests.
+
+The LG volume overlay can take a moment to appear initially. Once displayed, its movement was observed to follow the encoder smoothly.
+
+These results support retaining the Bourns encoder without adding software acceleration or command batching.
+
+The encoder pushbutton remains to be integrated using the existing momentary-button infrastructure.
+
+The second encoder will require custom-action selection state and push-to-run behavior. It should reuse the established physical-event and action-dispatch architecture rather than creating a separate command execution path.
 
 ### 11.8 Mechanical and feedback scope
 
