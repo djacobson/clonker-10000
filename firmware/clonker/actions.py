@@ -1,20 +1,24 @@
-
 # The Clonker 10000
 # clonker/actions.py -- The Dumb Queue
 #
-# Chapter 4, Phase 3B -- Compound custom actions
+# Chapter 6 -- Device adapter integration
 #
 # Clonker Designed by David Jacobson
 
 """Shared action dispatcher and cooperative task queue.
 
-One poll executes at most one eligible HTTP command.
+One poll executes at most one eligible command.
 Future-dated tasks never prevent immediate tasks from running.
 
 Fundamental actions remain single-command tasks.
 Custom actions execute ordered steps using one queue entry.
 
 Commands resolve against CURRENT configuration at execution time.
+Adapter selections are cached when configuration becomes active.
+
+Denon volume commands use persistent TCP with nonblocking pacing.
+All other commands continue using generic HTTP.
+
 Configuration saves clear pending work through the web service.
 
 An execution failure discards all remaining tasks.
@@ -27,6 +31,8 @@ import time
 
 from clonker.system import logger
 from clonker.net import http_transport
+from clonker.devices import denon
+from clonker import device_adapters
 from clonker import device_config_v2 as device_config
 
 
@@ -136,7 +142,7 @@ def dispatch(room_id, action_id, delay_seconds=0):
 
 
 def poll():
-    """Execute at most one eligible HTTP command."""
+    """Execute at most one eligible command."""
     global _last_result, _last_error
 
     if not _queue:
@@ -153,7 +159,10 @@ def poll():
     if selected is None:
         return False
 
-    task = _queue.pop(selected)
+    # Leave the selected task queued until we know whether
+    # its command can execute. This prevents pacing delays
+    # from allowing later commands to overtake it.
+    task = _queue[selected]
 
     room_id = task["room"]
     action_id = task["action"]
@@ -188,6 +197,9 @@ def poll():
                     "Custom destination is unconfigured"
                 )
 
+            # Custom actions always use generic HTTP.
+            adapter = device_adapters.GENERIC_HTTP
+
         else:
             room, action = device_config.action_details(
                 room_id, action_id
@@ -200,7 +212,7 @@ def poll():
                 room, target
             )
 
-            # Toggle direction tracking
+            # Toggle direction tracking.
             if action_id in ("mute-toggle", "power-toggle"):
                 toggle_key = (room_id, action_id)
                 toggle_direction = _toggle_next.get(
@@ -215,6 +227,8 @@ def poll():
 
             # Fundamental actions retain blank-command no-ops.
             if not endpoint or not path:
+                _queue.pop(selected)
+
                 message = "NO-OP: {} / {} (unconfigured)".format(
                     room["name"], action_id
                 )
@@ -224,25 +238,81 @@ def poll():
                 _last_error = None
                 return True
 
+            adapter = device_adapters.lookup(
+                room_id, action_id
+            )
+
+        # A Denon volume command may be waiting for the
+        # minimum interval since the previous TCP send.
+        #
+        # Do not remove it from the queue or execute later
+        # commands while this eligible task is waiting.
+        if (
+            adapter == device_adapters.DENON_TCP
+            and not denon.ready()
+        ):
+            return False
+
         logger.info(
-            "EXECUTING: {} / {} -> {} {} {}".format(
-                room["name"], action_id, target, method, path
+            "EXECUTING: {} / {} -> {} {} {} [{}]".format(
+                room["name"],
+                action_id,
+                target,
+                method,
+                path,
+                adapter,
             )
         )
 
-        # One bounded blocking HTTP request.
-        result = http_transport.send(
-            endpoint, method, path
-        )
+        if adapter == device_adapters.DENON_TCP:
+            native_command = device_adapters.denon_command(
+                path
+            )
 
-        message = (
-            "EXECUTED: {} / {} -> HTTP {} ({} ms)"
-        ).format(
-            room["name"],
-            action_id,
-            result["status"],
-            result["total_ms"],
-        )
+            start = time.monotonic()
+
+            accepted = denon.send_volume(
+                endpoint, native_command
+            )
+
+            # Defensive check: if pacing becomes ineligible,
+            # preserve the command and its queue position.
+            if not accepted:
+                return False
+
+            total_ms = round(
+                (time.monotonic() - start) * 1000, 1
+            )
+
+            message = (
+                "EXECUTED: {} / {} -> DENON TCP "
+                "{} ({} ms)"
+            ).format(
+                room["name"],
+                action_id,
+                native_command,
+                total_ms,
+            )
+
+        else:
+            # Existing bounded blocking HTTP transport.
+            result = http_transport.send(
+                endpoint, method, path
+            )
+
+            message = (
+                "EXECUTED: {} / {} -> HTTP {} ({} ms)"
+            ).format(
+                room["name"],
+                action_id,
+                result["status"],
+                result["total_ms"],
+            )
+
+        # Command transmission completed successfully.
+        # TCP success means bytes were sent, not that the
+        # receiver explicitly acknowledged execution.
+        _queue.pop(selected)
 
         logger.info(message)
         _last_result = message
@@ -254,11 +324,13 @@ def poll():
             _toggle_next[toggle_key] = (
                 "off" if toggle_direction == "on" else "on"
             )
+
             logger.info(
                 "TOGGLE: {} / {} completed {}; next {}".format(
-                    room["name"], action_id,
+                    room["name"],
+                    action_id,
                     toggle_direction.upper(),
-                    _toggle_next[toggle_key].upper()
+                    _toggle_next[toggle_key].upper(),
                 )
             )
 
@@ -266,7 +338,7 @@ def poll():
             next_index = task["step"] + 1
 
             if next_index < len(steps):
-                # Start the wait AFTER the HTTP request completes.
+                # Start the wait AFTER the command completes.
                 wait_seconds = (
                     command["wait_after_ms"] / 1000.0
                 )
@@ -301,6 +373,12 @@ def poll():
         return True
 
     except Exception as error:
+        # The selected task remains in the queue until
+        # successful completion. Remove it before counting
+        # and discarding the remaining pending tasks.
+        if selected < len(_queue) and _queue[selected] is task:
+            _queue.pop(selected)
+
         discarded = len(_queue)
         _queue.clear()
 
