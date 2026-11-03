@@ -24,7 +24,7 @@ The operational command path is:
 4. Validate and admit the action to the shared Dumb Queue™.
 5. Execute eligible work using the active configuration.
 6. Send the appropriate network command.
-7. Record the result without confusing HTTP success with actual equipment state.
+7. Record the transmission result without confusing network success with actual equipment state.
 
 **Be resilient in our dumbness.** Favor predictable, recoverable, measurable behavior over unnecessary abstraction.
 
@@ -623,17 +623,18 @@ Within that call:
 2. A changed room selection is logged.
 3. Each initialized button is polled.
 4. Stable press/release events are logged.
-5. Mapped press events are routed through `dispatch_selected()`.
+5. Mapped button presses are dispatched.
+6. The volume encoder is polled and completed movements are dispatched as generic volume actions.
 
 The selector uses a **50 ms software debounce**.
 
 Buttons use their reusable `Button` class debounce, currently 30 ms by default.
 
-Debouncing does not require blocking sleeps.
+The encoder driver interprets quadrature transitions and reports completed movement.
 
-The room selector and buttons currently share the same physical polling schedule.
+These controls share the physical polling schedule, currently targeting 1 ms.
 
-This is sufficient for the tested controls.
+Debouncing and encoder interpretation do not require blocking sleeps.
 
 ### 9.2 Encoder polling and volume-command pacing
 
@@ -870,7 +871,7 @@ It:
 4. Calls `actions.dispatch(room_id, action_id)` for configured rooms.
 5. Logs dispatch exceptions without terminating the physical poller.
 
-This helper is intended for ordinary buttons and future encoder-generated actions.
+This helper is shared by ordinary buttons and the operational volume encoder, and is intended for additional physical controls.
 
 The physical event mapping lives in `physical.py`, not `actions.py`.
 
@@ -1001,7 +1002,7 @@ Apple TV compatibility is an explicit objective, **not an implemented feature**.
 
 Discovery, pairing, authentication, session management, and a protocol-specific adapter may be required.
 
-The present stateless Denon/Roku HTTP transport should not be assumed suitable.
+The existing generic HTTP transport and specialized Denon TCP volume adapter do not provide Apple TV pairing or authenticated session management.
 
 Keep generic intentions such as Home, Back, navigation, and Play/Pause independent of equipment brands.
 
