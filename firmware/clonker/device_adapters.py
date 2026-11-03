@@ -21,6 +21,12 @@ becomes active. No adapter information is persisted to JSON.
 This module performs no network I/O or command execution.
 """
 
+import time
+
+from clonker.net import http_transport
+from clonker.devices import denon
+from clonker.devices import roku
+
 ROKU_HOLD = "roku-hold"
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
@@ -131,3 +137,75 @@ def snapshot():
     """Return a copy of the adapter map for diagnostics."""
 
     return dict(_adapter_map)
+
+def ready(adapter):
+    """Can this adapter accept its next queued command?"""
+    if adapter == DENON_TCP:
+        return denon.ready()
+
+    return True
+
+
+def execute(adapter, endpoint, method, path):
+    """Execute one command through the selected adapter.
+
+    Returns:
+        accepted: False means leave the command queued.
+        detail: Transport-specific diagnostic text.
+        total_ms: Time spent executing this command.
+
+    Raises on execution failure.
+    """
+    start = time.monotonic()
+
+    if adapter == DENON_TCP:
+        command = denon_command(path)
+        accepted = denon.send_volume(endpoint, command)
+
+        detail = "DENON TCP {}".format(command)
+
+    elif adapter == ROKU_HOLD:
+        direction = ROKU_VOLUME_COMMANDS.get(path)
+
+        if direction is None:
+            raise ValueError("Unsupported Roku volume command")
+
+        started = roku.volume(endpoint, direction)
+        accepted = True
+
+        detail = "ROKU HOLD {} ({})".format(
+            direction,
+            "keydown" if started else "extended",
+        )
+
+    elif adapter == GENERIC_HTTP:
+        result = http_transport.send(
+            endpoint, method, path
+        )
+        accepted = True
+
+        detail = "HTTP {}".format(result["status"])
+
+    else:
+        raise ValueError("Unknown device adapter")
+
+    return {
+        "accepted": accepted,
+        "detail": detail,
+        "total_ms": round(
+            (time.monotonic() - start) * 1000, 1
+        ),
+    }
+
+
+def poll():
+    """Advance adapters requiring background maintenance."""
+    return roku.poll()
+
+
+def close():
+    """Release adapter resources during shutdown."""
+    try:
+        roku.close()
+    finally:
+        denon.close()
