@@ -2319,6 +2319,58 @@ This was a small hardware change made early enough to avoid more disruptive rewi
 
 ---
 
+# Milestone 17 — The Volume Knob Finds Its Voice
+
+**Date:** November 3, 2026  
+**Chapter:** 6 — Physical controls  
+**Status:** PASS — physical volume encoder and real Denon volume control exercised
+
+### Goal
+
+Integrate the first rotary encoder into the production physical-control scheduler and verify that turning a physical knob produces room-aware volume commands on real equipment, without creating a second command execution system.
+
+### Implementation
+
+The volume control uses a **Bourns PEC11R-4215F-S0024** quadrature encoder, replacing the earlier Grayhill volume-encoder plan. Its A/B signals are assigned to **GP8/GP9** in `firmware/clonker/controls/pins.py`.
+
+The encoder is initialized and polled through the existing `clonker/controls/physical.py` integration. Its decoded movement is translated into the configured `volume-up` and `volume-down` fundamental actions for the room selected by the physical three-position selector. The path continues through the existing action dispatcher and shared **Dumb Queue™**, rather than bypassing application action handling.
+
+The existing room selector remains on **GP3/GP6/GP7**, with GP4/GP5 reserved for the Cowbell STEMMA QT/I²C connection. GP2 remains the room-aware momentary Power Toggle. The third selector position remains reserved for an unconfigured room and must not silently fall back to Den or Sunroom.
+
+### Denon transport improvement
+
+Repeated HTTP volume requests exposed a practical performance limitation for rotary control. A dedicated Denon adapter now recognizes configured fundamental volume actions using the standard Denon HTTP volume command signatures and sends the corresponding **`MVUP`** / **`MVDOWN`** commands over a persistent **TCP connection on port 23**.
+
+The adapter enforces a **50 ms minimum command interval**. It is selected through the existing device-adapter resolution mechanism; other commands continue to use the established bounded HTTP GET/POST transport. The queue remains the single command-execution path, even when its work is delivered over different transports.
+
+This is **not** a general replacement of Denon HTTP commands with TCP, nor a new standalone volume queue. See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for current transport selection, scheduling, and failure semantics.
+
+### Verification
+
+The Bourns encoder was bench-tested, integrated, and then exercised against the **Sunroom Denon AVR-X1800H**. Physical rotation produced actual receiver volume changes through the shared action pipeline and Denon TCP adapter.
+
+**Result: PASS — working physical volume knob on real equipment.**
+
+The earlier Chapter 6 Power Toggle and room-selection tests remain valid: both configured rooms responded to physical Power ON/OFF commands, and the unconfigured third room remained a safe no-op.
+
+These results establish an operational physical volume-control path, **not** an exhaustive stress test of rapid quadrature movement, missed edges, network failures, or long-duration operation. A 1 ms cooperative physical poll target is not a guaranteed worst-case input latency; blocking network operations can still delay polling.
+
+### Remaining boundaries
+
+- Test rapid and sustained encoder rotation, including direction reversals, under representative network load.
+- Integrate the second Bourns encoder for custom-action selection and press-to-run behavior.
+- Integrate remaining navigation, Back, Home, and encoder push-button controls.
+- Complete enclosure wiring, strain relief, OLED feedback, audio, and power-management experiments.
+- Preserve the distinction between the **GP2 equipment Power Toggle** and any future guarded system ignition/sleep control.
+
+### Engineering conclusion
+
+The Clonker now has two independently useful physical capabilities: it can select a room and toggle its equipment power, and it can turn a real receiver's volume up or down with a real knob. Both use the same application-level action machinery as the browser Test Remote.
+
+**One knob. One queue. Two transports. Still one Monster.**
+
+---
+
 **THE CLONKER 10000**
 
 *Less sleek. More CLONK.*
