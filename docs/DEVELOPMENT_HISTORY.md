@@ -61,6 +61,9 @@ The original test record and its revisions remain recoverable through Git histor
 | Oct 31, 2026 | 14. Chapter 5 room selector verification and closeout | Three-position rotary selector mapped, wired to GP3/GP4/GP5, and standalone GPIO-tested; Chapter 6 integration pending |
 | Nov 2, 2026 | 15. Chapter 6 physical room selection and Power Toggle | Integrated GP3/GP4/GP5 room selection, safe Room 3 no-op, and GP2 Power ON/OFF verified on actual equipment in Den and Sunroom |
 | Nov 2, 2026 | 16. Room selector GPIO reassignment | Moved selector from GP3/GP4/GP5 to GP3/GP6/GP7; all three positions retested successfully; GP4/GP5 reserved for STEMMA QT/I²C |
+| Nov 3, 2026 | 17. The Volume Knob Finds Its Voice | Bourns encoder on GP8/GP9 integrated; real Sunroom Denon volume changes verified using persistent TCP and the shared Dumb Queue™ |
+
+**Additional Chapter 4 development records:** Generic-device refactor and the Great Room 3 Eviction are preserved in their original chronological positions between Milestones 8 and 9.
 
 Dates are based on the original test records and Chapter 2 handoff. Changes without individually recorded timestamps are grouped into a period rather than assigned an invented date.
 
@@ -1248,7 +1251,7 @@ instructions.
 
 ---
 
-# Milestone 9 — The Clonker Learns to Forget What a TV Is
+# Chapter 4 Development Record — The Clonker Learns to Forget What a TV Is
 
 **Date:** October 22, 2026  
 **Status:** PASS — Chapter 4, Phase 1 complete
@@ -1368,7 +1371,7 @@ The Dumb Queue remains blissfully indifferent.
 
 ---
 
-# Milestone 10 — The Great Room 3 Eviction
+# Chapter 4 Development Record — The Great Room 3 Eviction
 
 **Date:** October 22, 2026  
 **Status:** PASS — Chapter 4, Phase 2 complete
@@ -1530,7 +1533,7 @@ This journal preserves the engineering reasoning and test evidence that commit m
 
 ---
 
-# Where the Story Stands
+# Historical Snapshot — Where the Story Stood on October 22, 2026
 
 **As of October 22, 2026 — Chapter 4, Phase 2 Complete**
 
