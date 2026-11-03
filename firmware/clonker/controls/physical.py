@@ -214,7 +214,8 @@ def poll():
 
         if step:
             action_id = (
-                "vol-up" if step > 0 else "vol-down"
+                "volume-up" if step > 0 else "volume-down"
             )
+
             dispatch_selected(action_id)
 
