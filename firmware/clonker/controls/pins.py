@@ -23,8 +23,8 @@ ROOM_SELECTOR_B_PIN = 6  # GP6 -- green, Sunroom
 ROOM_SELECTOR_C_PIN = 7  # GP7 -- blue, reserved Room 3
 
 # Volume encoder (press for mute)
-VOLUME_ENCODER_A_PIN = None
-VOLUME_ENCODER_B_PIN = None
+VOLUME_ENCODER_A_PIN = 8  # GP8 -- yellow
+VOLUME_ENCODER_B_PIN = 9  # GP9 -- green
 VOLUME_ENCODER_BUTTON_PIN = None
 
 # Custom-action selector (press to run)
