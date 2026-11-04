@@ -3,7 +3,7 @@
 
 **Design reference:** November 3, 2026  
 **Controller:** Raspberry Pi Pico 2 W (RP2350), CircuitPython 10.3.1  
-**Baseline:** Chapter 6 — physical room selection, Power Toggle, and Bourns volume encoder operational  
+**Baseline:** Chapter 6 complete — physical room selection, Power Toggle, Bourns volume encoder, and GP10 push-to-mute operational in both rooms
 **Source of GPIO truth:** [`firmware/clonker/controls/pins.py`](../firmware/clonker/controls/pins.py)
 
 > A gloriously overengineered, tactile Wi-Fi home-theater remote. Real knobs, real buttons, questionable restraint, and absolutely no desire to become another touchscreen.
@@ -96,7 +96,7 @@ The current project uses WAGO lever connectors for common ground distribution, s
 | Volume encoder B (green) | GP9 | Operational |
 | SERVICE (USB) / DEVICE boot switch | GP17 | Operational; handled by `boot.py` |
 | CONFIG / RUN guarded switch | GP18 | Operational |
-| Volume encoder push / Mute | `None` | Not assigned |
+| Volume encoder push / Mute | GP10 | Operational; Den and Sunroom tested |
 | Custom-action encoder A/B/push | `None` | Not assigned |
 | Navigation, Home, Back | `None` | Not assigned |
 | OLED I²C | GP4/GP5 reserved for STEMMA QT | Not integrated |
@@ -164,7 +164,7 @@ Both principal rotary controls use the **Bourns PEC11R-4215F-S0024** mechanical 
 
 | Control | Rotation | Shaft press | Current status |
 |---|---|---|---|
-| Volume | `volume-up` / `volume-down` | `mute-toggle` | Rotation operational; press pending |
+| Volume | `volume-up` / `volume-down` | `mute-toggle` | Rotation GP8/9 and push-to-mute GP10 operational in both rooms |
 | Custom Actions | Cycle room's named actions | Execute selected action | Bench component work done; application integration pending |
 
 Neither encoder is an absolute-position knob. Shaft angle does not represent a stored volume level or action index.
@@ -178,17 +178,32 @@ The volume encoder is integrated into the running Pico firmware:
 3. A completed movement returns `+1` or `-1` to `physical.py`.
 4. `physical.py` maps the direction to a generic `volume-up` or `volume-down` action.
 5. `dispatch_selected()` applies the current physical room and admits work to the Dumb Queue™.
-6. Recognized Denon fundamental volume commands use the specialized persistent TCP adapter; other mappings retain generic HTTP behavior.
+6. `device_adapters.py` selects the transport from the configured fundamental-action signature: Denon TCP, Roku ECP held-volume, or generic HTTP.
 
-The reusable `Encoder` class supports direction reversal and configurable `steps_per_detent` (1, 2, or 4; current default 4). It does not know the selected room, receiver model, or network syntax. Its pushbutton is a separate momentary input, intended to reuse `Button` when wired.
+The reusable `Encoder` class supports direction reversal and configurable `steps_per_detent` (1, 2, or 4; current default 4). It does not know the selected room, receiver model, or network syntax.
 
-**Observed equipment verification:** Slow five-click UP/DOWN tests returned to the starting Denon volume; moderate ten-click tests and aggressive twisting were also exercised. Receiver behavior was smooth and responsive. These are practical tests, not proof that no transitions can ever be lost under every network condition.
+The encoder's independent momentary pushbutton is connected between **GP10 and GND**. The existing `Button` driver detects its press, and `physical.py` dispatches the `mute-toggle` fundamental action.
+
+**Observed equipment verification:**
+
+- **Den:** Persistent Denon TCP volume control; slow, moderate, and aggressive rotation exercised.
+- **Sunroom:** Roku ECP held-volume control; single detents, fast twists, direction reversals, and sustained rotation exercised.
+- **Both rooms:** Physical encoder push-to-mute and push-to-unmute confirmed on real receivers.
+- **RUN mode:** Fast and sustained Roku volume testing passed with the configuration listener disabled.
+
+These are practical tests, not proof that no encoder transitions can ever be lost under every network condition.
 
 ### 5.3 Why volume is responsive now
 
-The cooperative physical polling target is **1 ms**, not the former 10 ms. Earlier one-request-per-connection HTTP volume control imposed noticeable blocking overhead. The Chapter 6 Denon TCP adapter now reuses a connection and spaces native `MVUP`/`MVDOWN` commands by at least **50 ms**, without sleeping inside the queue.
+The cooperative physical polling target is **1 ms**, not the former 10 ms.
 
-This does **not** make the firmware asynchronous. Socket connection establishment and writes can still block physical sampling. The queue preserves eligible ordering and allows future-dated custom-action waits to coexist with immediate work. No encoder batching, artificial acceleration, or second high-speed volume queue is currently implemented.
+The Denon TCP adapter reuses a connection and spaces native `MVUP`/`MVDOWN` commands by at least **50 ms**, without sleeping inside the queue.
+
+The Roku held-volume adapter starts a key hold on the first detent and extends it locally on additional same-direction detents. An idle timeout releases the key, while direction reversal releases the previous direction before starting the opposite one.
+
+This reduces repeated HTTP traffic during rapid rotation. The observed Sunroom receiver response was smooth, with slight display lag and very small overshoot.
+
+The firmware remains cooperative rather than asynchronous. Network operations can still block physical sampling. No second volume queue or separate encoder execution pipeline is implemented.
 
 See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for exact transport and scheduling behavior.
 
@@ -210,7 +225,7 @@ The intended faceplate includes dedicated **Back** and **Home** controls, a five
 
 `controls/buttons.py` provides a reusable active-low, internal-pull-up, nonblocking momentary driver. Its default debounce is **30 ms**. Stable `pressed` events dispatch; `released` events are diagnostic. `physical.py` maps button names to generic action IDs, so a future GPIO reassignment does not require changing device protocols.
 
-Current firmware maps names such as `POWER_TOGGLE`, `HOME`, `BACK`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `SELECT`, and `VOLUME_MUTE`. **Only assigned pins are initialized.** The physical navigation, Home, Back, playback, and volume-mute pushbutton functions remain unintegrated.
+Current firmware maps names such as `POWER_TOGGLE`, `HOME`, `BACK`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `SELECT`, and `VOLUME_MUTE`. **Only assigned pins are initialized.** The Power Toggle and volume-encoder push-to-mute are operational. Physical navigation, Home, Back, and playback controls remain unintegrated.
 
 The generic action vocabulary is defined by Config v4; do not confuse a physical button label with a manufacturer-specific command. The browser Test Remote already exercises the same action IDs independently of physical GPIO.
 
@@ -312,7 +327,7 @@ This is a **design and purchase-history register**, not a verified warehouse inv
 | CONFIG/RUN switch | Guarded maintained toggle | GP18 app mode | Verified |
 | Power Toggle button | Momentary switch | GP2 physical action | Operational |
 | Room selector | Three-position rotary | Room context | Operational GP3/6/7 |
-| Volume encoder | Bourns PEC11R-4215F-S0024 | Volume / future mute | Rotation operational GP8/9 |
+| Volume encoder | Bourns PEC11R-4215F-S0024 | Volume / push-to-mute | Rotation GP8/9 and mute GP10 operational |
 | Action encoder | Bourns PEC11R-4215F-S0024 | Select / run custom action | Bench work; integration pending |
 | Former encoder | Grayhill 62A22-02-040C | Former volume candidate | Superseded; reserved elsewhere |
 | Large knob | Kilo OEJNI-90-3-5 | Volume | Fit to verify |
@@ -386,6 +401,10 @@ Persistent Denon TCP reduces repeated connection overhead but cannot guarantee c
 | Chapter 6, November 3 | Slow, moderate, aggressive physical volume testing | Passed in observed trials |
 | Chapter 6, November 3 | Persistent Denon TCP and 50 ms command pacing | Passed |
 | Chapter 6, November 3 | Mixed-transport queue regression testing | Passed |
+| November 3 | Roku ECP held-volume, fast reversals, sustained rotation | Passed; slight lag and overshoot observed |
+| November 3 | Mixed-room volume: Denon TCP / Roku ECP | Passed |
+| November 3 | Bourns encoder push-to-mute on GP10 | Passed in Den and Sunroom |
+| November 3 | Physical controls in RUN mode | Passed |
 
 The first operational hardware-to-equipment control path arrived with the physical Power Toggle. The volume encoder extended that path without inventing a second queue or placing protocol logic in a GPIO driver.
 
@@ -397,14 +416,13 @@ The first operational hardware-to-equipment control path arrived with the physic
 
 Recommended sequence, subject to bench realities:
 
-1. Integrate the volume encoder's **push-to-mute** contact using the existing `Button` class and a deliberate GPIO assignment.
-2. Integrate the second **custom-action encoder**, including selection state, room changes, empty lists, and push-to-run.
-3. Add Home, Back, and the five-way navigation cluster with the shared button mapping.
-4. Evaluate playback controls and their final ergonomic placement.
-5. Test OLED and optional sound independently before relying on either for feedback.
-6. Finalize the guarded power mechanism, mechanical layout, cable routing, and enclosure assembly.
-7. Design and measure battery supply, charging, sleep, and wake behavior before calling SYSTEM MASTER an ignition system.
-8. Run extended real-equipment tests, including rapid rotation, receiver restart, network interruption, and mixed button/encoder activity.
+1. Integrate the second **custom-action encoder**, including selection state, room changes, empty lists, and push-to-run.
+2. Add Home, Back, and the five-way navigation cluster with the shared button mapping.
+3. Evaluate playback controls and their final ergonomic placement.
+4. Test OLED and optional sound independently before relying on either for feedback.
+5. Finalize the guarded power mechanism, mechanical layout, cable routing, and enclosure assembly.
+6. Design and measure battery supply, charging, sleep, and wake behavior before calling SYSTEM MASTER an ignition system.
+7. Run extended real-equipment tests, including network interruption, receiver restart, and simultaneous browser/encoder activity.
 
 Keep the known-good Pico configuration and working physical controls intact while introducing each new input. A component can be absent or disconnected without taking down the whole application; warn and continue wherever the existing optional-input architecture allows it.
 
