@@ -227,7 +227,25 @@ Apple TV support has not yet been implemented or tested. Its protocol, pairing, 
 
 ---
 
-## The Hardware
+## A Peek at the Hardware
+
+The Clonker 10000 is still very much a work in progress.
+
+The final enclosure hasn't materialized yet, but the knobs, switches, and assorted electronic organs are beginning to assemble into something that might eventually resemble a remote control.
+
+Or possibly the control panel of a very small submarine.
+
+<p align="center">
+  <img src="images/clonker_prototype2.png"
+       width="600"
+       alt="The Clonker 10000 hardware prototype">
+</p>
+
+*Actual prototype. Industrial design department still missing. Marketing department still disbanded.*
+
+---
+
+## The Actual Hardware
 
 The current controller is a **Raspberry Pi Pico 2 W (RP2350)** running **CircuitPython 10.3.1**.
 
@@ -262,24 +280,6 @@ An earlier ESP32-S3 Feather board was part of the original hardware exploration 
 **Hardware reality check:** Room selection, Power Toggle, rotary volume, and push-to-mute work against actual home-theater equipment. The complete control panel is still under construction.
 
 See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed inventory, proposed layout, GPIO status, and ongoing design decisions.
-
----
-
-## A Peek at the Hardware
-
-The Clonker 10000 is still very much a work in progress.
-
-The final enclosure hasn't materialized yet, but the knobs, switches, and assorted electronic organs are beginning to assemble into something that might eventually resemble a remote control.
-
-Or possibly the control panel of a very small submarine.
-
-<p align="center">
-  <img src="images/clonker_prototype.png"
-       width="600"
-       alt="The Clonker 10000 hardware prototype">
-</p>
-
-*Actual prototype. Industrial design department still missing. Marketing department still disbanded.*
 
 ---
 
