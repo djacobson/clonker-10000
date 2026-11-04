@@ -82,9 +82,7 @@ def release():
 
     # Set pacing before I/O so a failure cannot cause a busy retry loop.
     _next_release_attempt = now + RELEASE_RETRY_SECONDS
-    http_transport.send(
-        _endpoint, "POST", _path("keyup", _direction)
-    )
+    _send(_endpoint, "keyup", _direction)
     _reset()
     return True
 
@@ -121,9 +119,8 @@ def volume(endpoint, direction):
         _deadline = time.monotonic() + IDLE_RELEASE_SECONDS
         return False
 
-    http_transport.send(
-        endpoint, "POST", _path("keydown", direction)
-    )
+    _send(endpoint, "keydown", direction)
+
     now = time.monotonic()
     _endpoint = endpoint
     _direction = direction
