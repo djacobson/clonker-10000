@@ -345,6 +345,17 @@ def poll():
         discarded = len(_queue)
         _queue.clear()
 
+        # A failed command cancels the remaining queue.
+        # Release any active held controls as well.
+        try:
+            device_adapters.cancel_active()
+        except Exception as cleanup_error:
+            logger.warning(
+                "ADAPTER: Failure cleanup failed: {}".format(
+                    repr(cleanup_error)
+                )
+            )
+
         _last_error = "{} / {}: {}".format(
             room_id, action_id, repr(error)
         )
@@ -364,9 +375,16 @@ def poll():
 
 
 def clear(reason="Manual reset", reset_toggles=False):
-    """Discard pending tasks; optionally reset toggle history."""
+    """Discard pending tasks and release active held controls."""
     discarded = len(_queue)
     _queue.clear()
+
+    try:
+        device_adapters.cancel_active()
+    except Exception as error:
+        logger.warning(
+            "ADAPTER: Cancel cleanup failed: {}".format(repr(error))
+        )
 
     if reset_toggles:
         _toggle_next.clear()
