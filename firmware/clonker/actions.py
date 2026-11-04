@@ -210,6 +210,36 @@ def poll():
                 room, target
             )
 
+            # Toggle direction tracking.
+            if action_id in ("mute-toggle", "power-toggle"):
+                toggle_key = (room_id, action_id)
+                toggle_direction = _toggle_next.get(
+                    toggle_key, "on"
+                )
+                path = action[
+                    "on_path" if toggle_direction == "on"
+                    else "off_path"
+                ]
+            else:
+                path = action["path"]
+
+            # Fundamental actions retain blank-command no-ops.
+            if not endpoint or not path:
+                _queue.pop(selected)
+
+                message = "NO-OP: {} / {} (unconfigured)".format(
+                    room["name"], action_id
+                )
+
+                logger.info(message)
+                _last_result = message
+                _last_error = None
+                return True
+
+            adapter = device_adapters.lookup(
+                room_id, action_id
+            )
+
         # Adapter readiness preserves queue ordering.
         # An ineligible command stays queued.
         if not device_adapters.ready(adapter):
