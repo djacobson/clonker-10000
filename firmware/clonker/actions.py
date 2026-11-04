@@ -16,8 +16,8 @@ Custom actions execute ordered steps using one queue entry.
 Commands resolve against CURRENT configuration at execution time.
 Adapter selections are cached when configuration becomes active.
 
-Denon volume commands use persistent TCP with nonblocking pacing.
-All other commands continue using generic HTTP.
+Commands execute through the device adapter router.
+The queue preserves ordering when an adapter is not ready.
 
 Configuration saves clear pending work through the web service.
 
@@ -30,8 +30,6 @@ Power and mute use independent, volatile ON/OFF command histories.
 import time
 
 from clonker.system import logger
-from clonker.net import http_transport
-from clonker.devices import denon
 from clonker import device_adapters
 from clonker import device_config_v2 as device_config
 
@@ -212,45 +210,9 @@ def poll():
                 room, target
             )
 
-            # Toggle direction tracking.
-            if action_id in ("mute-toggle", "power-toggle"):
-                toggle_key = (room_id, action_id)
-                toggle_direction = _toggle_next.get(
-                    toggle_key, "on"
-                )
-                path = action[
-                    "on_path" if toggle_direction == "on"
-                    else "off_path"
-                ]
-            else:
-                path = action["path"]
-
-            # Fundamental actions retain blank-command no-ops.
-            if not endpoint or not path:
-                _queue.pop(selected)
-
-                message = "NO-OP: {} / {} (unconfigured)".format(
-                    room["name"], action_id
-                )
-
-                logger.info(message)
-                _last_result = message
-                _last_error = None
-                return True
-
-            adapter = device_adapters.lookup(
-                room_id, action_id
-            )
-
-        # A Denon volume command may be waiting for the
-        # minimum interval since the previous TCP send.
-        #
-        # Do not remove it from the queue or execute later
-        # commands while this eligible task is waiting.
-        if (
-            adapter == device_adapters.DENON_TCP
-            and not denon.ready()
-        ):
+        # Adapter readiness preserves queue ordering.
+        # An ineligible command stays queued.
+        if not device_adapters.ready(adapter):
             return False
 
         logger.info(
@@ -264,50 +226,21 @@ def poll():
             )
         )
 
-        if adapter == device_adapters.DENON_TCP:
-            native_command = device_adapters.denon_command(
-                path
-            )
+        result = device_adapters.execute(
+            adapter, endpoint, method, path
+        )
 
-            start = time.monotonic()
+        if not result["accepted"]:
+            return False
 
-            accepted = denon.send_volume(
-                endpoint, native_command
-            )
-
-            # Defensive check: if pacing becomes ineligible,
-            # preserve the command and its queue position.
-            if not accepted:
-                return False
-
-            total_ms = round(
-                (time.monotonic() - start) * 1000, 1
-            )
-
-            message = (
-                "EXECUTED: {} / {} -> DENON TCP "
-                "{} ({} ms)"
-            ).format(
-                room["name"],
-                action_id,
-                native_command,
-                total_ms,
-            )
-
-        else:
-            # Existing bounded blocking HTTP transport.
-            result = http_transport.send(
-                endpoint, method, path
-            )
-
-            message = (
-                "EXECUTED: {} / {} -> HTTP {} ({} ms)"
-            ).format(
-                room["name"],
-                action_id,
-                result["status"],
-                result["total_ms"],
-            )
+        message = (
+            "EXECUTED: {} / {} -> {} ({} ms)"
+        ).format(
+            room["name"],
+            action_id,
+            result["detail"],
+            result["total_ms"],
+        )
 
         # Command transmission completed successfully.
         # TCP success means bytes were sent, not that the
