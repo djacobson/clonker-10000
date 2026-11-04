@@ -19,6 +19,7 @@ import time
 from clonker.system import logger
 from clonker.net import web
 from clonker import actions
+from clonker import device_adapters
 from clonker.controls import switches
 from clonker.controls import physical
 from clonker import device_config_v2 as device_config
@@ -95,7 +96,8 @@ def main():
 
             # Priority 1: Physical GPIO inputs.
             # Priority 2: Execute one eligible queued action.
-            # Priority 3: CONFIG management HTTP.
+            # Priority 3: Maintain stateful device adapters.
+            # Priority 4: CONFIG management HTTP.
             #
             # The queue is polled in both CONFIG and RUN modes.
             now = time.monotonic()
@@ -109,6 +111,14 @@ def main():
             if now >= next_action_poll:
                 actions.poll()
                 next_action_poll = time.monotonic() + ACTION_POLL_INTERVAL
+
+            # Maintain stateful adapters independently of queue depth.
+            try:
+                device_adapters.poll()
+            except Exception as exc:
+                logger.warning(
+                    "Device adapter maintenance failed: {}".format(exc)
+                )
 
             # CONFIG/RUN is an application mode, not an HTTP command.
             config_mode = switches.config_enabled()
@@ -153,3 +163,4 @@ def main():
     finally:
         if web_running:
             web.stop()
+        device_adapters.close()
