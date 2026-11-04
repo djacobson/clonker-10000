@@ -306,6 +306,9 @@ def poll():
         return True
 
     except Exception as error:
+        import traceback
+        traceback.print_exception(type(error), error, error.__traceback__)
+
         # The selected task remains in the queue until
         # successful completion. Remove it before counting
         # and discarding the remaining pending tasks.
