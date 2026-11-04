@@ -5,7 +5,7 @@
 #
 # Clonker Designed by David Jacobson
 
-"""Resolve configured fundamental commands to device adapters.
+"""Resolve configured commands and route device execution.
 
 Adapter selection uses recognized command signatures,
 not device names, room IDs, or fixed device positions.
@@ -18,7 +18,8 @@ Unknown commands always resolve to generic HTTP.
 The in-memory adapter cache is rebuilt when configuration
 becomes active. No adapter information is persisted to JSON.
 
-This module performs no network I/O or command execution.
+This module owns adapter execution and lifecycle coordination.
+The Dumb Queue owns scheduling and failure policy.
 """
 
 import time
@@ -201,6 +202,16 @@ def execute(adapter, endpoint, method, path):
 def poll():
     """Advance adapters requiring background maintenance."""
     return roku.poll()
+
+
+def cancel_active():
+    """Request release of active adapter-held controls.
+
+    Does not close persistent Denon connections or discard queued
+    actions. A failed Roku release retains state for later poll()
+    retries and propagates the error to the caller.
+    """
+    return roku.release()
 
 
 def close():
