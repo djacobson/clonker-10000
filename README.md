@@ -433,95 +433,49 @@ The remaining physical controls can reuse the established architecture rather th
 
 ---
 
-## Project Status
+## Where the Monster Stands
 
-**November 3, 2026 — Chapter 6 complete: physical volume, push-to-mute, and mixed-protocol device adapters operational.**
+**November 3, 2026 — Chapter 6 complete.**
 
-Extreme beta, but the Monster now has working physical room selection, Power Toggle, and a rotary volume knob that controls real equipment in two rooms.
+The Clonker 10000 is still in extreme beta, but it's no longer just a pile of ambitious electronics and questionable design decisions.
 
-### Working and tested
+**The Monster actually controls things now.**
 
-**Core firmware and configuration**
+### What's Alive ⚡
 
-- Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
-- Wi-Fi connectivity and browser management interface.
-- Clonker Config v4 JSON configuration, validation, persistence, and recovery.
-- Revision checking, stale-edit rejection, no-change detection, and rotating backups.
-- Browser Test Remote supporting fourteen fundamental actions and custom actions.
-- Shared Dumb Queue™ with cooperative scheduling, delayed tasks, and failure cancellation.
-- Independent runtime power/mute toggle command histories.
-- Blank fundamental commands treated as intentional no-ops.
+- **Two rooms, one remote:** A physical rotary selector switches between Den and Sunroom, with a third position reserved for future mischief.
+- **Power at your fingertips:** The physical Power Toggle controls real equipment in either room.
+- **Jason Bourne has entered the building:** Our Bourns rotary encoder adjusts volume in both rooms. Press the knob to mute or unmute.
+- **Two protocols, one knob:** Denon uses persistent TCP; Roku uses clever ECP held-key commands. The hardware doesn't know or care.
+- **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom action sequences, and the legendary Dumb Queue™ are operational.
+- **Safety without sophistication:** Invalid room selections do nothing, configuration changes are validated, and failed commands don't leave the queue running amok.
 
-**Physical controls**
+All of this has been exercised against actual home-theater equipment, not just simulated buttons and wishful thinking.
 
-- GP17 SERVICE/DEVICE switch for filesystem ownership.
-- GP18 CONFIG/RUN switch for application management mode.
-- Three-position room selector for Den, Sunroom, and reserved Room 3.
-- Safe no-op when the selected room is not configured.
-- GP2 momentary Power Toggle, verified against equipment in both rooms.
-- Bourns PEC11R rotary volume encoder on GP8/GP9.
-- Encoder push-to-mute on GP10, verified in both rooms.
-- Shared room-aware physical action dispatch.
+### What's Still on the Operating Table 🔧
 
-**Networking and device adapters**
+- The second rotary encoder for selecting and running custom actions.
+- Navigation, Home, Back, and playback buttons.
+- OLED status display and audible CLONK feedback.
+- Final enclosure, faceplate, wiring, and rechargeable power.
+- Sleep/wake behavior and additional reliability testing.
+- Future device support, including Apple TV.
 
-- Bounded generic HTTP GET/POST for ordinary commands.
-- Signature-based adapter selection from active configuration.
-- Cached adapter routing rebuilt when configuration becomes active.
-- Persistent Denon TCP volume control with 50 ms minimum command spacing.
-- Roku ECP held-volume control using keydown/keyup.
-- Roku hold extension, direction reversal, idle release, and bounded release-retry behavior.
-- Generic HTTP fallback, including Roku mute and custom-action steps.
-- Adapter maintenance integrated into the cooperative scheduler.
+### What's Next?
 
-**Verified integration and regression behavior**
+More physical controls, beginning with the custom-action encoder or navigation buttons.
 
-- Denon volume control through persistent TCP.
-- Sunroom volume control through Roku ECP and HDMI-CEC.
-- Fast rotation, reversals, and sustained Roku volume testing.
-- Physical mute/unmute in Den and Sunroom.
-- Mixed HTTP/TCP queue ordering.
-- Denon pacing without overtaking queued work.
-- Custom-action waits with unrelated actions executing during delays.
-- Queue cancellation and subsequent recovery after execution failures.
-- Configuration and adapter-cache lifecycle regression tests.
+The underlying firmware is already doing its job. Now we're building the satisfying collection of knobs, switches, and buttons that will make using it a pleasure.
 
-### Not yet implemented or fully tested
+For the engineering details, test results, and occasionally embarrassing development history, see the [technical documentation](#documentation).
 
-- Second encoder for custom-action selection and execution.
-- Navigation, Home/Back, and playback buttons.
-- OLED display and audible feedback.
-- Final enclosure, aluminum faceplate, and rechargeable power architecture.
-- Deep-sleep ignition and wake behavior.
-- Apple TV pairing, authentication, and control.
-- Custom destinations and additional protocol integrations.
-- Denon TCP response parsing and unsolicited-status handling.
-- Comprehensive network-disconnect and receiver-restart recovery.
-- Long-duration stability and simultaneous high-rate input/network workloads.
+**The software talks to the equipment.**
 
-### Engineering decisions
+**The switches talk to the software.**
 
-The Bourns PEC11R is the operational volume encoder. The previously considered Grayhill encoder is reserved for another project.
+**And Jason Bourne is now licensed to mute.**
 
-Denon volume uses a persistent native TCP connection. Roku volume uses ECP held-key behavior to avoid sending an HTTP request for every detent.
-
-Both approaches preserve the same fundamental actions and shared Dumb Queue™.
-
-The Roku adapter maintains held-key state and performs release cleanup, but does not introduce another command queue.
-
-The firmware remains cooperative, and network operations can still temporarily delay physical input polling.
-
-### Next milestone
-
-Continue integrating physical controls, beginning with the second custom-action encoder or navigation buttons, while preserving the working volume and mute paths.
-
-The software talks to the equipment.
-
-The switches talk to the software.
-
-**And now Jason Bourne controls the volume in two rooms — and is licensed to mute.**
-
-Less sleek. More CLONK.
+*Less sleek. More CLONK.*
 
 ---
 
