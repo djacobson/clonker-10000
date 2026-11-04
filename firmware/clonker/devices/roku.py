@@ -35,6 +35,20 @@ def _path(operation, direction):
     return "/{}/{}".format(operation, key)
 
 
+def _send(endpoint, operation, direction):
+    """Send Roku ECP command with operation-specific error context."""
+    path = _path(operation, direction)
+
+    try:
+        return http_transport.send(endpoint, "POST", path)
+    except (OSError, ValueError) as error:
+        raise OSError(
+            "ROKU {} -> {} failed: {}".format(
+                path, endpoint, repr(error)
+            )
+        )
+
+
 def held_direction():
     return _direction
 
