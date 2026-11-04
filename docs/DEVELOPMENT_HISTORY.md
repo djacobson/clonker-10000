@@ -2374,6 +2374,197 @@ The Clonker now has two independently useful physical capabilities: it can selec
 
 ---
 
+# Milestone 18 — The Monster Learns to Speak Roku
+
+**Date:** November 3, 2026  
+**Chapter:** 6 — Physical Controls  
+**Status:** PASS — Roku held-volume control, mixed adapters, and physical push-to-mute verified on real equipment
+
+### Goal
+
+Extend the physical volume-control architecture beyond Denon's persistent TCP protocol without hardcoding room identities, introducing a second command queue, or sacrificing the responsiveness of the rotary encoder.
+
+The intended result was a single physical volume control that could operate different equipment through different protocols, based entirely on the configured fundamental actions.
+
+### Device adapter architecture
+
+The device-adapter layer recognizes supported command signatures and selects the appropriate transport.
+
+Three execution paths are now available:
+
+- **Denon TCP:** Recognized Denon fundamental volume commands use persistent TCP port 23 with a 50 ms minimum command interval.
+- **Roku held-volume:** Recognized Roku ECP fundamental volume commands use HTTP keydown/keyup with a locally maintained hold.
+- **Generic HTTP:** Other configured commands continue through the bounded HTTP GET/POST transport.
+
+Adapter resolution is based on the configured method and path, not room names or fixed device positions.
+
+The existing Dumb Queue™ remains the sole action execution pipeline. Physical controls dispatch fundamental actions without knowing which device protocol will execute them.
+
+The adapter layer owns transport-specific execution and lifecycle coordination.
+
+### Roku held-volume implementation
+
+The new `firmware/clonker/devices/roku.py` module implements time-based volume holds.
+
+The configured fundamental commands are:
+
+| Action | Method | Configured path |
+|---|---|---|
+| Volume Up | POST | `/keypress/VolumeUp` |
+| Volume Down | POST | `/keypress/VolumeDown` |
+
+The adapter recognizes these signatures and substitutes the appropriate Roku ECP keydown/keyup operations.
+
+On the first detent, it sends a keydown request. Additional same-direction detents refresh the hold deadline without additional HTTP requests.
+
+The implemented timing parameters are:
+
+| Parameter | Value |
+|---|---|
+| Idle release | 250 ms |
+| Maximum continuous hold | 2 seconds |
+| Failed-release retry interval | 500 ms |
+
+A direction reversal releases the previous key before starting the opposite direction.
+
+A failed release retains local held-key state and blocks new keydowns until release succeeds. Retry attempts are paced rather than repeated continuously.
+
+A held key can also be released during queue cancellation, command failure, configuration replacement, or application shutdown.
+
+Operation-specific HTTP diagnostics now identify the Roku command path, endpoint, and underlying exception representation.
+
+The design does not automatically retry uncertain keydown requests.
+
+### Refactoring and regression
+
+The adapter execution boundary was consolidated in `device_adapters.py`.
+
+The Dumb Queue now delegates device execution to the adapter layer instead of directly implementing individual transport decisions.
+
+An initial refactoring mistake accidentally removed part of the fundamental-action execution branch in `actions.py`, producing a local-variable exception.
+
+The missing fundamental-action handling was restored, including power/mute toggle path selection and unconfigured-command no-op handling.
+
+Subsequent regression testing confirmed:
+
+- Denon volume worked in both configured rooms.
+- The physical encoder continued operating correctly.
+- The physical Power Toggle worked.
+- The CONFIG/RUN switch worked.
+- The configuration management interface loaded.
+- No queue warnings appeared during the final Denon smoke test.
+
+Occasional browser-client idle timeout messages had been observed during earlier configuration navigation; they were not established as a regression caused by the adapter work.
+
+### Real Roku equipment verification
+
+The Sunroom configuration was changed to route volume through its Roku Ultra using Roku ECP. The Den room retained its Denon TCP volume mapping.
+
+Adapter-cache inspection confirmed:
+
+| Room | Volume adapter |
+|---|---|
+| Den | `denon-tcp` |
+| Sunroom | `roku-hold` |
+
+The Sunroom Roku controlled the connected Denon AVR-X1800H volume through the equipment's HDMI-CEC path.
+
+Observed tests included:
+
+1. A single clockwise detent increased receiver volume by 0.5 dB.
+2. Five steady clockwise detents increased volume from -35.0 dB to -33.5 dB.
+3. Clockwise/counterclockwise reversals produced commands in both directions.
+4. Fast clockwise and counterclockwise twists produced one keydown followed by multiple locally handled hold extensions.
+5. Approximately three seconds of continuous clockwise rotation produced a smooth, steady volume increase.
+6. The receiver stopped changing volume after rotation stopped, with only very slight observed overshoot.
+
+The sustained-rotation logs showed a fresh keydown after an extended hold, consistent with the two-second maximum-hold restart behavior.
+
+Fast and sustained tests were conducted in RUN mode, with the configuration HTTP server inactive.
+
+The physical feel was reported as smooth, with a small but acceptable delay in the receiver's displayed volume bar.
+
+### Network error and recovery
+
+One transient `OSError(119)` was observed during a direction-reversal experiment.
+
+The exact failing HTTP operation was not identified at the time.
+
+The receiver volume stopped changing, and a subsequent VolumeDown detent worked normally.
+
+Later reversal, fast-rotation, and sustained-rotation tests showed no additional visible errors.
+
+Operation-specific error diagnostics were added afterward to improve future troubleshooting.
+
+This does not establish that all network failure conditions are solved. In particular, a successful HTTP acknowledgment does not independently prove a receiver volume change or confirm every remote key-release state.
+
+### Jason Bourne gets a mute button
+
+The Bourns PEC11R volume encoder's separate momentary pushbutton was connected to GND and GP10.
+
+`VOLUME_ENCODER_BUTTON_PIN = 10` was enabled in `controls/pins.py`.
+
+No changes were required to the generic button driver or physical action dispatcher because `physical.py` already mapped `VOLUME_MUTE` to the `mute-toggle` fundamental action.
+
+Sunroom mute was configured as:
+
+| Field | Value |
+|---|---|
+| Target | Streaming (`device-3`) |
+| Method | POST |
+| On path | `/keypress/VolumeMute` |
+| Off path | `/keypress/VolumeMute` |
+
+The identical paths are intentional because Roku's VolumeMute command toggles mute.
+
+The mute command uses generic HTTP, not the Roku held-volume adapter.
+
+Physical push-to-mute and push-to-unmute were successfully tested on both rooms:
+
+- **Sunroom:** Roku ECP HTTP VolumeMute controlled the Denon through the Roku equipment path.
+- **Den:** Existing Denon HTTP mute commands controlled the Den receiver.
+
+PuTTY confirmed stable button presses, successful command execution, and independent per-room toggle direction history.
+
+### Verified physical controls at Chapter 6 closeout
+
+| Control | GPIO | Status |
+|---|---|---|
+| Power Toggle | GP2 | Operational |
+| Room selector — Den | GP3 | Operational |
+| Room selector — Sunroom | GP6 | Operational |
+| Room selector — reserved Room 3 | GP7 | Operational selection; safe no-op |
+| Bourns volume encoder A/B | GP8/GP9 | Operational |
+| Bourns encoder push-to-mute | GP10 | Operational in both rooms |
+| SERVICE / DEVICE | GP17 | Operational |
+| CONFIG / RUN | GP18 | Operational |
+| Custom-action encoder | Unassigned | Pending |
+| Navigation, Home, Back | Unassigned | Pending |
+| OLED I²C | GP4/GP5 reserved | Pending |
+
+### Remaining boundaries
+
+- Roku held-volume behavior remains dependent on network responsiveness and the connected equipment's CEC implementation.
+- One transient socket error was observed; future errors should be evaluated using the new operation-specific diagnostics.
+- Slight volume overshoot and display lag were observed but considered acceptable in initial testing.
+- Maximum-hold restart behavior was observed indirectly through logs and receiver response, not through a dedicated keyup trace.
+- Fast Roku rotation under simultaneous CONFIG-mode browser activity has not been equivalently stress-tested.
+- The custom-action encoder, remaining buttons, OLED, audio feedback, enclosure, and power-management work remain ahead.
+
+### Engineering conclusion
+
+Chapter 6 established that one physical rotary encoder and pushbutton can operate two rooms through different device protocols, using the same configured fundamental actions and shared Dumb Queue™.
+
+The system now supports Denon persistent TCP volume, Roku ECP held-volume, and generic HTTP commands without embedding equipment identities in the physical-control drivers.
+
+The result is more than a working command path: the Roku-controlled volume knob demonstrated smooth, practical behavior during fast twists, reversals, and sustained rotation.
+
+**One knob. Two rooms. Three transport strategies. One Dumb Queue™.**
+
+**Jason Bourne is licensed to mute.**
+
+---
+
 **THE CLONKER 10000**
 
 *Less sleek. More CLONK.*
