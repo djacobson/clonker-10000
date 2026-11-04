@@ -211,7 +211,7 @@ Clonker Config v4 supports up to three rooms, each with its own devices and comm
 
 The browser Test Remote can execute custom actions today.
 
-The physical room selector, Power Toggle, and Bourns volume encoder are operational. The custom-action encoder and remaining physical controls are still being integrated.
+The physical room selector, Power Toggle, Bourns volume encoder, and encoder push-to-mute are operational. The custom-action encoder and remaining physical controls are still being integrated.
 
 ### Device Compatibility Roadmap
 
@@ -237,28 +237,29 @@ A Pico Cowbell Terminal board provides screw-terminal GPIO connections, and a WA
 
 - **GP17 SERVICE/DEVICE switch:** Selects USB filesystem ownership or firmware write access at boot. Requires a complete power cycle to change modes.
 - **GP18 CONFIG/RUN switch:** Enables or disables the browser management listener live, without rebooting.
-- **GP3/GP6/GP7 rotary room selector:** Selects Den, Sunroom, or reserved Room 3. Integrated with firmware and verified after GPIO reassignment.
+- **GP3/GP6/GP7 rotary room selector:** Selects Den, Sunroom, or reserved Room 3.
 - **GP2 momentary Power Toggle:** Dispatches the selected room's configured power action. Actual ON/OFF equipment behavior verified in Den and Sunroom.
+- **GP8/GP9 Bourns volume encoder:** Physical rotation dispatches room-aware volume commands through Denon TCP or Roku ECP.
+- **GP10 encoder push-to-mute:** Physical press toggles mute in either configured room.
+
 GP4/GP5 are reserved for the Cowbell's STEMMA QT/I²C connector, potentially for the planned OLED status display.
-- **GP8/GP9 Bourns volume encoder:** Physical rotation dispatches room-aware volume commands. Slow, moderate, and aggressive rotation verified against the Sunroom Denon.
 
 ### Hardware still being integrated
 
-- **Bourns PEC11R volume encoder:** Rotation is integrated and operational; push-to-mute remains pending.
-- **Second Bourns PEC11R encoder:** Planned for custom-action selection and push-to-run.
+- Second Bourns PEC11R encoder for custom-action selection and push-to-run.
 - Substantial tactile navigation and shortcut buttons.
 - Tiny OLED status display.
-- Optional piezo or I2S-powered audible feedback.
+- Optional piezo or I²S-powered audible feedback.
 - Rechargeable power.
 - Final enclosure and aluminum faceplate.
 
-The working Bourns encoder is now the selected volume-control hardware. The previously considered Grayhill encoder is being saved for another project.
+The working Bourns encoder is the selected volume-control hardware. The previously considered Grayhill encoder is being saved for another project.
 
 The Pico 2 W is the active development platform.
 
 An earlier ESP32-S3 Feather board was part of the original hardware exploration but is not the current firmware target.
 
-**Hardware reality check:** Room selection, Power Toggle, and rotary volume control now work against actual home-theater equipment. The complete control panel is still under construction.
+**Hardware reality check:** Room selection, Power Toggle, rotary volume, and push-to-mute work against actual home-theater equipment. The complete control panel is still under construction.
 
 See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed inventory, proposed layout, GPIO status, and ongoing design decisions.
 
@@ -299,7 +300,7 @@ It can also run configured custom actions, including multi-step sequences across
 
 This allows the software architecture to be tested before committing to the final enclosure and GPIO wiring arrangement.
 
-**The first rotary knob is operational!** The physical Bourns volume encoder now controls the Denon through a persistent TCP connection. The Monster has learned to turn things up without waiting for an HTTP connection on every click.
+**The first rotary knob is operational!** The physical Bourns volume encoder controls Den through persistent Denon TCP and Sunroom through Roku ECP held-volume. Pressing the knob toggles mute in either room. One knob, two rooms, and no need for a new command queue.
 
 ---
 
@@ -316,37 +317,43 @@ This allows the software architecture to be tested before committing to the fina
 
 The Clonker uses a small, intentionally straightforward software architecture.
 
+
 ```text
 Physical GPIO inputs             Browser Test Remote
   (room selector, buttons,             |
    volume encoder)                     |
-         |                             v
-         v                       HTTP action API
-  Physical coordinator                 |
-         |                             |
-         v                             |
-  Room-aware dispatch                  |
-         |                             |
-         +---------------+-------------+
-                         |
-                         v
-                  Action dispatcher
-                         |
-                         v
-                    DUMB QUEUE
-                         |
-                         v
-              Cached adapter selection
-                         |
-                  +------+------+
-                  |             |
-                  v             v
-             Generic HTTP    Denon TCP
-              transport       adapter
-                  |             |
-                  v             v
-             Roku / AVR      Denon AVR
-               commands       volume
+          |                             v
+          v                       HTTP action API
+   Physical coordinator                 |
+          |                             |
+          v                             |
+   Room-aware dispatch                  |
+          |                             |
+          +---------------+-------------+
+                          |
+                          v
+                   Action dispatcher
+                          |
+                          v
+                     DUMB QUEUE
+                          |
+                          v
+                   Device adapters
+                          |
+               +----------+----------+
+               |          |          |
+               v          v          v
+           Denon TCP   Roku Hold  Generic HTTP
+           Persistent  ECP Keys    GET / POST
+               |          |          |
+               v          v          v
+           Denon AVR     Roku     Roku / Denon
+             Volume     Volume    Other Actions
+
+           Cooperative adapter maintenance
+                    |
+                    v
+             Roku key release
 ```
 
 **Both input paths converge on the same action dispatcher and Dumb Queue™.**
@@ -357,17 +364,21 @@ Room 3 is reserved. If selected without a configured room, physical action dispa
 
 The queue preserves command ordering, schedules delayed work, and cancels pending commands when execution fails.
 
-A device-adapter resolver recognizes supported fundamental-command patterns. Its selections are cached when configuration is loaded or successfully changed, rather than repeatedly analyzing the commands during execution.
+A device-adapter resolver recognizes supported fundamental-command signatures and caches specialized selections when configuration becomes active.
 
-Currently, recognized Denon volume-up and volume-down commands use a persistent TCP connection with 50 ms minimum transmission spacing. Other commands retain the existing generic HTTP transport.
+Recognized Denon volume commands use persistent TCP with 50 ms minimum transmission spacing.
 
-The adapter architecture allows additional device protocols to be introduced without making the queue responsible for manufacturer-specific behavior.
+Recognized Roku volume commands use ECP held-key behavior: the first detent starts a hold, subsequent same-direction detents extend it locally, and adapter maintenance releases the key after rotation stops.
 
-Custom actions reuse the same queue and currently execute through the existing HTTP transport. Cooperative waits permit unrelated eligible commands to execute while a custom action is delayed.
+Other commands use generic HTTP, including Roku mute and current custom-action steps.
 
-Outbound HTTP remains synchronous and blocking. The Denon TCP adapter also uses synchronous socket operations, but avoids repeatedly establishing connections for individual volume commands.
+The adapter layer coordinates execution and lifecycle cleanup without introducing another action queue.
 
-The architecture has been verified with actual equipment, physical encoder operation, mixed HTTP/TCP command ordering, delayed custom actions, and failure-cancellation regression tests.
+Custom actions reuse the shared Dumb Queue™. Cooperative waits permit unrelated eligible commands to execute while a custom action is delayed.
+
+Outbound networking remains synchronous. Specialized adapters reduce repeated connection overhead but do not guarantee uninterrupted physical polling.
+
+The architecture has been verified against actual Denon and Roku equipment, including mixed-room volume, physical mute, command ordering, custom-action waits, and failure-cancellation regression tests.
 
 ### Configuration
 
@@ -412,11 +423,11 @@ The interface currently provides:
 
 The browser Test Remote and physical controls use the same shared action dispatcher and Dumb Queue™.
 
-**Real network control is operational.** The Pico executes configured Roku and Denon HTTP commands, while recognized Denon fundamental volume commands use a persistent TCP connection.
+**Real network control is operational.** The Pico executes configured Roku and Denon HTTP commands, recognized Denon volume commands through persistent TCP, and recognized Roku volume commands through held-key ECP.
 
 The browser receives an acknowledgment when an action is queued. Actual device execution occurs subsequently through the cooperative scheduler.
 
-Chapter 6 connected the physical room selector, Power Toggle, and Bourns volume encoder to this shared execution path.
+Chapter 6 connected physical room selection, Power Toggle, rotary volume, and push-to-mute to this shared execution path, with Denon TCP and Roku ECP providing specialized volume transports.
 
 The remaining physical controls can reuse the established architecture rather than introducing another execution mechanism.
 
@@ -424,9 +435,9 @@ The remaining physical controls can reuse the established architecture rather th
 
 ## Project Status
 
-**November 3, 2026 — Chapter 6: Physical volume control and device adapters operational.**
+**November 3, 2026 — Chapter 6 complete: physical volume, push-to-mute, and mixed-protocol device adapters operational.**
 
-Extreme beta, but the Monster now has working physical room selection, Power Toggle, and a rotary volume knob that controls real Denon receivers.
+Extreme beta, but the Monster now has working physical room selection, Power Toggle, and a rotary volume knob that controls real equipment in two rooms.
 
 ### Working and tested
 
@@ -445,70 +456,70 @@ Extreme beta, but the Monster now has working physical room selection, Power Tog
 
 - GP17 SERVICE/DEVICE switch for filesystem ownership.
 - GP18 CONFIG/RUN switch for application management mode.
-- Three-position physical room selector for Den, Sunroom, and reserved Room 3.
+- Three-position room selector for Den, Sunroom, and reserved Room 3.
 - Safe no-op when the selected room is not configured.
-- GP2 momentary Power Toggle, verified against actual equipment in both rooms.
-- Bourns PEC11R rotary encoder integrated as the physical volume control.
-- Physical encoder events routed through the same action dispatcher as the browser Test Remote.
-- Slow, moderate, and aggressive encoder rotation exercised successfully against the Sunroom Denon.
+- GP2 momentary Power Toggle, verified against equipment in both rooms.
+- Bourns PEC11R rotary volume encoder on GP8/GP9.
+- Encoder push-to-mute on GP10, verified in both rooms.
+- Shared room-aware physical action dispatch.
 
 **Networking and device adapters**
 
-- Existing bounded HTTP GET/POST transport for Roku and other configured commands.
-- Device-adapter selection derived from recognized fundamental-command patterns.
-- Cached adapter selections rebuilt during successful configuration loading and saving.
-- Generic HTTP fallback for commands without a specialized adapter.
-- Persistent Denon TCP transport for recognized volume-up and volume-down commands.
-- Cooperative, nonblocking 50 ms minimum interval between Denon TCP volume transmissions.
-- TCP connection reuse and switching between the two configured Denon receivers.
-- No automatic retry of commands whose transmission outcome is uncertain.
+- Bounded generic HTTP GET/POST for ordinary commands.
+- Signature-based adapter selection from active configuration.
+- Cached adapter routing rebuilt when configuration becomes active.
+- Persistent Denon TCP volume control with 50 ms minimum command spacing.
+- Roku ECP held-volume control using keydown/keyup.
+- Roku hold extension, direction reversal, idle release, and bounded release-retry behavior.
+- Generic HTTP fallback, including Roku mute and custom-action steps.
+- Adapter maintenance integrated into the cooperative scheduler.
 
 **Verified integration and regression behavior**
 
-- Five volume-up and five volume-down commands executed through the Dumb Queue™ and Denon TCP, returning the receiver to its starting volume.
-- Physical encoder tested with five slow detents in each direction.
-- Moderate and aggressive encoder rotation produced responsive, smooth volume changes.
-- Mixed HTTP/TCP command ordering preserved.
-- Denon pacing holds an eligible command without allowing later commands to overtake it.
-- Future-dated commands do not prevent unrelated immediate commands from executing.
-- Delayed custom-action steps allow other eligible commands to run during their wait.
-- Execution failures discard pending queue work.
-- Successful configuration saves update the adapter cache; rejected stale saves leave it unchanged.
-- Production configuration restoration and disposable-test cleanup verified.
+- Denon volume control through persistent TCP.
+- Sunroom volume control through Roku ECP and HDMI-CEC.
+- Fast rotation, reversals, and sustained Roku volume testing.
+- Physical mute/unmute in Den and Sunroom.
+- Mixed HTTP/TCP queue ordering.
+- Denon pacing without overtaking queued work.
+- Custom-action waits with unrelated actions executing during delays.
+- Queue cancellation and subsequent recovery after execution failures.
+- Configuration and adapter-cache lifecycle regression tests.
 
 ### Not yet implemented or fully tested
 
-- Physical volume-encoder push-to-mute.
 - Second encoder for custom-action selection and execution.
 - Navigation, Home/Back, and playback buttons.
 - OLED display and audible feedback.
 - Final enclosure, aluminum faceplate, and rechargeable power architecture.
 - Deep-sleep ignition and wake behavior.
 - Apple TV pairing, authentication, and control.
-- Additional device adapters and configurable adapter overrides.
+- Custom destinations and additional protocol integrations.
 - Denon TCP response parsing and unsolicited-status handling.
-- Comprehensive network-disconnect and receiver-restart recovery tests.
-- Long-duration stability and sustained high-rate workloads.
+- Comprehensive network-disconnect and receiver-restart recovery.
+- Long-duration stability and simultaneous high-rate input/network workloads.
 
 ### Engineering decisions
 
-The working Bourns encoder is the current volume-control choice. The previously considered Grayhill encoder is reserved for another project.
+The Bourns PEC11R is the operational volume encoder. The previously considered Grayhill encoder is reserved for another project.
 
-No volume batching or software acceleration is currently required. The physical knob already provides smooth, responsive control using ordinary encoder events and paced TCP commands.
+Denon volume uses a persistent native TCP connection. Roku volume uses ECP held-key behavior to avoid sending an HTTP request for every detent.
 
-The Dumb Queue™ remains intentionally simple. Device-specific protocol details belong in adapters, not in the generic action scheduler.
+Both approaches preserve the same fundamental actions and shared Dumb Queue™.
 
-Custom actions continue to use the existing HTTP transport. The current Denon TCP specialization applies only to recognized fundamental volume commands.
+The Roku adapter maintains held-key state and performs release cleanup, but does not introduce another command queue.
+
+The firmware remains cooperative, and network operations can still temporarily delay physical input polling.
 
 ### Next milestone
 
-Complete the remaining physical controls, document the new adapter architecture, and investigate reliability under network failures and prolonged operation.
+Continue integrating physical controls, beginning with the second custom-action encoder or navigation buttons, while preserving the working volume and mute paths.
 
 The software talks to the equipment.
 
 The switches talk to the software.
 
-**And now the volume knob talks to the Denon—without making us wait for HTTP on every click.**
+**And now Jason Bourne controls the volume in two rooms — and is licensed to mute.**
 
 Less sleek. More CLONK.
 
