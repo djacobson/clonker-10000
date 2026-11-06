@@ -5,13 +5,13 @@
 **Extreme beta — an enthusiast-built home theater remote with an unreasonable appreciation for substantial metallic controls.**
 
 <p align="center">
-  <img src="images/main_knobs.jpeg" width="350" alt="Clonker Main Knobs">
+  <img src="images/clonker_final.jpeg" width="350" alt="Clonker Case">
 </p>
 
 <p align="center">
-  <img src="images/tmp_oled_screen.jpeg"
+  <img src="images/main_knobs.jpeg"
        height="150"
-       alt="Clonker OLED Display Concept"
+       alt="Clonker Main Knobs"
        style="vertical-align: top;">
   &nbsp;&nbsp;
   <img src="images/tmp_toggle.jpeg"
