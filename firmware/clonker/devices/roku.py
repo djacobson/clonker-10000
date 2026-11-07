@@ -130,21 +130,30 @@ def volume(endpoint, direction):
 
 
 def poll():
-    """Release an idle, expired, or pending hold with paced retries."""
-    if _direction is None:
-        return False
-    now = time.monotonic()
-    if (
-        _release_pending or now >= _deadline
-        or now >= _started + MAX_HOLD_SECONDS
-    ):
-        return release()
-    return False
+    """Maintain encoder and physical-button holds."""
+    volume_result = False
+    button_result = False
+
+    if _direction is not None:
+        now = time.monotonic()
+        if (
+            _release_pending or now >= _deadline
+            or now >= _started + MAX_HOLD_SECONDS
+        ):
+            volume_result = release()
+
+    button_result = button_poll()
+
+    return volume_result or button_result
 
 
 def close():
-    """Attempt cleanup; preserve state if release is unresolved."""
-    return release()
+    """Attempt to release both types of held controls."""
+    try:
+        release()
+    finally:
+        button_up()
+
 
 # Explicit physical-button holds.
 # Independent of the encoder-driven volume hold.
