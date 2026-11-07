@@ -328,6 +328,8 @@ Candidate components include an **Adafruit MAX98357A I²S amplifier**, **Adafrui
 
 This is a **design and purchase-history register**, not a verified warehouse inventory. Ordered, received, installed, and operational are different states.
 
+For exact manufacturer part numbers, component identification, and actual drilled/test-fitted mounting-hole sizes, see the [Hardware Parts List](HARDWARE_PARTS_LIST.md). The register below tracks design decisions and implementation status rather than duplicating the detailed parts list.
+
 | Item | Identifying part / type | Purpose | Status |
 |---|---|---|---|
 | Controller | Raspberry Pi Pico 2 W | Firmware | Operational |

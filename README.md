@@ -319,7 +319,7 @@ The previously considered Grayhill volume encoder was set aside in favor of the 
 
 The Pico 2 W is the active firmware platform. An earlier ESP32-S3 Feather was part of the initial exploration, not the current implementation.
 
-For component details, GPIO assignments, physical layout, and build decisions, see [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md).
+For component selection, GPIO assignments, wiring, and physical design, see [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md). For exact part numbers and verified mounting-hole sizes, see the [Hardware Parts List](docs/HARDWARE_PARTS_LIST.md).
 
 ---
 
@@ -510,6 +510,7 @@ The project is documented as it develops, including architectural decisions, imp
 | [Architecture](docs/ARCHITECTURE.md) | System design, component responsibilities, and boundaries |
 | [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) | Components, GPIO, wiring, and physical design |
 | [Configuration](docs/CONFIGURATION.md) | Config v4 schema, validation, and recovery |
+| [Hardware Parts List](docs/HARDWARE_PARTS_LIST.md) | Actual components, part numbers, and verified mounting/drill sizes |
 | [Firmware & Network](docs/FIRMWARE_NETWORK.md) | Networking, adapters, scheduler, and diagnostics |
 | [Operating Modes](docs/OPERATING_MODES.md) | SERVICE/DEVICE and CONFIG/RUN |
 | [Development](docs/DEVELOPMENT.md) | Development and deployment workflow |
