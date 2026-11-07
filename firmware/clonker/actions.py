@@ -146,7 +146,14 @@ def dispatch_hold(room_id, action_id, event, destination=None, command=None):
     if room_id not in device_config.ROOM_IDS:
         raise ValueError("Unknown room")
 
-    if action_id not in ("skip-back", "skip-forward"):
+    if action_id not in (
+        "nav-up",
+        "nav-down",
+        "nav-left",
+        "nav-right",
+        "skip-back",
+        "skip-forward",
+    ):
         raise ValueError("Unsupported held-button action")
 
     if event not in ("pressed", "released"):
