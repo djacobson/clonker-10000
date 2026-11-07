@@ -270,7 +270,7 @@ def poll():
             adapter = device_adapters.GENERIC_HTTP
 
         elif kind == "hold":
-            room = device_config.current()["rooms"][room_id]
+            room_name = room_id
             target = task["target"]
             endpoint = task["endpoint"]
             method = task["method"]
@@ -326,9 +326,12 @@ def poll():
         if not device_adapters.ready(adapter):
             return False
 
+        if kind != "hold":
+            room_name = room["name"]
+
         logger.info(
             "EXECUTING: {} / {} -> {} {} {} [{}]".format(
-                room["name"],
+                room_name,
                 action_id,
                 target,
                 method,
