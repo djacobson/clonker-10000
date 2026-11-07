@@ -20,6 +20,7 @@ from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button
 from clonker.controls.encoders import Encoder
+from clonker.display import oled
 
 # Physical button names -> fundamental action IDs.
 # Only assigned GPIO buttons are initialized.
@@ -335,6 +336,7 @@ def poll():
 
         if step:
             _action_count += step
+            oled.set_count(_action_count)
             logger.info(
                 "ACTION ENCODER: {}".format(_action_count)
             )
