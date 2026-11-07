@@ -355,7 +355,7 @@ def poll():
         message = (
             "EXECUTED: {} / {} -> {} ({} ms)"
         ).format(
-            room["name"],
+            room_name,
             action_id,
             result["detail"],
             result["total_ms"],
