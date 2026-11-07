@@ -29,6 +29,7 @@ from clonker.devices import denon
 from clonker.devices import roku
 
 ROKU_HOLD = "roku-hold"
+ROKU_BUTTON = "roku-button"
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
 
@@ -193,6 +194,46 @@ def execute(adapter, endpoint, method, path):
     return {
         "accepted": accepted,
         "detail": detail,
+        "total_ms": round(
+            (time.monotonic() - start) * 1000, 1
+        ),
+    }
+
+
+def execute_hold(endpoint, method, path, event):
+    """Execute a queued physical-button press or release."""
+    start = time.monotonic()
+
+    if method != "POST":
+        raise ValueError("Roku held button requires POST")
+
+    keys = {
+        "/keypress/Rev": "Rev",
+        "/keypress/Fwd": "Fwd",
+    }
+
+    key = keys.get(path)
+
+    if key is None:
+        raise ValueError(
+            "Unsupported Roku held-button path: {}".format(path)
+        )
+
+    if not endpoint:
+        raise ValueError("Roku held-button endpoint is empty")
+
+    if event == "pressed":
+        roku.button_down(endpoint, key)
+        operation = "keydown"
+    elif event == "released":
+        roku.button_up()
+        operation = "keyup"
+    else:
+        raise ValueError("Invalid held-button event")
+
+    return {
+        "accepted": True,
+        "detail": "ROKU {} {}".format(operation, key),
         "total_ms": round(
             (time.monotonic() - start) * 1000, 1
         ),
