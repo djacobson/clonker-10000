@@ -132,8 +132,13 @@ def dispatch_hold_button(button_name, action_id, event):
             endpoint = device_config.resolve_endpoint(
                 room, action["target"]
             )
+            command = (
+                action["target"],
+                action["method"],
+                action["path"],
+            )
             actions.dispatch_hold(
-                room_id, action_id, event, endpoint
+                room_id, action_id, event, endpoint, command
             )
         except Exception as exc:
             logger.warning(
@@ -141,7 +146,7 @@ def dispatch_hold_button(button_name, action_id, event):
             )
             return False
 
-        _hold_rooms[button_name] = (room_id, endpoint)
+        _hold_rooms[button_name] = (room_id, endpoint, command)
         return True
 
     if event == "released":
@@ -150,11 +155,11 @@ def dispatch_hold_button(button_name, action_id, event):
         if original is None:
             return False
 
-        room_id, endpoint = original
+        room_id, endpoint, command = original
 
         try:
             actions.dispatch_hold(
-                room_id, action_id, event, endpoint
+                room_id, action_id, event, endpoint, command
             )
             return True
         except Exception as exc:
