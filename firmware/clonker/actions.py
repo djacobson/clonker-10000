@@ -139,7 +139,7 @@ def dispatch(room_id, action_id, delay_seconds=0):
     }
 
 
-def dispatch_hold(room_id, action_id, event, destination=None):
+def dispatch_hold(room_id, action_id, event, destination=None, command=None):
     """Queue a physical held-button press or release."""
     global _peak_depth
 
@@ -167,6 +167,15 @@ def dispatch_hold(room_id, action_id, event, destination=None):
     else:
         endpoint = destination
 
+    if command is None:
+        command = (
+            action["target"],
+            action["method"],
+            action["path"],
+        )
+
+    target, method, path = command
+
     # Preserve the destination at press/release time.
     # Later configuration changes must not redirect a keyup.
     _queue.append({
@@ -175,9 +184,9 @@ def dispatch_hold(room_id, action_id, event, destination=None):
         "kind": "hold",
         "event": event,
         "endpoint": endpoint,
-        "target": action["target"],
-        "method": action["method"],
-        "path": action["path"],
+        "target": target,
+        "method": method,
+        "path": path,
         "due": 0,
     })
 
