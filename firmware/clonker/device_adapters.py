@@ -246,13 +246,24 @@ def poll():
 
 
 def cancel_active():
-    """Request release of active adapter-held controls.
+    """Best-effort cleanup of active Roku holds.
 
-    Does not close persistent Denon connections or discard queued
-    actions. A failed Roku release retains state for later poll()
-    retries and propagates the error to the caller.
+    Attempt both releases independently so a failure
+    in one does not prevent the other.
     """
-    return roku.release()
+    first_error = None
+
+    for release in (roku.button_up, roku.release):
+        try:
+            release()
+        except Exception as error:
+            if first_error is None:
+                first_error = error
+
+    if first_error is not None:
+        raise first_error
+
+    return True
 
 
 def close():
