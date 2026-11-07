@@ -276,11 +276,12 @@ def poll():
         if action_id is None:
             continue
 
-        # Hold-capable buttons will eventually use both events.
-        # Until then, preserve ordinary press-only dispatch.
+        # Skip buttons use queued keydown/keyup events.
+        # All other buttons remain press-only.
         if button.name in HOLD_BUTTONS:
-            if event == "pressed":
-                dispatch_selected(action_id)
+            dispatch_hold_button(
+                button.name, action_id, event
+            )
             continue
 
         # All other buttons retain their original behavior.
