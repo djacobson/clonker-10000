@@ -29,9 +29,9 @@ All listed exterior mounting holes have been drilled and successfully test-fitte
 | **Nav Left** | Philmore 30-146 momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
 | **Nav Right** | Philmore 30-146 momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
 | **Nav Select / OK** | YMJSAN 19 mm metal momentary pushbutton, high head | 20 mm (≈25/32") — step ✓ |
-| **Skip Back** | Philmore 30-2299 sub-mini momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
+| **Skip Back (red)** | Philmore 30-2289 sub-mini SPST NO momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
 | **Play / Pause** | Philmore 30-111 momentary pushbutton | 10 mm (≈25/64") — step ✓ |
-| **Skip Forward** | Philmore 30-2299 sub-mini momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
+| **Skip Forward (red)** | Philmore 30-2289 sub-mini SPST NO momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
 | **Room Selector** | uxcell 2P3T, 3-position rotary switch | 10 mm (≈25/64") — step ✓ |
 | ↳ Selector knob | uxcell s18102300ux0967, 6 mm D-shaft | — |
 | **Power Toggle** | YMJSAN 19 mm metal momentary pushbutton, high head | 20 mm (≈25/32") — step ✓ |
@@ -109,7 +109,7 @@ These measurements document the actual construction results rather than relying 
 
 **Room selector:** The uxcell 2P3T selector fit perfectly in a 10 mm opening. It uses a 6 mm D-shaped shaft. The knob was reused from an earlier multi-position selector.
 
-**Skip Back / Forward:** Both smaller pushbuttons required 9/32-inch openings rather than the initially attempted 1/4-inch holes.
+**Skip Back / Forward:** Both controls use Philmore 30-2289 red nylon, normally-open momentary pushbuttons. They fit the existing verified 7.14 mm (9/32") openings. The original black Philmore 30-2299 normally-closed switches were replaced after failing during soldering. Both models share the same published 0.265-inch mounting-hole specification.
 
 **OLED mounting:** Four 7/64-inch holes provided a good fit for the M2.5 mounting screws. Minor rotational adjustment was possible by loosening the screws.
 
