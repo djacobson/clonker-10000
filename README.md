@@ -26,17 +26,17 @@ Fewer buttons. Bigger switches. Beautiful metallic knobs. Real tactile feedback.
 
 And perhaps a case that opens with actual lunchbox latches.
 
-*(For now, imagine those magnificent controls mounted on a big-ass, honkin' brick of an enclosure, weighing somewhere between 0.5 and 10 pounds. Possibly steampunk-ish. Definitely not something that disappears between sofa cushions.)*
+*(Imagine a collection of magnificent controls mounted on a big-ass, honkin' enclosure, weighing somewhere between 0.5 and 10 pounds. Possibly steampunk-ish. Definitely not something that disappears between sofa cushions.)*
 
 <p>
   <sub>
     <b>⚙️ CURRENT COMPATIBILITY — EXTREME BETA</b><br>
-    <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython<br>
-    <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (future)<br>
+    <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython 10.3.1<br>
+    <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (future possibility)<br>
     <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
-    <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<
-    <b>Configuration:</b> Browser editor · HTTP and Denon TCP control · Executable custom actions<br>
-    <b>Physical controls:</b> Room selector · Power Toggle · Rotary volume encoder operational
+    <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<br>
+    <b>Configuration:</b> Browser editor · Config v4 · Custom actions<br>
+    <b>Physical controls:</b> Room selector · Power · Volume/Mute · Navigation · Playback
   </sub>
 </p>
 
@@ -50,7 +50,7 @@ Not because they're modern. I like modern technology.
 
 I dislike the tiny, nearly indistinguishable rubber buttons, the obsession with sleekness, and the apparent assumption that everybody operates their television while staring directly at the remote.
 
-Humans are tactile beasts.
+**Humans are tactile beasts.**
 
 I want to reach for my remote in pitch-black darkness, immediately recognize what I'm touching, and operate the important functions without looking.
 
@@ -187,43 +187,66 @@ The current finalists:
 
 ## What Is the Clonker Actually Going to Do?
 
-The Clonker is being developed as a configurable Wi-Fi remote for multiple home theater systems.
+The Clonker is a configurable Wi-Fi remote for multiple home theater systems.
 
-The goal is to control everyday functions through a small number of physical controls rather than a forest of device-specific buttons.
+Instead of maintaining separate physical controls for every device, it sends generic actions to equipment selected through the current room's configuration.
 
-### Fundamental actions
+### Fourteen Fundamental Actions
 
-Each configured room supports fourteen standard action IDs:
+Each configured room supports the same fourteen action IDs:
 
 | Function | Actions |
 |---|---|
 | Volume | Up, Down, Mute Toggle |
 | Navigation | Up, Down, Left, Right, Select |
-| Navigation shortcuts | Back, Home |
+| Shortcuts | Back, Home |
 | Playback | Play/Pause, Skip Back, Skip Forward |
 | Power | Power Toggle |
 
-Each action can be mapped to a configured TV, AV receiver, or streaming device.
+Each action can target a configured television, AV receiver, or streaming device.
 
-Clonker Config v4 supports up to three rooms, each with its own devices and command mappings. The current installation configures Den and Sunroom.
+The current installation has three configured room entries:
 
-**Custom actions are operational in firmware.** They can combine ordered device commands and cooperative waits for equipment-specific functions such as listening modes or a simple movie-start sequence.
+- **Den:** Operational Denon AVR and Roku equipment.
+- **Sunroom:** Operational Denon AVR and Roku equipment.
+- **Room 3:** A configured placeholder for future expansion.
 
-The browser Test Remote can execute custom actions today.
+The physical room selector switches between them.
 
-The physical room selector, Power Toggle, Bourns volume encoder, and encoder push-to-mute are operational. The custom-action encoder and remaining physical controls are still being integrated.
+The third room is not a combined-room mode. Its device addresses and commands are currently blank.
+
+### Custom Actions
+
+The Clonker can also execute named sequences of configured commands.
+
+For example, a *Movie* action might:
+
+1. Send Home to the streaming device.
+2. Wait a few seconds.
+3. Select a receiver listening mode.
+
+Custom actions are already operational through the browser Test Remote.
+
+They use the same command queue as ordinary actions, so an unrelated eligible command can execute while a custom action is waiting.
+
+The second rotary encoder is intended to make selecting and running these actions possible without opening the browser.
 
 ### Device Compatibility Roadmap
 
-Clonker's current, tested network-control targets are Denon AV receivers and Roku streaming devices.
+Current tested equipment includes:
 
-**Apple TV support is an explicit future project objective.** The long-term goal is to support Apple TV alongside Roku through the same fundamental Clonker actions, without requiring different physical controls.
+- **Denon AV receivers**, using HTTP commands and persistent TCP for recognized volume actions.
+- **Roku streaming devices**, using ECP commands, including held-key behavior.
 
-Other network-controllable TVs, receivers, and streaming devices may be considered as the project develops.
+**Apple TV support is an explicit future objective.**
 
-Apple TV support has not yet been implemented or tested. Its protocol, pairing, authentication, and integration requirements will be investigated when that development phase begins.
+Its discovery, pairing, authentication, and control requirements will be investigated when that development phase begins.
 
-**The goal is simple: the physical controls shouldn't care whether they're talking to a Denon, Roku, or something we haven't added yet.**
+Other network-controllable TVs, receivers, and streaming devices may be considered later.
+
+The goal is simple:
+
+**The physical controls shouldn't care whether they're talking to a Denon, Roku, or something we haven't added yet.**
 
 ---
 
@@ -231,7 +254,7 @@ Apple TV support has not yet been implemented or tested. Its protocol, pairing, 
 
 The Clonker 10000 is still very much a work in progress.
 
-The final enclosure hasn't materialized yet, but the knobs, switches, and assorted electronic organs are beginning to assemble into something that might eventually resemble a remote control.
+The knobs, switches, buttons, and assorted electronic organs are assembling into something that might eventually resemble a remote control.
 
 Or possibly the control panel of a very small submarine.
 
@@ -258,41 +281,51 @@ The current controller is a **Raspberry Pi Pico 2 W (RP2350)** running **Circuit
 
 A Pico Cowbell Terminal board provides screw-terminal GPIO connections, and a WAGO ground bus distributes common ground to the controls.
 
-### Physical controls already verified
+The physical build includes an aluminum faceplate, substantial controls, and a growing collection of wiring that would probably concern a minimalist industrial designer.
 
-- **GP17 SERVICE/DEVICE switch:** Selects USB filesystem ownership or firmware write access at boot. Requires a complete power cycle to change modes.
-- **GP18 CONFIG/RUN switch:** Enables or disables the browser management listener live, without rebooting.
-- **GP3/GP6/GP7 rotary room selector:** Selects Den, Sunroom, or reserved Room 3.
-- **GP2 momentary Power Toggle:** Dispatches the selected room's configured power action. Actual ON/OFF equipment behavior verified in Den and Sunroom.
-- **GP8/GP9 Bourns volume encoder:** Physical rotation dispatches room-aware volume commands through Denon TCP or Roku ECP.
-- **GP10 encoder push-to-mute:** Physical press toggles mute in either configured room.
+### Physical Controls
 
-GP4/GP5 are reserved for the Cowbell's STEMMA QT/I²C connector, potentially for the planned OLED status display.
+| Control | Current status |
+|---|---|
+| Three-position room selector | Operational |
+| Momentary Power Toggle | Operational |
+| Bourns volume encoder | Operational |
+| Volume push-to-mute | Operational |
+| Navigation Up/Down/Left/Right | Operational |
+| Select / OK | Operational |
+| Back and Home | Operational |
+| Play/Pause | Operational |
+| Skip Back / Skip Forward | Operational |
+| Second Bourns encoder | Wired and electrically tested |
+| SERVICE/DEVICE switch | Operational |
+| CONFIG/RUN switch | Operational |
 
-### Hardware still being integrated
+The volume encoder controls real equipment in two rooms using different network protocols.
 
-- Second Bourns PEC11R encoder for custom-action selection and push-to-run.
-- Substantial tactile navigation and shortcut buttons.
-- Tiny OLED status display.
-- Optional piezo or I²S-powered audible feedback.
-- Rechargeable power.
-- Final enclosure and aluminum faceplate.
+The navigation and skip buttons support Roku keydown/keyup behavior, allowing a physical button to remain held rather than merely sending repeated individual keypresses.
 
-The working Bourns encoder is the selected volume-control hardware. The previously considered Grayhill encoder is being saved for another project.
+The second Bourns encoder is intended for custom-action selection and execution.
 
-The Pico 2 W is the active development platform.
+### Still on the Workbench
 
-An earlier ESP32-S3 Feather board was part of the original hardware exploration but is not the current firmware target.
+- OLED status display.
+- Audible CLONK feedback.
+- Final internal wiring and strain relief.
+- Enclosure finishing and assembly.
+- Rechargeable power and sleep/wake behavior.
+- Additional reliability testing.
 
-**Hardware reality check:** Room selection, Power Toggle, rotary volume, and push-to-mute work against actual home-theater equipment. The complete control panel is still under construction.
+The previously considered Grayhill volume encoder was set aside in favor of the Bourns units.
 
-See [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) for the detailed inventory, proposed layout, GPIO status, and ongoing design decisions.
+The Pico 2 W is the active firmware platform. An earlier ESP32-S3 Feather was part of the initial exploration, not the current implementation.
+
+For component details, GPIO assignments, physical layout, and build decisions, see [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md).
 
 ---
 
 ## A Peek at the Software
 
-The configuration interface already exists and runs on the Pico.
+The Clonker already has a browser-based configuration interface running directly on the Pico.
 
 <p align="left">
   <img src="images/clonker_config_sample.png"
@@ -301,20 +334,22 @@ The configuration interface already exists and runs on the Pico.
        style="vertical-align: top;">
 </p>
 
-The project also includes a browser Test Remote for exercising the same fourteen fundamental action IDs that physical controls invoke.
+There's also a browser Test Remote that exercises the same fundamental actions used by the physical controls.
 
-It can also run configured custom actions, including multi-step sequences across different devices.
+It can run custom actions, test equipment commands, and help verify configuration before everything is permanently mounted in the enclosure.
 
-This allows the software architecture to be tested before committing to the final enclosure and GPIO wiring arrangement.
+The browser interface is primarily a configuration and development tool.
 
-**The first rotary knob is operational!** The physical Bourns volume encoder controls Den through persistent Denon TCP and Sunroom through Roku ECP held-volume. Pressing the knob toggles mute in either room. One knob, two rooms, and no need for a new command queue.
+**The objective is to use the physical remote without needing the browser at all.**
 
 ---
 
 ## Software Architecture
 
 <p align="center">
-  <img src="images/clonker_brain.jpeg" alt="The Clonker 10000 Brain" width="600">
+  <img src="images/clonker_brain.jpeg"
+       alt="The Clonker 10000 Brain"
+       width="600">
   <br>
   <sub>
     <b>The Clonker Brain</b> — A Raspberry Pi Pico 2 W,
@@ -322,159 +357,139 @@ This allows the software architecture to be tested before committing to the fina
   </sub>
 </p>
 
-The Clonker uses a small, intentionally straightforward software architecture.
-
+The software architecture is intentionally straightforward.
 
 ```text
-Physical GPIO inputs             Browser Test Remote
-  (room selector, buttons,             |
-   volume encoder)                     |
-          |                             v
-          v                       HTTP action API
-   Physical coordinator                 |
-          |                             |
-          v                             |
-   Room-aware dispatch                  |
-          |                             |
-          +---------------+-------------+
-                          |
-                          v
-                   Action dispatcher
-                          |
-                          v
-                     DUMB QUEUE
-                          |
-                          v
-                   Device adapters
-                          |
-               +----------+----------+
-               |          |          |
-               v          v          v
-           Denon TCP   Roku Hold  Generic HTTP
-           Persistent  ECP Keys    GET / POST
-               |          |          |
-               v          v          v
-           Denon AVR     Roku     Roku / Denon
-             Volume     Volume    Other Actions
-
-           Cooperative adapter maintenance
-                    |
-                    v
-             Roku key release
+       PHYSICAL CONTROLS       BROWSER TEST REMOTE
+                |                      |
+                v                      |
+       Physical Coordinator            |
+                |                      |
+                +-----------+----------+
+                            |
+                            v
+                     Action Dispatcher
+                            |
+                            v
+                       DUMB QUEUE
+                            |
+                            v
+                      Device Adapters
+                            |
+              +-------------+-------------+
+              |             |             |
+              v             v             v
+          Denon TCP      Roku ECP      Generic HTTP
+          Persistent     Held Keys      GET / POST
+              |             |             |
+              v             v             v
+          Denon AVR        Roku       Other Commands
 ```
 
 **Both input paths converge on the same action dispatcher and Dumb Queue™.**
 
-The physical room selector establishes context. Buttons and encoder movements produce generic actions that are resolved using the selected room's configuration.
+Physical controls generate generic actions. The selected room's configuration determines which equipment receives them.
 
-Room 3 is reserved. If selected without a configured room, physical action dispatch safely does nothing.
+The queue schedules work, preserves applicable ordering, handles custom-action waits, and cancels pending commands after execution failures.
 
-The queue preserves command ordering, schedules delayed work, and cancels pending commands when execution fails.
+Device adapters select the appropriate transport.
 
-A device-adapter resolver recognizes supported fundamental-command signatures and caches specialized selections when configuration becomes active.
+- Denon volume uses persistent TCP with command pacing.
+- Roku volume uses temporary ECP key holds.
+- Six physical navigation and skip buttons use explicit Roku keydown/keyup.
+- Other supported commands use generic HTTP.
 
-Recognized Denon volume commands use persistent TCP with 50 ms minimum transmission spacing.
+Roku held-key cleanup is maintained cooperatively even after the last queued command finishes.
 
-Recognized Roku volume commands use ECP held-key behavior: the first detent starts a hold, subsequent same-direction detents extend it locally, and adapter maintenance releases the key after rotation stops.
+The Clonker does not claim to know the actual state of every connected device. It tracks commands, not reality.
 
-Other commands use generic HTTP, including Roku mute and current custom-action steps.
+And yes, the queue really is called the **Dumb Queue™**.
 
-The adapter layer coordinates execution and lifecycle cleanup without introducing another action queue.
+Because sometimes the smartest design decision is knowing when not to be clever.
 
-Custom actions reuse the shared Dumb Queue™. Cooperative waits permit unrelated eligible commands to execute while a custom action is delayed.
-
-Outbound networking remains synchronous. Specialized adapters reduce repeated connection overhead but do not guarantee uninterrupted physical polling.
-
-The architecture has been verified against actual Denon and Roku equipment, including mixed-room volume, physical mute, command ordering, custom-action waits, and failure-cancellation regression tests.
+For the engineering details, see [System Architecture](docs/ARCHITECTURE.md) and [Firmware & Network](docs/FIRMWARE_NETWORK.md).
 
 ### Configuration
 
-Configuration is stored in JSON and edited through the Clonker's browser interface.
-
 The current **Clonker Config v4** system supports:
 
-- One to three configured rooms using supported stable IDs; the current sample configures Den and Sunroom.
-- TV, AVR, and streaming-device endpoints per room.
-- IPv4 addresses with optional HTTP ports.
+- One to three rooms.
+- Three generic built-in device destinations per room.
 - Fourteen fundamental actions per room.
 - GET and POST command definitions.
-- Separate ON and OFF command paths for mute and power toggles.
-- Volatile, independent toggle command-direction histories per room and action.
-- Blank commands as intentional no-ops.
-- Up to sixteen named custom actions per room, each containing one to sixteen ordered steps.
-- Cooperative waits between custom-action steps.
-- Configuration revision checking.
-- Stale-edit conflict protection.
-- No-change detection.
-- Rotating backups.
-- Validated startup recovery.
-- Filesystem write protection during USB SERVICE mode.
+- Separate configured power and mute paths.
+- Named custom actions with ordered steps and waits.
+- Revision checking and stale-edit protection.
+- Validated saves, backups, and recovery.
+- Intentional blank commands for ordinary actions.
 
-**Runtime toggle direction selection is implemented and tested.** The next ON/OFF direction advances only after a successful HTTP request.
+Configuration is stored as JSON and edited through the browser.
 
-It is command history, not authoritative knowledge of the equipment's actual power or mute state.
+The current Room 3 placeholder has blank equipment commands. Ordinary actions safely do nothing there; explicit Roku held-button dispatch still needs equivalent blank-command protection.
+
+The configuration system is designed to avoid silently sending commands to another room when the selected room is unavailable.
+
+See [Configuration & Recovery](docs/CONFIGURATION.md).
 
 ### Management Interface
 
-The Pico hosts a browser-based configuration and testing interface on port `9090` while in CONFIG mode.
+The Pico hosts its management interface on port `9090` while CONFIG mode is enabled.
 
-The interface currently provides:
+The interface provides configuration editing, Test Remote operation, custom-action execution, and clock synchronization.
 
-- JSON configuration editing.
-- Device and room settings.
-- Configuration save and validation.
-- A Test Remote with all fourteen fundamental actions.
-- Room-specific custom-action selection and execution.
-- A clock synchronization interface.
-- SERVICE/DEVICE filesystem ownership protection.
+The management service is intended for a trusted local network. It does not currently provide application-level authentication.
 
-The browser Test Remote and physical controls use the same shared action dispatcher and Dumb Queue™.
+The firmware's CONFIG/RUN switch enables or disables the management interface without rebooting.
 
-**Real network control is operational.** The Pico executes configured Roku and Denon HTTP commands, recognized Denon volume commands through persistent TCP, and recognized Roku volume commands through held-key ECP.
+The separate SERVICE/DEVICE switch controls filesystem write ownership at boot.
 
-The browser receives an acknowledgment when an action is queued. Actual device execution occurs subsequently through the cooperative scheduler.
-
-Chapter 6 connected physical room selection, Power Toggle, rotary volume, and push-to-mute to this shared execution path, with Denon TCP and Roku ECP providing specialized volume transports.
-
-The remaining physical controls can reuse the established architecture rather than introducing another execution mechanism.
+See [Operating Modes](docs/OPERATING_MODES.md).
 
 ---
 
 ## Where the Monster Stands
 
-**November 3, 2026 — Chapter 6 complete.**
+**November 7, 2026 — Chapter 7 physical-controls milestone.**
 
-The Clonker 10000 is still in extreme beta, but it's no longer just a pile of ambitious electronics and questionable design decisions.
+The Clonker 10000 is still in extreme beta.
+
+But it's no longer just a collection of ambitious electronics, colorful wires, and questionable design decisions.
 
 **The Monster actually controls things now.**
 
 ### What's Alive ⚡
 
-- **Two rooms, one remote:** A physical rotary selector switches between Den and Sunroom, with a third position reserved for future mischief.
-- **Power at your fingertips:** The physical Power Toggle controls real equipment in either room.
-- **Jason Bourne has entered the building:** Our Bourns rotary encoder adjusts volume in both rooms. Press the knob to mute or unmute.
-- **Two protocols, one knob:** Denon uses persistent TCP; Roku uses clever ECP held-key commands. The hardware doesn't know or care.
-- **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom action sequences, and the legendary Dumb Queue™ are operational.
-- **Safety without sophistication:** Invalid room selections do nothing, configuration changes are validated, and failed commands don't leave the queue running amok.
+- **Three room positions:** Den, Sunroom, and a configured Room 3 placeholder.
+- **Power at your fingertips:** Physical Power Toggle works in Den and Sunroom.
+- **Jason Bourne has entered the building:** The Bourns volume encoder controls both rooms. Press to mute.
+- **Two protocols, one knob:** Denon uses persistent TCP; Roku uses ECP held-volume.
+- **Actual navigation:** Up, Down, Left, Right, Select, Back, and Home are integrated.
+- **Playback controls:** Play/Pause and Skip Back/Forward are integrated.
+- **Buttons that understand holding:** Six Roku navigation and skip buttons support explicit press/release behavior.
+- **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom actions, and the Dumb Queue™.
+- **A more responsive workshop:** CONFIG-mode browser performance improved during Chapter 7 testing.
 
-All of this has been exercised against actual home-theater equipment, not just simulated buttons and wishful thinking.
+These are working firmware and physical-control capabilities, not just plans on a drawing board.
 
 ### What's Still on the Operating Table 🔧
 
-- The second rotary encoder for selecting and running custom actions.
-- Navigation, Home, Back, and playback buttons.
-- OLED status display and audible CLONK feedback.
-- Final enclosure, faceplate, wiring, and rechargeable power.
-- Sleep/wake behavior and additional reliability testing.
-- Future device support, including Apple TV.
+- Complete the custom-action rotary interface.
+- Bring the OLED display to life.
+- Add satisfying audible CLONK feedback.
+- Finish the enclosure, wiring, and power system.
+- Investigate sleep/wake behavior.
+- Improve reliability and failure recovery.
+- Expand compatibility, including Apple TV.
 
 ### What's Next?
 
-More physical controls, beginning with the custom-action encoder or navigation buttons.
+The second Bourns encoder is wired and waiting for its application-level role: selecting a configured custom action and pressing to execute it.
 
-The underlying firmware is already doing its job. Now we're building the satisfying collection of knobs, switches, and buttons that will make using it a pleasure.
+That should make the Clonker considerably more useful without touching the browser.
 
-For the engineering details, test results, and occasionally embarrassing development history, see the [technical documentation](#documentation).
+After that, the OLED and final hardware assembly can start making this thing look less like a bench experiment.
+
+Or perhaps more like a bench experiment inside a very nice enclosure.
 
 **The software talks to the equipment.**
 
@@ -488,22 +503,22 @@ For the engineering details, test results, and occasionally embarrassing develop
 
 ## Documentation
 
-The project is being documented as it develops, including decisions, testing, and implementation boundaries.
+The project is documented as it develops, including architectural decisions, implementation details, testing, and the occasional embarrassing experiment.
 
 | Document | Purpose |
 |---|---|
-| [Architecture](docs/ARCHITECTURE.md) | Overall system design and implementation boundaries |
-| [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) | Physical controls, component inventory, and design manifesto |
-| [Configuration](docs/CONFIGURATION.md) | Config v4 JSON schema, validation, and recovery |
-| [Firmware & Network](docs/FIRMWARE_NETWORK.md) | HTTP API, networking, and clock behavior |
+| [Architecture](docs/ARCHITECTURE.md) | System design, component responsibilities, and boundaries |
+| [Hardware & Physical Controls](docs/HARDWARE_CONTROLS.md) | Components, GPIO, wiring, and physical design |
+| [Configuration](docs/CONFIGURATION.md) | Config v4 schema, validation, and recovery |
+| [Firmware & Network](docs/FIRMWARE_NETWORK.md) | Networking, adapters, scheduler, and diagnostics |
 | [Operating Modes](docs/OPERATING_MODES.md) | SERVICE/DEVICE and CONFIG/RUN |
 | [Development](docs/DEVELOPMENT.md) | Development and deployment workflow |
-| [Development History](docs/DEVELOPMENT_HISTORY.md) | Major milestones in Clonker development |
-| [Chapter 2 Handoff](docs/CHAPTER_2_HANDOFF.md) | Historical Chapter 2 handoff and development baseline |
+| [Development History](docs/DEVELOPMENT_HISTORY.md) | Chronological milestones and test evidence |
+| [Chapter 2 Handoff](docs/CHAPTER_2_HANDOFF.md) | Historical development baseline |
 
 This is a personal, experimental maker project, not a finished commercial product.
 
-The documentation is intended to distinguish implemented behavior from ideas, prototypes, and future plans.
+The documentation distinguishes implemented features from planned work and historical experiments.
 
 ---
 
