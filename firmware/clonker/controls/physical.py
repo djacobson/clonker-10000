@@ -62,6 +62,9 @@ BUTTON_ACTIONS = {
     "RIGHT": "nav-right",
     "SELECT": "select",
     "VOLUME_MUTE": "mute-toggle",
+    "SKIP_BACK": "skip-back",
+    "PLAY_PAUSE": "play-pause",
+    "SKIP_FORWARD": "skip-forward",
 }
 
 
@@ -118,6 +121,9 @@ def initialize():
         ("SELECT", pins.SELECT_BUTTON_PIN),
         ("VOLUME_MUTE", pins.VOLUME_ENCODER_BUTTON_PIN),
         ("ACTION_RUN", pins.ACTION_ENCODER_BUTTON_PIN),
+        ("SKIP_BACK", pins.SKIP_BACK_BUTTON_PIN),
+        ("PLAY_PAUSE", pins.PLAY_PAUSE_BUTTON_PIN),
+        ("SKIP_FORWARD", pins.SKIP_FORWARD_BUTTON_PIN),
     )
 
     for name, pin_number in definitions:
