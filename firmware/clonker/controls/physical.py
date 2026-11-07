@@ -81,6 +81,8 @@ _initialized = False
 _buttons = []
 
 _volume_encoder = None
+_action_encoder = None
+_action_count = 0
 # Physical button name -> room selected when pressed.
 _hold_rooms = {}
 
@@ -178,6 +180,7 @@ def initialize():
     """Initialize assigned physical buttons and room selector."""
     global _initialized
     global _volume_encoder
+    global _action_encoder
 
     if _initialized:
         return True
@@ -248,12 +251,32 @@ def initialize():
                 "Volume encoder unavailable: {}".format(exc)
             )
 
+    # Initialize the Custom Action rotary encoder.
+    if (
+        pins.ACTION_ENCODER_A_PIN is not None
+        and pins.ACTION_ENCODER_B_PIN is not None
+    ):
+        try:
+            encoder = Encoder(
+                "ACTION",
+                pins.ACTION_ENCODER_A_PIN,
+                pins.ACTION_ENCODER_B_PIN,
+            )
+            encoder.initialize()
+            _action_encoder = encoder
+            logger.info("Action encoder initialized")
+        except Exception as exc:
+            logger.warning(
+                "Action encoder unavailable: {}".format(exc)
+            )
+
     _initialized = True
     return True
 
 
 def poll():
     """Poll physical inputs and route button presses."""
+    global _action_count
 
     if not _initialized:
         return
@@ -305,3 +328,13 @@ def poll():
 
             dispatch_selected(action_id)
 
+    # Custom Action encoder: local selection counter only.
+    # No queue activity or network dispatch.
+    if _action_encoder is not None:
+        step = _action_encoder.poll()
+
+        if step:
+            _action_count += step
+            logger.info(
+                "ACTION ENCODER: {}".format(_action_count)
+            )
