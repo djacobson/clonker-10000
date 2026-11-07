@@ -208,6 +208,10 @@ def execute_hold(endpoint, method, path, event):
         raise ValueError("Roku held button requires POST")
 
     keys = {
+        "/keypress/Up": "Up",
+        "/keypress/Down": "Down",
+        "/keypress/Left": "Left",
+        "/keypress/Right": "Right",
         "/keypress/Rev": "Rev",
         "/keypress/Fwd": "Fwd",
     }
