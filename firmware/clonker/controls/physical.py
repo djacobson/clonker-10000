@@ -111,7 +111,7 @@ def dispatch_selected(action_id):
 
 
 def dispatch_hold_button(button_name, action_id, event):
-    """Queue a held-button event using its original room."""
+    """Queue a hold using the room and endpoint from press."""
     if event == "pressed":
         room_id = selectors.selected_room()
 
@@ -126,24 +126,36 @@ def dispatch_hold_button(button_name, action_id, event):
             return False
 
         try:
-            actions.dispatch_hold(room_id, action_id, event)
+            room, action = device_config.action_details(
+                room_id, action_id
+            )
+            endpoint = device_config.resolve_endpoint(
+                room, action["target"]
+            )
+            actions.dispatch_hold(
+                room_id, action_id, event, endpoint
+            )
         except Exception as exc:
             logger.warning(
                 "PHYSICAL hold dispatch failed: {}".format(exc)
             )
             return False
 
-        _hold_rooms[button_name] = room_id
+        _hold_rooms[button_name] = (room_id, endpoint)
         return True
 
     if event == "released":
-        room_id = _hold_rooms.pop(button_name, None)
+        original = _hold_rooms.pop(button_name, None)
 
-        if room_id is None:
+        if original is None:
             return False
 
+        room_id, endpoint = original
+
         try:
-            actions.dispatch_hold(room_id, action_id, event)
+            actions.dispatch_hold(
+                room_id, action_id, event, endpoint
+            )
             return True
         except Exception as exc:
             logger.warning(
