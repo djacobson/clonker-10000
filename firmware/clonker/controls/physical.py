@@ -78,6 +78,8 @@ _initialized = False
 _buttons = []
 
 _volume_encoder = None
+# Physical button name -> room selected when pressed.
+_hold_rooms = {}
 
 
 def dispatch_selected(action_id):
@@ -106,6 +108,50 @@ def dispatch_selected(action_id):
             )
         )
         return False
+
+
+def dispatch_hold_button(button_name, action_id, event):
+    """Queue a held-button event using its original room."""
+    if event == "pressed":
+        room_id = selectors.selected_room()
+
+        if room_id not in device_config.current()["rooms"]:
+            logger.info(
+                "PHYSICAL HOLD NO-OP: {} / {} "
+                "(room unavailable)".format(room_id, action_id)
+            )
+            return False
+
+        if button_name in _hold_rooms:
+            return False
+
+        try:
+            actions.dispatch_hold(room_id, action_id, event)
+        except Exception as exc:
+            logger.warning(
+                "PHYSICAL hold dispatch failed: {}".format(exc)
+            )
+            return False
+
+        _hold_rooms[button_name] = room_id
+        return True
+
+    if event == "released":
+        room_id = _hold_rooms.pop(button_name, None)
+
+        if room_id is None:
+            return False
+
+        try:
+            actions.dispatch_hold(room_id, action_id, event)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "PHYSICAL hold release failed: {}".format(exc)
+            )
+            return False
+
+    return False
 
 
 def initialize():
