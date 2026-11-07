@@ -139,6 +139,58 @@ def dispatch(room_id, action_id, delay_seconds=0):
     }
 
 
+def dispatch_hold(room_id, action_id, event):
+    """Queue a physical held-button press or release."""
+    global _peak_depth
+
+    if room_id not in device_config.ROOM_IDS:
+        raise ValueError("Unknown room")
+
+    if action_id not in ("skip-back", "skip-forward"):
+        raise ValueError("Unsupported held-button action")
+
+    if event not in ("pressed", "released"):
+        raise ValueError("Invalid held-button event")
+
+    if len(_queue) >= QUEUE_CAPACITY:
+        logger.warning("DUMB QUEUE: Full; hold rejected")
+        raise ValueError("Action queue full")
+
+    room, action = device_config.action_details(
+        room_id, action_id
+    )
+
+    endpoint = device_config.resolve_endpoint(
+        room, action["target"]
+    )
+
+    # Preserve the destination at press/release time.
+    # Later configuration changes must not redirect a keyup.
+    _queue.append({
+        "room": room_id,
+        "action": action_id,
+        "kind": "hold",
+        "event": event,
+        "endpoint": endpoint,
+        "method": action["method"],
+        "path": action["path"],
+        "due": 0,
+    })
+
+    _peak_depth = max(_peak_depth, len(_queue))
+
+    logger.info(
+        "QUEUED HOLD: {} / {} {} (depth {})".format(
+            room["name"],
+            action_id,
+            event.upper(),
+            len(_queue),
+        )
+    )
+
+    return True
+
+
 def poll():
     """Execute at most one eligible command."""
     global _last_result, _last_error
