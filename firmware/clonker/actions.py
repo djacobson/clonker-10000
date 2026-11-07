@@ -172,6 +172,7 @@ def dispatch_hold(room_id, action_id, event):
         "kind": "hold",
         "event": event,
         "endpoint": endpoint,
+        "target": action["target"],
         "method": action["method"],
         "path": action["path"],
         "due": 0,
@@ -252,7 +253,7 @@ def poll():
 
         elif kind == "hold":
             room = device_config.current()["rooms"][room_id]
-            target = "streaming"
+            target = task["target"]
             endpoint = task["endpoint"]
             method = task["method"]
             path = task["path"]
