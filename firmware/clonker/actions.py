@@ -139,7 +139,7 @@ def dispatch(room_id, action_id, delay_seconds=0):
     }
 
 
-def dispatch_hold(room_id, action_id, event):
+def dispatch_hold(room_id, action_id, event, destination=None):
     """Queue a physical held-button press or release."""
     global _peak_depth
 
@@ -160,9 +160,12 @@ def dispatch_hold(room_id, action_id, event):
         room_id, action_id
     )
 
-    endpoint = device_config.resolve_endpoint(
-        room, action["target"]
-    )
+    if destination is None:
+        endpoint = device_config.resolve_endpoint(
+            room, action["target"]
+        )
+    else:
+        endpoint = destination
 
     # Preserve the destination at press/release time.
     # Later configuration changes must not redirect a keyup.
