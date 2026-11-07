@@ -67,6 +67,12 @@ BUTTON_ACTIONS = {
     "SKIP_FORWARD": "skip-forward",
 }
 
+# Physical buttons eligible for explicit press/release handling.
+# Activation will follow once the device adapter supports holds.
+HOLD_BUTTONS = (
+    "SKIP_BACK",
+    "SKIP_FORWARD",
+)
 
 _initialized = False
 _buttons = []
@@ -202,13 +208,20 @@ def poll():
             "{} {}".format(button.name, event.upper())
         )
 
-        # Only stable presses trigger actions.
-        if event != "pressed":
-            continue
-
         action_id = BUTTON_ACTIONS.get(button.name)
 
-        if action_id is not None:
+        if action_id is None:
+            continue
+
+        # Hold-capable buttons will eventually use both events.
+        # Until then, preserve ordinary press-only dispatch.
+        if button.name in HOLD_BUTTONS:
+            if event == "pressed":
+                dispatch_selected(action_id)
+            continue
+
+        # All other buttons retain their original behavior.
+        if event == "pressed":
             dispatch_selected(action_id)
 
         # ACTION_RUN will use the custom-action selection
