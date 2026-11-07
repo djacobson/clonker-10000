@@ -1,9 +1,8 @@
-
 # The Clonker 10000 — Firmware, Network & Clock
 
-**Design reference:** Updated November 3, 2026  
+**Design reference:** November 7, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Current baseline:** Chapter 6 — Config v4, Dumb Queue™, physical controls, and protocol adapters  
+**Current baseline:** Chapter 7 — Config v4, Dumb Queue™, physical controls, Roku button holds, and protocol adapters  
 **Scope:** Firmware behavior, networking, scheduler timing, protocol adapters, diagnostics, tests, and operational limitations.
 
 > One Monster. One Dumb Queue™. More than one way to deliver a CLONK.
@@ -34,22 +33,22 @@ Related responsibilities:
 - Roku ECP held-key volume control.
 - Roku ECP mute through generic HTTP.
 - GP17 SERVICE/DEVICE and GP18 CONFIG/RUN switches.
-- GP2 physical Power Toggle.
-- GP3/GP6/GP7 three-position room selector.
-- GP8/GP9 Bourns volume encoder.
-- GP10 volume-encoder push-to-mute.
+- Physical Power Toggle and three-position room selector.
+- Bourns volume encoder and push-to-mute.
+- Physical navigation, Home, Back, Select, and playback input integration.
+- Six Roku physical-button holds using keydown/keyup.
 - Independent per-room power/mute toggle histories.
 - Cooperative custom-action waits and failure cancellation.
+- Three-room Config v4 installation, including a blank Room 3 placeholder.
+- Improved browser responsiveness during Chapter 7 Config Mode testing.
 
-**November 3 milestone:** One physical volume encoder successfully controlled two rooms using different transport protocols. Den used persistent Denon TCP; Sunroom used Roku ECP held-volume commands, with receiver volume changes observed through HDMI-CEC.
-
-Fast rotation, direction reversal, and approximately three seconds of sustained rotation were exercised. Physical push-to-mute was verified in both rooms.
+**Chapter 7 milestone:** The physical interface now extends beyond power and volume. Four navigation buttons and Skip Back/Forward support explicit Roku keydown/keyup behavior through the existing queue and adapter architecture.
 
 ### Pending or not exhaustively tested
 
-The second encoder for custom-action selection, navigation/Back/Home/playback buttons, OLED, audible feedback, battery/sleep, and final enclosure remain pending.
+OLED, audible feedback, battery/sleep, final enclosure, and long-uptime operation remain future work.
 
-Apple TV pairing/control, custom destination slots, Denon TCP response parsing, long-uptime operation, and exhaustive outage recovery are also pending.
+Apple TV pairing/control, custom destination slots, Denon TCP response parsing, and exhaustive outage recovery are also pending.
 
 The management service has **no application-level authentication**. Use only on a trusted LAN; never expose port 9090 to the public internet.
 
@@ -64,16 +63,16 @@ The management service has **no application-level authentication**. Use only on 
 | `firmware/clonker/main.py` | Initialization, operating modes, cooperative scheduler |
 | `firmware/clonker/device_config_v2.py` | Config v4 validation, active configuration, revisions, persistence |
 | `firmware/clonker/actions.py` | Action admission, Dumb Queue™, execution coordination, cancellation |
-| `firmware/clonker/device_adapters.py` | Command-signature recognition, cached adapter selection, execution delegation |
+| `firmware/clonker/device_adapters.py` | Command recognition, cached routing, execution and cleanup |
 | `firmware/clonker/devices/denon.py` | Persistent Denon TCP volume transport |
-| `firmware/clonker/devices/roku.py` | Roku ECP held-volume controller |
+| `firmware/clonker/devices/roku.py` | Roku ECP held-volume and physical-button holds |
 | `firmware/clonker/net/http_transport.py` | Bounded blocking outbound HTTP |
 | `firmware/clonker/net/web.py` | CONFIG-only inbound HTTP and management APIs |
 | `firmware/clonker/controls/pins.py` | GPIO assignments |
 | `firmware/clonker/controls/buttons.py` | Debounced momentary inputs |
 | `firmware/clonker/controls/selectors.py` | Physical room selection |
 | `firmware/clonker/controls/encoders.py` | Reusable quadrature encoder driver |
-| `firmware/clonker/controls/physical.py` | Physical polling, event mapping, room-aware dispatch |
+| `firmware/clonker/controls/physical.py` | Physical polling, action mapping, room-aware dispatch, hold context |
 | `firmware/clonker/controls/switches.py` | CONFIG/RUN state and development overrides |
 | `firmware/clonker/system/clock.py` | Clock reference |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
@@ -90,8 +89,6 @@ The historical filename `device_config_v2.py` does **not** mean the active schem
 
 ### Separation of concerns
 
-The application follows these boundaries:
-
 1. GPIO drivers recognize electrical input events.
 2. Physical coordination translates events into generic actions.
 3. Configuration supplies destinations, methods, and command paths.
@@ -99,7 +96,7 @@ The application follows these boundaries:
 5. `device_adapters.py` selects and invokes the appropriate transport.
 6. Transport modules perform network operations.
 
-Physical controls do not contain Denon or Roku protocol knowledge.
+Physical controls do not contain Denon or Roku protocol implementation.
 
 There is no second volume queue and no independent execution pipeline for specialized adapters.
 
@@ -126,16 +123,18 @@ The main loop also uses a short `time.sleep(0.001)` yield.
 
 These are **target service intervals**, not threads, interrupts, or guaranteed maximum latencies.
 
-The cooperative scheduler services:
+The cooperative scheduler services, in order:
 
-- Physical inputs.
-- At most one eligible queued action.
-- Protocol adapter maintenance, including Roku held-key release.
-- CONFIG/RUN mode evaluation.
-- Inbound management HTTP when enabled.
-- A short yield.
+1. Physical GPIO inputs.
+2. At most one eligible queued action.
+3. Protocol adapter maintenance.
+4. CONFIG/RUN mode evaluation.
+5. Inbound management HTTP when enabled.
+6. A short yield.
 
-The Roku adapter must continue receiving maintenance polls even when the Dumb Queue™ is empty. A held key may require release after the final encoder detent has already been executed.
+The Roku adapter continues receiving maintenance polls even when the Dumb Queue™ is empty.
+
+A held key may require release after the final queued action has completed.
 
 ### 3.2 Independent operating-mode switches
 
@@ -163,28 +162,52 @@ Current GPIO assignments:
 | Power Toggle | GP2 |
 | Room selector — Den | GP3 |
 | Room selector — Sunroom | GP6 |
-| Room selector — reserved Room 3 | GP7 |
+| Room selector — Room 3 | GP7 |
 | Volume encoder A/B | GP8/GP9 |
 | Volume encoder push-to-mute | GP10 |
+| Custom-action encoder A/B | GP11/GP12 |
+| Custom-action encoder pushbutton | GP13 |
+| Navigation Up | GP14 |
+| Navigation Down | GP15 |
+| Navigation Left | GP16 |
 | SERVICE/DEVICE | GP17 |
 | CONFIG/RUN | GP18 |
+| Navigation Right | GP19 |
+| Select / OK | GP20 |
+| Back | GP21 |
+| Home | GP22 |
+| Skip Back | GP26 |
+| Play/Pause | GP27 |
+| Skip Forward | GP28 |
 | OLED I²C reservation | GP4/GP5 |
 
-`physical.poll()` updates room selection, polls initialized buttons, and polls the volume encoder.
+`controls/pins.py` remains the authoritative assignment reference.
+
+`physical.poll()` updates room selection, polls initialized buttons, and polls active encoders.
 
 The room selector requires a valid grounded input and 50 ms stability.
 
 Momentary buttons use a default 30 ms debounce.
 
-Encoder transitions are decoded by the reusable `Encoder` class. Completed movements become `volume-up` or `volume-down` fundamental actions.
+Encoder transitions are decoded by the reusable `Encoder` class. Completed volume movements become `volume-up` or `volume-down` fundamental actions.
 
-The encoder's separate momentary switch generates `mute-toggle`.
-
-`physical.dispatch_selected(action_id)` rejects unavailable rooms before queue admission. Reserved Room 3 must not silently control Den or Sunroom.
+The volume encoder's separate momentary switch generates `mute-toggle`.
 
 Browser Test Remote room selection remains independent of the physical room selector.
 
-Outbound synchronous network operations can still delay GPIO polling. Neither the 1 ms target nor the adapter architecture guarantees capture of every electrical transition under all conditions.
+Outbound synchronous network operations can delay GPIO polling. Neither the 1 ms target nor the adapter architecture guarantees capture of every electrical transition under all conditions.
+
+### 3.4 Chapter 7 responsiveness work
+
+Chapter 7 investigated slow Config page loads, occasional Test Remote timeouts, and competition between physical polling, diagnostics, and management HTTP.
+
+Changes included reducing unnecessary polling and diagnostic overhead while preserving the cooperative scheduler.
+
+Subsequent Safari and Chrome tests showed substantially improved responsiveness.
+
+This did not introduce threads, a concurrent web server, or nonblocking outbound networking.
+
+The fundamental limitation remains: a synchronous socket operation can temporarily delay other cooperative tasks.
 
 ---
 
@@ -208,7 +231,7 @@ The firmware has four distinct networking responsibilities:
 1. **Inbound management HTTP:** Cooperative single-client listener, CONFIG mode only.
 2. **Generic outbound HTTP:** Bounded synchronous request using a fresh TCP connection.
 3. **Denon TCP adapter:** Persistent outbound TCP connection for recognized fundamental volume commands.
-4. **Roku held-volume adapter:** State-managed ECP keydown/keyup requests using the generic outbound HTTP transport.
+4. **Roku ECP adapter:** State-managed keydown/keyup requests for encoder volume and physical-button holds.
 
 The generic HTTP transport reuses its SocketPool object but does not reuse individual HTTP TCP connections.
 
@@ -229,7 +252,7 @@ The listener accepts a connection, receives a bounded request, prepares a respon
 
 A single active-client slot is not concurrent request processing.
 
-| Setting | Current firmware value |
+| Setting | Current documented value |
 |---|---:|
 | `MAX_REQUEST_BYTES` | 10,240 |
 | `MAX_HEADER_BYTES` | 2,048 |
@@ -254,13 +277,13 @@ Config's separate maximum serialized size is 8,192 UTF-8 bytes. HTTP headers and
 
 An API response reporting `queued` means admission, not network transmission or equipment execution.
 
-The browser and physical controls converge at `actions.dispatch()`.
+The browser and physical controls converge at the shared action system.
 
 ### 5.2 Silent clients and browser pacing
 
 Some browser connections arrived without sending request data and occupied the single client slot.
 
-A short idle timeout now abandons completely silent connections. The current source uses 0.2 seconds.
+A short idle timeout abandons completely silent connections.
 
 During Chapter 5, CONFIG pages sometimes stalled or returned `ERR_EMPTY_RESPONSE`.
 
@@ -270,7 +293,9 @@ Changing `WEB_POLL_INTERVAL` from 10 ms to 1 ms substantially improved repeated 
 
 Physical controls were re-enabled and inbound diagnostics disabled.
 
-Occasional browser-client idle timeout messages were still observed during Chapter 6. Their precise cause was not established, and they were not demonstrated to be adapter regressions.
+Chapter 7 continued performance tuning while adding more physical inputs.
+
+The latest browser tests were responsive, although long-term concurrent-load behavior has not been exhaustively established.
 
 ### 5.3 Saves and active state
 
@@ -280,7 +305,7 @@ The active RAM configuration is authoritative.
 
 A successful changed save publishes the validated configuration, rebuilds adapter selections, clears pending queue work, and resets volatile toggle histories.
 
-Adapter lifecycle coordination must account for any outstanding Roku held key when configuration changes.
+Adapter lifecycle coordination must account for outstanding Roku held keys when configuration changes.
 
 An unchanged save preserves pending work and toggle state.
 
@@ -295,8 +320,17 @@ The Pico filesystem does not automatically synchronize with GitHub. Protect brow
 ## 6. The Dumb Queue™
 
 **Module:** `clonker/actions.py`  
-**Capacity:** 128 entries  
-**Main interface:** `dispatch(room_id, action_id, delay_seconds=0)`, `poll()`, `clear()`, `status()`.
+**Capacity:** 128 entries
+
+Main interfaces include:
+
+```python
+dispatch(room_id, action_id, delay_seconds=0)
+dispatch_hold(room_id, action_id, event, destination=None, command=None)
+poll()
+clear()
+status()
+```
 
 > One queue. One poller. One shared execution path.
 
@@ -306,7 +340,7 @@ Admission validates the room, action, delay, and capacity.
 
 Fundamental actions use stable IDs; custom actions use room-specific saved IDs.
 
-Tasks retain compact identity, step index, and due time rather than copied endpoint definitions.
+Ordinary tasks retain compact identity, step index, and due time rather than copied endpoint definitions.
 
 The actual command is resolved from active configuration when executed.
 
@@ -324,7 +358,9 @@ Among currently eligible tasks, queue order matters. This is not strict FIFO acr
 
 A recognized Denon TCP volume command must satisfy the adapter's minimum 50 ms interval.
 
-If the selected eligible command is waiting for pacing, it stays in its queue position and `poll()` returns without executing a later command. This prevents overtaking.
+If the selected eligible command is waiting for pacing, it stays in its queue position and `poll()` returns without executing a later command.
+
+This prevents overtaking.
 
 Pacing uses monotonic time rather than sleeping inside the queue.
 
@@ -338,7 +374,9 @@ Missing endpoints or blank paths produce logged no-ops.
 
 `power-toggle` and `mute-toggle` select configured ON/OFF paths using independent volatile `(room_id, action_id)` direction histories, defaulting to ON.
 
-History advances only after successful transmission. Failures and no-ops do not advance it.
+History advances only after successful transmission.
+
+Failures and no-ops do not advance it.
 
 This is **last-successful-command direction**, not equipment-state discovery.
 
@@ -360,7 +398,47 @@ Current custom steps always use generic HTTP, even when their paths resemble rec
 
 There is no macro thread, branching engine, or rollback.
 
-### 6.5 Failure policy and status
+### 6.5 Physical-button hold events
+
+Chapter 7 added a new queued task type:
+
+```python
+{
+    "kind": "hold",
+    "room": room_id,
+    "action": action_id,
+    "event": "pressed",  # or "released"
+    "endpoint": endpoint,
+    "method": method,
+    "path": path,
+    "due": 0,
+}
+```
+
+This example illustrates the relevant fields; the implementation also retains its target information.
+
+Supported fundamental actions are:
+
+```text
+nav-up
+nav-down
+nav-left
+nav-right
+skip-back
+skip-forward
+```
+
+Unlike ordinary fundamental actions, hold tasks preserve their resolved endpoint and command at admission.
+
+This is essential because a physical button may remain held while the user changes rooms.
+
+The release must return to the original destination.
+
+The queue processes these events through the existing execution loop.
+
+There is no separate button-hold queue.
+
+### 6.6 Failure policy and status
 
 An execution exception discards remaining queued tasks, including unfinished custom work, and logs the failure.
 
@@ -384,19 +462,24 @@ Queue admission, successful network transmission, and confirmed equipment behavi
 
 The adapter layer separates **what action was requested** from **how the command reaches the equipment**.
 
-Adapter selection is based on recognized command signatures, not room names, manufacturer labels, or fixed device positions.
+Ordinary adapter selection is based on recognized command signatures, not room names, manufacturer labels, or fixed device positions.
+
+Explicit physical-button holds use a dedicated Roku execution path.
 
 ### 7.1 Supported execution paths
 
-| Adapter | Selection | Transport |
+| Adapter / execution path | Selection | Transport |
 |---|---|---|
 | `denon-tcp` | Recognized Denon fundamental volume commands | Persistent TCP port 23 |
-| `roku-hold` | Recognized Roku fundamental volume commands | ECP keydown/keyup over HTTP |
+| `roku-hold` | Recognized Roku fundamental volume commands | ECP keydown/keyup |
+| Roku physical-button hold | Explicit supported press/release event | ECP keydown/keyup |
 | `generic-http` | Other configured commands | Bounded HTTP GET/POST |
 
-Only fundamental `volume-up` and `volume-down` actions are eligible for specialized adapter selection.
+Only fundamental `volume-up` and `volume-down` actions are eligible for cached specialized adapter selection.
 
 Custom-action steps retain generic HTTP execution.
+
+Physical-button holds bypass ordinary signature-based adapter selection and use `execute_hold()`.
 
 ### 7.2 Recognized Denon signatures
 
@@ -411,7 +494,7 @@ These signatures select `denon-tcp`.
 
 The configured endpoint identifies the receiver host; the adapter uses native TCP port 23.
 
-### 7.3 Recognized Roku signatures
+### 7.3 Recognized Roku volume signatures
 
 Method: POST
 
@@ -432,9 +515,32 @@ POST /keydown/VolumeDown
 POST /keyup/VolumeDown
 ```
 
-### 7.4 Adapter cache
+### 7.4 Physical-button hold signatures
 
-Specialized selections are cached by `(room_id, action_id)`.
+`device_adapters.execute_hold()` recognizes these Roku ECP paths:
+
+```text
+/keypress/Up    -> Up
+/keypress/Down  -> Down
+/keypress/Left  -> Left
+/keypress/Right -> Right
+/keypress/Rev   -> Rev
+/keypress/Fwd   -> Fwd
+```
+
+The configured method must be POST.
+
+A `pressed` event becomes Roku keydown.
+
+A `released` event becomes Roku keyup.
+
+Unsupported methods, paths, or empty endpoints raise execution errors.
+
+These restrictions distinguish explicit physical holds from ordinary generic HTTP actions.
+
+### 7.5 Adapter cache
+
+Specialized fundamental-volume selections are cached by `(room_id, action_id)`.
 
 No adapter identifiers are written into Config v4 JSON.
 
@@ -537,7 +643,7 @@ This reduces network traffic while allowing Roku to repeat the held volume comma
 | Parameter | Value | Purpose |
 |---|---:|---|
 | Idle release | 250 ms | Release after rotation stops |
-| Maximum hold | 2 seconds | Bound continuous hold duration |
+| Maximum volume hold | 2 seconds | Bound continuous hold duration |
 | Failed-release retry | 500 ms | Avoid tight retry loops |
 
 These are experimental values retained after successful physical testing.
@@ -610,7 +716,7 @@ The two HTTP requests still introduce some reversal latency.
 
 ### 9.7 Maximum-hold behavior
 
-A hold is limited to approximately two seconds.
+A volume hold is limited to approximately two seconds.
 
 Continued rotation beyond that boundary releases the previous hold and can begin a new one.
 
@@ -630,20 +736,18 @@ Retry attempts are paced at approximately 500 ms rather than occurring on every 
 
 This is a specialized cleanup mechanism, not a general queue retry policy.
 
-Network failure can still prevent confirmation that the remote received a release. Software cannot guarantee remote key state when the network is unavailable.
+Network failure can still prevent confirmation that the remote received a release.
 
 ### 9.9 Lifecycle coordination
-
-The adapter exposes maintenance and cleanup operations for the application lifecycle.
 
 Held-key cleanup is relevant when:
 
 - Rotation stops.
 - Direction changes.
-- The maximum hold is reached.
+- Maximum hold is reached.
 - Queued work is canceled.
 - Configuration is replaced.
-- The application shuts down.
+- Application shuts down.
 
 Cleanup is best effort and remains subject to network availability.
 
@@ -651,26 +755,21 @@ Cleanup is best effort and remains subject to network availability.
 
 The Roku adapter wraps outbound HTTP failures with operation-specific context.
 
-A diagnostic can identify:
+A diagnostic can identify keydown or keyup, direction, endpoint, and original exception.
 
-- Keydown or keyup.
-- Volume direction.
-- Destination endpoint.
-- Original exception representation.
-
-For example:
+Example:
 
 ```text
 ROKU /keyup/VolumeUp -> 192.168.50.28:8060 failed: OSError(119,)
 ```
 
-This is illustrative; the actual exception formatting depends on CircuitPython and the failure path.
+This is illustrative; actual exception formatting depends on CircuitPython and the failure path.
 
 One transient `OSError(119)` occurred during early reversal testing before these diagnostics were added.
 
 The precise failing operation was not established.
 
-Subsequent tests recovered successfully and showed no further visible socket errors.
+Subsequent tests recovered successfully.
 
 ### 9.11 What the adapter does not guarantee
 
@@ -688,7 +787,159 @@ It is a time-based physical-control mechanism, not a volume-position controller.
 
 ---
 
-## 10. Generic outbound HTTP transport
+## 10. Roku physical-button holds — Chapter 7
+
+**Modules:** `controls/physical.py`, `actions.py`, `device_adapters.py`, `devices/roku.py`
+
+Physical navigation and skip buttons require different behavior from the encoder's held-volume mechanism.
+
+A button remains logically pressed for as long as the user holds it, subject to the safety limit.
+
+### 10.1 Supported buttons
+
+| Physical button | Fundamental action | Roku ECP key |
+|---|---|---|
+| Up | `nav-up` | `Up` |
+| Down | `nav-down` | `Down` |
+| Left | `nav-left` | `Left` |
+| Right | `nav-right` | `Right` |
+| Skip Back | `skip-back` | `Rev` |
+| Skip Forward | `skip-forward` | `Fwd` |
+
+These six buttons use explicit press/release events.
+
+Other physical buttons continue using ordinary fundamental-action dispatch.
+
+### 10.2 Press handling
+
+When a supported button is pressed:
+
+1. The button driver reports a debounced press.
+2. `physical.py` determines the selected room.
+3. The configured endpoint and action command are resolved.
+4. The press context is retained in physical coordination state.
+5. `actions.dispatch_hold()` admits the event.
+6. The queue executes the event through `device_adapters.execute_hold()`.
+7. The Roku module sends the appropriate ECP keydown.
+
+Example:
+
+```text
+Physical NAV_UP pressed
+    |
+    v
+actions.dispatch_hold(..., "pressed")
+    |
+    v
+Dumb Queue
+    |
+    v
+device_adapters.execute_hold()
+    |
+    v
+POST /keydown/Up
+```
+
+The button driver itself does not send HTTP.
+
+### 10.3 Release handling
+
+On physical release:
+
+1. The button driver reports a debounced release.
+2. `physical.py` retrieves the saved press context.
+3. The release is queued using the original endpoint and command.
+4. The adapter sends the corresponding Roku ECP keyup.
+
+Example:
+
+```text
+Physical NAV_UP released
+    |
+    v
+Original room / endpoint / command
+    |
+    v
+actions.dispatch_hold(..., "released")
+    |
+    v
+Dumb Queue
+    |
+    v
+POST /keyup/Up
+```
+
+The original context is important.
+
+If the user changes the room selector while holding a button, the release must still go to the Roku that received the original keydown.
+
+### 10.4 Why hold tasks preserve commands
+
+Ordinary queued fundamental actions resolve their commands from active configuration when eligible.
+
+Hold tasks are different.
+
+They preserve:
+
+- Room ID.
+- Endpoint.
+- Target.
+- Method.
+- Path.
+- Press/release event.
+
+This prevents a later room selection from redirecting the release.
+
+It also avoids having the release depend on newly selected room state.
+
+### 10.5 Hold safety
+
+The physical-button hold mechanism has a maximum hold duration of approximately **30 seconds**.
+
+The Roku module maintains this separately from the two-second encoder-volume hold.
+
+The two mechanisms share the adapter and HTTP transport infrastructure but have distinct hold lifecycles.
+
+Cancellation and shutdown attempt best-effort release cleanup.
+
+A failed keyup may require later cleanup attempts, and complete recovery cannot be guaranteed if the Roku or network becomes unreachable.
+
+### 10.6 Configuration requirements
+
+The explicit physical-button hold adapter requires:
+
+- A configured endpoint.
+- POST method.
+- One of the six recognized Roku ECP keypress paths.
+
+Unsupported paths or blank endpoints are execution errors in the current hold path.
+
+This matters for the current Room 3 placeholder, which contains blank device addresses and command paths.
+
+Ordinary fundamental actions already support blank-command no-ops.
+
+**The physical hold path still needs equivalent blank-command protection before Room 3 can be considered fully safe for all buttons.**
+
+This is a genuine execution boundary, not merely a documentation distinction.
+
+### 10.7 Verification
+
+Chapter 7 testing exercised all six supported physical hold buttons.
+
+The tests established:
+
+- Debounced physical press detection.
+- Queued hold admission.
+- Roku keydown execution.
+- Physical release detection.
+- Roku keyup execution.
+- Practical held-button behavior.
+
+The tests do not establish guaranteed release after every possible network outage or application interruption.
+
+---
+
+## 11. Generic outbound HTTP transport
 
 **Module:** `clonker/net/http_transport.py`  
 **Interface:** `send(endpoint, method, path)`
@@ -715,11 +966,11 @@ Non-2xx responses, malformed requests, connection errors, and timeouts raise exc
 
 The transport does not provide full response-body parsing, TLS, authentication, redirects, persistent HTTP connections, arbitrary POST bodies, or device-specific semantics.
 
-### 10.1 Generic HTTP remains necessary
+### 11.1 Generic HTTP remains necessary
 
 Generic HTTP handles:
 
-- Roku navigation and ordinary ECP keypresses.
+- Ordinary Roku navigation and ECP keypresses.
 - Roku mute.
 - Denon HTTP power and mute commands.
 - Custom-action steps.
@@ -739,7 +990,7 @@ This works because the Roku command itself toggles mute.
 
 The Clonker's per-room toggle history still records which logical toggle direction was last successfully sent.
 
-### 10.2 Why HTTP remains bounded and blocking
+### 11.2 Why HTTP remains bounded and blocking
 
 Earlier nonblocking TCP experiments on the tested CircuitPython platform encountered `OSError(119)` and lacked a usable `getsockopt(SO_ERROR)` inspection path.
 
@@ -759,9 +1010,13 @@ The queue can buffer admitted actions. It cannot reconstruct electrical transiti
 
 ---
 
-## 11. Equipment mapping and observed behavior
+## 12. Equipment mapping and observed behavior
 
-The current installation has two configured rooms: Den and Sunroom.
+The current development installation contains three configured rooms:
+
+- `room-1` — Den.
+- `room-2` — Sunroom.
+- `room-3` — Room 3, blank placeholder.
 
 Config v4 permits one to three rooms and three generic built-in destinations per room:
 
@@ -771,7 +1026,7 @@ Config v4 permits one to three rooms and three generic built-in destinations per
 
 Browser labels commonly read TV, AVR, and Streaming, but those labels do not enforce protocols.
 
-### 11.1 Development installation endpoints
+### 12.1 Development installation endpoints
 
 | Equipment | Installation-specific endpoint | Observation |
 |---|---|---|
@@ -782,7 +1037,7 @@ Browser labels commonly read TV, AVR, and Streaming, but those labels do not enf
 
 These addresses are records of the development installation, not defaults or configuration requirements.
 
-### 11.2 Current mixed-volume configuration
+### 12.2 Current mixed-volume configuration
 
 | Room | Volume action configuration | Selected adapter |
 |---|---|---|
@@ -793,17 +1048,19 @@ The Sunroom Roku controls the Denon receiver's volume through the equipment's HD
 
 This demonstrates that adapter selection is based on configured command signatures rather than room identity.
 
-### 11.3 Physical Power Toggle
+### 12.3 Physical Power Toggle
 
 GP2 Power Toggle successfully controlled Den and Sunroom ON/OFF through the selected room and shared queue.
 
-The reserved Room 3 position produced a safe no-op.
-
 Independent per-room toggle direction histories were observed.
+
+Earlier Room 3 tests produced a safe no-op when the room was unconfigured.
+
+The current Room 3 is configured but contains blank commands, a different condition.
 
 These tests verified equipment behavior, not automatic equipment-state detection.
 
-### 11.4 Physical volume
+### 12.4 Physical volume
 
 The Bourns PEC11R-4215F-S0024 encoder on GP8/GP9 generates generic volume actions through `physical.py`.
 
@@ -813,7 +1070,7 @@ The Sunroom uses Roku held-volume ECP.
 
 The encoder remains a relative control; its shaft position does not encode an absolute volume value.
 
-### 11.5 Physical push-to-mute
+### 12.5 Physical push-to-mute
 
 The Bourns encoder's separate momentary pushbutton is wired to GND and GP10.
 
@@ -826,7 +1083,22 @@ Observed results:
 
 No separate mute execution system was required.
 
-### 11.6 Custom-action equipment test
+### 12.6 Physical navigation and playback
+
+Chapter 7 added the navigation cluster, Back, Home, Select, and playback button integration.
+
+Six buttons use explicit Roku held-key behavior:
+
+- Up.
+- Down.
+- Left.
+- Right.
+- Skip Back.
+- Skip Forward.
+
+Their press and release events are delivered through the same action queue used by the existing physical and browser controls.
+
+### 12.7 Custom-action equipment test
 
 The Sunroom *Movie* action used:
 
@@ -840,7 +1112,7 @@ An independent volume command was also observed executing during the custom wait
 
 ---
 
-## 12. Clock and diagnostics
+## 13. Clock and diagnostics
 
 **Modules:** `clonker/system/clock.py` and `clonker/system/logger.py`.
 
@@ -864,7 +1136,7 @@ Keep routine logging modest. Continuous diagnostics can distort timing and brows
 
 ---
 
-## 13. Verification record and evidence limits
+## 14. Verification record and evidence limits
 
 ### October 21 — outbound HTTP and queue
 
@@ -900,7 +1172,9 @@ The physical polling system remained enabled during successful browser tests.
 
 The three-position selector first passed a standalone electrical test and was later integrated on GP3/GP6/GP7, preserving GP4/GP5 for I²C.
 
-Den and Sunroom Power Toggle ON/OFF passed, with Room 3 safely rejected before queue admission.
+Den and Sunroom Power Toggle ON/OFF passed.
+
+At that time, Room 3 was unconfigured and rejected before queue admission.
 
 ### November 3 — Denon TCP and mixed queue
 
@@ -957,15 +1231,51 @@ Physical mute and unmute passed in both rooms:
 
 The logs showed successful command execution and independent per-room toggle histories.
 
+### November 4–7 — Chapter 7 physical integration
+
+Chapter 7 expanded the GPIO subsystem to include the navigation cluster, playback buttons, and second Bourns encoder wiring.
+
+The physical mapping table associates button identities with the existing fundamental action vocabulary.
+
+The six navigation/skip buttons gained explicit press/release handling.
+
+The Roku adapter gained physical-button hold operations, separate from encoder-driven volume holds.
+
+Physical tests exercised all six held buttons.
+
+A defective Skip Back tactile switch was replaced during hardware verification.
+
+### November 4–7 — browser responsiveness
+
+Additional Config Mode tests examined scheduler competition, diagnostics, and HTTP responsiveness.
+
+After adjustments, Safari and Chrome were both observed loading the Config page and Test Remote responsively.
+
+This supports the current practical behavior, not a guarantee under all network conditions.
+
+### November 7 — Room 3 configuration
+
+The development configuration was extended to include `room-3` with blank device addresses and command paths.
+
+The physical selector initially failed to log Room 3 selection.
+
+Inspection identified a GP7 wire that had pulled out of the Cowbell terminal.
+
+Reseating the wire restored selector operation.
+
+The problem was physical connectivity, not the selector's software mapping.
+
 ---
 
-## 14. Operational limitations and next investigations
+## 15. Operational limitations and next investigations
 
 ### Physical controls
 
-The room selector, Power Toggle, volume encoder, and volume push-to-mute are operational.
+Power Toggle, room selection, volume, mute, navigation, and playback inputs have been integrated.
 
-The second encoder, navigation, Home, Back, playback, display, and audio remain pending.
+The six Roku physical-button holds have been exercised.
+
+OLED, audio feedback, battery/sleep, and final enclosure work remain future development.
 
 ### Denon TCP
 
@@ -983,11 +1293,15 @@ Slight display lag and volume overshoot have been observed.
 
 One transient `OSError(119)` occurred during early reversal testing. Later tests recovered and completed without additional visible errors.
 
-Operation-specific diagnostics are now available.
-
 The maximum-hold release sequence was inferred from behavior and logs rather than independently traced.
 
-Fast rotation with simultaneous CONFIG-mode browser activity has not been equivalently stress-tested.
+### Roku physical-button holds
+
+The six recognized Roku hold paths require valid endpoints, POST methods, and recognized ECP paths.
+
+The 30-second safety limit reduces the risk of an indefinitely held physical key.
+
+Network failures can still prevent guaranteed key release.
 
 ### Generic HTTP
 
@@ -1007,9 +1321,13 @@ There is no general retry or rollback mechanism.
 
 ### Room 3
 
-The selector position works, but no room is configured.
+The third selector position and configured Room 3 placeholder are operational.
 
-No fallback to another room occurs.
+Ordinary blank fundamental commands produce no-ops.
+
+The explicit physical hold path still needs blank-command protection to avoid execution errors when Room 3 is selected.
+
+No fallback to another room should occur.
 
 ### Equipment state
 
@@ -1036,12 +1354,13 @@ Useful future tests include:
 - Stale Denon TCP connections after AVR restart.
 - Switching receivers during bursts.
 - Network interruption during Roku keydown or keyup.
+- Physical-button release after room changes and failures.
 - Roku held-volume under simultaneous CONFIG-mode browser activity.
 - High-rate encoder capture during other HTTP operations.
 - Queue pressure and malformed responses.
 - Long-uptime operation and repeated reconnects.
 
-The next physical work should reuse the existing encoder/button drivers, physical coordinator, adapter selection, and shared queue.
+Future physical features should reuse the existing encoder/button drivers, physical coordinator, adapter selection, and shared queue.
 
 Do not introduce speculative protocol modules or a second action execution path merely because it is possible.
 
@@ -1049,7 +1368,7 @@ Do not introduce speculative protocol modules or a second action execution path 
 
 ---
 
-## 15. Related documents
+## 16. Related documents
 
 - [Architecture](ARCHITECTURE.md) — component boundaries and system invariants.
 - [Configuration & Recovery](CONFIGURATION.md) — Config v4 schema, revisions, persistence, recovery.
