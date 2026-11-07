@@ -67,9 +67,12 @@ BUTTON_ACTIONS = {
     "SKIP_FORWARD": "skip-forward",
 }
 
-# Physical buttons eligible for explicit press/release handling.
-# Activation will follow once the device adapter supports holds.
+# Physical buttons using queued keydown/keyup events.
 HOLD_BUTTONS = (
+    "UP",
+    "DOWN",
+    "LEFT",
+    "RIGHT",
     "SKIP_BACK",
     "SKIP_FORWARD",
 )
