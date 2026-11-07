@@ -212,11 +212,14 @@ def button_down(endpoint, key):
             "Another Roku physical button is already held"
         )
 
-    _send_button(endpoint, "keydown", key)
-
+    # Record the hold before transmission. If the Roku
+    # receives keydown but the response fails, queue-failure
+    # cleanup can still attempt the matching keyup.
     _button_endpoint = endpoint
     _button_key = key
     _button_started = time.monotonic()
+
+    _send_button(endpoint, "keydown", key)
     return True
 
 
