@@ -22,6 +22,7 @@ from clonker import actions
 from clonker import device_adapters
 from clonker.controls import switches
 from clonker.controls import physical
+from clonker.display import oled
 from clonker import device_config_v2 as device_config
 
 
@@ -91,6 +92,18 @@ def main():
     next_action_poll = time.monotonic()
     next_physical_poll = time.monotonic()
 
+    # OLED is optional; failure must not stop Clonker.
+    oled_ready = False
+    if PHYSICAL_CONTROLS_ENABLED:
+        try:
+            oled_ready = oled.initialize()
+            if oled_ready:
+                logger.info("OLED initialized")
+        except Exception as exc:
+            logger.warning(
+                "OLED unavailable: {}".format(exc)
+            )
+
     try:
         while True:
 
@@ -156,6 +169,17 @@ def main():
                         time.monotonic() + WEB_POLL_INTERVAL
                     )
 
+            # Service the OLED after the higher-priority work.
+            if oled_ready:
+                try:
+                    oled.poll()
+                except Exception as exc:
+                    logger.warning(
+                        "OLED poll failed: {}".format(exc)
+                    )
+                    oled.close()
+                    oled_ready = False
+
             # Yield briefly to the CircuitPython runtime.
             # Keep this INSIDE the while True loop.
             time.sleep(0.001)
@@ -164,3 +188,5 @@ def main():
         if web_running:
             web.stop()
         device_adapters.close()
+        if oled_ready:
+            oled.close()
