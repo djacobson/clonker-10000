@@ -156,25 +156,31 @@ def dispatch_hold(room_id, action_id, event, destination=None, command=None):
         logger.warning("DUMB QUEUE: Full; hold rejected")
         raise ValueError("Action queue full")
 
-    room, action = device_config.action_details(
-        room_id, action_id
-    )
-
-    if destination is None:
-        endpoint = device_config.resolve_endpoint(
-            room, action["target"]
-        )
-    else:
+    if destination is not None and command is not None:
         endpoint = destination
-
-    if command is None:
-        command = (
-            action["target"],
-            action["method"],
-            action["path"],
+        target, method, path = command
+        room_name = room_id
+    else:
+        room, action = device_config.action_details(
+            room_id, action_id
         )
+        room_name = room["name"]
 
-    target, method, path = command
+        if destination is None:
+            endpoint = device_config.resolve_endpoint(
+                room, action["target"]
+            )
+        else:
+            endpoint = destination
+
+        if command is None:
+            command = (
+                action["target"],
+                action["method"],
+                action["path"],
+            )
+
+        target, method, path = command
 
     # Preserve the destination at press/release time.
     # Later configuration changes must not redirect a keyup.
@@ -194,7 +200,7 @@ def dispatch_hold(room_id, action_id, event, destination=None, command=None):
 
     logger.info(
         "QUEUED HOLD: {} / {} {} (depth {})".format(
-            room["name"],
+            room_name,
             action_id,
             event.upper(),
             len(_queue),
