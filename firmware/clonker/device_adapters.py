@@ -226,7 +226,7 @@ def execute_hold(endpoint, method, path, event):
         roku.button_down(endpoint, key)
         operation = "keydown"
     elif event == "released":
-        roku.button_up()
+        roku.button_up(endpoint, key)
         operation = "keyup"
     else:
         raise ValueError("Invalid held-button event")
