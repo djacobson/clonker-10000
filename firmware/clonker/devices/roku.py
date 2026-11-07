@@ -163,7 +163,6 @@ _button_endpoint = None
 _button_key = None
 _button_started = 0.0
 _button_release_pending = False
-_button_next_release = 0.0
 
 
 def button_held_key():
@@ -173,13 +172,12 @@ def button_held_key():
 
 def _reset_button():
     global _button_endpoint, _button_key, _button_started
-    global _button_release_pending, _button_next_release
+    global _button_release_pending
 
     _button_endpoint = None
     _button_key = None
     _button_started = 0.0
     _button_release_pending = False
-    _button_next_release = 0.0
 
 
 def _send_button(endpoint, operation, key):
