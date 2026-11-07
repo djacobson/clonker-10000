@@ -1,9 +1,9 @@
 # The Clonker 10000 — Configuration, Persistence & Recovery
 
-**Design reference:** November 3, 2026  
+**Design reference:** November 7, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Active schema:** Clonker Config v4 (JSON)  
-**Baseline:** Chapter 6 — browser and physical actions, room selector, Bourns volume encoder, Dumb Queue™, and Denon TCP volume adapter operational
+**Baseline:** Chapter 7 — three configured rooms, physical navigation/playback controls, Roku button holds, Dumb Queue™, and protocol adapters operational
 
 > Clonker controls intent, not reality. A command can be accepted, transmitted, and acknowledged without proving what the television actually did.
 
@@ -55,7 +55,7 @@ The root object has **exactly** `version` and `rooms`:
 
 **The fragment above illustrates keys only and is not deployable:** the `devices` and `actions` objects must contain all required entries.
 
-The `rooms` object contains **one to three** of the stable IDs `room-1`, `room-2`, and `room-3`. They may be omitted individually, but at least one room must exist. The current working setup has Den and Sunroom; Room 3 is reserved. The room selector can physically select Room 3, but commands for an unconfigured room safely do nothing.
+The `rooms` object contains **one to three** of the stable IDs `room-1`, `room-2`, and `room-3`. They may be omitted individually, but at least one room must exist. The current development installation contains Den (`room-1`), Sunroom (`room-2`), and a configured Room 3 placeholder (`room-3`) with blank device addresses and command paths. The physical selector recognizes all three positions. An unconfigured room and a configured room containing blank commands are distinct conditions; neither should cause an action to fall back to another room.
 
 Every configured room has **exactly** these four keys:
 
@@ -286,7 +286,9 @@ For transport details, exact scheduler intervals, and test evidence, use [Firmwa
 
 ## 11. Regression checklist
 
-Use **DEVICE + CONFIG** for persistent-save tests. Preserve working files and note deployed revision before experiments.
+The Bourns physical volume encoder on GP8/GP9 generates generic volume actions, not Denon-specific commands. Physical room selection (GP3/GP6/GP7) determines which configured room receives them. GP2 Power Toggle, volume push-to-mute, navigation, playback buttons, and the browser Test Remote share the same action system.
+
+Chapter 7 added six explicit Roku physical-button holds (navigation Up/Down/Left/Right and Skip Back/Forward). These use queued press/release events and require a valid Roku endpoint, POST method, and recognized ECP command path. Unlike ordinary fundamental actions, the current hold execution path does not yet treat blank commands as no-ops. See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for implementation details.
 
 - **Schema:** Reject unknown/missing keys, unsupported versions, invalid room IDs, invalid endpoints, missing fundamental actions, invalid toggle fields, and custom-action rule violations.
 - **Size:** Test the 8192-byte serialized limit, including multibyte UTF-8 cases where relevant.
@@ -297,7 +299,7 @@ Use **DEVICE + CONFIG** for persistent-save tests. Preserve working files and no
 - **Out-of-band change:** Confirm disk/RAM mismatch rejects a save rather than overwriting an unexpected primary.
 - **Recovery:** Test primary, `.bak`, `.bak.old` fallback separately; verify fallback does not silently repair primary.
 - **Execution:** Test both rooms, configured no-ops, power/mute histories, custom step waits, mixed HTTP/TCP ordering, and failures clearing the queue.
-- **Physical:** Verify room selector, GP2 Power Toggle, Bourns detents, and safe Room 3 no-op on actual hardware.
+- **Physical:** Verify all three room-selector positions, Power Toggle, volume/mute, navigation and playback buttons, and Roku press/release behavior. For configured Room 3, verify ordinary blank-command no-ops separately from physical hold behavior; blank-command protection for holds remains pending.
 
 Record what was actually exercised rather than labeling the entire checklist “passed.” The documented Denon volume bench tests included five slow and ten moderate clicks in each direction and aggressive turning, with volume returning to its starting level. A separate TCP pacing test sent ten commands in approximately 606 ms; mixed-transport queue regression tests covered ordering, waits, and failure clearing. Those are useful evidence, not exhaustive long-duration guarantees.
 
