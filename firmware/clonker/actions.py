@@ -250,6 +250,16 @@ def poll():
             # Custom actions always use generic HTTP.
             adapter = device_adapters.GENERIC_HTTP
 
+        elif kind == "hold":
+            room = device_config.current()["rooms"][room_id]
+            target = "streaming"
+            endpoint = task["endpoint"]
+            method = task["method"]
+            path = task["path"]
+            event = task["event"]
+
+            adapter = device_adapters.ROKU_BUTTON
+
         else:
             room, action = device_config.action_details(
                 room_id, action_id
@@ -308,9 +318,14 @@ def poll():
             )
         )
 
-        result = device_adapters.execute(
-            adapter, endpoint, method, path
-        )
+        if kind == "hold":
+            result = device_adapters.execute_hold(
+                endpoint, method, path, event
+            )
+        else:
+            result = device_adapters.execute(
+                adapter, endpoint, method, path
+            )
 
         if not result["accepted"]:
             return False
