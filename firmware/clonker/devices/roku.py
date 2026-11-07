@@ -145,3 +145,105 @@ def poll():
 def close():
     """Attempt cleanup; preserve state if release is unresolved."""
     return release()
+
+# Explicit physical-button holds.
+# Independent of the encoder-driven volume hold.
+BUTTON_MAX_HOLD_SECONDS = 30.0
+
+_button_endpoint = None
+_button_key = None
+_button_started = 0.0
+_button_release_pending = False
+_button_next_release = 0.0
+
+
+def button_held_key():
+    """Return the currently held physical-button key."""
+    return _button_key
+
+
+def _reset_button():
+    global _button_endpoint, _button_key, _button_started
+    global _button_release_pending, _button_next_release
+
+    _button_endpoint = None
+    _button_key = None
+    _button_started = 0.0
+    _button_release_pending = False
+    _button_next_release = 0.0
+
+
+def _send_button(endpoint, operation, key):
+    """Send a Roku keydown or keyup for a physical button."""
+    if not key or "/" in key:
+        raise ValueError("Invalid Roku button key")
+
+    path = "/{}/{}".format(operation, key)
+
+    try:
+        return http_transport.send(endpoint, "POST", path)
+    except (OSError, ValueError) as error:
+        raise OSError(
+            "ROKU {} -> {} failed: {}".format(
+                path, endpoint, repr(error)
+            )
+        )
+
+
+def button_down(endpoint, key):
+    """Begin one explicit physical-button hold."""
+    global _button_endpoint, _button_key, _button_started
+
+    if not endpoint:
+        raise ValueError("Roku endpoint is empty")
+
+    if _button_key is not None:
+        if _button_endpoint == endpoint and _button_key == key:
+            return False
+
+        button_up()
+
+        if _button_key is not None:
+            raise OSError("Previous Roku button release pending")
+
+    _send_button(endpoint, "keydown", key)
+
+    _button_endpoint = endpoint
+    _button_key = key
+    _button_started = time.monotonic()
+    return True
+
+
+def button_up():
+    """Release the active button, retaining state on failure."""
+    global _button_release_pending, _button_next_release
+
+    if _button_key is None:
+        return False
+
+    _button_release_pending = True
+    now = time.monotonic()
+
+    if now < _button_next_release:
+        return False
+
+    _button_next_release = now + RELEASE_RETRY_SECONDS
+
+    _send_button(_button_endpoint, "keyup", _button_key)
+    _reset_button()
+    return True
+
+
+def button_poll():
+    """Retry failed releases and guard against lost releases."""
+    if _button_key is None:
+        return False
+
+    if (
+        _button_release_pending
+        or time.monotonic() - _button_started
+        >= BUTTON_MAX_HOLD_SECONDS
+    ):
+        return button_up()
+
+    return False
