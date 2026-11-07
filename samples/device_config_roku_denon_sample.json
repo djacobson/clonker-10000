@@ -46,7 +46,7 @@
         },
         "skip-back": {
           "target": "device-3",
-          "path": "/keypress/InstantReplay",
+          "path": "/keypress/Rev",
           "method": "POST"
         },
         "nav-left": {
@@ -184,7 +184,7 @@
         },
         "skip-back": {
           "target": "device-3",
-          "path": "/keypress/InstantReplay",
+          "path": "/keypress/Rev",
           "method": "POST"
         },
         "nav-left": {
@@ -257,6 +257,89 @@
         "device-2": "192.168.50.40:8080",
         "device-3": "192.168.50.28:8060"
       }
+    },
+    "room-3": {
+      "name": "Room 3",
+      "devices": {
+        "device-1": "",
+        "device-2": "",
+        "device-3": ""
+      },
+      "actions": {
+        "back": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "mute-toggle": {
+          "target": "device-2",
+          "method": "GET",
+          "on_path": "",
+          "off_path": ""
+        },
+        "power-toggle": {
+          "target": "device-3",
+          "method": "POST",
+          "on_path": "",
+          "off_path": ""
+        },
+        "home": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "select": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "nav-up": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "skip-forward": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "volume-down": {
+          "target": "device-2",
+          "method": "GET",
+          "path": ""
+        },
+        "skip-back": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "nav-left": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "play-pause": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "volume-up": {
+          "target": "device-2",
+          "method": "GET",
+          "path": ""
+        },
+        "nav-down": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        },
+        "nav-right": {
+          "target": "device-3",
+          "method": "POST",
+          "path": ""
+        }
+      },
+      "custom_actions": []
     }
   },
   "version": 4
