@@ -223,34 +223,36 @@ def button_down(endpoint, key):
     return True
 
 
-def button_up():
-    """Release the active button, retaining state on failure."""
-    global _button_release_pending, _button_next_release
+def button_up(endpoint=None, key=None):
+    """Release the active physical button once.
+
+    Optional endpoint/key arguments verify that the release
+    belongs to the original press.
+    """
+    global _button_release_pending
 
     if _button_key is None:
         return False
 
+    if endpoint is not None and endpoint != _button_endpoint:
+        raise ValueError("Roku button endpoint mismatch")
+
+    if key is not None and key != _button_key:
+        raise ValueError("Roku button key mismatch")
+
     _button_release_pending = True
-    now = time.monotonic()
-
-    if now < _button_next_release:
-        return False
-
-    _button_next_release = now + RELEASE_RETRY_SECONDS
-
     _send_button(_button_endpoint, "keyup", _button_key)
     _reset_button()
     return True
 
 
 def button_poll():
-    """Retry failed releases and guard against lost releases."""
-    if _button_key is None:
+    """Attempt one safety release if a button stays held too long."""
+    if _button_key is None or _button_release_pending:
         return False
 
     if (
-        _button_release_pending
-        or time.monotonic() - _button_started
+        time.monotonic() - _button_started
         >= BUTTON_MAX_HOLD_SECONDS
     ):
         return button_up()
