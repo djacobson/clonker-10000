@@ -249,6 +249,13 @@ Or possibly the control panel of a very small submarine.
 
 The current controller is a **Raspberry Pi Pico 2 W (RP2350)** running **CircuitPython 10.3.1**.
 
+<a href="images/clonker_nervous_system.jpeg">
+  <img src="images/clonker_nervous_system.jpeg"
+       alt="Inside the Clonker 10000 — wiring and electronics"
+       width="170"
+       align="right">
+</a>
+
 A Pico Cowbell Terminal board provides screw-terminal GPIO connections, and a WAGO ground bus distributes common ground to the controls.
 
 ### Physical controls already verified
