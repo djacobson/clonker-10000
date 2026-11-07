@@ -2565,6 +2565,213 @@ The result is more than a working command path: the Roku-controlled volume knob 
 
 ---
 
+# Milestone 19 — The Monster Gets More Fingers
+
+**Date:** November 4–7, 2026  
+**Chapter:** 7 — Physical Controls and Performance  
+**Status:** PASS — navigation, playback buttons, Roku physical holds, and three-room selection verified
+
+### Goal
+
+Expand the Clonker's physical controls beyond the operational room selector, Power Toggle, volume encoder, and push-to-mute.
+
+Integrate navigation and playback buttons while preserving the existing fundamental-action vocabulary, shared Dumb Queue™, and protocol adapter architecture.
+
+Improve CONFIG-mode browser responsiveness without introducing threads, another command queue, or unnecessary architectural complexity.
+
+### Expanded physical GPIO integration
+
+Chapter 7 assigned and integrated the remaining navigation and playback inputs.
+
+| Control | GPIO |
+|---|---|
+| Navigation Up | GP14 |
+| Navigation Down | GP15 |
+| Navigation Left | GP16 |
+| Navigation Right | GP19 |
+| Select / OK | GP20 |
+| Back | GP21 |
+| Home | GP22 |
+| Skip Back | GP26 |
+| Play/Pause | GP27 |
+| Skip Forward | GP28 |
+| Custom-action encoder A/B | GP11/GP12 |
+| Custom-action encoder pushbutton | GP13 |
+
+Existing assignments remained unchanged:
+
+- GP2 — Power Toggle.
+- GP3/GP6/GP7 — three-position room selector.
+- GP8/GP9 — volume encoder.
+- GP10 — volume push-to-mute.
+- GP17 — SERVICE/DEVICE.
+- GP18 — CONFIG/RUN.
+- GP4/GP5 — reserved I²C.
+
+The physical action mapping remains centralized in `controls/physical.py`, with GPIO assignments defined separately in `controls/pins.py`.
+
+The reusable button and encoder drivers remain independent of equipment protocols.
+
+### Physical-button hold architecture
+
+Six physical buttons gained explicit press-and-release behavior:
+
+- Navigation Up.
+- Navigation Down.
+- Navigation Left.
+- Navigation Right.
+- Skip Back.
+- Skip Forward.
+
+Unlike ordinary momentary actions, these buttons must distinguish a held press from a release.
+
+The implementation extends the existing execution pipeline:
+
+1. `controls/buttons.py` detects debounced press/release events.
+2. `controls/physical.py` identifies hold-capable buttons and remembers their press context.
+3. `actions.dispatch_hold()` admits hold events to the existing Dumb Queue™.
+4. `device_adapters.execute_hold()` validates supported Roku ECP commands.
+5. `devices/roku.py` sends `/keydown/` and `/keyup/` requests.
+
+The physical coordinator preserves the room, endpoint, and command associated with each press.
+
+A release therefore targets the original device even if the room selector changes while the button is held.
+
+No separate hold queue, background thread, or independent command pipeline was introduced.
+
+### Roku ECP button holds
+
+The recognized physical hold commands are:
+
+| Fundamental action | Roku key |
+|---|---|
+| `nav-up` | `Up` |
+| `nav-down` | `Down` |
+| `nav-left` | `Left` |
+| `nav-right` | `Right` |
+| `skip-back` | `Rev` |
+| `skip-forward` | `Fwd` |
+
+The configured command paths use Roku's ordinary `/keypress/` form, while physical hold execution translates press/release events into `/keydown/` and `/keyup/`.
+
+Physical-button holds have a 30-second maximum-hold safety limit.
+
+This is separate from the two-second maximum used by encoder-driven Roku held-volume.
+
+Adapter cancellation and shutdown paths attempt best-effort cleanup of outstanding holds.
+
+The implementation cannot guarantee key release when network connectivity is unavailable.
+
+### Physical verification
+
+All six Roku hold-capable buttons were exercised using actual physical controls.
+
+Testing covered:
+
+- Button press detection.
+- Queue admission.
+- Roku keydown execution.
+- Physical hold behavior.
+- Button release detection.
+- Roku keyup execution.
+
+A defective Skip Back tactile switch was identified during testing and replaced.
+
+The completed tests established practical operation of the six held-button controls.
+
+They do not establish exhaustive recovery from every possible network interruption or application shutdown.
+
+### CONFIG-mode responsiveness
+
+Chapter 7 also investigated slow browser page loads and occasional Test Remote timeouts.
+
+The investigation focused on competition among:
+
+- Frequent GPIO polling.
+- Cooperative HTTP management.
+- Synchronous outbound network operations.
+- Diagnostic logging.
+- Other scheduler work.
+
+Adjustments reduced unnecessary polling and diagnostic overhead while retaining the cooperative scheduler.
+
+Subsequent Safari and Chrome tests showed substantially improved Config page and Test Remote responsiveness.
+
+The firmware remains cooperative and uses synchronous outbound network operations.
+
+The improvements do not guarantee a fixed maximum input latency during blocking socket calls.
+
+### Three-room configuration and selector repair
+
+The development installation was expanded from two configured rooms to three using Config v4.
+
+The rooms are:
+
+| Room | Configuration |
+|---|---|
+| `room-1` | Den — operational equipment |
+| `room-2` | Sunroom — operational equipment |
+| `room-3` | Room 3 — configured placeholder with blank endpoints and command paths |
+
+No Config v4 schema change was required.
+
+The third selector position was already supported electrically and logically.
+
+During initial testing, moving the selector to Room 3 did not produce the expected `ROOM SELECTED: room-3` log.
+
+Inspection revealed that the GP7 wire had pulled out of the Pico Cowbell terminal.
+
+Reseating the connection restored normal room-selection behavior.
+
+**Result: PASS — Room 3 selector operation verified after correcting the loose connection.**
+
+The failure was physical wiring, not a firmware mapping defect.
+
+### Blank-command execution boundary
+
+Config v4 permits blank device addresses and ordinary fundamental command paths.
+
+Ordinary fundamental actions treat these as intentional no-ops.
+
+Explicit physical-button holds currently require a valid endpoint, POST method, and recognized Roku command path.
+
+Consequently, the configured blank Room 3 placeholder is not yet guaranteed to be harmless for every held-button action.
+
+Blank-command protection for physical holds remains a small but important follow-up.
+
+This distinction should not be confused with the earlier Chapter 6 behavior, when Room 3 was unconfigured and rejected before queue admission.
+
+### Documentation consolidation
+
+Following the Chapter 7 implementation work, the documentation was updated to reflect the current baseline.
+
+The updated references include:
+
+- `HARDWARE_CONTROLS.md` — physical wiring, controls, GPIO assignments, and verification.
+- `ARCHITECTURE.md` — action routing, shared queue, physical holds, and adapter responsibilities.
+- `FIRMWARE_NETWORK.md` — execution mechanics, Roku holds, scheduler behavior, and diagnostics.
+- `CONFIGURATION.md` — three-room installation and blank-command semantics.
+
+The README remains the public-facing introduction; detailed implementation and historical evidence belong in the dedicated documents.
+
+### Engineering conclusion
+
+Chapter 7 expanded the Clonker from a physical power-and-volume controller into a substantially more complete tactile remote.
+
+The same fundamental actions now support browser commands, rotary volume, momentary buttons, and physical Roku holds.
+
+The existing queue and adapter architecture accommodated the new behavior without requiring a second execution system.
+
+CONFIG-mode responsiveness improved, and the three-position selector now operates with three configured room entries.
+
+The remaining work includes completing the custom-action rotary experience, OLED feedback, enclosure integration, and additional reliability testing.
+
+**One Monster. Two knobs. Three rooms. More buttons than good judgment.**
+
+**Less sleek. More CLONK.**
+
+---
+
 **THE CLONKER 10000**
 
 *Less sleek. More CLONK.*
