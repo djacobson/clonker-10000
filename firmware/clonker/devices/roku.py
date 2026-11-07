@@ -208,10 +208,9 @@ def button_down(endpoint, key):
         if _button_endpoint == endpoint and _button_key == key:
             return False
 
-        button_up()
-
-        if _button_key is not None:
-            raise OSError("Previous Roku button release pending")
+        raise OSError(
+            "Another Roku physical button is already held"
+        )
 
     _send_button(endpoint, "keydown", key)
 
