@@ -16,18 +16,18 @@ The room selector maintains its own selected-room state.
 from clonker.system import logger
 from clonker.system import perf
 from clonker import actions
-
-perf.register("physical.dispatch")
-perf.register("physical.hold")
-# GPIO sampling only; excludes event handling and dispatch.
-perf.register("physical.scan")
-
 from clonker import device_config_v2 as device_config
 from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button
 from clonker.controls.encoders import Encoder
 from clonker.display import oled
+
+
+perf.register("physical.dispatch")
+perf.register("physical.hold")
+perf.register("physical.scan")
+
 
 # Physical button names -> fundamental action IDs.
 # Only assigned GPIO buttons are initialized.
@@ -91,6 +91,7 @@ _buttons = []
 _volume_encoder = None
 _action_encoder = None
 _action_index = 0
+
 # Physical button name -> room selected when pressed.
 _hold_rooms = {}
 
@@ -355,12 +356,16 @@ def poll():
     if not _initialized:
         return
 
+    # Accumulate GPIO read durations across one physical poll.
+    # Event handling, logging, and dispatch are excluded.
+    scan_ns = 0
+
     # Update room state before handling button events.
     started = perf.start()
     try:
         room_id = selectors.poll()
     finally:
-        perf.stop("physical.scan", started)
+        scan_ns += perf.start() - started
 
     if room_id is not None:
         logger.info("ROOM SELECTED: {}".format(room_id))
@@ -372,7 +377,7 @@ def poll():
         try:
             event = button.poll()
         finally:
-            perf.stop("physical.scan", started)
+            scan_ns += perf.start() - started
 
         if event is None:
             continue
@@ -409,7 +414,7 @@ def poll():
         try:
             step = _volume_encoder.poll()
         finally:
-            perf.stop("physical.scan", started)
+            scan_ns += perf.start() - started
 
         if step:
             action_id = (
@@ -425,7 +430,7 @@ def poll():
         try:
             step = _action_encoder.poll()
         finally:
-            perf.stop("physical.scan", started)
+            scan_ns += perf.start() - started
 
         if step:
             room_id = selectors.selected_room()
@@ -439,3 +444,6 @@ def poll():
                 _action_index = 0
 
             _log_custom_selection(room_id)
+
+    # Record one cumulative scan duration per physical poll.
+    perf.record("physical.scan", scan_ns)
