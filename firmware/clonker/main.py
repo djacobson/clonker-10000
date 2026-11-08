@@ -111,6 +111,11 @@ def main():
     perf_adapter_max = 0.0
     perf_oled_max = 0.0
     perf_loop_max = 0.0
+
+    perf_web_max = 0.0
+    perf_web_total = 0.0
+    perf_web_count = 0
+
     perf_oled_refresh_start = oled.get_refresh_count()
 
     # OLED is optional; failure must not stop Clonker.
@@ -223,7 +228,18 @@ def main():
             if web_running:
                 now = time.monotonic()
                 if now >= next_web_poll:
+                    if PERF_ENABLED:
+                        perf_web_start = time.monotonic()
+
                     web.poll()
+
+                    if PERF_ENABLED:
+                        elapsed = time.monotonic() - perf_web_start
+                        perf_web_total += elapsed
+                        perf_web_count += 1
+                        if elapsed > perf_web_max:
+                            perf_web_max = elapsed
+
                     next_web_poll = (
                         time.monotonic() + WEB_POLL_INTERVAL
                     )
@@ -302,12 +318,29 @@ def main():
                         )
                     )
 
+                    average_web = (
+                        perf_web_total / perf_web_count
+                        if perf_web_count else 0.0
+                    )
+                    logger.info(
+                        "PERF: mode={}, HTTP polls={}, "
+                        "avg={:.2f}ms, max={:.1f}ms".format(
+                            "CONFIG" if config_mode else "RUN",
+                            perf_web_count,
+                            average_web * 1000,
+                            perf_web_max * 1000
+                        )
+                    )
+
                     perf_physical_max = 0.0
                     perf_physical_exec_max = 0.0
                     perf_queue_max = 0.0
                     perf_adapter_max = 0.0
                     perf_oled_max = 0.0
                     perf_loop_max = 0.0
+                    perf_web_max = 0.0
+                    perf_web_total = 0.0
+                    perf_web_count = 0
                     perf_physical_slow = 0
                     perf_physical_gap_sum = 0.0
                     perf_physical_gap_count = 0
