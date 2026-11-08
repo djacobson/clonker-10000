@@ -1,9 +1,9 @@
 # The Clonker 10000 — System Architecture
 
-**Design reference:** November 7, 2026  
+**Updated:** November 8, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
-**Current baseline:** Chapter 7 — physical navigation, playback controls, and Roku button holds operational  
+**Current baseline:** Chapter 7 closeout — completed physical assembly, both Bourns encoders, Roku button holds, initial SH1106 OLED integration, and shared PERF instrumentation  
 **Configuration:** Clonker Config v4
 
 > **Clonker controls actions, not brands. Controlled devices own their own state.**
@@ -171,6 +171,8 @@ Roku key releases may occur after ordinary queue work has completed. Adapter mai
 | `firmware/clonker/controls/switches.py` | CONFIG/RUN switch and development overrides |
 | `firmware/clonker/system/clock.py` | UTC reference and monotonic timing |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
+| `firmware/clonker/system/perf.py` | Shared performance measurement and statistics |
+| `firmware/clonker/display/oled.py` | SH1106 display initialization, deferred rendering, refresh pacing, and idle-off behavior |
 | `firmware/clonker/www/` | Configuration editor and Test Remote |
 | `firmware/clonker/legacy/` | Historical XML implementation |
 
@@ -751,13 +753,14 @@ These intervals are targets, not guaranteed maximum latencies.
 
 ### 10.1 Scheduling priorities
 
-The main loop processes work in this order:
+The main loop processes work in this general order:
 
 1. Physical GPIO inputs.
 2. One eligible queued action, when due.
 3. Stateful device-adapter maintenance.
 4. CONFIG/RUN mode evaluation and management HTTP.
-5. Brief CircuitPython yield.
+5. OLED display polling.
+6. Brief CircuitPython yield.
 
 The action queue operates in both CONFIG and RUN modes.
 
@@ -779,17 +782,25 @@ However, synchronous socket operations can still temporarily delay physical samp
 
 The queue cannot reconstruct electrical transitions that were never observed.
 
-### 10.3 Chapter 7 Config Mode responsiveness
+### 10.3 Chapter 7 responsiveness and PERF instrumentation
 
-Chapter 7 investigated slow browser page loads and occasional management HTTP timeouts while physical polling, diagnostics, and network operations competed for scheduler time.
+Chapter 7 investigated slow browser page loads, occasional management HTTP timeouts, and competition between physical polling, diagnostics, and network operations.
 
-The investigation led to adjustments that reduced unnecessary polling and diagnostic overhead, while preserving the shared cooperative architecture.
+Scheduler adjustments and reduced diagnostic overhead substantially improved Config page and Test Remote responsiveness in Safari and Chrome.
 
-Subsequent testing showed substantially improved Config page and Test Remote responsiveness in Safari and Chrome.
+The shared `system/perf.py` module now provides named timing measurements and accumulated statistics.
 
-This is a practical performance improvement, not a transition to asynchronous networking.
+`main.py` instruments physical polling gaps, physical execution, queue execution, adapter maintenance, management HTTP, OLED polling, and main-loop execution.
 
-The firmware still uses synchronous outbound transport, and a blocking operation can temporarily delay other cooperative work.
+Optional internal measurements in `controls/physical.py` permit more focused investigation without permanently enabling detailed instrumentation.
+
+Testing identified occasional physical execution spikes around 40–50 ms. Their cause remains unresolved.
+
+These execution spikes must be distinguished from longer physical polling gaps caused by synchronous network operations.
+
+The instrumentation does not change the cooperative execution model, introduce asynchronous networking, or guarantee that every encoder transition will be captured.
+
+Detailed measurements and experiments belong in [Firmware, Network & Clock](FIRMWARE_NETWORK.md) and [Development History](DEVELOPMENT_HISTORY.md).
 
 ### 10.4 Adapter maintenance
 
@@ -914,7 +925,23 @@ Both actions pass through the selected room and shared Dumb Queue™.
 
 The encoder driver does not know whether the destination is Denon or Roku.
 
-### 11.6 Two-room verification
+11.6 ### Custom-action encoder
+
+The second Bourns encoder uses GP11/GP12 for rotation and GP13 for its pushbutton.
+
+Rotation cycles through the currently selected room's ordered custom actions, wrapping at the ends of the list.
+
+The physical coordinator maintains the selected action index. Changing rooms resets the selection.
+
+An empty custom-action list is handled without attempting execution.
+
+Pressing the encoder dispatches the selected custom action through the existing `actions.py` execution path.
+
+The selected action name is also sent to the OLED display interface.
+
+The encoder driver itself remains independent of configuration, custom-action semantics, and display hardware.
+
+### 11.7 Two-room verification
 
 | Room | Volume transport | Mute transport | Observed result |
 |---|---|---|---|
@@ -929,15 +956,23 @@ Physical navigation and skip-button holds were also exercised against Roku equip
 
 These results establish tested functionality, not indefinite fault-free operation.
 
-### 11.7 Future physical features
+### 11.8 OLED feedback and future physical features
 
-The physical architecture leaves room for:
+The SH1106 128×64 OLED is operational over I²C on GP4/GP5.
 
-- Custom-action selection and execution from the second encoder.
-- OLED room/action/status display.
+`display/oled.py` owns display initialization, deferred text rendering, refresh pacing, and idle display-off behavior.
+
+The physical custom-action encoder requests display updates when the selected action changes. The OLED driver performs actual display operations during cooperative scheduler polling.
+
+This preserves the boundary between physical input interpretation and display hardware operations.
+
+The physical assembly is mounted, soldered, wired, secured, and strain-relieved through the Pico Cowbell Terminal board.
+
+Future development includes:
+
+- Additional OLED room, action, and status feedback.
 - Audible CLONK feedback.
-- Final enclosure and cable management.
-- Battery, charging, sleep, and wake behavior.
+- Battery selection, charging, sleep, and wake behavior.
 - Possible alternate panel orientation.
 
 The future orientation concept would exchange navigation and skip directions through an alternate action mapping rather than rewriting GPIO drivers.
@@ -1061,10 +1096,20 @@ These are different evidence levels.
 | Chapter 7, November 2026 | Physical navigation and playback buttons operational |
 | Chapter 7, November 2026 | Six Roku keydown/keyup physical-button holds verified |
 | Chapter 7, November 7 | Configured blank Room 3 added to development installation |
+| Chapter 7, November 7 | Room-aware custom-action encoder selection and execution operational |
+| Chapter 7, November 7 | SH1106 OLED driver and initial custom-action display feedback integrated |
+| Chapter 7, November 8 | Shared `system/perf.py` instrumentation operational |
+| Chapter 7 closeout, November 8 | Physical assembly complete; unresolved timing spikes documented for further investigation |
 
-Chapter 7 extends the existing architecture rather than replacing it.
+Chapter 7 extended the existing architecture rather than replacing it.
 
-The most significant change is explicit physical-button hold behavior: the Clonker can now distinguish a press from a release, preserve the original destination, and deliver both through the existing queue and adapter system.
+Its principal additions were explicit physical-button holds, room-aware custom-action encoder control, initial OLED feedback, and shared performance instrumentation.
+
+Physical-button holds preserve the original destination across press and release events. The custom-action encoder reuses the existing action dispatcher and Dumb Queue™. The OLED receives display requests without requiring direct I²C writes from physical event handlers.
+
+Shared PERF instrumentation measures the existing cooperative scheduler without introducing another execution pipeline.
+
+The physical assembly is complete. Battery power, sleep/wake behavior, additional display feedback, and further performance investigation remain Chapter 8 work.
 
 ---
 
