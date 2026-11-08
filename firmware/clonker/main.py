@@ -104,6 +104,8 @@ def main():
     perf_queue_max = 0.0
     perf_oled_max = 0.0
     perf_loop_max = 0.0
+    perf_physical_slow = 0
+    perf_oled_refresh_start = oled.get_refresh_count()
 
     # OLED is optional; failure must not stop Clonker.
     oled_ready = False
@@ -136,6 +138,8 @@ def main():
                         gap = now - perf_last_physical
                         if gap > perf_physical_max:
                             perf_physical_max = gap
+                        if gap > 0.020:
+                            perf_physical_slow += 1
                     perf_last_physical = now
 
                 physical.poll()
@@ -226,8 +230,9 @@ def main():
 
                 if time.monotonic() - perf_report_at >= PERF_INTERVAL:
                     logger.info(
-                        "PERF: physical max gap={:.1f}ms".format(
-                            perf_physical_max * 1000
+                        "PERF: physical max gap={:.1f}ms, >20ms={}".format(
+                            perf_physical_max * 1000,
+                            perf_physical_slow
                         )
                     )
                     logger.info(
@@ -236,8 +241,9 @@ def main():
                         )
                     )
                     logger.info(
-                        "PERF: OLED max poll={:.1f}ms".format(
-                            perf_oled_max * 1000
+                        "PERF: OLED max poll={:.1f}ms, refreshes={}".format(
+                            perf_oled_max * 1000,
+                            oled.get_refresh_count() - perf_oled_refresh_start
                         )
                     )
                     logger.info(
@@ -250,6 +256,8 @@ def main():
                     perf_queue_max = 0.0
                     perf_oled_max = 0.0
                     perf_loop_max = 0.0
+                    perf_physical_slow = 0
+                    perf_oled_refresh_start = oled.get_refresh_count()
                     perf_report_at = time.monotonic()
 
             # Yield briefly to the CircuitPython runtime.

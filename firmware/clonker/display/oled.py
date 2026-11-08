@@ -45,6 +45,8 @@ _count = 0
 _dirty = False
 _last_activity = 0.0
 _last_refresh = 0.0
+# Successful screen updates since module initialization.
+_refresh_count = [0]
 
 
 def _write(payload):
@@ -168,7 +170,13 @@ def poll():
             return
         _awake = True
     _dirty = False
+    _refresh_count[0] += 1
     _last_refresh = time.monotonic()
+
+
+def get_refresh_count():
+    """Return the cumulative number of successful screen refreshes."""
+    return _refresh_count
 
 
 def close():
