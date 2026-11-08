@@ -19,12 +19,10 @@ from clonker import actions
 
 perf.register("physical.dispatch")
 perf.register("physical.hold")
-
-from clonker import device_config_v2 as device_config
-
 # GPIO sampling only; excludes event handling and dispatch.
 perf.register("physical.scan")
 
+from clonker import device_config_v2 as device_config
 from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button

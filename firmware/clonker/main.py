@@ -444,6 +444,7 @@ def main():
 
                     # Targeted physical dispatch measurements.
                     for name in (
+                        "physical.scan",
                         "physical.dispatch",
                         "physical.hold",
                     ):
@@ -483,6 +484,7 @@ def main():
                     perf_report_at = time.monotonic_ns()
 
                     # Reset targeted measurements after reporting.
+                    perf.reset("physical.scan")
                     perf.reset("physical.dispatch")
                     perf.reset("physical.hold")
 
