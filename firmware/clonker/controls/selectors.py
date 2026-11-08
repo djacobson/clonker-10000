@@ -100,7 +100,6 @@ def poll():
     if not _initialized:
         return None
 
-
     now = time.monotonic_ns()
     raw_room = _read()
 

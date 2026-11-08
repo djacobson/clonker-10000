@@ -21,8 +21,8 @@ import busio
 ADDRESS = 0x3C
 WIDTH = 128
 COLUMN_OFFSET = 2
-IDLE_TIMEOUT = 15.0
-REFRESH_INTERVAL = 0.10
+IDLE_TIMEOUT_NS = 15_000_000_000   # 15 seconds
+REFRESH_INTERVAL_NS = 100_000_000  # 100 ms
 
 # Five-column glyphs, rendered at 2x scale.
 # Each character occupies 12 horizontal pixels.
@@ -77,8 +77,8 @@ _i2c = None
 _awake = False
 _text = ""
 _dirty = False
-_last_activity = 0.0
-_last_refresh = 0.0
+_last_activity = 0
+_last_refresh = 0
 
 # Successful screen updates since module initialization.
 _refresh_count = [0]
@@ -185,8 +185,8 @@ def initialize():
         _command(0xAE)
         _awake = False
         _dirty = False
-        _last_activity = time.monotonic()
-        _last_refresh = 0.0
+        _last_activity = time.monotonic_ns()
+        _last_refresh = 0
         return True
 
     except Exception:
@@ -209,7 +209,7 @@ def show_text(message):
         _dirty = True
 
     # Repeated messages count as activity too.
-    _last_activity = time.monotonic()
+    _last_activity = time.monotonic_ns()
 
 
 def set_count(value):
@@ -226,14 +226,14 @@ def poll():
     if _i2c is None:
         return
 
-    now = time.monotonic()
+    now = time.monotonic_ns()
 
-    if _awake and now - _last_activity >= IDLE_TIMEOUT:
+    if _awake and now - _last_activity >= IDLE_TIMEOUT_NS:
         if _command(0xAE):
             _awake = False
         return
 
-    if not _dirty or now - _last_refresh < REFRESH_INTERVAL:
+    if not _dirty or now - _last_refresh < REFRESH_INTERVAL_NS:
         return
 
     upper, lower = _render(_text)
@@ -248,7 +248,7 @@ def poll():
 
     _dirty = False
     _refresh_count[0] += 1
-    _last_refresh = time.monotonic()
+    _last_refresh = time.monotonic_ns()
 
 
 def get_refresh_count():
