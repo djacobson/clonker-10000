@@ -25,14 +25,15 @@ import digitalio
 from clonker.controls import pins
 
 
-_DEBOUNCE_SECONDS = 0.05
+# Room selector debounce: 50 milliseconds.
+_DEBOUNCE_NS = 50_000_000  # 50 ms
 
 _inputs = []
 _initialized = False
 
 _selected_room = None
 _last_raw_room = None
-_last_change_time = 0.0
+_last_change_time = 0
 
 
 def initialize():
@@ -68,7 +69,7 @@ def initialize():
 
         _selected_room = _read()
         _last_raw_room = _selected_room
-        _last_change_time = time.monotonic()
+        _last_change_time = time.monotonic_ns()
         _initialized = True
         return True
 
@@ -99,7 +100,8 @@ def poll():
     if not _initialized:
         return None
 
-    now = time.monotonic()
+
+    now = time.monotonic_ns()
     raw_room = _read()
 
     if raw_room != _last_raw_room:
@@ -109,7 +111,7 @@ def poll():
     if (
         raw_room is not None
         and raw_room != _selected_room
-        and now - _last_change_time >= _DEBOUNCE_SECONDS
+        and now - _last_change_time >= _DEBOUNCE_NS
     ):
         _selected_room = raw_room
         return _selected_room
@@ -129,4 +131,4 @@ def deinit():
     _initialized = False
     _selected_room = None
     _last_raw_room = None
-    _last_change_time = 0.0
+    _last_change_time = 0
