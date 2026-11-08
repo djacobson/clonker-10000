@@ -104,12 +104,14 @@ def _log_custom_selection(room_id):
     custom_actions = _custom_actions_for_room(room_id)
 
     if not custom_actions:
+        oled.show_text("No customs")
         logger.info(
             "CUSTOM SELECT: {} / No customs".format(room_id)
         )
         return
 
     selected = custom_actions[_action_index]
+    oled.show_text(selected["name"])
 
     logger.info(
         "CUSTOM SELECT: {} / {} ({}/{})".format(
@@ -365,7 +367,7 @@ def poll():
             dispatch_selected(action_id)
 
     # Custom Action encoder: circular, room-specific selection.
-    # No network dispatch during rotation.
+    # Rotation updates the OLED but never dispatches commands.
     if _action_encoder is not None:
         step = _action_encoder.poll()
 
@@ -377,21 +379,7 @@ def poll():
                 _action_index = (
                     _action_index + step
                 ) % len(custom_actions)
-
-                selected = custom_actions[_action_index]
-
-                logger.info(
-                    "CUSTOM SELECT: {} / {} ({}/{})".format(
-                        room_id,
-                        selected["name"],
-                        _action_index + 1,
-                        len(custom_actions)
-                    )
-                )
             else:
                 _action_index = 0
-                logger.info(
-                    "CUSTOM SELECT: {} / No customs".format(
-                        room_id
-                    )
-                )
+
+            _log_custom_selection(room_id)
