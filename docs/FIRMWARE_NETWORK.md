@@ -1,8 +1,8 @@
 # The Clonker 10000 — Firmware, Network & Clock
 
-**Design reference:** November 7, 2026  
+**Updated:** November 8, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Current baseline:** Chapter 7 — Config v4, Dumb Queue™, physical controls, Roku button holds, and protocol adapters  
+**Current baseline:** Chapter 7 closeout — Config v4, Dumb Queue™, completed physical assembly, both Bourns encoders, Roku holds, initial SH1106 OLED integration, and shared PERF instrumentation  
 **Scope:** Firmware behavior, networking, scheduler timing, protocol adapters, diagnostics, tests, and operational limitations.
 
 > One Monster. One Dumb Queue™. More than one way to deliver a CLONK.
@@ -34,19 +34,22 @@ Related responsibilities:
 - Roku ECP mute through generic HTTP.
 - GP17 SERVICE/DEVICE and GP18 CONFIG/RUN switches.
 - Physical Power Toggle and three-position room selector.
-- Bourns volume encoder and push-to-mute.
+- Both Bourns encoders, including volume/mute and custom-action selection/execution.
 - Physical navigation, Home, Back, Select, and playback input integration.
 - Six Roku physical-button holds using keydown/keyup.
+- Initial SH1106 OLED integration and custom-action display feedback.
 - Independent per-room power/mute toggle histories.
 - Cooperative custom-action waits and failure cancellation.
 - Three-room Config v4 installation, including a blank Room 3 placeholder.
-- Improved browser responsiveness during Chapter 7 Config Mode testing.
+- Improved browser responsiveness during Chapter 7 CONFIG-mode testing.
+- Shared PERF instrumentation for scheduler and subsystem diagnostics.
+- Completed physical wiring, mounting, soldering, and strain relief.
 
-**Chapter 7 milestone:** The physical interface now extends beyond power and volume. Four navigation buttons and Skip Back/Forward support explicit Roku keydown/keyup behavior through the existing queue and adapter architecture.
+**Chapter 7 milestone:** The Clonker now has an assembled physical control interface, room-aware command execution, operational custom-action selection, initial OLED feedback, and performance instrumentation suitable for continued investigation.
 
 ### Pending or not exhaustively tested
 
-OLED, audible feedback, battery/sleep, final enclosure, and long-uptime operation remain future work.
+Further OLED uses, audible feedback, battery/sleep behavior, exhaustive long-uptime operation, and unresolved physical polling performance investigations remain future work.
 
 Apple TV pairing/control, custom destination slots, Denon TCP response parsing, and exhaustive outage recovery are also pending.
 
@@ -76,6 +79,8 @@ The management service has **no application-level authentication**. Use only on 
 | `firmware/clonker/controls/switches.py` | CONFIG/RUN state and development overrides |
 | `firmware/clonker/system/clock.py` | Clock reference |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
+| `firmware/clonker/system/perf.py` | Shared named performance measurements and statistics |
+| `firmware/clonker/display/oled.py` | SH1106 OLED initialization, deferred rendering, and polling |
 | `firmware/clonker/www/` | Browser editor and Test Remote |
 | `firmware/clonker/legacy/` | Historical XML code |
 
@@ -183,15 +188,19 @@ Current GPIO assignments:
 
 `controls/pins.py` remains the authoritative assignment reference.
 
-`physical.poll()` updates room selection, polls initialized buttons, and polls active encoders.
+`physical.poll()` updates room selection, polls initialized buttons, and polls both active Bourns encoders.
 
 The room selector requires a valid grounded input and 50 ms stability.
 
 Momentary buttons use a default 30 ms debounce.
 
-Encoder transitions are decoded by the reusable `Encoder` class. Completed volume movements become `volume-up` or `volume-down` fundamental actions.
+Encoder transitions are decoded by the reusable `Encoder` class.
 
-The volume encoder's separate momentary switch generates `mute-toggle`.
+Completed volume movements become `volume-up` or `volume-down` fundamental actions. The volume encoder's separate pushbutton generates `mute-toggle`.
+
+The custom-action encoder cycles through the selected room's ordered custom actions. Its pushbutton dispatches the selected action through the existing execution path.
+
+The OLED displays custom-action selections through the deferred display interface. Actual I²C updates occur during OLED polling rather than directly inside the selection handler.
 
 Browser Test Remote room selection remains independent of the physical room selector.
 
@@ -1112,7 +1121,9 @@ An independent volume command was also observed executing during the custom wait
 
 ---
 
-## 13. Clock and diagnostics
+## 13. Clock, logging, and performance diagnostics
+
+### 13.1 Clock
 
 **Modules:** `clonker/system/clock.py` and `clonker/system/logger.py`.
 
@@ -1122,17 +1133,97 @@ The browser can submit UTC Unix time through `/api/clock`.
 
 Readable timestamps are calculated from that reference and subsequent monotonic elapsed time.
 
-Queue deadlines, custom waits, Denon pacing, and Roku hold timing use `time.monotonic()`.
+Queue deadlines, custom waits, Denon pacing, and Roku hold timing use monotonic time.
 
 Browser clock changes must not shift these deadlines.
 
 Automated NTP synchronization is not established by the current verified baseline.
+
+### 13.2 Logging
 
 Serial logging records action admission, execution, failures, room changes, and operating-mode transitions.
 
 There is no persistent flash log or background logging server.
 
 Keep routine logging modest. Continuous diagnostics can distort timing and browser responsiveness.
+
+### 13.3 Shared PERF infrastructure
+
+**Module:** `clonker/system/perf.py`.
+
+Chapter 7 introduced a reusable performance measurement helper supporting:
+
+- Registration of named measurements.
+- Start/stop timing.
+- Direct elapsed-time recording.
+- Accumulated statistics and snapshots.
+- Resetting measurements between reporting intervals.
+
+The main scheduler registers and collects measurements for physical polling, queue activity, adapter activity, management HTTP, OLED polling, and overall loop execution.
+
+The current scheduler-level diagnostic configuration in `main.py` includes:
+
+```python
+PERF_ENABLED = True
+PERF_INTERVAL_NS = 30_000_000_000
+GC_TEST_ENABLED = False
+```
+
+PERF reports are generated approximately every 30 seconds.
+
+The reports include physical polling-gap statistics, execution-duration measurements, and contextual information such as memory availability and OLED refresh activity.
+
+The instrumentation is operational and intended for continued targeted extension.
+
+### 13.4 Physical internal diagnostics
+
+`controls/physical.py` provides optional internal instrumentation.
+
+The current baseline is:
+
+```python
+PHYSICAL_PERF_ENABLED = False
+
+PERF_SCAN = False
+PERF_EVENTS = False
+PERF_VOLUME = False
+PERF_DISPATCH = False
+PERF_HOLD = False
+```
+
+The master flag controls whether internal physical instrumentation is active. Individual flags allow more focused measurements.
+
+Disabling internal physical instrumentation does not disable scheduler-level timing of `physical.poll()`.
+
+Use focused measurements rather than enabling every diagnostic indiscriminately.
+
+### 13.5 Interpreting performance measurements
+
+Three distinct concepts must not be conflated:
+
+1. **Physical polling gap:** Time between opportunities to poll physical controls.
+2. **Physical execution duration:** Time spent executing `physical.poll()`.
+3. **Network execution duration:** Time consumed by a blocking transport or adapter operation.
+
+A long network request can delay the next physical poll without necessarily increasing the measured execution duration of `physical.poll()` itself.
+
+Chapter 7 observed occasional physical execution spikes around 40–50 ms during sustained volume activity, even after disabling detailed internal instrumentation.
+
+Blocking Roku HTTP operations also produced substantially longer cooperative scheduler gaps.
+
+The source of the physical execution spikes remains unresolved.
+
+### 13.6 Garbage-collection experiment
+
+An explicit garbage-collection diagnostic was tested during Chapter 7.
+
+`main.py` retains the optional `GC_TEST_ENABLED` switch, currently disabled.
+
+The experiment did not conclusively explain the physical execution spikes.
+
+Do not repeat it without identifying what additional evidence a new experiment would provide.
+
+See [Development History](DEVELOPMENT_HISTORY.md) for the recorded investigation.
 
 ---
 
@@ -1265,17 +1356,53 @@ Reseating the wire restored selector operation.
 
 The problem was physical connectivity, not the selector's software mapping.
 
+### November 7–8 — Custom-action encoder and OLED integration
+
+The second Bourns encoder was integrated into the physical coordinator.
+
+Rotation cycles through the currently selected room's ordered custom actions, wrapping around the available entries. Pressing the encoder executes the selected action through the existing dispatcher.
+
+Room changes reset the selection. Empty custom-action lists are handled without attempting execution.
+
+The OLED integration introduced `display/oled.py`, implementing a 128×64 SH1106 display over I²C on GP4/GP5.
+
+The display uses deferred text requests, rate-limited polling, partial updates, and idle display-off. The custom-action selector displays the selected action name or `No customs`.
+
+The initial encoder and OLED implementations are operational. Further user-interface integration remains planned.
+
+### November 8 — Shared performance instrumentation
+
+Performance measurement was consolidated into `system/perf.py`, replacing much of the earlier ad hoc timing bookkeeping.
+
+Scheduler-level measurements now cover physical polling gaps, physical execution, queue execution, adapter execution, management HTTP activity, OLED polling, and main-loop execution.
+
+Optional internal measurements in `controls/physical.py` support more focused investigations.
+
+During sustained volume testing, occasional physical execution spikes around 40–50 ms remained unresolved. Blocking Roku operations also produced longer scheduler gaps, but these represent different timing measurements.
+
+The investigation included instrumentation-overhead changes, logging changes, and an explicit garbage-collection experiment. None conclusively isolated the physical execution spikes.
+
+Detailed results, unsuccessful experiments, and the Chapter 8 diagnostic handoff are preserved in [Development History](DEVELOPMENT_HISTORY.md).
+
 ---
 
 ## 15. Operational limitations and next investigations
 
 ### Physical controls
 
-Power Toggle, room selection, volume, mute, navigation, and playback inputs have been integrated.
+The Chapter 7 physical assembly is complete: controls are mounted, soldered, wired, secured, strain-relieved, and connected through the Pico Cowbell Terminal board.
 
-The six Roku physical-button holds have been exercised.
+Power Toggle, room selection, volume, mute, navigation, playback, and both Bourns rotary encoders are integrated.
 
-OLED, audio feedback, battery/sleep, and final enclosure work remain future development.
+The custom-action encoder supports room-specific selection, OLED display of the selected action, and push-to-run execution. Its initial implementation is largely complete.
+
+All six Roku physical-button holds have been exercised on real equipment.
+
+The SH1106 OLED has completed initial application integration. Additional status and feedback uses remain future work.
+
+PERF instrumentation is operational and continues to be extended for targeted investigations.
+
+Audible feedback, rechargeable battery operation, and sleep/wake behavior remain future development.
 
 ### Denon TCP
 
@@ -1351,14 +1478,19 @@ Apple TV discovery, pairing, authenticated sessions, and commands are not implem
 
 Useful future tests include:
 
+- Isolate the occasional 40–50 ms `physical.exec` spikes observed during sustained volume activity.
+- Distinguish delays occurring inside `physical.poll()` from cooperative scheduler gaps caused by blocking network operations.
+- Extend targeted PERF measurements only when they can answer a specific diagnostic question.
 - Stale Denon TCP connections after AVR restart.
 - Switching receivers during bursts.
 - Network interruption during Roku keydown or keyup.
 - Physical-button release after room changes and failures.
+- Blank-command safety for physical held buttons in Room 3.
 - Roku held-volume under simultaneous CONFIG-mode browser activity.
 - High-rate encoder capture during other HTTP operations.
 - Queue pressure and malformed responses.
 - Long-uptime operation and repeated reconnects.
+- Additional OLED feedback integration and display-performance testing.
 
 Future physical features should reuse the existing encoder/button drivers, physical coordinator, adapter selection, and shared queue.
 
