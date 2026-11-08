@@ -28,6 +28,8 @@ perf.register("physical.dispatch")
 perf.register("physical.hold")
 perf.register("physical.scan")
 perf.register("physical.events")
+perf.register("physical.events.active")
+perf.register("physical.events.idle")
 
 
 # Diagnostic: suppress physical input event INFO logging.
@@ -365,8 +367,9 @@ def poll():
     poll_started = perf.start()
 
     # Accumulate GPIO read durations across one physical poll.
-    # Event handling, logging, and dispatch are excluded.
+    # Track whether any physical input event occurred.
     scan_ns = 0
+    event_seen = False
 
     # Update room state before handling button events.
     started = perf.start()
@@ -376,6 +379,7 @@ def poll():
         scan_ns += perf.start() - started
 
     if room_id is not None:
+        event_seen = True
         if PHYSICAL_EVENT_LOGGING:
             logger.info("ROOM SELECTED: {}".format(room_id))
         _action_index = 0
@@ -390,6 +394,8 @@ def poll():
 
         if event is None:
             continue
+
+        event_seen = True
 
         if PHYSICAL_EVENT_LOGGING:
             logger.info(
@@ -427,6 +433,7 @@ def poll():
             scan_ns += perf.start() - started
 
         if step:
+            event_seen = True
             action_id = (
                 "volume-up" if step > 0 else "volume-down"
             )
@@ -443,6 +450,7 @@ def poll():
             scan_ns += perf.start() - started
 
         if step:
+            event_seen = True
             room_id = selectors.selected_room()
             custom_actions = _custom_actions_for_room(room_id)
 
@@ -457,5 +465,13 @@ def poll():
 
     # Separate GPIO sampling from the remaining physical work.
     total_ns = perf.start() - poll_started
+    events_ns = max(0, total_ns - scan_ns)
+
     perf.record("physical.scan", scan_ns)
-    perf.record("physical.events", max(0, total_ns - scan_ns))
+    perf.record("physical.events", events_ns)
+
+    # Classify each completed poll by actual input activity.
+    if event_seen:
+        perf.record("physical.events.active", events_ns)
+    else:
+        perf.record("physical.events.idle", events_ns)
