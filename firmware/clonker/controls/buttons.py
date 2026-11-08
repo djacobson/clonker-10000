@@ -27,11 +27,12 @@ class Button:
         self.name = name
         self.pin_number = pin_number
         self.debounce_seconds = debounce_seconds
+        self.debounce_ns = int(debounce_seconds * 1_000_000_000)
 
         self._input = None
         self._last_raw_state = True
         self._stable_state = True
-        self._last_change_time = 0.0
+        self._last_change_time = 0
 
     def initialize(self):
         """Claim and configure the GPIO input."""
@@ -53,7 +54,7 @@ class Button:
 
             self._last_raw_state = state
             self._stable_state = state
-            self._last_change_time = time.monotonic()
+            self._last_change_time = time.monotonic_ns()
             self._input = gpio
 
         except Exception:
@@ -68,7 +69,7 @@ class Button:
         if self._input is None:
             return None
 
-        now = time.monotonic()
+        now = time.monotonic_ns()
         raw_state = self._input.value
 
         if raw_state != self._last_raw_state:
@@ -77,7 +78,7 @@ class Button:
 
         if (
             raw_state != self._stable_state
-            and now - self._last_change_time >= self.debounce_seconds
+            and now - self._last_change_time >= self.debounce_ns
         ):
             self._stable_state = raw_state
 
