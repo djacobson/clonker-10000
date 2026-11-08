@@ -2770,6 +2770,179 @@ The remaining work includes completing the custom-action rotary experience, OLED
 
 **Less sleek. More CLONK.**
 
+## Chapter 7 Addendum — Physical Polling Performance Investigation
+
+**Date:** November 8, 2026  
+**Status:** Investigation ongoing; Chapter 8 handoff pending  
+**Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1
+
+### Objective
+
+Investigate occasional 40–50 ms execution spikes inside `physical.poll()` during sustained volume encoder activity.
+
+The goal was to distinguish ordinary blocking network delays from unexpected time spent executing the physical input coordinator, without unnecessarily redesigning the cooperative scheduler or the working control system.
+
+### PERF infrastructure
+
+Introduced `clonker/system/perf.py` as a shared performance measurement helper.
+
+The helper supports named measurements, elapsed-time recording, sample counts, average and maximum durations, slow-operation counts, snapshots, and resets.
+
+Scheduler instrumentation was consolidated around this helper, replacing much of the earlier ad hoc performance bookkeeping.
+
+Relevant measurements include:
+
+- `physical.gap` — elapsed time between physical polling opportunities.
+- `physical.exec` — complete physical polling execution.
+- `queue.exec` — shared action queue processing.
+- `adapter.exec` — device adapter maintenance.
+- `loop.exec` — overall cooperative scheduler iteration.
+- Optional internal physical measurements for scanning, events, volume handling, and dispatch.
+
+Periodic reports retain useful context such as free memory, OLED refresh count, and management HTTP polling.
+
+### Physical instrumentation refactor
+
+Detailed measurements were added to `controls/physical.py` to isolate input scanning, event handling, and action dispatch.
+
+Initial instrumentation measured individual GPIO operations. This was subsequently simplified to reduce repeated statistics updates.
+
+A module-level diagnostic switch was then introduced:
+
+`PHYSICAL_PERF_ENABLED = False`
+
+The physical polling routine was refactored so that scan, event, and volume timing are conditionally bypassed when diagnostics are disabled.
+
+Individual diagnostic flags were also introduced for future targeted investigation.
+
+**Current baseline:** Internal physical instrumentation disabled; scheduler-level PERF remains enabled.
+
+The dispatch and hold diagnostic flags are declared but are not yet independently wired into their respective helpers.
+
+### Observed idle behavior
+
+Repeated RUN-mode tests demonstrated consistently fast physical polling while idle.
+
+In the latest Sunroom baseline:
+
+| Measurement | Result |
+|---|---:|
+| GPIO gap average | 2.34 ms |
+| GPIO gap maximum | 7.93 ms |
+| Physical execution average | 0.82 ms |
+| Physical execution maximum | 5.66 ms |
+| Physical executions over 20 ms | 0 |
+
+This establishes that the normal idle GPIO polling path is responsive.
+
+### Observed volume activity
+
+Sustained Sunroom volume encoder tests produced intermittent physical execution spikes.
+
+Latest results after simplifying the physical instrumentation:
+
+| Measurement | Result |
+|---|---:|
+| GPIO gap average | 2.77 ms |
+| GPIO gap maximum | 237.00 ms |
+| Physical execution average | 1.02 ms |
+| Physical execution maximum | 46.68 ms |
+| Physical executions over 20 ms | 55 |
+| Queue executions over 20 ms | 10 |
+| Adapter executions over 20 ms | 7 |
+| Main loop maximum | 235.93 ms |
+
+The Roku held-volume implementation includes blocking HTTP keydown operations, observed around 115–117 ms in this test.
+
+These network operations explain substantial cooperative scheduler gaps, but do not by themselves explain why an individual `physical.poll()` call sometimes measures approximately 45 ms.
+
+### Diagnostic experiments and findings
+
+**Physical event logging**
+
+Disabled detailed physical event logging during performance testing.
+
+The physical execution spikes persisted.
+
+**Internal PERF instrumentation**
+
+Disabled the physical module's detailed statistics collection, initially through a no-op PERF interface and subsequently through conditional timing paths.
+
+The spikes persisted near their previous magnitude.
+
+A representative earlier maximum was 46.02 ms; the latest refactored implementation reached 46.68 ms.
+
+This weakens the hypothesis that internal PERF bookkeeping is the primary cause.
+
+**Explicit garbage collection**
+
+An earlier controlled explicit-GC experiment was performed. Its diagnostic switch remains available in `main.py` as `GC_TEST_ENABLED`, currently set to `False`.
+
+The investigation did not establish garbage collection as the cause of the spikes.
+
+Automatic CircuitPython garbage collection remains a possible contributor, but has not been conclusively isolated.
+
+Do not repeat the existing explicit-GC experiment without identifying what additional evidence a new test would provide.
+
+**Source review**
+
+Reviewed the scheduler, physical coordinator, button handling, encoder decoding, and PERF helper.
+
+The scheduler's `physical.exec` measurement correctly surrounds `physical.poll()` and does not intentionally include subsequent queue or adapter execution.
+
+The encoder and button drivers are nonblocking.
+
+Previously measured individual dispatch operations were substantially shorter than the observed 40–50 ms physical execution spikes.
+
+No obvious blocking 45 ms operation was identified in the normal volume input path.
+
+### Conclusions
+
+**Confirmed:**
+
+- Idle physical polling is fast and consistent.
+- Volume input and real equipment control remain operational.
+- Blocking network operations contribute to long GPIO polling gaps.
+- Physical execution spikes persist after disabling logging and most internal instrumentation.
+- The outer scheduler timing boundary is correctly placed.
+
+**Not established:**
+
+- The exact cause of the 40–50 ms physical execution spikes.
+- Whether automatic garbage collection accounts for some or all of the unexplained duration.
+- Whether event-path allocations, runtime scheduling, or another interaction is responsible.
+- Whether the spikes materially affect user-perceived input responsiveness.
+
+The investigation should distinguish measured facts from hypotheses.
+
+### Chapter 8 investigation guidance
+
+Begin by reviewing the latest source and this diagnostic history before proposing changes.
+
+Recommended priorities:
+
+1. Preserve the working physical controls, action queue, and network adapters.
+2. Avoid repeating previously inconclusive experiments.
+3. Identify the remaining unmeasured portions of the active volume event path.
+4. Investigate allocation pressure and automatic runtime pauses only with a clearly defined diagnostic hypothesis.
+5. Prefer one reversible change and one controlled test at a time.
+6. Avoid adding substantial instrumentation overhead to the hot GPIO polling loop.
+7. Consider whether the remaining spikes warrant further optimization based on actual missed detents or responsiveness problems.
+
+Do not confuse long cooperative scheduler gaps during blocking Roku requests with the separate physical execution spike investigation.
+
+### Engineering status
+
+The PERF helper and scheduler diagnostics are operational.
+
+The physical coordinator has a lean production polling path and optional targeted diagnostics.
+
+The approximately 45 ms physical execution anomaly remains unresolved.
+
+**Chapter 7 leaves a working Clonker, a substantially cleaner diagnostic system, and one stubborn gremlin for Chapter 8.**
+
+Less guessing. More measuring. More CLONK.
+
 ---
 
 **THE CLONKER 10000**
