@@ -58,6 +58,8 @@ PERF_SCHEDULER = (
 PERF_PHYSICAL = (
     "physical.scan",
     "physical.events",
+    "physical.events.active",
+    "physical.events.idle",
     "physical.dispatch",
     "physical.hold",
 )
