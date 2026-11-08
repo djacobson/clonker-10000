@@ -35,6 +35,9 @@ PHYSICAL_POLL_INTERVAL = 0.001
 WEB_POLL_INTERVAL = 0.001
 ACTION_POLL_INTERVAL = 0.01
 
+# Lightweight serial performance diagnostics.
+PERF_ENABLED = True
+PERF_INTERVAL = 30.0
 
 def main():
     logger.info("THE CLONKER 10000")
@@ -92,6 +95,16 @@ def main():
     next_action_poll = time.monotonic()
     next_physical_poll = time.monotonic()
 
+    # Performance statistics for periodic serial reporting.
+    perf_report_at = time.monotonic()
+    perf_last_physical = None
+    perf_last_queue = None
+
+    perf_physical_max = 0.0
+    perf_queue_max = 0.0
+    perf_oled_max = 0.0
+    perf_loop_max = 0.0
+
     # OLED is optional; failure must not stop Clonker.
     oled_ready = False
     if PHYSICAL_CONTROLS_ENABLED:
@@ -114,14 +127,30 @@ def main():
             #
             # The queue is polled in both CONFIG and RUN modes.
             now = time.monotonic()
+            if PERF_ENABLED:
+                perf_loop_start = now
 
             if physical_ready and now >= next_physical_poll:
+                if PERF_ENABLED:
+                    if perf_last_physical is not None:
+                        gap = now - perf_last_physical
+                        if gap > perf_physical_max:
+                            perf_physical_max = gap
+                    perf_last_physical = now
+
                 physical.poll()
                 next_physical_poll = (
                     time.monotonic() + PHYSICAL_POLL_INTERVAL
                 )
 
             if now >= next_action_poll:
+                if PERF_ENABLED:
+                    if perf_last_queue is not None:
+                        gap = now - perf_last_queue
+                        if gap > perf_queue_max:
+                            perf_queue_max = gap
+                    perf_last_queue = now
+
                 actions.poll()
                 next_action_poll = time.monotonic() + ACTION_POLL_INTERVAL
 
@@ -169,8 +198,11 @@ def main():
                         time.monotonic() + WEB_POLL_INTERVAL
                     )
 
-            # Service the OLED after the higher-priority work.
+            # Service the OLED after higher-priority work.
             if oled_ready:
+                if PERF_ENABLED:
+                    perf_oled_start = time.monotonic()
+
                 try:
                     oled.poll()
                 except Exception as exc:
@@ -179,6 +211,46 @@ def main():
                     )
                     oled.close()
                     oled_ready = False
+
+                if PERF_ENABLED:
+                    elapsed = time.monotonic() - perf_oled_start
+                    if elapsed > perf_oled_max:
+                        perf_oled_max = elapsed
+
+            # Performance summary: one report per interval.
+            if PERF_ENABLED:
+                perf_elapsed = time.monotonic() - perf_loop_start
+
+                if perf_elapsed > perf_loop_max:
+                    perf_loop_max = perf_elapsed
+
+                if time.monotonic() - perf_report_at >= PERF_INTERVAL:
+                    logger.info(
+                        "PERF: physical max gap={:.1f}ms".format(
+                            perf_physical_max * 1000
+                        )
+                    )
+                    logger.info(
+                        "PERF: queue max gap={:.1f}ms".format(
+                            perf_queue_max * 1000
+                        )
+                    )
+                    logger.info(
+                        "PERF: OLED max poll={:.1f}ms".format(
+                            perf_oled_max * 1000
+                        )
+                    )
+                    logger.info(
+                        "PERF: main loop max={:.1f}ms".format(
+                            perf_loop_max * 1000
+                        )
+                    )
+
+                    perf_physical_max = 0.0
+                    perf_queue_max = 0.0
+                    perf_oled_max = 0.0
+                    perf_loop_max = 0.0
+                    perf_report_at = time.monotonic()
 
             # Yield briefly to the CircuitPython runtime.
             # Keep this INSIDE the while True loop.
