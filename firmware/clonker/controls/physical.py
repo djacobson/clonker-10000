@@ -14,7 +14,6 @@ The room selector maintains its own selected-room state.
 """
 
 from clonker.system import logger
-from clonker.system import perf
 from clonker import actions
 from clonker import device_config_v2 as device_config
 from clonker.controls import pins
@@ -23,6 +22,35 @@ from clonker.controls.buttons import Button
 from clonker.controls.encoders import Encoder
 from clonker.display import oled
 
+from clonker.system import perf as _perf
+
+# Diagnostic switch for physical-module instrumentation.
+# False disables internal timing and statistics collection.
+# The scheduler's physical.exec measurement remains active.
+PHYSICAL_PERF_ENABLED = False
+
+
+class _DisabledPerf:
+    """No-op instrumentation for controlled performance tests."""
+
+    @staticmethod
+    def register(*args, **kwargs):
+        pass
+
+    @staticmethod
+    def start():
+        return 0
+
+    @staticmethod
+    def stop(*args):
+        return 0
+
+    @staticmethod
+    def record(*args):
+        pass
+
+
+perf = _perf if PHYSICAL_PERF_ENABLED else _DisabledPerf()
 
 perf.register("physical.dispatch")
 perf.register("physical.hold")
