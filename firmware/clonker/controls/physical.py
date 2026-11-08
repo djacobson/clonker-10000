@@ -27,6 +27,7 @@ from clonker.display import oled
 perf.register("physical.dispatch")
 perf.register("physical.hold")
 perf.register("physical.scan")
+perf.register("physical.events")
 
 
 # Diagnostic: suppress physical input event INFO logging.
@@ -360,6 +361,9 @@ def poll():
     if not _initialized:
         return
 
+    # Time the complete physical polling operation.
+    poll_started = perf.start()
+
     # Accumulate GPIO read durations across one physical poll.
     # Event handling, logging, and dispatch are excluded.
     scan_ns = 0
@@ -451,5 +455,7 @@ def poll():
 
             _log_custom_selection(room_id)
 
-    # Record one cumulative scan duration per physical poll.
+    # Separate GPIO sampling from the remaining physical work.
+    total_ns = perf.start() - poll_started
     perf.record("physical.scan", scan_ns)
+    perf.record("physical.events", max(0, total_ns - scan_ns))
