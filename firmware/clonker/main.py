@@ -57,6 +57,7 @@ PERF_SCHEDULER = (
 # Targeted physical measurements.
 PERF_PHYSICAL = (
     "physical.scan",
+    "physical.events",
     "physical.dispatch",
     "physical.hold",
 )
