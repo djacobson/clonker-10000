@@ -31,14 +31,17 @@ from clonker import device_config_v2 as device_config
 # False = brain-only mode; browser controls and action queue still work.
 PHYSICAL_CONTROLS_ENABLED = True
 
-# Cooperative scheduler intervals.
-PHYSICAL_POLL_INTERVAL = 0.001
-WEB_POLL_INTERVAL = 0.001
-ACTION_POLL_INTERVAL = 0.01
+# Cooperative scheduler intervals (integer nanoseconds).
+NS_PER_MS = 1_000_000
+
+PHYSICAL_POLL_INTERVAL_NS = 1_000_000
+WEB_POLL_INTERVAL_NS = 1_000_000
+ACTION_POLL_INTERVAL_NS = 10_000_000
 
 # Lightweight serial performance diagnostics.
 PERF_ENABLED = True
-PERF_INTERVAL = 30.0
+PERF_INTERVAL_NS = 30_000_000_000
+SLOW_PHYSICAL_GAP_NS = 20_000_000
 
 def main():
     logger.info("THE CLONKER 10000")
@@ -92,28 +95,29 @@ def main():
     last_announced_mode = None
     last_announced_source = None
 
-    next_web_poll = time.monotonic()
-    next_action_poll = time.monotonic()
-    next_physical_poll = time.monotonic()
+    now = time.monotonic_ns()
+    next_web_poll = now
+    next_action_poll = now
+    next_physical_poll = now
 
     # Performance statistics for periodic serial reporting.
-    perf_report_at = time.monotonic()
+    perf_report_at = now
     perf_last_physical = None
     perf_last_queue = None
 
-    perf_physical_max = 0.0
-    perf_physical_exec_max = 0.0
-    perf_physical_gap_sum = 0.0
+    perf_physical_max = 0
+    perf_physical_exec_max = 0
+    perf_physical_gap_sum = 0
     perf_physical_gap_count = 0
     perf_physical_slow = 0
 
-    perf_queue_max = 0.0
-    perf_adapter_max = 0.0
-    perf_oled_max = 0.0
-    perf_loop_max = 0.0
+    perf_queue_max = 0
+    perf_adapter_max = 0
+    perf_oled_max = 0
+    perf_loop_max = 0
 
-    perf_web_max = 0.0
-    perf_web_total = 0.0
+    perf_web_max = 0
+    perf_web_total = 0
     perf_web_count = 0
 
     perf_oled_refresh_start = oled.get_refresh_count()
@@ -139,7 +143,7 @@ def main():
             # Priority 4: CONFIG management HTTP.
             #
             # The queue is polled in both CONFIG and RUN modes.
-            now = time.monotonic()
+            now = time.monotonic_ns()
             if PERF_ENABLED:
                 perf_loop_start = now
 
@@ -153,21 +157,21 @@ def main():
                         if gap > perf_physical_max:
                             perf_physical_max = gap
 
-                        if gap > 0.020:
+                        if gap > SLOW_PHYSICAL_GAP_NS:
                             perf_physical_slow += 1
 
                     perf_last_physical = now
-                    perf_physical_start = time.monotonic()
+                    perf_physical_start = time.monotonic_ns()
 
                 physical.poll()
 
                 if PERF_ENABLED:
-                    elapsed = time.monotonic() - perf_physical_start
+                    elapsed = time.monotonic_ns() - perf_physical_start
                     if elapsed > perf_physical_exec_max:
                         perf_physical_exec_max = elapsed
 
                 next_physical_poll = (
-                    time.monotonic() + PHYSICAL_POLL_INTERVAL
+                    time.monotonic_ns() + PHYSICAL_POLL_INTERVAL_NS
                 )
 
             if now >= next_action_poll:
@@ -179,11 +183,13 @@ def main():
                     perf_last_queue = now
 
                 actions.poll()
-                next_action_poll = time.monotonic() + ACTION_POLL_INTERVAL
+                next_action_poll = (
+                    time.monotonic_ns() + ACTION_POLL_INTERVAL_NS
+                )
 
             # Maintain stateful adapters independently of queue depth.
             if PERF_ENABLED:
-                perf_adapter_start = time.monotonic()
+                perf_adapter_start = time.monotonic_ns()
 
             try:
                 device_adapters.poll()
@@ -193,7 +199,7 @@ def main():
                 )
 
             if PERF_ENABLED:
-                elapsed = time.monotonic() - perf_adapter_start
+                elapsed = time.monotonic_ns() - perf_adapter_start
                 if elapsed > perf_adapter_max:
                     perf_adapter_max = elapsed
 
@@ -226,28 +232,28 @@ def main():
 
             # Advance at most one inbound network operation per poll.
             if web_running:
-                now = time.monotonic()
+                now = time.monotonic_ns()
                 if now >= next_web_poll:
                     if PERF_ENABLED:
-                        perf_web_start = time.monotonic()
+                        perf_web_start = time.monotonic_ns()
 
                     web.poll()
 
                     if PERF_ENABLED:
-                        elapsed = time.monotonic() - perf_web_start
+                        elapsed = time.monotonic_ns() - perf_web_start
                         perf_web_total += elapsed
                         perf_web_count += 1
                         if elapsed > perf_web_max:
                             perf_web_max = elapsed
 
                     next_web_poll = (
-                        time.monotonic() + WEB_POLL_INTERVAL
+                        time.monotonic_ns() + WEB_POLL_INTERVAL_NS
                     )
 
             # Service the OLED after higher-priority work.
             if oled_ready:
                 if PERF_ENABLED:
-                    perf_oled_start = time.monotonic()
+                    perf_oled_start = time.monotonic_ns()
 
                 try:
                     oled.poll()
@@ -259,57 +265,62 @@ def main():
                     oled_ready = False
 
                 if PERF_ENABLED:
-                    elapsed = time.monotonic() - perf_oled_start
+                    elapsed = time.monotonic_ns() - perf_oled_start
                     if elapsed > perf_oled_max:
                         perf_oled_max = elapsed
 
             # Performance summary: one report per interval.
             if PERF_ENABLED:
-                perf_elapsed = time.monotonic() - perf_loop_start
+                perf_elapsed = time.monotonic_ns() - perf_loop_start
 
                 if perf_elapsed > perf_loop_max:
                     perf_loop_max = perf_elapsed
 
-                if time.monotonic() - perf_report_at >= PERF_INTERVAL:
-                    average_gap = (
-                        perf_physical_gap_sum / perf_physical_gap_count
+                if (
+                    time.monotonic_ns() - perf_report_at
+                    >= PERF_INTERVAL_NS
+                ):
+                    average_gap_ms = (
+                        perf_physical_gap_sum
+                        / perf_physical_gap_count
+                        / NS_PER_MS
                         if perf_physical_gap_count else 0.0
                     )
 
                     logger.info(
-                        "PERF: physical gap avg={:.1f}ms, "
-                        "max={:.1f}ms, >20ms={}".format(
-                            average_gap * 1000,
-                            perf_physical_max * 1000,
+                        "PERF: physical gap avg={:.2f}ms, "
+                        "max={:.2f}ms, >20ms={}".format(
+                            average_gap_ms,
+                            perf_physical_max / NS_PER_MS,
                             perf_physical_slow
                         )
                     )
                     logger.info(
-                        "PERF: physical execution max={:.1f}ms".format(
-                            perf_physical_exec_max * 1000
+                        "PERF: physical execution max={:.2f}ms".format(
+                            perf_physical_exec_max / NS_PER_MS
                         )
                     )
                     logger.info(
-                        "PERF: queue gap max={:.1f}ms".format(
-                            perf_queue_max * 1000
+                        "PERF: queue gap max={:.2f}ms".format(
+                            perf_queue_max / NS_PER_MS
                         )
                     )
                     logger.info(
-                        "PERF: adapter execution max={:.1f}ms".format(
-                            perf_adapter_max * 1000
+                        "PERF: adapter execution max={:.2f}ms".format(
+                            perf_adapter_max / NS_PER_MS
                         )
                     )
                     logger.info(
-                        "PERF: OLED execution max={:.1f}ms, "
+                        "PERF: OLED execution max={:.2f}ms, "
                         "refreshes={}".format(
-                            perf_oled_max * 1000,
+                            perf_oled_max / NS_PER_MS,
                             oled.get_refresh_count()
                             - perf_oled_refresh_start
                         )
                     )
                     logger.info(
-                        "PERF: main loop max={:.1f}ms".format(
-                            perf_loop_max * 1000
+                        "PERF: main loop max={:.2f}ms".format(
+                            perf_loop_max / NS_PER_MS
                         )
                     )
                     logger.info(
@@ -318,34 +329,36 @@ def main():
                         )
                     )
 
-                    average_web = (
-                        perf_web_total / perf_web_count
+                    average_web_ms = (
+                        perf_web_total
+                        / perf_web_count
+                        / NS_PER_MS
                         if perf_web_count else 0.0
                     )
                     logger.info(
                         "PERF: mode={}, HTTP polls={}, "
-                        "avg={:.2f}ms, max={:.1f}ms".format(
+                        "avg={:.2f}ms, max={:.2f}ms".format(
                             "CONFIG" if config_mode else "RUN",
                             perf_web_count,
-                            average_web * 1000,
-                            perf_web_max * 1000
+                            average_web_ms,
+                            perf_web_max / NS_PER_MS
                         )
                     )
 
-                    perf_physical_max = 0.0
-                    perf_physical_exec_max = 0.0
-                    perf_queue_max = 0.0
-                    perf_adapter_max = 0.0
-                    perf_oled_max = 0.0
-                    perf_loop_max = 0.0
-                    perf_web_max = 0.0
-                    perf_web_total = 0.0
+                    perf_physical_max = 0
+                    perf_physical_exec_max = 0
+                    perf_queue_max = 0
+                    perf_adapter_max = 0
+                    perf_oled_max = 0
+                    perf_loop_max = 0
+                    perf_web_max = 0
+                    perf_web_total = 0
                     perf_web_count = 0
                     perf_physical_slow = 0
-                    perf_physical_gap_sum = 0.0
+                    perf_physical_gap_sum = 0
                     perf_physical_gap_count = 0
                     perf_oled_refresh_start = oled.get_refresh_count()
-                    perf_report_at = time.monotonic()
+                    perf_report_at = time.monotonic_ns()
 
             # Yield briefly to the CircuitPython runtime.
             # Keep this INSIDE the while True loop.
