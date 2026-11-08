@@ -123,6 +123,28 @@ def _log_custom_selection(room_id):
     )
 
 
+def _run_selected_custom():
+    """Dispatch the selected room's Custom Action."""
+    room_id = selectors.selected_room()
+    custom_actions = _custom_actions_for_room(room_id)
+
+    if not custom_actions:
+        logger.info(
+            "CUSTOM RUN NO-OP: {} / No customs".format(room_id)
+        )
+        return False
+
+    selected = custom_actions[_action_index]
+
+    logger.info(
+        "CUSTOM RUN: {} / {}".format(
+            room_id, selected["name"]
+        )
+    )
+
+    return dispatch_selected(selected["id"])
+
+
 def dispatch_selected(action_id):
     """Dispatch an action to the currently selected room.
 
@@ -335,6 +357,12 @@ def poll():
             "{} {}".format(button.name, event.upper())
         )
 
+        # Custom Action encoder press executes the current selection.
+        if button.name == "ACTION_RUN":
+            if event == "pressed":
+                _run_selected_custom()
+            continue
+
         action_id = BUTTON_ACTIONS.get(button.name)
 
         if action_id is None:
@@ -348,12 +376,8 @@ def poll():
             )
             continue
 
-        # All other buttons retain their original behavior.
         if event == "pressed":
             dispatch_selected(action_id)
-
-        # ACTION_RUN will use the custom-action selection
-        # maintained by the future encoder integration.
 
     # Volume encoder: one completed detent -> one action.
     if _volume_encoder is not None:
