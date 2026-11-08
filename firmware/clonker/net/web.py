@@ -34,10 +34,10 @@ MAX_HEADER_BYTES = 2048
 IO_CHUNK_BYTES = 512
 
 # Abandon silent browser connections quickly.
-IDLE_CLIENT_TIMEOUT_SECONDS = 0.2
+IDLE_CLIENT_TIMEOUT_NS = 200_000_000    # 200 ms
 
 # Allow active requests and responses more time.
-CLIENT_TIMEOUT_SECONDS = 4.0
+CLIENT_TIMEOUT_NS = 4_000_000_000       # 4 seconds
 
 # Connection state is kept across poll() calls rather than blocking on I/O.
 _pool = None
@@ -46,7 +46,7 @@ _client = None
 _request = None
 _response = None
 _sent = 0
-_last_activity = 0.0
+_last_activity = 0
 
 
 def http_trace(message):
@@ -80,7 +80,7 @@ def _close_client():
     _request = None
     _response = None
     _sent = 0
-    _last_activity = 0.0
+    _last_activity = 0
 
 
 def start():
@@ -288,7 +288,7 @@ def poll():
     global _client, _request, _response, _sent, _last_activity
     if _listener is None:
         return
-    now = time.monotonic()
+    now = time.monotonic_ns()
 
     # Accept a new client if the server is idle.
     if _client is None:
@@ -320,12 +320,12 @@ def poll():
         and len(_request) == 0
     )
 
-    timeout = (
-        IDLE_CLIENT_TIMEOUT_SECONDS
-        if silent_client else CLIENT_TIMEOUT_SECONDS
+    timeout_ns = (
+        IDLE_CLIENT_TIMEOUT_NS
+        if silent_client else CLIENT_TIMEOUT_NS
     )
 
-    if now - _last_activity > timeout:
+    if now - _last_activity > timeout_ns:
         phase = "RECEIVING" if _response is None else "SENDING"
 
         logger.warning(
