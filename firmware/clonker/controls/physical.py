@@ -30,6 +30,7 @@ perf.register("physical.scan")
 perf.register("physical.events")
 perf.register("physical.events.active")
 perf.register("physical.events.idle")
+perf.register("physical.volume")
 
 
 # Diagnostic: suppress physical input event INFO logging.
@@ -433,12 +434,15 @@ def poll():
             scan_ns += perf.start() - started
 
         if step:
-            event_seen = True
-            action_id = (
-                "volume-up" if step > 0 else "volume-down"
-            )
-
-            dispatch_selected(action_id)
+            started = perf.start()
+            try:
+                event_seen = True
+                action_id = (
+                    "volume-up" if step > 0 else "volume-down"
+                )
+                dispatch_selected(action_id)
+            finally:
+                perf.stop("physical.volume", started)
 
     # Custom Action encoder: circular, room-specific selection.
     # Rotation updates the OLED but never dispatches commands.
