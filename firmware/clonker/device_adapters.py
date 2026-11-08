@@ -158,7 +158,7 @@ def execute(adapter, endpoint, method, path):
 
     Raises on execution failure.
     """
-    start = time.monotonic()
+    start = time.monotonic_ns()
 
     if adapter == DENON_TCP:
         command = denon_command(path)
@@ -195,14 +195,14 @@ def execute(adapter, endpoint, method, path):
         "accepted": accepted,
         "detail": detail,
         "total_ms": round(
-            (time.monotonic() - start) * 1000, 1
+            (time.monotonic_ns() - start) / 1_000_000, 1
         ),
     }
 
 
 def execute_hold(endpoint, method, path, event):
     """Execute a queued physical-button press or release."""
-    start = time.monotonic()
+    start = time.monotonic_ns()
 
     if method != "POST":
         raise ValueError("Roku held button requires POST")
@@ -239,7 +239,7 @@ def execute_hold(endpoint, method, path, event):
         "accepted": True,
         "detail": "ROKU {} {}".format(operation, key),
         "total_ms": round(
-            (time.monotonic() - start) * 1000, 1
+            (time.monotonic_ns() - start) / 1_000_000, 1
         ),
     }
 
