@@ -37,7 +37,7 @@ def set_utc(unix_seconds, source_name="BROWSER"):
     if not (946684800 <= unix_seconds <= 4102444800):
         raise ValueError("UTC timestamp out of range")
 
-    _reference_monotonic = time.monotonic()
+    _reference_monotonic = time.monotonic_ns()
     _reference_utc = unix_seconds
     _source = source_name
 
@@ -46,11 +46,11 @@ def timestamp():
     """Return a printable timestamp for log messages."""
     if _reference_utc is None:
         return "[DEFAULTTIME +{:07.1f}s]".format(
-            time.monotonic()
+            time.monotonic_ns() / 1_000_000_000
         )
 
-    elapsed = time.monotonic() - _reference_monotonic
-    current_utc = _reference_utc + int(elapsed)
+    elapsed_ns = time.monotonic_ns() - _reference_monotonic
+    current_utc = _reference_utc + elapsed_ns // 1_000_000_000
 
     t = time.localtime(current_utc)
 
