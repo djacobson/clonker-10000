@@ -24,14 +24,21 @@ from clonker.display import oled
 
 from clonker.system import perf as _perf
 
-# Diagnostic switch for physical-module instrumentation.
-# False disables internal timing and statistics collection.
-# The scheduler's physical.exec measurement remains active.
+# Physical diagnostics master switch.
+# False = lean production polling.
+# True = enable individually selected measurements below.
 PHYSICAL_PERF_ENABLED = False
+
+# Select only the measurements needed for an experiment.
+PERF_SCAN = False
+PERF_EVENTS = False
+PERF_VOLUME = False
+PERF_DISPATCH = False
+PERF_HOLD = False
 
 
 class _DisabledPerf:
-    """No-op instrumentation for controlled performance tests."""
+    """No-op instrumentation for disabled diagnostics."""
 
     @staticmethod
     def register(*args, **kwargs):
@@ -50,6 +57,7 @@ class _DisabledPerf:
         pass
 
 
+# Existing dispatch helpers can continue using this interface.
 perf = _perf if PHYSICAL_PERF_ENABLED else _DisabledPerf()
 
 perf.register("physical.dispatch")
@@ -392,46 +400,57 @@ def poll():
     if not _initialized:
         return
 
-    # Time the complete physical polling operation.
-    poll_started = perf.start()
+    measure_scan = PHYSICAL_PERF_ENABLED and PERF_SCAN
+    measure_events = PHYSICAL_PERF_ENABLED and PERF_EVENTS
+    measure_volume = PHYSICAL_PERF_ENABLED and PERF_VOLUME
 
-    # Accumulate GPIO read durations across one physical poll.
-    # Track whether any physical input event occurred.
-    scan_ns = 0
-    event_seen = False
+    if measure_events:
+        poll_started = _perf.start()
+        event_seen = False
 
-    # Update room state before handling button events.
-    started = perf.start()
-    try:
-        room_id = selectors.poll()
-    finally:
-        scan_ns += perf.start() - started
+    if measure_scan:
+        scan_ns = 0
+
+    # Room selector.
+    if measure_scan:
+        started = _perf.start()
+
+    room_id = selectors.poll()
+
+    if measure_scan:
+        scan_ns += _perf.start() - started
 
     if room_id is not None:
-        event_seen = True
+        if measure_events:
+            event_seen = True
+
         if PHYSICAL_EVENT_LOGGING:
             logger.info("ROOM SELECTED: {}".format(room_id))
+
         _action_index = 0
         _log_custom_selection(room_id)
 
+    # Momentary buttons.
     for button in _buttons:
-        started = perf.start()
-        try:
-            event = button.poll()
-        finally:
-            scan_ns += perf.start() - started
+        if measure_scan:
+            started = _perf.start()
+
+        event = button.poll()
+
+        if measure_scan:
+            scan_ns += _perf.start() - started
 
         if event is None:
             continue
 
-        event_seen = True
+        if measure_events:
+            event_seen = True
 
         if PHYSICAL_EVENT_LOGGING:
             logger.info(
                 "{} {}".format(button.name, event.upper())
             )
 
-        # Custom Action encoder press executes the current selection.
         if button.name == "ACTION_RUN":
             if event == "pressed":
                 _run_selected_custom()
@@ -442,8 +461,6 @@ def poll():
         if action_id is None:
             continue
 
-        # Skip buttons use queued keydown/keyup events.
-        # All other buttons remain press-only.
         if button.name in HOLD_BUTTONS:
             dispatch_hold_button(
                 button.name, action_id, event
@@ -453,36 +470,45 @@ def poll():
         if event == "pressed":
             dispatch_selected(action_id)
 
-    # Volume encoder: one completed detent -> one action.
+    # Volume encoder.
     if _volume_encoder is not None:
-        started = perf.start()
-        try:
-            step = _volume_encoder.poll()
-        finally:
-            scan_ns += perf.start() - started
+        if measure_scan:
+            started = _perf.start()
+
+        step = _volume_encoder.poll()
+
+        if measure_scan:
+            scan_ns += _perf.start() - started
 
         if step:
-            started = perf.start()
-            try:
+            if measure_events:
                 event_seen = True
-                action_id = (
-                    "volume-up" if step > 0 else "volume-down"
-                )
-                dispatch_selected(action_id)
-            finally:
-                perf.stop("physical.volume", started)
 
-    # Custom Action encoder: circular, room-specific selection.
-    # Rotation updates the OLED but never dispatches commands.
+            if measure_volume:
+                started = _perf.start()
+
+            action_id = (
+                "volume-up" if step > 0 else "volume-down"
+            )
+            dispatch_selected(action_id)
+
+            if measure_volume:
+                _perf.stop("physical.volume", started)
+
+    # Custom Action encoder.
     if _action_encoder is not None:
-        started = perf.start()
-        try:
-            step = _action_encoder.poll()
-        finally:
-            scan_ns += perf.start() - started
+        if measure_scan:
+            started = _perf.start()
+
+        step = _action_encoder.poll()
+
+        if measure_scan:
+            scan_ns += _perf.start() - started
 
         if step:
-            event_seen = True
+            if measure_events:
+                event_seen = True
+
             room_id = selectors.selected_room()
             custom_actions = _custom_actions_for_room(room_id)
 
@@ -495,15 +521,25 @@ def poll():
 
             _log_custom_selection(room_id)
 
-    # Separate GPIO sampling from the remaining physical work.
-    total_ns = perf.start() - poll_started
-    events_ns = max(0, total_ns - scan_ns)
+    # Optional diagnostic measurements.
+    if measure_scan:
+        _perf.record("physical.scan", scan_ns)
 
-    perf.record("physical.scan", scan_ns)
-    perf.record("physical.events", events_ns)
+    if measure_events:
+        total_ns = _perf.start() - poll_started
 
-    # Classify each completed poll by actual input activity.
-    if event_seen:
-        perf.record("physical.events.active", events_ns)
-    else:
-        perf.record("physical.events.idle", events_ns)
+        if measure_scan:
+            events_ns = max(0, total_ns - scan_ns)
+        else:
+            events_ns = total_ns
+
+        _perf.record("physical.events", events_ns)
+
+        if event_seen:
+            _perf.record(
+                "physical.events.active", events_ns
+            )
+        else:
+            _perf.record(
+                "physical.events.idle", events_ns
+            )
