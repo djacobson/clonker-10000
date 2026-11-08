@@ -30,7 +30,7 @@ import wifi
 
 TCP_PORT = 23
 SOCKET_TIMEOUT = 1.0
-MIN_COMMAND_INTERVAL = 0.05
+MIN_COMMAND_INTERVAL_NS = 50_000_000  # 50 ms
 
 _pool = None
 _socket = None
@@ -88,13 +88,13 @@ def close():
 
 def ready():
     """Return True when another volume command may be sent."""
-    return time.monotonic() >= _next_send_time
+    return time.monotonic_ns() >= _next_send_time
 
 
 def remaining_seconds():
-    """Return the remaining command pacing delay."""
-    remaining = _next_send_time - time.monotonic()
-    return max(0, remaining)
+    """Return the remaining command pacing delay in seconds."""
+    remaining_ns = _next_send_time - time.monotonic_ns()
+    return max(0, remaining_ns) / 1_000_000_000
 
 
 def connected_host():
@@ -165,7 +165,7 @@ def send_volume(endpoint, command):
         _socket.sendall(data)
 
         _next_send_time = (
-            time.monotonic() + MIN_COMMAND_INTERVAL
+            time.monotonic_ns() + MIN_COMMAND_INTERVAL_NS
         )
 
         return True
