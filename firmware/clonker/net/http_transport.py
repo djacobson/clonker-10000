@@ -26,8 +26,7 @@ DEFAULT_PORT = 80
 
 # Initial diagnostic values; tune using real device measurements.
 SOCKET_TIMEOUT = 0.5
-TOTAL_TIMEOUT = 1.5
-
+TOTAL_TIMEOUT_NS = 1_500_000_000  # 1.5 seconds
 
 MAX_STATUS_LINE = 128
 HTTP_DIAGNOSTICS = False
@@ -41,7 +40,9 @@ def _trace(message):
 
 
 def _elapsed_ms(start):
-    return round((time.monotonic() - start) * 1000, 1)
+    return round(
+        (time.monotonic_ns() - start) / 1_000_000, 1
+    )
 
 
 def _parse_endpoint(endpoint):
@@ -83,10 +84,10 @@ def _parse_endpoint(endpoint):
 
 def _remaining(deadline):
     """Seconds remaining in the request's cooperative deadline."""
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
+    remaining_ns = deadline - time.monotonic_ns()
+    if remaining_ns <= 0:
         raise OSError("HTTP total deadline exceeded")
-    return remaining
+    return remaining_ns / 1_000_000_000
 
 
 def _prepare_socket(sock, deadline):
@@ -176,8 +177,8 @@ def send(endpoint, method, path):
         "\r\n"
     ).format(method, path, host, port).encode("utf-8")
 
-    start = time.monotonic()
-    deadline = start + TOTAL_TIMEOUT
+    start = time.monotonic_ns()
+    deadline = start + TOTAL_TIMEOUT_NS
     stage = "socket"
     sock = None
 
@@ -192,13 +193,13 @@ def send(endpoint, method, path):
         sock = pool.socket(pool.AF_INET, pool.SOCK_STREAM)
 
         stage = "connect"
-        phase_start = time.monotonic()
+        phase_start = time.monotonic_ns()
         _prepare_socket(sock, deadline)
         sock.connect((host, port))
         connect_ms = _elapsed_ms(phase_start)
 
         stage = "send"
-        phase_start = time.monotonic()
+        phase_start = time.monotonic_ns()
         offset = 0
 
         while offset < len(request):
@@ -213,7 +214,7 @@ def send(endpoint, method, path):
         send_ms = _elapsed_ms(phase_start)
 
         stage = "response"
-        phase_start = time.monotonic()
+        phase_start = time.monotonic_ns()
         status = _read_status_line(sock, deadline)
         response_ms = _elapsed_ms(phase_start)
 
