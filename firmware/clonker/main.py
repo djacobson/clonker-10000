@@ -18,6 +18,7 @@ import time
 import gc
 
 from clonker.system import logger
+from clonker.system import perf
 from clonker.net import web
 from clonker import actions
 from clonker import device_adapters
@@ -441,6 +442,25 @@ def main():
                     else:
                         logger.info("PERF: no slow branches")
 
+                    # Targeted physical dispatch measurements.
+                    for name in (
+                        "physical.dispatch",
+                        "physical.hold",
+                    ):
+                        stat = perf.snapshot(name)
+
+                        if stat is not None and stat["count"]:
+                            logger.info(
+                                "PERF: {} n={}, avg={:.2f}ms, "
+                                "max={:.2f}ms, >20ms={}".format(
+                                    name,
+                                    stat["count"],
+                                    stat["avg_ms"],
+                                    stat["max_ms"],
+                                    stat["slow_count"],
+                                )
+                            )
+
                     # Reset statistics for the next reporting window.
                     perf_physical_max = 0
                     perf_physical_exec_max = 0
@@ -461,6 +481,10 @@ def main():
 
                     perf_oled_refresh_start = oled.get_refresh_count()
                     perf_report_at = time.monotonic_ns()
+
+                    # Reset targeted measurements after reporting.
+                    perf.reset("physical.dispatch")
+                    perf.reset("physical.hold")
 
             # Yield briefly to the CircuitPython runtime.
             # Keep this INSIDE the while True loop.
