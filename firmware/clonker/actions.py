@@ -35,6 +35,8 @@ from clonker import device_config_v2 as device_config
 
 
 QUEUE_CAPACITY = 128
+NS_PER_MS = 1_000_000           # 1 millisecond
+NS_PER_SECOND = 1_000_000_000   # 1 second
 
 # Entries contain room, action, kind, step, and due time.
 # Custom tasks advance through their steps without blocking.
@@ -107,7 +109,8 @@ def dispatch(room_id, action_id, delay_seconds=0):
 
     due = (
         0 if delay_seconds == 0
-        else time.monotonic() + delay_seconds
+        else time.monotonic_ns()
+        + int(delay_seconds * NS_PER_SECOND)
     )
 
     _queue.append({
@@ -224,7 +227,7 @@ def poll():
     if not _queue:
         return False
 
-    now = time.monotonic()
+    now = time.monotonic_ns()
     selected = None
 
     for index, task in enumerate(_queue):
@@ -397,15 +400,13 @@ def poll():
             next_index = task["step"] + 1
 
             if next_index < len(steps):
-                # Start the wait AFTER the command completes.
-                wait_seconds = (
-                    command["wait_after_ms"] / 1000.0
-                )
 
+                # Start the wait AFTER the command completes.
+                wait_ms = command["wait_after_ms"]
                 task["step"] = next_index
                 task["due"] = (
-                    0 if wait_seconds == 0
-                    else time.monotonic() + wait_seconds
+                    0 if wait_ms == 0
+                    else time.monotonic_ns() + wait_ms * NS_PER_MS
                 )
 
                 # Return to the queue so other eligible
