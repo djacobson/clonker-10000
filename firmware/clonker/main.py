@@ -32,16 +32,17 @@ from clonker import device_config_v2 as device_config
 PHYSICAL_CONTROLS_ENABLED = True
 
 # Cooperative scheduler intervals (integer nanoseconds).
+# 1_000_000 ns = 1 ms; 1_000_000_000 ns = 1 second.
 NS_PER_MS = 1_000_000
 
-PHYSICAL_POLL_INTERVAL_NS = 1_000_000
-WEB_POLL_INTERVAL_NS = 1_000_000
-ACTION_POLL_INTERVAL_NS = 10_000_000
+PHYSICAL_POLL_INTERVAL_NS = 1_000_000    # 1 ms
+WEB_POLL_INTERVAL_NS = 1_000_000         # 1 ms
+ACTION_POLL_INTERVAL_NS = 10_000_000     # 10 ms
 
 # Lightweight serial performance diagnostics.
 PERF_ENABLED = True
-PERF_INTERVAL_NS = 30_000_000_000
-SLOW_PHYSICAL_GAP_NS = 20_000_000
+PERF_INTERVAL_NS = 30_000_000_000        # 30 seconds
+SLOW_PHYSICAL_GAP_NS = 20_000_000        # 20 ms
 
 def main():
     logger.info("THE CLONKER 10000")
