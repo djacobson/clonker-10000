@@ -176,7 +176,7 @@ def poll():
 
 def get_refresh_count():
     """Return the cumulative number of successful screen refreshes."""
-    return _refresh_count
+    return _refresh_count[0]
 
 
 def close():
