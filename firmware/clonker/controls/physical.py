@@ -14,7 +14,12 @@ The room selector maintains its own selected-room state.
 """
 
 from clonker.system import logger
+from clonker.system import perf
 from clonker import actions
+
+perf.register("physical.dispatch")
+perf.register("physical.hold")
+
 from clonker import device_config_v2 as device_config
 from clonker.controls import pins
 from clonker.controls import selectors
@@ -161,6 +166,7 @@ def dispatch_selected(action_id):
         )
         return False
 
+    started = perf.start()
     try:
         actions.dispatch(room_id, action_id)
         return True
@@ -171,6 +177,8 @@ def dispatch_selected(action_id):
             )
         )
         return False
+    finally:
+        perf.stop("physical.dispatch", started)
 
 
 def dispatch_hold_button(button_name, action_id, event):
@@ -188,6 +196,7 @@ def dispatch_hold_button(button_name, action_id, event):
         if button_name in _hold_rooms:
             return False
 
+        started = perf.start()
         try:
             room, action = device_config.action_details(
                 room_id, action_id
@@ -208,6 +217,8 @@ def dispatch_hold_button(button_name, action_id, event):
                 "PHYSICAL hold dispatch failed: {}".format(exc)
             )
             return False
+        finally:
+            perf.stop("physical.hold", started)
 
         _hold_rooms[button_name] = (room_id, endpoint, command)
         return True
@@ -220,6 +231,7 @@ def dispatch_hold_button(button_name, action_id, event):
 
         room_id, endpoint, command = original
 
+        started = perf.start()
         try:
             actions.dispatch_hold(
                 room_id, action_id, event, endpoint, command
@@ -230,6 +242,8 @@ def dispatch_hold_button(button_name, action_id, event):
                 "PHYSICAL hold release failed: {}".format(exc)
             )
             return False
+        finally:
+            perf.stop("physical.hold", started)
 
     return False
 
