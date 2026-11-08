@@ -15,6 +15,7 @@ Outbound HTTP requests are synchronous and blocking.
 """
 
 import time
+import gc
 
 from clonker.system import logger
 from clonker.net import web
@@ -101,10 +102,15 @@ def main():
     perf_last_queue = None
 
     perf_physical_max = 0.0
+    perf_physical_exec_max = 0.0
+    perf_physical_gap_sum = 0.0
+    perf_physical_gap_count = 0
+    perf_physical_slow = 0
+
     perf_queue_max = 0.0
+    perf_adapter_max = 0.0
     perf_oled_max = 0.0
     perf_loop_max = 0.0
-    perf_physical_slow = 0
     perf_oled_refresh_start = oled.get_refresh_count()
 
     # OLED is optional; failure must not stop Clonker.
@@ -136,13 +142,25 @@ def main():
                 if PERF_ENABLED:
                     if perf_last_physical is not None:
                         gap = now - perf_last_physical
+                        perf_physical_gap_sum += gap
+                        perf_physical_gap_count += 1
+
                         if gap > perf_physical_max:
                             perf_physical_max = gap
+
                         if gap > 0.020:
                             perf_physical_slow += 1
+
                     perf_last_physical = now
+                    perf_physical_start = time.monotonic()
 
                 physical.poll()
+
+                if PERF_ENABLED:
+                    elapsed = time.monotonic() - perf_physical_start
+                    if elapsed > perf_physical_exec_max:
+                        perf_physical_exec_max = elapsed
+
                 next_physical_poll = (
                     time.monotonic() + PHYSICAL_POLL_INTERVAL
                 )
@@ -159,12 +177,20 @@ def main():
                 next_action_poll = time.monotonic() + ACTION_POLL_INTERVAL
 
             # Maintain stateful adapters independently of queue depth.
+            if PERF_ENABLED:
+                perf_adapter_start = time.monotonic()
+
             try:
                 device_adapters.poll()
             except Exception as exc:
                 logger.warning(
                     "Device adapter maintenance failed: {}".format(exc)
                 )
+
+            if PERF_ENABLED:
+                elapsed = time.monotonic() - perf_adapter_start
+                if elapsed > perf_adapter_max:
+                    perf_adapter_max = elapsed
 
             # CONFIG/RUN is an application mode, not an HTTP command.
             config_mode = switches.config_enabled()
@@ -229,21 +255,40 @@ def main():
                     perf_loop_max = perf_elapsed
 
                 if time.monotonic() - perf_report_at >= PERF_INTERVAL:
+                    average_gap = (
+                        perf_physical_gap_sum / perf_physical_gap_count
+                        if perf_physical_gap_count else 0.0
+                    )
+
                     logger.info(
-                        "PERF: physical max gap={:.1f}ms, >20ms={}".format(
+                        "PERF: physical gap avg={:.1f}ms, "
+                        "max={:.1f}ms, >20ms={}".format(
+                            average_gap * 1000,
                             perf_physical_max * 1000,
                             perf_physical_slow
                         )
                     )
                     logger.info(
-                        "PERF: queue max gap={:.1f}ms".format(
+                        "PERF: physical execution max={:.1f}ms".format(
+                            perf_physical_exec_max * 1000
+                        )
+                    )
+                    logger.info(
+                        "PERF: queue gap max={:.1f}ms".format(
                             perf_queue_max * 1000
                         )
                     )
                     logger.info(
-                        "PERF: OLED max poll={:.1f}ms, refreshes={}".format(
+                        "PERF: adapter execution max={:.1f}ms".format(
+                            perf_adapter_max * 1000
+                        )
+                    )
+                    logger.info(
+                        "PERF: OLED execution max={:.1f}ms, "
+                        "refreshes={}".format(
                             perf_oled_max * 1000,
-                            oled.get_refresh_count() - perf_oled_refresh_start
+                            oled.get_refresh_count()
+                            - perf_oled_refresh_start
                         )
                     )
                     logger.info(
@@ -251,12 +296,21 @@ def main():
                             perf_loop_max * 1000
                         )
                     )
+                    logger.info(
+                        "PERF: free memory={} bytes".format(
+                            gc.mem_free()
+                        )
+                    )
 
                     perf_physical_max = 0.0
+                    perf_physical_exec_max = 0.0
                     perf_queue_max = 0.0
+                    perf_adapter_max = 0.0
                     perf_oled_max = 0.0
                     perf_loop_max = 0.0
                     perf_physical_slow = 0
+                    perf_physical_gap_sum = 0.0
+                    perf_physical_gap_count = 0
                     perf_oled_refresh_start = oled.get_refresh_count()
                     perf_report_at = time.monotonic()
 
