@@ -83,9 +83,42 @@ _buttons = []
 
 _volume_encoder = None
 _action_encoder = None
-_action_count = 0
+_action_index = 0
 # Physical button name -> room selected when pressed.
 _hold_rooms = {}
+
+
+def _custom_actions_for_room(room_id):
+    """Return ordered Custom Actions for a configured room."""
+    rooms = device_config.current()["rooms"]
+    room = rooms.get(room_id)
+
+    if room is None:
+        return ()
+
+    return room["custom_actions"]
+
+
+def _log_custom_selection(room_id):
+    """Log the selected Custom Action without executing it."""
+    custom_actions = _custom_actions_for_room(room_id)
+
+    if not custom_actions:
+        logger.info(
+            "CUSTOM SELECT: {} / No customs".format(room_id)
+        )
+        return
+
+    selected = custom_actions[_action_index]
+
+    logger.info(
+        "CUSTOM SELECT: {} / {} ({}/{})".format(
+            room_id,
+            selected["name"],
+            _action_index + 1,
+            len(custom_actions)
+        )
+    )
 
 
 def dispatch_selected(action_id):
@@ -277,7 +310,7 @@ def initialize():
 
 def poll():
     """Poll physical inputs and route button presses."""
-    global _action_count
+    global _action_index
 
     if not _initialized:
         return
@@ -287,6 +320,8 @@ def poll():
 
     if room_id is not None:
         logger.info("ROOM SELECTED: {}".format(room_id))
+        _action_index = 0
+        _log_custom_selection(room_id)
 
     for button in _buttons:
         event = button.poll()
@@ -329,14 +364,34 @@ def poll():
 
             dispatch_selected(action_id)
 
-    # Custom Action encoder: local selection counter only.
-    # No queue activity or network dispatch.
+    # Custom Action encoder: circular, room-specific selection.
+    # No network dispatch during rotation.
     if _action_encoder is not None:
         step = _action_encoder.poll()
 
         if step:
-            _action_count += step
-            oled.set_count(_action_count)
-            logger.info(
-                "ACTION ENCODER: {}".format(_action_count)
-            )
+            room_id = selectors.selected_room()
+            custom_actions = _custom_actions_for_room(room_id)
+
+            if custom_actions:
+                _action_index = (
+                    _action_index + step
+                ) % len(custom_actions)
+
+                selected = custom_actions[_action_index]
+
+                logger.info(
+                    "CUSTOM SELECT: {} / {} ({}/{})".format(
+                        room_id,
+                        selected["name"],
+                        _action_index + 1,
+                        len(custom_actions)
+                    )
+                )
+            else:
+                _action_index = 0
+                logger.info(
+                    "CUSTOM SELECT: {} / No customs".format(
+                        room_id
+                    )
+                )
