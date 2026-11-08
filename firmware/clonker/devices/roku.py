@@ -18,15 +18,15 @@ prove that the connected AVR actually changed volume.
 import time
 from clonker.net import http_transport
 
-IDLE_RELEASE_SECONDS = 0.25
-MAX_HOLD_SECONDS = 2.0  # Experimental safety limit.
-RELEASE_RETRY_SECONDS = 0.5
+IDLE_RELEASE_NS = 250_000_000   # 250 ms
+MAX_HOLD_NS = 2_000_000_000     # 2 seconds; safety limit
+RELEASE_RETRY_NS = 500_000_000  # 500 ms
 
 _endpoint = None
 _direction = None
-_deadline = 0.0
-_started = 0.0
-_next_release_attempt = 0.0
+_deadline = 0
+_started = 0
+_next_release_attempt = 0
 _release_pending = False
 
 
@@ -58,9 +58,9 @@ def _reset():
     global _next_release_attempt, _release_pending
     _endpoint = None
     _direction = None
-    _deadline = 0.0
-    _started = 0.0
-    _next_release_attempt = 0.0
+    _deadline = 0
+    _started = 0
+    _next_release_attempt = 0
     _release_pending = False
 
 
@@ -76,12 +76,12 @@ def release():
         return False
 
     _release_pending = True
-    now = time.monotonic()
+    now = time.monotonic_ns()
     if now < _next_release_attempt:
         return False
 
     # Set pacing before I/O so a failure cannot cause a busy retry loop.
-    _next_release_attempt = now + RELEASE_RETRY_SECONDS
+    _next_release_attempt = now + RELEASE_RETRY_NS
     _send(_endpoint, "keyup", _direction)
     _reset()
     return True
@@ -100,11 +100,11 @@ def volume(endpoint, direction):
     if not endpoint:
         raise ValueError("Roku endpoint is empty")
 
-    now = time.monotonic()
+    now = time.monotonic_ns()
     expired = (
         _direction is not None
         and (now >= _deadline
-             or now >= _started + MAX_HOLD_SECONDS)
+             or now >= _started + MAX_HOLD_NS)
     )
 
     if _direction is not None and (
@@ -116,16 +116,16 @@ def volume(endpoint, direction):
             raise OSError("Roku key release pending")
 
     if _direction == direction and _endpoint == endpoint:
-        _deadline = time.monotonic() + IDLE_RELEASE_SECONDS
+        _deadline = time.monotonic_ns() + IDLE_RELEASE_NS
         return False
 
     _send(endpoint, "keydown", direction)
 
-    now = time.monotonic()
+    now = time.monotonic_ns()
     _endpoint = endpoint
     _direction = direction
     _started = now
-    _deadline = now + IDLE_RELEASE_SECONDS
+    _deadline = now + IDLE_RELEASE_NS
     return True
 
 
@@ -135,10 +135,10 @@ def poll():
     button_result = False
 
     if _direction is not None:
-        now = time.monotonic()
+        now = time.monotonic_ns()
         if (
             _release_pending or now >= _deadline
-            or now >= _started + MAX_HOLD_SECONDS
+            or now >= _started + MAX_HOLD_NS
         ):
             volume_result = release()
 
@@ -157,11 +157,11 @@ def close():
 
 # Explicit physical-button holds.
 # Independent of the encoder-driven volume hold.
-BUTTON_MAX_HOLD_SECONDS = 30.0
+BUTTON_MAX_HOLD_NS = 30_000_000_000     # 30 seconds
 
 _button_endpoint = None
 _button_key = None
-_button_started = 0.0
+_button_started = 0
 _button_release_pending = False
 
 
@@ -176,7 +176,7 @@ def _reset_button():
 
     _button_endpoint = None
     _button_key = None
-    _button_started = 0.0
+    _button_started = 0
     _button_release_pending = False
 
 
@@ -217,7 +217,7 @@ def button_down(endpoint, key):
     # cleanup can still attempt the matching keyup.
     _button_endpoint = endpoint
     _button_key = key
-    _button_started = time.monotonic()
+    _button_started = time.monotonic_ns()
 
     _send_button(endpoint, "keydown", key)
     return True
@@ -252,8 +252,8 @@ def button_poll():
         return False
 
     if (
-        time.monotonic() - _button_started
-        >= BUTTON_MAX_HOLD_SECONDS
+        time.monotonic_ns() - _button_started
+        >= BUTTON_MAX_HOLD_NS
     ):
         return button_up()
 
