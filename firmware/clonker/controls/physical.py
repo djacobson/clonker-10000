@@ -21,6 +21,10 @@ perf.register("physical.dispatch")
 perf.register("physical.hold")
 
 from clonker import device_config_v2 as device_config
+
+# GPIO sampling only; excludes event handling and dispatch.
+perf.register("physical.scan")
+
 from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button
@@ -354,7 +358,11 @@ def poll():
         return
 
     # Update room state before handling button events.
-    room_id = selectors.poll()
+    started = perf.start()
+    try:
+        room_id = selectors.poll()
+    finally:
+        perf.stop("physical.scan", started)
 
     if room_id is not None:
         logger.info("ROOM SELECTED: {}".format(room_id))
@@ -362,7 +370,11 @@ def poll():
         _log_custom_selection(room_id)
 
     for button in _buttons:
-        event = button.poll()
+        started = perf.start()
+        try:
+            event = button.poll()
+        finally:
+            perf.stop("physical.scan", started)
 
         if event is None:
             continue
@@ -395,7 +407,11 @@ def poll():
 
     # Volume encoder: one completed detent -> one action.
     if _volume_encoder is not None:
-        step = _volume_encoder.poll()
+        started = perf.start()
+        try:
+            step = _volume_encoder.poll()
+        finally:
+            perf.stop("physical.scan", started)
 
         if step:
             action_id = (
@@ -407,7 +423,11 @@ def poll():
     # Custom Action encoder: circular, room-specific selection.
     # Rotation updates the OLED but never dispatches commands.
     if _action_encoder is not None:
-        step = _action_encoder.poll()
+        started = perf.start()
+        try:
+            step = _action_encoder.poll()
+        finally:
+            perf.stop("physical.scan", started)
 
         if step:
             room_id = selectors.selected_room()
