@@ -44,6 +44,23 @@ PERF_ENABLED = True
 PERF_INTERVAL_NS = 30_000_000_000        # 30 seconds
 SLOW_PHYSICAL_GAP_NS = 20_000_000        # 20 ms
 
+# Scheduler branch attribution.
+# A slow branch is one execution exceeding 20 ms.
+PERF_BRANCH_PHYSICAL = 0
+PERF_BRANCH_QUEUE = 1
+PERF_BRANCH_ADAPTER = 2
+PERF_BRANCH_WEB = 3
+PERF_BRANCH_OLED = 4
+
+PERF_BRANCH_NAMES = (
+    "physical",
+    "queue",
+    "adapter",
+    "web",
+    "OLED",
+)
+
+
 def main():
     logger.info("THE CLONKER 10000")
     logger.info("Application started")
@@ -84,7 +101,9 @@ def main():
         try:
             physical_ready = physical.initialize()
         except Exception as exc:
-            logger.warning("Physical controls initialization failed: {}".format(exc))
+            logger.warning(
+                "Physical controls initialization failed: {}".format(exc)
+            )
 
     if not PHYSICAL_CONTROLS_ENABLED:
         logger.info("Physical controls disabled (brain-only mode)")
@@ -120,6 +139,12 @@ def main():
     perf_web_max = 0
     perf_web_total = 0
     perf_web_count = 0
+
+    # Fixed-size branch statistics.
+    # Count executions exceeding the slow threshold and track
+    # the maximum duration of those executions.
+    perf_branch_counts = [0] * len(PERF_BRANCH_NAMES)
+    perf_branch_max = [0] * len(PERF_BRANCH_NAMES)
 
     perf_oled_refresh_start = oled.get_refresh_count()
 
@@ -168,8 +193,15 @@ def main():
 
                 if PERF_ENABLED:
                     elapsed = time.monotonic_ns() - perf_physical_start
+
                     if elapsed > perf_physical_exec_max:
                         perf_physical_exec_max = elapsed
+
+                    if elapsed > SLOW_PHYSICAL_GAP_NS:
+                        index = PERF_BRANCH_PHYSICAL
+                        perf_branch_counts[index] += 1
+                        if elapsed > perf_branch_max[index]:
+                            perf_branch_max[index] = elapsed
 
                 next_physical_poll = (
                     time.monotonic_ns() + PHYSICAL_POLL_INTERVAL_NS
@@ -182,8 +214,19 @@ def main():
                         if gap > perf_queue_max:
                             perf_queue_max = gap
                     perf_last_queue = now
+                    perf_action_start = time.monotonic_ns()
 
                 actions.poll()
+
+                if PERF_ENABLED:
+                    elapsed = time.monotonic_ns() - perf_action_start
+
+                    if elapsed > SLOW_PHYSICAL_GAP_NS:
+                        index = PERF_BRANCH_QUEUE
+                        perf_branch_counts[index] += 1
+                        if elapsed > perf_branch_max[index]:
+                            perf_branch_max[index] = elapsed
+
                 next_action_poll = (
                     time.monotonic_ns() + ACTION_POLL_INTERVAL_NS
                 )
@@ -201,8 +244,15 @@ def main():
 
             if PERF_ENABLED:
                 elapsed = time.monotonic_ns() - perf_adapter_start
+
                 if elapsed > perf_adapter_max:
                     perf_adapter_max = elapsed
+
+                if elapsed > SLOW_PHYSICAL_GAP_NS:
+                    index = PERF_BRANCH_ADAPTER
+                    perf_branch_counts[index] += 1
+                    if elapsed > perf_branch_max[index]:
+                        perf_branch_max[index] = elapsed
 
             # CONFIG/RUN is an application mode, not an HTTP command.
             config_mode = switches.config_enabled()
@@ -244,8 +294,15 @@ def main():
                         elapsed = time.monotonic_ns() - perf_web_start
                         perf_web_total += elapsed
                         perf_web_count += 1
+
                         if elapsed > perf_web_max:
                             perf_web_max = elapsed
+
+                        if elapsed > SLOW_PHYSICAL_GAP_NS:
+                            index = PERF_BRANCH_WEB
+                            perf_branch_counts[index] += 1
+                            if elapsed > perf_branch_max[index]:
+                                perf_branch_max[index] = elapsed
 
                     next_web_poll = (
                         time.monotonic_ns() + WEB_POLL_INTERVAL_NS
@@ -267,8 +324,15 @@ def main():
 
                 if PERF_ENABLED:
                     elapsed = time.monotonic_ns() - perf_oled_start
+
                     if elapsed > perf_oled_max:
                         perf_oled_max = elapsed
+
+                    if elapsed > SLOW_PHYSICAL_GAP_NS:
+                        index = PERF_BRANCH_OLED
+                        perf_branch_counts[index] += 1
+                        if elapsed > perf_branch_max[index]:
+                            perf_branch_max[index] = elapsed
 
             # Performance summary: one report per interval.
             if PERF_ENABLED:
@@ -346,6 +410,38 @@ def main():
                         )
                     )
 
+                    # Report slow execution attribution.
+                    worst_branch = -1
+                    worst_duration = 0
+
+                    for i in range(len(PERF_BRANCH_NAMES)):
+                        count = perf_branch_counts[i]
+                        duration = perf_branch_max[i]
+
+                        if count:
+                            logger.info(
+                                "PERF: slow {} count={}, max={:.2f}ms".format(
+                                    PERF_BRANCH_NAMES[i],
+                                    count,
+                                    duration / NS_PER_MS
+                                )
+                            )
+
+                        if duration > worst_duration:
+                            worst_duration = duration
+                            worst_branch = i
+
+                    if worst_branch >= 0:
+                        logger.info(
+                            "PERF: worst branch={} ({:.2f}ms)".format(
+                                PERF_BRANCH_NAMES[worst_branch],
+                                worst_duration / NS_PER_MS
+                            )
+                        )
+                    else:
+                        logger.info("PERF: no slow branches")
+
+                    # Reset statistics for the next reporting window.
                     perf_physical_max = 0
                     perf_physical_exec_max = 0
                     perf_queue_max = 0
@@ -358,6 +454,11 @@ def main():
                     perf_physical_slow = 0
                     perf_physical_gap_sum = 0
                     perf_physical_gap_count = 0
+
+                    for i in range(len(PERF_BRANCH_NAMES)):
+                        perf_branch_counts[i] = 0
+                        perf_branch_max[i] = 0
+
                     perf_oled_refresh_start = oled.get_refresh_count()
                     perf_report_at = time.monotonic_ns()
 
