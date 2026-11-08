@@ -60,6 +60,7 @@ PERF_PHYSICAL = (
     "physical.events",
     "physical.events.active",
     "physical.events.idle",
+    "physical.volume",
     "physical.dispatch",
     "physical.hold",
 )
