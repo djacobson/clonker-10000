@@ -41,6 +41,10 @@ ACTION_POLL_INTERVAL_NS = 10_000_000
 PERF_ENABLED = True
 PERF_INTERVAL_NS = 30_000_000_000
 
+# Temporary experiment: explicit GC at each reporting boundary.
+GC_TEST_ENABLED = True
+perf.register("gc.collect")
+
 # Scheduler measurements, in reporting order.
 PERF_SCHEDULER = (
     "physical.exec",
@@ -112,6 +116,9 @@ def _report_performance(config_mode, oled_refresh_start):
 
     for name in PERF_PHYSICAL:
         _report_stat(name)
+
+    # Previous reporting boundary's explicit GC duration.
+    _report_stat("gc.collect", "GC collection")
 
     # Scheduler operations: report only slow branches.
     worst_name = None
@@ -393,6 +400,13 @@ def main():
 
                     # Reset all registered timing measurements.
                     perf.reset()
+
+                    # Diagnostic: collect at a known point between
+                    # reporting windows, and measure its duration.
+                    if GC_TEST_ENABLED:
+                        started = perf.start()
+                        gc.collect()
+                        perf.stop("gc.collect", started)
 
                     perf_oled_refresh_start = (
                         oled.get_refresh_count()
