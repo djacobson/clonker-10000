@@ -3,7 +3,7 @@
 
 **Updated:** November 8, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Baseline:** Chapter 7 — Config v4, three-room physical control, Bourns encoders, navigation/playback buttons, Roku holds, shared Dumb Queue™, and PERF diagnostics
+**Baseline:** Chapter 7 — Config v4, three-room physical control, Bourns encoders, navigation/playback buttons, Roku holds, shared Dumb Queue™, and PERF diagnostics  
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
