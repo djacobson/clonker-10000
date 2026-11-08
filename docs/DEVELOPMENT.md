@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** November 3, 2026  
+**Updated:** November 8, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Baseline:** Chapter 6 — Config v4, physical room selector and Power Toggle, operational Bourns volume encoder, shared Dumb Queue™, and Denon TCP volume adapter  
+**Baseline:** Chapter 7 — Config v4, three-room physical control, Bourns encoders, navigation/playback buttons, Roku holds, shared Dumb Queue™, and PERF diagnostics
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
@@ -68,6 +68,8 @@ The former ESP32-S3 and XML designs are historical. `device_config_v2.py` is the
 | `firmware/clonker/controls/physical.py` | Physical initialization, polling and room-aware action mapping |
 | `firmware/clonker/system/clock.py` | Clock reference |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
+| `firmware/clonker/system/perf.py` | Shared named performance measurements and statistics |
+| `firmware/clonker/display/oled.py` | OLED initialization, polling and display updates |
 
 Preserve package directories and `__init__.py` files. Remove stale duplicate modules when refactoring; a successful copy does not guarantee Python imported the intended version.
 
@@ -186,21 +188,43 @@ See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for precise transport, paci
 
 ## 9. Physical-control verification
 
-| Control | GPIO | Current status |
-|---|---|---|
-| SERVICE/DEVICE boot switch | GP17 | Physically verified |
-| CONFIG/RUN switch | GP18 | Physically verified; live listener transitions |
-| Power Toggle button | GP2 | Room-aware equipment ON/OFF verified |
-| Room selector | GP3 / GP6 / GP7 | Three positions verified; Room 3 safely unavailable |
-| Bourns volume encoder A/B | GP8 / GP9 | Rotation integrated; real Denon TCP volume verified |
-| Volume encoder press | Unassigned | Mute press pending |
-| Custom-action encoder | Unassigned | Rotation and Run press pending |
-| Navigation, Back, Home | Unassigned | Pending |
-| OLED, sound, battery and enclosure completion | Not assigned | Planned |
+The Chapter 7 implementation expanded physical input support beyond the original Chapter 6 power and volume controls.
 
-The room selector chooses context; it does not transmit commands. A physical press or completed encoder detent maps to a generic action through `physical.py`, then the shared dispatcher and queue. An unconfigured Room 3 action is a safe no-op, **not** an automatic fallback to another room.
+| Control | Current status |
+|---|---|
+| SERVICE/DEVICE boot switch | Operational |
+| CONFIG/RUN switch | Operational |
+| Power Toggle | Operational |
+| Three-position room selector | Operational; Room 3 configured as placeholder |
+| Bourns volume encoder | Operational in Den and Sunroom |
+| Volume encoder push-to-mute | Integrated |
+| Custom-action encoder | Rotation and selection integrated; further experience testing pending |
+| Navigation, Select/OK, Back, Home | Integrated |
+| Play/Pause and Skip Back/Forward | Integrated, including Roku held-key behavior |
+| OLED | Integration and feedback work ongoing |
+| Audible CLONK, battery, final enclosure | Planned or in progress |
 
-Do not confuse the operational Bourns **volume rotation** with its not-yet-integrated pushbutton or the separate custom-action encoder. The Grayhill encoder was considered earlier but is not the active volume plan.
+GPIO assignments are maintained in `controls/pins.py` and documented in [Hardware & Physical Controls](HARDWARE_CONTROLS.md).
+
+Physical inputs use room-aware generic actions routed through the shared dispatcher and queue. Roku held-button behavior uses explicit keydown/keyup handling.
+
+The configured Room 3 placeholder has blank command mappings. Ordinary fundamental actions treat blank mappings as no-ops; held-button safety requires additional verification.
+
+### Physical polling performance
+
+Chapter 7 introduced shared PERF instrumentation in `system/perf.py`.
+
+The scheduler records physical polling gaps, execution durations, queue and adapter activity, and other timing measurements.
+
+`controls/physical.py` supports optional internal diagnostics controlled by `PHYSICAL_PERF_ENABLED` and individual measurement flags.
+
+The current baseline has internal physical diagnostics disabled while scheduler-level PERF remains enabled.
+
+Idle polling is consistently fast. During sustained volume activity, occasional physical execution spikes around 40–50 ms remain unexplained.
+
+Blocking Roku network operations also produce longer cooperative scheduler gaps. These are distinct measurements and should not be conflated.
+
+The full investigation, test results, and unsuccessful experiments are recorded in [Development History](DEVELOPMENT_HISTORY.md).
 
 ## 10. Debugging and serial discipline
 
@@ -241,12 +265,14 @@ After meaningful work, record the date, changed files, deployed version if known
 
 ### Remaining work
 
-- Integrate volume encoder press-to-mute and the second custom-action selector/Run encoder.
-- Add physical navigation, Back, Home and playback controls.
-- Integrate OLED and audible CLONK feedback.
-- Develop battery management, guarded ignition/deep sleep and final enclosure.
-- Expand regression coverage for rapid input during blocking network operations, network failures, long uptime and interrupted writes.
-- Pursue custom destination slots and Apple TV discovery/pairing/authentication **later**, without speculative protocol modules.
+- Investigate the unresolved 40–50 ms physical execution spikes during sustained volume activity; distinguish runtime pauses from input-processing overhead.
+- Complete the individual `PERF_DISPATCH` and `PERF_HOLD` diagnostic switches when needed.
+- Continue physical control reliability testing, particularly rapid encoder input during blocking Roku network operations.
+- Complete the custom-action encoder experience and OLED status feedback.
+- Integrate audible CLONK feedback, battery management, sleep/wake behavior, and final enclosure wiring.
+- Verify blank-command safety for physical held-button actions in Room 3.
+- Expand regression coverage for network failures, long uptime, and interrupted writes.
+- Pursue custom destination slots and Apple TV discovery/pairing/authentication later.
 
 ### Reference map
 
