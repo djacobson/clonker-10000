@@ -29,6 +29,10 @@ perf.register("physical.hold")
 perf.register("physical.scan")
 
 
+# Diagnostic: suppress physical input event INFO logging.
+# Warnings, errors, and action/network logs remain enabled.
+PHYSICAL_EVENT_LOGGING = False
+
 # Physical button names -> fundamental action IDs.
 # Only assigned GPIO buttons are initialized.
 #
@@ -368,7 +372,8 @@ def poll():
         scan_ns += perf.start() - started
 
     if room_id is not None:
-        logger.info("ROOM SELECTED: {}".format(room_id))
+        if PHYSICAL_EVENT_LOGGING:
+            logger.info("ROOM SELECTED: {}".format(room_id))
         _action_index = 0
         _log_custom_selection(room_id)
 
@@ -382,9 +387,10 @@ def poll():
         if event is None:
             continue
 
-        logger.info(
-            "{} {}".format(button.name, event.upper())
-        )
+        if PHYSICAL_EVENT_LOGGING:
+            logger.info(
+                "{} {}".format(button.name, event.upper())
+            )
 
         # Custom Action encoder press executes the current selection.
         if button.name == "ACTION_RUN":

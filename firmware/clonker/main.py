@@ -42,7 +42,7 @@ PERF_ENABLED = True
 PERF_INTERVAL_NS = 30_000_000_000
 
 # Temporary experiment: explicit GC at each reporting boundary.
-GC_TEST_ENABLED = True
+GC_TEST_ENABLED = False
 perf.register("gc.collect")
 
 # Scheduler measurements, in reporting order.
