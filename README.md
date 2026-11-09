@@ -296,7 +296,8 @@ The physical build includes an aluminum faceplate, substantial controls, and a g
 | Back and Home | Operational |
 | Play/Pause | Operational |
 | Skip Back / Skip Forward | Operational |
-| Second Bourns encoder | Wired and electrically tested |
+| Second Bourns custom-action encoder | Operational |
+| SH1106 OLED status display | Operational |
 | SERVICE/DEVICE switch | Operational |
 | CONFIG/RUN switch | Operational |
 
@@ -304,11 +305,14 @@ The volume encoder controls real equipment in two rooms using different network 
 
 The navigation and skip buttons support Roku keydown/keyup behavior, allowing a physical button to remain held rather than merely sending repeated individual keypresses.
 
-The second Bourns encoder is intended for custom-action selection and execution.
+The second Bourns encoder selects and executes room-specific Custom Actions.
+
+The OLED provides event-driven feedback for Custom Actions, volume direction, and mute state, with automatic display-off after inactivity.
 
 ### Still on the Workbench
 
-- OLED status display.
+- Audible CLONK feedback.
+
 - Audible CLONK feedback.
 - Final internal wiring and strain relief.
 - Enclosure finishing and assembly.
@@ -459,37 +463,38 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 
 ### What's Alive ⚡
 
-- **Three room positions:** Den, Sunroom, and a configured Room 3 placeholder.
+- **Three room positions:** Den, Sunroom, and an unused Room 3 placeholder.
 - **Power at your fingertips:** Physical Power Toggle works in Den and Sunroom.
 - **Jason Bourne has entered the building:** The Bourns volume encoder controls both rooms. Press to mute.
 - **Two protocols, one knob:** Denon uses persistent TCP; Roku uses ECP held-volume.
 - **Actual navigation:** Up, Down, Left, Right, Select, Back, and Home are integrated.
 - **Playback controls:** Play/Pause and Skip Back/Forward are integrated.
 - **Buttons that understand holding:** Six Roku navigation and skip buttons support explicit press/release behavior.
+- **Custom actions at your fingertips:** The second Bourns encoder selects and executes room-specific Custom Actions.
+- **A screen that speaks:** The OLED displays custom-action selections, volume direction, and mute feedback, then sleeps after inactivity.
 - **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom actions, and the Dumb Queue™.
-- **A more responsive workshop:** CONFIG-mode browser performance improved during Chapter 7 testing.
+- **A more responsive workshop:** CONFIG-mode browser improvements and Chapter 8 physical polling optimizations are operational.
 
 These are working firmware and physical-control capabilities, not just plans on a drawing board.
 
 ### What's Still on the Operating Table 🔧
 
-- Complete the custom-action rotary interface.
-- Bring the OLED display to life.
 - Add satisfying audible CLONK feedback.
-- Finish the enclosure, wiring, and power system.
-- Investigate sleep/wake behavior.
-- Improve reliability and failure recovery.
+- Finish enclosure details and the rechargeable power system.
+- Investigate battery management and sleep/wake behavior.
+- Continue reliability and failure-recovery testing.
 - Expand compatibility, including Apple TV.
+- Explore additional OLED feedback where it provides real value.
 
 ### What's Next?
 
-The second Bourns encoder is wired and waiting for its application-level role: selecting a configured custom action and pressing to execute it.
+The physical controls are assembled and operational, including both Bourns encoders and the OLED.
 
-That should make the Clonker considerably more useful without touching the browser.
+The custom-action encoder selects and executes room-specific actions. The OLED provides custom-action, volume-direction, and mute feedback without continuous screen rendering.
 
-After that, the OLED and final hardware assembly can start making this thing look less like a bench experiment.
+The next major frontier is making the Clonker comfortably self-contained: battery power, charging, and sensible sleep/wake behavior.
 
-Or perhaps more like a bench experiment inside a very nice enclosure.
+Or perhaps making it look slightly less like a bench experiment inside a very nice enclosure.
 
 **The software talks to the equipment.**
 

@@ -960,11 +960,25 @@ These results establish tested functionality, not indefinite fault-free operatio
 
 The SH1106 128×64 OLED is operational over I²C on GP4/GP5.
 
-`display/oled.py` owns display initialization, deferred text rendering, refresh pacing, and idle display-off behavior.
+`display/oled.py` owns display initialization, deferred text rendering, refresh pacing, activity tracking, and idle display-off behavior.
 
-The physical custom-action encoder requests display updates when the selected action changes. The OLED driver performs actual display operations during cooperative scheduler polling.
+The OLED provides three primary types of feedback:
 
-This preserves the boundary between physical input interpretation and display hardware operations.
+- **Custom Actions:** Displays the selected action name when the custom-action encoder changes selection.
+- **Volume:** Displays `VOL UP +` or `- VOL DOWN` according to rotation direction.
+- **Mute:** Displays `MUTE ON` or `MUTE OFF` after successful transmission of the corresponding toggle command.
+
+Volume feedback uses lightweight `is_showing_or_pending()` and `touch()` helpers to avoid requesting additional text rendering for repeated detents in the same direction.
+
+The OLED retains its existing 100 ms refresh limiter and 15-second idle timeout.
+
+Text requests do not perform immediate I2C transfers. Actual display operations occur during cooperative scheduler polling.
+
+The SH1106 controller retains displayed pixels without continuous framebuffer updates. The application therefore uses event-driven display requests rather than continuous rendering.
+
+Mute messages reflect the action dispatcher's successfully transmitted toggle direction, not independently queried receiver state.
+
+This preserves the boundary between physical input interpretation, action execution, and display hardware operations.
 
 The physical assembly is mounted, soldered, wired, secured, and strain-relieved through the Pico Cowbell Terminal board.
 
@@ -1109,7 +1123,13 @@ Physical-button holds preserve the original destination across press and release
 
 Shared PERF instrumentation measures the existing cooperative scheduler without introducing another execution pipeline.
 
-The physical assembly is complete. Battery power, sleep/wake behavior, additional display feedback, and further performance investigation remain Chapter 8 work.
+Chapter 8 resolved the recurring physical polling execution spikes by replacing repeated configuration validation with lightweight accessors into the already-validated active configuration.
+
+The same approach was extended to custom-action lookup and physical hold-button room checks.
+
+OLED feedback now includes Custom Actions, volume direction, and completed mute-toggle commands. All were verified on physical hardware.
+
+The physical assembly is complete. Battery power, sleep/wake behavior, audible feedback, and further reliability testing remain future work.
 
 ---
 
