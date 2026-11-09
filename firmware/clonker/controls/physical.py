@@ -193,7 +193,12 @@ def _run_selected_custom():
         )
     )
 
-    return dispatch_selected(selected["id"])
+    if dispatch_selected(selected["id"]):
+        oled.show_text(selected["name"])
+        oled.acknowledge()
+        return True
+
+    return False
 
 
 def dispatch_selected(action_id):
