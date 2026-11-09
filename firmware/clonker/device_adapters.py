@@ -62,6 +62,17 @@ def resolve(kind, action_id, method, path):
     ):
         return ROKU_HOLD
 
+    if (
+        kind == "hold"
+        and action_id in (
+            "nav-up", "nav-down", "nav-left", "nav-right",
+            "skip-back", "skip-forward",
+        )
+        and method == "POST"
+        and path in roku.BUTTON_COMMANDS
+    ):
+        return ROKU_BUTTON
+
     return GENERIC_HTTP
 
 
@@ -89,13 +100,18 @@ def rebuild(config):
     for room_id, room in config["rooms"].items():
         for action_id, action in room["actions"].items():
 
-            # Only fundamental volume actions are supported
-            # by specialized adapters in Chapter 6.
-            if action_id not in ("volume-up", "volume-down"):
+            if action_id in ("volume-up", "volume-down"):
+                kind = "fundamental"
+            elif action_id in (
+                "nav-up", "nav-down", "nav-left", "nav-right",
+                "skip-back", "skip-forward",
+            ):
+                kind = "hold"
+            else:
                 continue
 
             adapter = resolve(
-                "fundamental",
+                kind,
                 action_id,
                 action["method"],
                 action["path"],
