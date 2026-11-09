@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Hardware & Physical Controls
 
-**Updated:** November 8, 2026  
+**Updated:** November 9, 2026  
 **Controller:** Raspberry Pi Pico 2 W (RP2350), CircuitPython 10.3.1  
-**Baseline:** Chapter 7 closeout — assembled and wired physical controls, two operational Bourns encoders, room selection, navigation/playback, initial OLED integration, and ongoing performance refinement  
+**Baseline:** Chapter 8 — assembled physical controls, operational room selector and both Bourns encoders, room-aware OLED feedback, persistent Custom Action execution acknowledgment, and physical polling optimizations    
 **Source of GPIO truth:** [`firmware/clonker/controls/pins.py`](../firmware/clonker/controls/pins.py)
 
 > A gloriously overengineered, tactile Wi-Fi home-theater remote. Real knobs, real buttons, questionable restraint, and absolutely no desire to become another touchscreen.
@@ -335,7 +335,7 @@ The OLED displays `No customs` when the selected room has no custom actions.
 
 Execution reuses the existing action-dispatch architecture. No separate custom-action execution pipeline was introduced.
 
-**Chapter 7 status:** Initial custom-action selection and execution are operational and largely complete. Future work may refine the user experience, display feedback, and edge-case handling.
+**Chapter 8 status:** Custom Action selection, shaft-press execution, OLED selection feedback, and persistent inverted execution acknowledgment are operational and hardware verified. Rotation clears previous acknowledgments, including when the displayed action name remains unchanged.
 
 ### 7.5 Knobs
 
@@ -437,11 +437,11 @@ A possible future 180-degree control-orientation mode could reverse navigation o
 
 ### 9.1 Current integrated display
 
-The active firmware display driver is:
+The active display driver is:
 
 `firmware/clonker/display/oled.py`
 
-It implements a **128×64 SH1106 OLED** using I²C.
+It implements a **128×64 SH1106 OLED** over I²C.
 
 | Property | Current implementation |
 |---|---|
@@ -451,60 +451,153 @@ It implements a **128×64 SH1106 OLED** using I²C.
 | SDA | GP4 |
 | SCL | GP5 |
 | Bus speed | 400 kHz |
-| Refresh interval | 100 ms minimum |
+| Minimum refresh interval | 100 ms |
 | Idle display-off | 15 seconds |
+| Text layouts | Centered single line or optional two-line layout |
+| Hardware inversion | Supported and operational |
 
-Earlier planning and GPIO comments referenced a 64×32 SSD1306 display. Those references are historical and should not be mistaken for the currently integrated SH1106 driver.
+Earlier references to a 64×32 SSD1306 are historical. The integrated display is the 128×64 SH1106.
 
 ### 9.2 Display architecture
 
-The OLED module is designed to avoid unnecessary work in the physical event path.
+The OLED uses an event-driven design to minimize work in the physical control path.
 
-`show_text()` records a requested display message without immediately performing I²C communication.
+`show_text(message, second_line=None, reset_ack=False)` records a display request without performing I²C communication.
 
-`poll()` handles the actual display update.
+`poll()` performs the actual display operations.
 
 The driver supports:
 
-- Initialization.
-- Text rendering.
-- Rate-limited updates.
-- Partial display updates.
-- Idle display-off.
+- Single-line text using the enlarged font.
+- Optional two-line text with a smaller heading and enlarged second line.
+- Partial SH1106 page updates.
+- A 100 ms minimum interval between framebuffer refreshes.
+- Automatic display-off after 15 seconds without display activity.
+- Hardware inversion without framebuffer redraw.
+- Explicit acknowledgment reset.
 - Refresh-count diagnostics.
-- Cleanup.
+- Display initialization and cleanup.
 
-It does not require a third-party display library.
+Identical text requests do not trigger redundant framebuffer updates while the display is awake.
 
-### 9.3 Initial application integration
+A repeated `show_text()` call extends the idle timeout, even when no redraw is required.
 
-The OLED is integrated into the running application.
+The driver does not require a third-party display library.
 
-The custom-action encoder uses it to display:
+### 9.3 Room-selector feedback
 
-- The currently selected custom-action name.
-- `No customs` when the room has no configured custom actions.
+Chapter 8 integrated the physical room selector with the OLED.
 
-The OLED module also supports a counter interface used during integration and testing.
+Changing the selector displays:
 
-**Chapter 7 status:** Initial OLED integration is complete and operational.
+- A small heading identifying the room number.
+- The configured room name in the enlarged font.
 
-Further display uses are planned, including additional room, operating-mode, action, and status feedback.
+For example:
 
-The OLED is a user-interface component, not a requirement for the shared action queue to execute commands.
+    ROOM 2
+    SUNROOM
 
-### 9.4 Future display work
+An unconfigured selector position displays:
+
+    ROOM 3
+    UNASSIGNED
+
+The display request occurs only when the debounced room selection changes. It does not require continuous configuration lookups or display updates.
+
+Room selection resets the Custom Action selection index but does not execute an action.
+
+### 9.4 Custom Action selection and execution feedback
+
+The Custom Action encoder provides two distinct interactions.
+
+**Rotation — selection**
+
+- Cycles through the selected room's Custom Actions.
+- Displays the selected action name normally.
+- Displays `No customs` when the room has no Custom Actions.
+- Clears any previous execution acknowledgment.
+
+**Shaft press — execution**
+
+- Dispatches the currently selected Custom Action through the existing action system.
+- Requests the action name on the OLED.
+- Requests hardware inversion after successful dispatch.
+- Leaves the display inverted until another display message or idle timeout.
+
+Hardware inversion uses the SH1106 commands:
+
+- `0xA7` — inverted display.
+- `0xA6` — normal display.
+
+Inverted mode displays dark text against an illuminated background.
+
+The acknowledgment is persistent rather than a timed flash. It requires no additional timer or blocking delay.
+
+The OLED can wake from its idle state to display an execution acknowledgment.
+
+Repeated execution acknowledgments do not toggle the display back to normal.
+
+Selection and execution remain separate concepts:
+
+- **Normal display:** Selected action.
+- **Inverted display:** Execution acknowledgment.
+
+### 9.5 Acknowledgment reset and efficiency
+
+The driver exposes:
+
+`oled.acknowledge()`
+
+This requests hardware inversion without immediately performing I²C.
+
+The optional `reset_ack=True` argument to `show_text()` explicitly clears an acknowledgment, even if the requested text is identical to the current text.
+
+For example:
+
+    oled.show_text("MOVIE", reset_ack=True)
+
+This restores normal display mode without requiring a framebuffer redraw when `MOVIE` is already displayed.
+
+That distinction handles cases where the user rotates the Custom Action encoder but returns to the same displayed action name.
+
+The driver tracks requested and applied inversion states. `poll()` sends an inversion command only when those states differ.
+
+Idle timeout restores normal display mode before switching off the panel.
+
+The shared action queue does not wait for OLED operations.
+
+### 9.6 Hardware verification
+
+Chapter 8 hardware testing confirmed:
+
+| Test | Result |
+|---|---|
+| Two-line room display | PASS |
+| Return to single-line display without ghost text | PASS |
+| Room selector positions, including unconfigured room | PASS |
+| Automatic OLED idle-off | PASS |
+| Hardware inversion | PASS |
+| Restore normal mode | PASS |
+| Reset acknowledgment with identical text | PASS |
+| Reset without redundant framebuffer refresh | PASS |
+| Custom Action shaft press and OLED acknowledgment | PASS |
+
+The no-redraw test confirmed that the successful framebuffer refresh count remained at one after inversion and restoration.
+
+### 9.7 Future display work
 
 Potential enhancements include:
 
-- Persistent or contextual room identification.
-- Command execution feedback.
-- CONFIG/RUN indication.
+- Additional feedback for Home, Back, playback, and other controls.
+- CONFIG/RUN indication where useful.
 - Network and battery status.
-- Additional messages from other application subsystems.
-- Refinements to display timing, readability, and idle behavior.
+- Additional application status messages.
+- Further user-interface edge-case testing.
 
-These are future capabilities, not claims about the current implementation.
+Not every button requires inversion. Persistent inversion is currently reserved for the two-stage Custom Action selection/execution interaction.
+
+The OLED is a feedback component, not a requirement for command execution.
 
 ---
 
