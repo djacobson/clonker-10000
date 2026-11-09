@@ -444,7 +444,6 @@ def poll():
             logger.info("ROOM SELECTED: {}".format(room_id))
 
         _action_index = 0
-        _log_custom_selection(room_id)
 
     # Momentary buttons.
     for button in _buttons:
