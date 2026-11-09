@@ -227,8 +227,8 @@ def initialize():
         raise
 
 
-def show_text(message, second_line=None):
-    """Queue one or two centered lines without performing I2C."""
+def show_text(message, second_line=None, reset_ack=False):
+    """Queue display text; optionally clear an acknowledgment."""
     global _text, _second_line, _dirty, _last_activity
     global _invert_requested
 
@@ -239,15 +239,19 @@ def show_text(message, second_line=None):
     if second_line is not None:
         second_line = str(second_line)
 
-    if (
+    changed = (
         message != _text
         or second_line != _second_line
         or not _awake
-    ):
+    )
+
+    if changed:
         _text = message
         _second_line = second_line
-        _invert_requested = False
         _dirty = True
+
+    if changed or reset_ack:
+        _invert_requested = False
 
     _last_activity = time.monotonic_ns()
 

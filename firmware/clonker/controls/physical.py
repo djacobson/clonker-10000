@@ -155,14 +155,14 @@ def _log_custom_selection(room_id):
     custom_actions = _custom_actions_for_room(room_id)
 
     if not custom_actions:
-        oled.show_text("No customs")
+        oled.show_text("No customs", reset_ack=True)
         logger.info(
             "CUSTOM SELECT: {} / No customs".format(room_id)
         )
         return
 
     selected = custom_actions[_action_index]
-    oled.show_text(selected["name"])
+    oled.show_text(selected["name"], reset_ack=True)
 
     logger.info(
         "CUSTOM SELECT: {} / {} ({}/{})".format(
