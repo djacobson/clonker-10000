@@ -203,12 +203,17 @@ def execute(adapter, endpoint, method, path):
     }
 
 
-def execute_hold(endpoint, method, path, event):
-    """Execute a queued physical-button press or release."""
+def execute_hold(adapter, endpoint, method, path, event):
+    """Execute a held-button event through its selected adapter."""
     start = time.monotonic_ns()
 
+    if adapter != ROKU_BUTTON:
+        raise ValueError(
+            "Unsupported held-button adapter: {}".format(adapter)
+        )
+
     if method != "POST":
-        raise ValueError("Roku held button requires POST")
+        raise ValueError("Roku held-button adapter requires POST")
 
     key = roku.BUTTON_COMMANDS.get(path)
 
