@@ -143,7 +143,10 @@ def dispatch(room_id, action_id, delay_seconds=0):
     }
 
 
-def dispatch_hold(room_id, action_id, event, destination=None, command=None):
+def dispatch_hold(
+    room_id, action_id, event,
+    destination=None, command=None, adapter=None
+):
     """Queue a physical held-button press or release."""
     global _peak_depth
 
@@ -193,6 +196,16 @@ def dispatch_hold(room_id, action_id, event, destination=None, command=None):
 
         target, method, path = command
 
+    if adapter is None:
+        adapter = device_adapters.lookup(room_id, action_id)
+
+    if adapter == device_adapters.GENERIC_HTTP:
+        raise ValueError(
+            "No native hold adapter for {} / {}".format(
+                room_id, action_id
+            )
+        )
+
     # Preserve the destination at press/release time.
     # Later configuration changes must not redirect a keyup.
     _queue.append({
@@ -204,6 +217,7 @@ def dispatch_hold(room_id, action_id, event, destination=None, command=None):
         "target": target,
         "method": method,
         "path": path,
+        "adapter": adapter,
         "due": 0,
     })
 
@@ -288,7 +302,7 @@ def poll():
             path = task["path"]
             event = task["event"]
 
-            adapter = device_adapters.ROKU_BUTTON
+            adapter = task["adapter"]
 
         else:
             room, action = device_config.action_details(
@@ -353,7 +367,7 @@ def poll():
 
         if kind == "hold":
             result = device_adapters.execute_hold(
-                endpoint, method, path, event
+                adapter, endpoint, method, path, event
             )
         else:
             result = device_adapters.execute(
