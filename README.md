@@ -1,4 +1,4 @@
-# THE CLONKER 10000
+# THE CLONKER 10000™
 
 ### Less sleek. More CLONK. ⚡🔩
 
@@ -20,7 +20,7 @@
        style="vertical-align: top;">
 </p>
 
-**THE CLONKER 10000** is my DIY maker project to build the home theater and Hi-Fi remote control I've always wanted.
+**THE CLONKER 10000™** is my DIY maker project to build the home theater and Hi-Fi remote control I've always wanted.
 
 Fewer buttons. Bigger switches. Beautiful metallic knobs. Real tactile feedback. Modern Wi-Fi control.
 
