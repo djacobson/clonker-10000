@@ -3143,6 +3143,106 @@ The Monster has learned to speak, without becoming a chatterbox.
 
 Less rendering. More CLONK.
 
+## Chapter 8 — Room-Aware OLED and Custom Action Acknowledgment — November 9, 2026
+
+### Objective
+
+Extend the operational SH1106 OLED beyond volume, mute, and basic Custom Action selection while preserving the cooperative scheduler's responsiveness.
+
+The design goals were:
+
+- Provide useful room-selection feedback.
+- Support both single-line and two-line text layouts.
+- Distinguish Custom Action selection from execution.
+- Avoid unnecessary framebuffer redraws and I2C traffic.
+- Reuse existing display timing and idle behavior.
+
+### Room-selector integration
+
+The physical room selector now requests a two-line OLED message when the selected room changes.
+
+The first line identifies the room position. The second line displays the configured room name or `UNASSIGNED`.
+
+The two-line layout uses a smaller heading and enlarged main text.
+
+Room changes continue to reset the Custom Action selection index without executing an action.
+
+Physical hardware testing confirmed the room display, including the unconfigured third selector position.
+
+### Custom Action execution acknowledgment
+
+The Custom Action encoder now has two visually distinct states:
+
+1. Rotation selects an action and displays its name normally.
+2. Pressing the shaft dispatches the action and requests an inverted OLED acknowledgment after successful dispatch.
+
+The SH1106 supports hardware inversion through controller commands `0xA7` and `0xA6`.
+
+This avoids modifying or retransmitting the framebuffer merely to change the visual acknowledgment state.
+
+The acknowledgment remains inverted until another message, an explicit reset, or the existing idle timeout.
+
+No additional timer, animation, or blocking delay was introduced.
+
+### Same-text acknowledgment reset
+
+A subtle case was identified: selecting an action again may need to clear an acknowledgment even when the displayed action name is unchanged.
+
+The OLED API therefore gained:
+
+    show_text(message, second_line=None, reset_ack=False)
+
+The optional `reset_ack=True` clears the inversion acknowledgment independently of text rendering.
+
+Hardware testing verified that resetting acknowledgment for identical text restored normal display mode without incrementing the framebuffer refresh count.
+
+### Deferred execution and display behavior
+
+The physical Custom Action handler now:
+
+1. Dispatches the selected action through the existing action system.
+2. Requests the selected name on the OLED after successful dispatch.
+3. Requests hardware inversion through `oled.acknowledge()`.
+
+The OLED poller remains responsible for actual I2C operations.
+
+The acknowledgment is visual feedback for successful dispatch, not proof that every step of a potentially asynchronous Custom Action has completed.
+
+The shared Dumb Queue™ and network adapters were not modified.
+
+### Hardware verification
+
+The following behaviors were successfully exercised on the Pico 2 W:
+
+| Test | Result |
+|---|---|
+| Two-line room display | PASS |
+| Unconfigured room indication | PASS |
+| Single-line display after two-line message | PASS |
+| Automatic OLED idle-off | PASS |
+| Hardware inversion and restoration | PASS |
+| Same-text acknowledgment reset | PASS |
+| Reset without framebuffer redraw | PASS |
+| Physical Custom Action execution acknowledgment | PASS |
+
+The complete Custom Action encoder acknowledgment interaction was reported to work beautifully during live hardware testing.
+
+Additional unusual-state and rapid-interaction testing remains ongoing.
+
+### Chapter 8 checkpoint
+
+Room-aware OLED feedback and persistent Custom Action execution acknowledgment are operational.
+
+The design retains deferred display updates, hardware-assisted inversion, the existing refresh limiter, and automatic idle-off.
+
+Further physical-button feedback will be evaluated individually. Persistent inversion is particularly appropriate for the Custom Action encoder's two-stage select-and-execute interaction; ordinary navigation and playback controls may require only brief messages or no display feedback.
+
+**Chapter 8 OLED acknowledgment milestone: COMPLETE.**
+
+The Monster now knows the difference between *choosing* something and *CLONKing* it into action.
+
+Less redraw. More CLONK.
+
 ---
 
 **THE CLONKER 10000**
