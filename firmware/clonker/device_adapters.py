@@ -33,20 +33,8 @@ ROKU_BUTTON = "roku-button"
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
 
-
-# Exact HTTP command paths recognized by the Denon TCP adapter.
-# Values are equivalent native Denon TCP commands.
-# Other Denon commands remain on generic HTTP.
-
-DENON_VOLUME_COMMANDS = {
-    "/goform/formiPhoneAppDirect.xml?MVUP": "MVUP",
-    "/goform/formiPhoneAppDirect.xml?MVDOWN": "MVDOWN",
-}
-
-ROKU_VOLUME_COMMANDS = {
-    "/keypress/VolumeUp": "up",
-    "/keypress/VolumeDown": "down",
-}
+# Device-specific command signatures live in their adapters.
+# Adapter selection still occurs when configuration becomes active.
 
 # Only specialized adapter selections are stored.
 # Key: (room_id, action_id)
@@ -62,7 +50,7 @@ def resolve(kind, action_id, method, path):
         kind == "fundamental"
         and action_id in ("volume-up", "volume-down")
         and method == "GET"
-        and path in DENON_VOLUME_COMMANDS
+        and path in denon.VOLUME_COMMANDS
     ):
         return DENON_TCP
 
@@ -70,7 +58,7 @@ def resolve(kind, action_id, method, path):
         kind == "fundamental"
         and action_id in ("volume-up", "volume-down")
         and method == "POST"
-        and path in ROKU_VOLUME_COMMANDS
+        and path in roku.VOLUME_COMMANDS
     ):
         return ROKU_HOLD
 
@@ -79,8 +67,7 @@ def resolve(kind, action_id, method, path):
 
 def denon_command(path):
     """Translate a recognized HTTP path to a Denon TCP command."""
-
-    command = DENON_VOLUME_COMMANDS.get(path)
+    command = denon.VOLUME_COMMANDS.get(path)
 
     if command is None:
         raise ValueError("Unsupported Denon TCP command")
@@ -207,14 +194,7 @@ def execute_hold(endpoint, method, path, event):
     if method != "POST":
         raise ValueError("Roku held button requires POST")
 
-    keys = {
-        "/keypress/Up": "Up",
-        "/keypress/Down": "Down",
-        "/keypress/Left": "Left",
-        "/keypress/Right": "Right",
-        "/keypress/Rev": "Rev",
-        "/keypress/Fwd": "Fwd",
-    }
+    key = roku.BUTTON_COMMANDS.get(path)
 
     key = keys.get(path)
 

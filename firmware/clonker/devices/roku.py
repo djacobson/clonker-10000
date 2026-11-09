@@ -22,6 +22,22 @@ IDLE_RELEASE_NS = 250_000_000   # 250 ms
 MAX_HOLD_NS = 2_000_000_000     # 2 seconds; safety limit
 RELEASE_RETRY_NS = 500_000_000  # 500 ms
 
+# Recognized configured commands for specialized Roku behavior.
+VOLUME_COMMANDS = {
+    "/keypress/VolumeUp": "up",
+    "/keypress/VolumeDown": "down",
+}
+
+# Physical-button paths supporting explicit keydown/keyup.
+BUTTON_COMMANDS = {
+    "/keypress/Up": "Up",
+    "/keypress/Down": "Down",
+    "/keypress/Left": "Left",
+    "/keypress/Right": "Right",
+    "/keypress/Rev": "Rev",
+    "/keypress/Fwd": "Fwd",
+}
+
 _endpoint = None
 _direction = None
 _deadline = 0

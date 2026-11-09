@@ -32,6 +32,13 @@ TCP_PORT = 23
 SOCKET_TIMEOUT = 1.0
 MIN_COMMAND_INTERVAL_NS = 50_000_000  # 50 ms
 
+# Recognized HTTP paths with equivalent native TCP commands.
+# Other Denon commands continue through generic HTTP.
+VOLUME_COMMANDS = {
+    "/goform/formiPhoneAppDirect.xml?MVUP": "MVUP",
+    "/goform/formiPhoneAppDirect.xml?MVDOWN": "MVDOWN",
+}
+
 _pool = None
 _socket = None
 _host = None
