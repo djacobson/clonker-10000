@@ -493,23 +493,27 @@ def poll():
             dispatched = dispatch_hold_button(
                 button.name, action_id, event
             )
-            if dispatched and event == "pressed" and button.name in (
-                "UP", "DOWN", "LEFT", "RIGHT"
-            ):
-                oled.show_text({
+            if dispatched and event == "pressed":
+                messages = {
                     "UP": "^ UP",
                     "DOWN": "~ DOWN",
                     "LEFT": "< LEFT",
                     "RIGHT": "RIGHT >",
-                }[button.name])
+                    "SKIP_BACK": "< SKIP BK",
+                    "SKIP_FORWARD": "SKIP FWD >",
+                }
+                oled.show_text(messages[button.name])
             continue
 
         if event == "pressed":
             dispatched = dispatch_selected(action_id)
-            if dispatched and button.name in (
-                "HOME", "BACK", "SELECT"
-            ):
-                oled.show_text(button.name)
+            if dispatched:
+                if button.name == "PLAY_PAUSE":
+                    oled.show_text("PLAY/PAUSE")
+                elif button.name in (
+                    "HOME", "BACK", "SELECT"
+                ):
+                    oled.show_text(button.name)
 
     # Volume encoder.
     if _volume_encoder is not None:
