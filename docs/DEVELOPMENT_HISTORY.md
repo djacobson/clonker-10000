@@ -2943,6 +2943,36 @@ The approximately 45 ms physical execution anomaly remains unresolved.
 
 Less guessing. More measuring. More CLONK.
 
+## Chapter 7 Closeout — November 8, 2026
+
+Chapter 7 concludes with the Clonker's physical controls assembled, connected, and operational.
+
+### Completed
+
+- Physical controls mounted, soldered, wired, secured, and strain-relieved.
+- Both Bourns encoders integrated: volume/mute and room-aware custom-action selection/execution.
+- Navigation, playback, and Roku physical-button holds operational.
+- SH1106 OLED integrated with initial custom-action feedback.
+- Shared PERF instrumentation implemented for scheduler and physical polling diagnostics.
+- CONFIG-mode browser responsiveness substantially improved.
+- Architecture, hardware, and firmware documentation updated.
+
+### Remaining work
+
+- Investigate occasional 40–50 ms `physical.exec` spikes if further testing establishes a meaningful responsiveness problem.
+- Continue OLED interface and feedback improvements.
+- Evaluate battery packs, charging, and power management.
+- Address remaining blank-command safety behavior for the unused third room.
+- Preserve working network adapters and the Dumb Queue™ while refining performance.
+
+**Chapter 7 status: COMPLETE.**
+
+The Monster has buttons, knobs, a screen, and a nervous system.
+
+Chapter 8 gets to teach it some manners.
+
+Less sleek. More CLONK.
+
 ---
 
 **THE CLONKER 10000**
