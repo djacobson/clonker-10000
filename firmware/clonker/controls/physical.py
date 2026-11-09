@@ -260,7 +260,7 @@ def dispatch_hold_button(button_name, action_id, event):
                 action["method"],
                 action["path"],
             )
-            adapter = device_adapters.lookup(
+            adapter = device_adapters.lookup_hold(
                 room_id, action_id
             )
             actions.dispatch_hold(

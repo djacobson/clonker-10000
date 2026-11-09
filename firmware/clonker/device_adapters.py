@@ -37,7 +37,8 @@ DENON_TCP = "denon-tcp"
 # Adapter selection still occurs when configuration becomes active.
 
 # Only specialized adapter selections are stored.
-# Key: (room_id, action_id)
+# Ordinary actions: (room_id, action_id)
+# Physical holds: ("hold", room_id, action_id)
 # Value: adapter identifier
 
 _adapter_map = {}
@@ -118,7 +119,11 @@ def rebuild(config):
             )
 
             if adapter != GENERIC_HTTP:
-                new_map[(room_id, action_id)] = adapter
+                if kind == "hold":
+                    key = ("hold", room_id, action_id)
+                else:
+                    key = (room_id, action_id)
+                new_map[key] = adapter
 
     global _adapter_map
     _adapter_map = new_map
@@ -134,6 +139,14 @@ def lookup(room_id, action_id):
 
     return _adapter_map.get(
         (room_id, action_id),
+        GENERIC_HTTP,
+    )
+
+
+def lookup_hold(room_id, action_id):
+    """Return the cached adapter for a physical held button."""
+    return _adapter_map.get(
+        ("hold", room_id, action_id),
         GENERIC_HTTP,
     )
 
