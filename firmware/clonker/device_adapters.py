@@ -154,7 +154,7 @@ def execute(adapter, endpoint, method, path):
         detail = "DENON TCP {}".format(command)
 
     elif adapter == ROKU_HOLD:
-        direction = ROKU_VOLUME_COMMANDS.get(path)
+        direction = roku.VOLUME_COMMANDS.get(path)
 
         if direction is None:
             raise ValueError("Unsupported Roku volume command")
@@ -195,8 +195,6 @@ def execute_hold(endpoint, method, path, event):
         raise ValueError("Roku held button requires POST")
 
     key = roku.BUTTON_COMMANDS.get(path)
-
-    key = keys.get(path)
 
     if key is None:
         raise ValueError(
