@@ -49,7 +49,7 @@ Related responsibilities:
 
 ### Pending or not exhaustively tested
 
-Further OLED uses, audible feedback, battery/sleep behavior, exhaustive long-uptime operation, and unresolved physical polling performance investigations remain future work.
+Further OLED uses, audible feedback, battery/sleep behavior, exhaustive long-uptime operation, and network-related scheduler responsiveness testing remain future work.
 
 Apple TV pairing/control, custom destination slots, Denon TCP response parsing, and exhaustive outage recovery are also pending.
 
@@ -1207,11 +1207,11 @@ Three distinct concepts must not be conflated:
 
 A long network request can delay the next physical poll without necessarily increasing the measured execution duration of `physical.poll()` itself.
 
-Chapter 7 observed occasional physical execution spikes around 40–50 ms during sustained volume activity, even after disabling detailed internal instrumentation.
+Chapter 7 observed occasional physical execution spikes around 40–50 ms during sustained volume activity. Chapter 8 traced these spikes to repeated configuration validation inside the physical dispatch wrapper, before the `physical.dispatch` timer started.
 
-Blocking Roku HTTP operations also produced substantially longer cooperative scheduler gaps.
+Replacing that validation with the lightweight `device_config.has_room()` check reduced observed maximum physical execution to approximately 8 ms, with no polls exceeding 20 ms in the verification test.
 
-The source of the physical execution spikes remains unresolved.
+Blocking Roku HTTP operations can still produce substantially longer cooperative scheduler gaps. These are separate from the resolved physical execution problem.
 
 ### 13.6 Garbage-collection experiment
 
@@ -1378,11 +1378,13 @@ Scheduler-level measurements now cover physical polling gaps, physical execution
 
 Optional internal measurements in `controls/physical.py` support more focused investigations.
 
-During sustained volume testing, occasional physical execution spikes around 40–50 ms remained unresolved. Blocking Roku operations also produced longer scheduler gaps, but these represent different timing measurements.
+During Chapter 7, sustained volume testing revealed occasional 40–50 ms physical execution spikes. Blocking Roku operations also produced longer scheduler gaps, but these represent different timing measurements.
 
-The investigation included instrumentation-overhead changes, logging changes, and an explicit garbage-collection experiment. None conclusively isolated the physical execution spikes.
+Chapter 8 traced the physical execution spikes to repeated configuration validation in the room-availability check. `device_config.current()` reconstructed a validated configuration copy for every physical action, outside the existing `physical.dispatch` timing boundary.
 
-Detailed results, unsuccessful experiments, and the Chapter 8 diagnostic handoff are preserved in [Development History](DEVELOPMENT_HISTORY.md).
+The fix introduced `device_config.has_room()`, which checks the already-validated in-memory configuration without copying or revalidating it. Subsequent testing reduced maximum physical execution from approximately 48 ms to 8 ms, with no physical polls exceeding 20 ms during the observed test interval.
+
+The original investigations, unsuccessful experiments, resolution, and performance-debugging lessons are preserved in [Development History](DEVELOPMENT_HISTORY.md).
 
 ---
 
@@ -1478,7 +1480,6 @@ Apple TV discovery, pairing, authenticated sessions, and commands are not implem
 
 Useful future tests include:
 
-- Isolate the occasional 40–50 ms `physical.exec` spikes observed during sustained volume activity.
 - Distinguish delays occurring inside `physical.poll()` from cooperative scheduler gaps caused by blocking network operations.
 - Extend targeted PERF measurements only when they can answer a specific diagnostic question.
 - Stale Denon TCP connections after AVR restart.
