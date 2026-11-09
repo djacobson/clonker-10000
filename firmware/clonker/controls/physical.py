@@ -209,7 +209,7 @@ def dispatch_selected(action_id):
     """
     room_id = selectors.selected_room()
 
-    if room_id not in device_config.current()["rooms"]:
+    if not device_config.has_room(room_id):
         logger.info(
             "PHYSICAL NO-OP: {} / {} (room unavailable)".format(
                 room_id, action_id

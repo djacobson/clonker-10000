@@ -380,6 +380,17 @@ def current():
     return validate_config(_current)
 
 
+def has_room(room_id):
+    """Check active validated configuration without revalidation.
+
+    Returns only a Boolean; does not expose mutable config data.
+    """
+    if _current is None:
+        raise RuntimeError("Configuration not loaded")
+
+    return room_id in _current["rooms"]
+
+
 def room(room_id):
     return current()["rooms"][room_id]
 
