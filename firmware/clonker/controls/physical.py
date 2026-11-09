@@ -26,12 +26,12 @@ from clonker.system import perf as _perf
 
 # Physical performance diagnostics.
 # Enable only the measurements needed for an experiment.
-PHYSICAL_PERF_ENABLED = True
+PHYSICAL_PERF_ENABLED = False
 
-PERF_SCAN = True
-PERF_EVENTS = True
-PERF_VOLUME = True
-PERF_DISPATCH = True
+PERF_SCAN = False
+PERF_EVENTS = False
+PERF_VOLUME = False
+PERF_DISPATCH = False
 PERF_HOLD = False
 
 # Threshold for correlated slow-poll diagnostics.
