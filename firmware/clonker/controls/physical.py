@@ -145,14 +145,8 @@ _hold_rooms = {}
 
 
 def _custom_actions_for_room(room_id):
-    """Return ordered Custom Actions for a configured room."""
-    rooms = device_config.current()["rooms"]
-    room = rooms.get(room_id)
-
-    if room is None:
-        return ()
-
-    return room["custom_actions"]
+    """Return ordered Custom Actions without revalidation."""
+    return device_config.custom_actions_for_room(room_id)
 
 
 def _log_custom_selection(room_id):

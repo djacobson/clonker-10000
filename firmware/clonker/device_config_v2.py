@@ -395,6 +395,26 @@ def room(room_id):
     return current()["rooms"][room_id]
 
 
+def custom_actions_for_room(room_id):
+    """Fast read-only access to a room's ordered Custom Actions.
+
+    Uses the already-validated active configuration.
+    Does not copy or revalidate configuration data.
+
+    Returns an empty tuple for an unavailable room.
+    Callers MUST NOT mutate the returned data.
+    """
+    if _current is None:
+        raise RuntimeError("Configuration not loaded")
+
+    room = _current["rooms"].get(room_id)
+
+    if room is None:
+        return ()
+
+    return room["custom_actions"]
+
+
 def action_details(room_id, action_id):
     """Fast internal access to an already-validated fundamental action.
 
