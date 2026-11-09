@@ -490,13 +490,21 @@ def poll():
             continue
 
         if button.name in HOLD_BUTTONS:
-            dispatch_hold_button(
+            dispatched = dispatch_hold_button(
                 button.name, action_id, event
             )
+            if dispatched and event == "pressed" and button.name in (
+                "UP", "DOWN", "LEFT", "RIGHT"
+            ):
+                oled.show_text(button.name)
             continue
 
         if event == "pressed":
-            dispatch_selected(action_id)
+            dispatched = dispatch_selected(action_id)
+            if dispatched and button.name in (
+                "HOME", "BACK", "SELECT"
+            ):
+                oled.show_text(button.name)
 
     # Volume encoder.
     if _volume_encoder is not None:
