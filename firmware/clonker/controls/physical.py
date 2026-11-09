@@ -16,6 +16,7 @@ The room selector maintains its own selected-room state.
 from clonker.system import logger
 from clonker import actions
 from clonker import device_config_v2 as device_config
+from clonker import device_adapters
 from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button
@@ -259,8 +260,12 @@ def dispatch_hold_button(button_name, action_id, event):
                 action["method"],
                 action["path"],
             )
+            adapter = device_adapters.lookup(
+                room_id, action_id
+            )
             actions.dispatch_hold(
-                room_id, action_id, event, endpoint, command
+                room_id, action_id, event,
+                endpoint, command, adapter
             )
         except Exception as exc:
             logger.warning(
@@ -271,7 +276,9 @@ def dispatch_hold_button(button_name, action_id, event):
             if measure:
                 _perf.stop("physical.hold", started)
 
-        _hold_rooms[button_name] = (room_id, endpoint, command)
+        _hold_rooms[button_name] = (
+            room_id, endpoint, command, adapter
+        )
         return True
 
     if event == "released":
@@ -280,14 +287,15 @@ def dispatch_hold_button(button_name, action_id, event):
         if original is None:
             return False
 
-        room_id, endpoint, command = original
+        room_id, endpoint, command, adapter = original
 
         measure = PHYSICAL_PERF_ENABLED and PERF_HOLD
         started = _perf.start() if measure else None
 
         try:
             actions.dispatch_hold(
-                room_id, action_id, event, endpoint, command
+                room_id, action_id, event,
+                endpoint, command, adapter
             )
             return True
         except Exception as exc:
