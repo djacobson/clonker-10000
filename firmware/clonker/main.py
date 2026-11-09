@@ -42,7 +42,7 @@ PERF_ENABLED = True
 PERF_INTERVAL_NS = 30_000_000_000
 
 # TEST 7: Periodic explicit garbage collection.
-GC_TEST_ENABLED = True
+GC_TEST_ENABLED = False
 GC_INTERVAL_NS = 2_000_000_000  # 2 seconds
 perf.register("gc.collect")
 
@@ -248,10 +248,8 @@ def main():
     perf_last_physical = None
     perf_oled_refresh_start = oled.get_refresh_count()
 
-
     # TEST 7: First explicit GC after two seconds.
     next_gc_at = now + GC_INTERVAL_NS
-
 
     # OLED is optional; failure must not stop Clonker.
     oled_ready = False
@@ -418,7 +416,6 @@ def main():
                     )
                     perf_report_at = time.monotonic_ns()
 
-
             # TEST 7: Periodic explicit garbage collection.
             # Run outside physical.poll(), once every 2 seconds.
             if GC_TEST_ENABLED:
@@ -432,7 +429,6 @@ def main():
                     next_gc_at = (
                         time.monotonic_ns() + GC_INTERVAL_NS
                     )
-
 
             # Yield briefly to the CircuitPython runtime.
             # Keep this INSIDE the while True loop.
