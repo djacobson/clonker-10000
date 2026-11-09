@@ -32,6 +32,7 @@ import time
 from clonker.system import logger
 from clonker import device_adapters
 from clonker import device_config_v2 as device_config
+from clonker.display import oled
 
 
 QUEUE_CAPACITY = 128
@@ -394,6 +395,12 @@ def poll():
                     toggle_direction.upper(),
                     _toggle_next[toggle_key].upper(),
                 )
+            )
+
+        if kind == "fundamental" and action_id == "mute-toggle":
+            oled.show_text(
+                "MUTE ON" if toggle_direction == "on"
+                else "MUTE OFF"
             )
 
         if kind == "custom":
