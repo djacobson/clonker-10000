@@ -24,17 +24,18 @@ from clonker.display import oled
 
 from clonker.system import perf as _perf
 
-# Physical diagnostics master switch.
-# False = lean production polling.
-# True = enable individually selected measurements below.
-PHYSICAL_PERF_ENABLED = False
+# Physical performance diagnostics.
+# Enable only the measurements needed for an experiment.
+PHYSICAL_PERF_ENABLED = True
 
-# Select only the measurements needed for an experiment.
-PERF_SCAN = False
-PERF_EVENTS = False
+PERF_SCAN = True
+PERF_EVENTS = True
 PERF_VOLUME = False
-PERF_DISPATCH = False
+PERF_DISPATCH = True
 PERF_HOLD = False
+
+# Threshold for correlated slow-poll diagnostics.
+PHYSICAL_SLOW_NS = 20_000_000
 
 
 class _DisabledPerf:
@@ -67,6 +68,9 @@ perf.register("physical.events")
 perf.register("physical.events.active")
 perf.register("physical.events.idle")
 perf.register("physical.volume")
+perf.register("physical.non_scan")
+perf.register("physical.slow.scan")
+perf.register("physical.slow.non_scan")
 
 
 # Diagnostic: suppress physical input event INFO logging.
@@ -213,7 +217,9 @@ def dispatch_selected(action_id):
         )
         return False
 
-    started = perf.start()
+    measure = PHYSICAL_PERF_ENABLED and PERF_DISPATCH
+    started = _perf.start() if measure else None
+
     try:
         actions.dispatch(room_id, action_id)
         return True
@@ -225,7 +231,8 @@ def dispatch_selected(action_id):
         )
         return False
     finally:
-        perf.stop("physical.dispatch", started)
+        if measure:
+            _perf.stop("physical.dispatch", started)
 
 
 def dispatch_hold_button(button_name, action_id, event):
@@ -243,7 +250,9 @@ def dispatch_hold_button(button_name, action_id, event):
         if button_name in _hold_rooms:
             return False
 
-        started = perf.start()
+        measure = PHYSICAL_PERF_ENABLED and PERF_HOLD
+        started = _perf.start() if measure else None
+
         try:
             room, action = device_config.action_details(
                 room_id, action_id
@@ -265,7 +274,8 @@ def dispatch_hold_button(button_name, action_id, event):
             )
             return False
         finally:
-            perf.stop("physical.hold", started)
+            if measure:
+                _perf.stop("physical.hold", started)
 
         _hold_rooms[button_name] = (room_id, endpoint, command)
         return True
@@ -278,7 +288,9 @@ def dispatch_hold_button(button_name, action_id, event):
 
         room_id, endpoint, command = original
 
-        started = perf.start()
+        measure = PHYSICAL_PERF_ENABLED and PERF_HOLD
+        started = _perf.start() if measure else None
+
         try:
             actions.dispatch_hold(
                 room_id, action_id, event, endpoint, command
@@ -290,7 +302,8 @@ def dispatch_hold_button(button_name, action_id, event):
             )
             return False
         finally:
-            perf.stop("physical.hold", started)
+            if measure:
+                _perf.stop("physical.hold", started)
 
     return False
 
@@ -404,6 +417,7 @@ def poll():
     measure_events = PHYSICAL_PERF_ENABLED and PERF_EVENTS
     measure_volume = PHYSICAL_PERF_ENABLED and PERF_VOLUME
 
+    # Measure the full internal poll independently of scan timing.
     if measure_events:
         poll_started = _perf.start()
         event_seen = False
@@ -490,6 +504,7 @@ def poll():
             action_id = (
                 "volume-up" if step > 0 else "volume-down"
             )
+
             dispatch_selected(action_id)
 
             if measure_volume:
@@ -521,25 +536,40 @@ def poll():
 
             _log_custom_selection(room_id)
 
-    # Optional diagnostic measurements.
+    # End timing before recording statistics.
+    if measure_events:
+        total_ns = _perf.start() - poll_started
+
     if measure_scan:
         _perf.record("physical.scan", scan_ns)
 
     if measure_events:
-        total_ns = _perf.start() - poll_started
-
-        if measure_scan:
-            events_ns = max(0, total_ns - scan_ns)
-        else:
-            events_ns = total_ns
-
-        _perf.record("physical.events", events_ns)
+        # Always report the full internal polling duration.
+        _perf.record("physical.events", total_ns)
 
         if event_seen:
             _perf.record(
-                "physical.events.active", events_ns
+                "physical.events.active", total_ns
             )
         else:
             _perf.record(
-                "physical.events.idle", events_ns
+                "physical.events.idle", total_ns
             )
+
+        if measure_scan:
+            non_scan_ns = max(0, total_ns - scan_ns)
+
+            _perf.record(
+                "physical.non_scan", non_scan_ns
+            )
+
+            # Correlated scan and non-scan durations
+            # for individual slow physical polls.
+            if total_ns > PHYSICAL_SLOW_NS:
+                _perf.record(
+                    "physical.slow.scan", scan_ns
+                )
+                _perf.record(
+                    "physical.slow.non_scan",
+                    non_scan_ns
+                )
