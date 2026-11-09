@@ -305,9 +305,9 @@ The volume encoder controls real equipment in two rooms using different network 
 
 The navigation and skip buttons support Roku keydown/keyup behavior, allowing a physical button to remain held rather than merely sending repeated individual keypresses.
 
-The second Bourns encoder selects and executes room-specific Custom Actions.
+The second Bourns encoder selects and executes room-specific Custom Actions. The OLED uses persistent hardware inversion to acknowledge execution.
 
-The OLED provides event-driven feedback for Custom Actions, volume direction, and mute state, with automatic display-off after inactivity.
+The OLED also provides two-line room identification, volume-direction and mute feedback, with automatic display-off after inactivity. Updates are event-driven rather than continuously rendered.
 
 ### Still on the Workbench
 
@@ -467,8 +467,8 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 - **Actual navigation:** Up, Down, Left, Right, Select, Back, and Home are integrated.
 - **Playback controls:** Play/Pause and Skip Back/Forward are integrated.
 - **Buttons that understand holding:** Six Roku navigation and skip buttons support explicit press/release behavior.
-- **Custom actions at your fingertips:** The second Bourns encoder selects and executes room-specific Custom Actions.
-- **A screen that speaks:** The OLED displays custom-action selections, volume direction, and mute feedback, then sleeps after inactivity.
+- **Custom actions at your fingertips:** Rotate the second Bourns encoder to choose an action, then press to execute it. The OLED inverts to acknowledge the CLONK.
+- **A screen that speaks:** The OLED identifies rooms, displays selected actions, reports volume direction and mute feedback, and sleeps after inactivity. All without constantly redrawing itself.
 - **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom actions, and the Dumb Queue™.
 - **A more responsive workshop:** CONFIG-mode browser improvements and Chapter 8 physical polling optimizations are operational.
 
@@ -487,7 +487,7 @@ These are working firmware and physical-control capabilities, not just plans on 
 
 The physical controls are assembled and operational, including both Bourns encoders and the OLED.
 
-The custom-action encoder selects and executes room-specific actions. The OLED provides custom-action, volume-direction, and mute feedback without continuous screen rendering.
+The Custom Action encoder selects and executes room-specific actions, with OLED inversion acknowledging execution. The display also provides two-line room identification, volume-direction feedback, and mute feedback without continuous screen rendering.
 
 The next major frontier is making the Clonker comfortably self-contained: battery power, charging, and sensible sleep/wake behavior.
 
