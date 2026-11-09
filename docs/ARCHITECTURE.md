@@ -1,9 +1,9 @@
 # The Clonker 10000 — System Architecture
 
-**Updated:** November 8, 2026  
+**Updated:** November 9, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
-**Current baseline:** Chapter 7 closeout — completed physical assembly, both Bourns encoders, Roku button holds, initial SH1106 OLED integration, and shared PERF instrumentation  
+**Current baseline:** Chapter 8 — assembled physical controls, optimized physical polling, room-aware OLED feedback, and persistent Custom Action execution acknowledgments  
 **Configuration:** Clonker Config v4
 
 > **Clonker controls actions, not brands. Controlled devices own their own state.**
@@ -172,7 +172,7 @@ Roku key releases may occur after ordinary queue work has completed. Adapter mai
 | `firmware/clonker/system/clock.py` | UTC reference and monotonic timing |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
 | `firmware/clonker/system/perf.py` | Shared performance measurement and statistics |
-| `firmware/clonker/display/oled.py` | SH1106 display initialization, deferred rendering, refresh pacing, and idle-off behavior |
+| `firmware/clonker/display/oled.py` | SH1106 initialization, one/two-line deferred rendering, hardware inversion acknowledgments, refresh pacing, and idle-off behavior |
 | `firmware/clonker/www/` | Configuration editor and Test Remote |
 | `firmware/clonker/legacy/` | Historical XML implementation |
 
@@ -956,40 +956,50 @@ Physical navigation and skip-button holds were also exercised against Roku equip
 
 These results establish tested functionality, not indefinite fault-free operation.
 
-### 11.8 OLED feedback and future physical features
+### 11.8 OLED feedback and physical coordination
 
-The SH1106 128×64 OLED is operational over I²C on GP4/GP5.
+The SH1106 128×64 OLED operates over I²C on GP4/GP5.
 
-`display/oled.py` owns display initialization, deferred text rendering, refresh pacing, activity tracking, and idle display-off behavior.
+`display/oled.py` owns display initialization, text rendering, hardware inversion, refresh pacing, activity tracking, and idle display-off.
 
-The OLED provides three primary types of feedback:
+`controls/physical.py` requests display changes in response to physical events. It does not perform direct I²C operations.
 
-- **Custom Actions:** Displays the selected action name when the custom-action encoder changes selection.
-- **Volume:** Displays `VOL UP +` or `- VOL DOWN` according to rotation direction.
-- **Mute:** Displays `MUTE ON` or `MUTE OFF` after successful transmission of the corresponding toggle command.
+Implemented feedback includes:
 
-Volume feedback uses lightweight `is_showing_or_pending()` and `touch()` helpers to avoid requesting additional text rendering for repeated detents in the same direction.
+- **Room selection:** Two-line room number and configured name, or `UNASSIGNED`.
+- **Custom Action selection:** Normal display of the selected action name.
+- **Custom Action execution:** Persistent inverted display after successful dispatch.
+- **Volume:** `VOL UP +` or `- VOL DOWN` according to rotation direction.
+- **Mute:** `MUTE ON` or `MUTE OFF` following successful toggle-command transmission.
 
-The OLED retains its existing 100 ms refresh limiter and 15-second idle timeout.
+Volume feedback uses `is_showing_or_pending()` and `touch()` to avoid redundant rendering during repeated detents in the same direction.
 
-Text requests do not perform immediate I2C transfers. Actual display operations occur during cooperative scheduler polling.
+The OLED provides two text layouts: enlarged single-line text and an optional smaller heading above enlarged text.
 
-The SH1106 controller retains displayed pixels without continuous framebuffer updates. The application therefore uses event-driven display requests rather than continuous rendering.
+`show_text(message, second_line=None, reset_ack=False)` records a request without immediate I²C.
 
-Mute messages reflect the action dispatcher's successfully transmitted toggle direction, not independently queried receiver state.
+When the requested text is unchanged and the display is awake, no framebuffer refresh is scheduled. Repeated requests still extend the idle activity timer.
 
-This preserves the boundary between physical input interpretation, action execution, and display hardware operations.
+`acknowledge()` requests hardware inversion. `poll()` applies `0xA7` or `0xA6` only when the requested inversion state differs from the applied state.
+
+The optional `reset_ack=True` clears an acknowledgment without forcing a framebuffer redraw when the text is unchanged.
+
+The OLED retains its 100 ms minimum framebuffer refresh interval and 15-second idle timeout. Idle sleep restores normal inversion mode before switching off the display.
+
+Display updates remain cooperative and separate from command dispatch. Successful Custom Action dispatch is requested before its OLED acknowledgment.
+
+Mute messages represent the action dispatcher's transmitted toggle direction, not independently queried receiver state.
 
 The physical assembly is mounted, soldered, wired, secured, and strain-relieved through the Pico Cowbell Terminal board.
 
 Future development includes:
 
-- Additional OLED room, action, and status feedback.
+- Additional OLED messages where they improve usability.
 - Audible CLONK feedback.
 - Battery selection, charging, sleep, and wake behavior.
 - Possible alternate panel orientation.
 
-The future orientation concept would exchange navigation and skip directions through an alternate action mapping rather than rewriting GPIO drivers.
+The orientation concept would exchange navigation and skip directions through an alternate action mapping rather than rewriting GPIO drivers.
 
 No general panel-orientation feature is currently implemented.
 
@@ -1123,11 +1133,19 @@ Physical-button holds preserve the original destination across press and release
 
 Shared PERF instrumentation measures the existing cooperative scheduler without introducing another execution pipeline.
 
-Chapter 8 resolved the recurring physical polling execution spikes by replacing repeated configuration validation with lightweight accessors into the already-validated active configuration.
+Chapter 8 resolved recurring physical polling execution spikes by replacing repeated configuration validation with lightweight accessors into the already-validated active configuration.
 
-The same approach was extended to custom-action lookup and physical hold-button room checks.
+The same approach was extended to Custom Action lookup and physical hold-button room checks.
 
-OLED feedback now includes Custom Actions, volume direction, and completed mute-toggle commands. All were verified on physical hardware.
+Chapter 8 also expanded the event-driven OLED interface:
+
+- Room selection now requests a two-line display containing the room number and configured name, or `UNASSIGNED` for an unavailable room.
+- Custom Action rotation displays the selected name and explicitly clears any previous execution acknowledgment.
+- Successful Custom Action dispatch requests the action name and persistent hardware inversion.
+- Inversion remains active until a new display message, explicit acknowledgment reset, or idle sleep.
+- The SH1106 performs inversion through hardware commands without framebuffer redraws or additional timers.
+
+The OLED behavior, including same-text acknowledgment reset without redundant framebuffer refresh, was verified on physical hardware.
 
 The physical assembly is complete. Battery power, sleep/wake behavior, audible feedback, and further reliability testing remain future work.
 
