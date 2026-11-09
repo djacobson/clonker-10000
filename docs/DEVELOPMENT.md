@@ -226,6 +226,34 @@ Blocking Roku network operations also produce longer cooperative scheduler gaps.
 
 The full investigation, test results, and unsuccessful experiments are recorded in [Development History](DEVELOPMENT_HISTORY.md).
 
+### The Clonker Test Kitchen Sink™
+
+Development and experimental test scripts live in:
+
+`firmware/tests/`
+
+This directory intentionally sits outside `firmware/clonker/`.
+
+It's our kitchen sink of experiments: some scripts test Clonker modules, while others investigate the Pico, CircuitPython, GPIO, hardware peripherals, networking, and other platform behavior independently of the application.
+
+Some are regression tests. Some are diagnostic tools. Others are historical experiments that answered a question once and may never need to run again.
+
+**Before inventing another test, look in the kitchen sink.**
+
+When troubleshooting or developing a subsystem:
+
+1. Inspect `firmware/tests/` in the current GitHub repository.
+2. Read existing relevant scripts before proposing new ones.
+3. Reuse or extend existing tests when practical.
+4. Check Git history or `DEVELOPMENT_HISTORY.md` when historical context matters.
+5. Verify a script's assumptions and dependencies before running it on the Pico.
+
+Git is the authoritative test inventory. Do not maintain a duplicate file list in documentation.
+
+Tests are development tools, not necessarily part of the normal Clonker runtime deployment.
+
+**Less reinventing. More CLONK.**
+
 ## 10. Debugging and serial discipline
 
 **Record:** commit/deployed version, GP17 and GP18 positions, selected room, GPIO mapping, exact test action, queue/transport logs, and observed equipment behavior. If a cold power cycle changes the result, note it.
