@@ -3045,6 +3045,104 @@ The Dumb Queue™ was innocent. The configuration paperwork department was not.
 
 Less validation. More CLONK.
 
+## Chapter 8 — OLED Feedback and Configuration Access Improvements — November 8, 2026
+
+### Configuration access improvements
+
+Following the physical polling performance investigation, additional configuration lookups were reviewed for unnecessary validation overhead.
+
+Added `device_config.custom_actions_for_room(room_id)` to provide fast, read-only access to the ordered Custom Actions of an already-validated room configuration.
+
+Updated `controls/physical.py` to use this accessor rather than repeatedly calling `device_config.current()`.
+
+The custom-action encoder previously triggered configuration validation during selection and execution, potentially more than once per detent.
+
+Also replaced the remaining `device_config.current()` room-membership check in the physical hold-button path with `device_config.has_room()`.
+
+These changes preserve the existing configuration safety model without repeatedly copying and validating the active configuration during physical interactions.
+
+### OLED volume feedback
+
+Extended the existing SH1106 OLED integration to provide simple volume-direction feedback.
+
+The volume encoder now displays:
+
+- `VOL UP +` for clockwise rotation.
+- `- VOL DOWN` for counterclockwise rotation.
+
+The messages intentionally indicate direction rather than attempting to track receiver volume levels.
+
+The OLED module gained two lightweight helpers:
+
+- `is_showing_or_pending(message)` checks whether a message is already displayed or awaiting refresh.
+- `touch()` extends the display activity timeout without rendering text or performing I2C operations.
+
+Repeated detents in the same direction therefore do not request additional text rendering. Direction changes, display wakeups, and replacement of another message trigger normal deferred updates.
+
+The existing OLED refresh limiter and 15-second idle timeout remain in place.
+
+### OLED mute feedback
+
+Added `MUTE ON` and `MUTE OFF` messages after successful mute command transmission.
+
+Mute feedback is generated in `actions.py`, using the toggle direction already maintained by the action dispatcher.
+
+No independent mute-state tracking was added to the physical controls or OLED module.
+
+The displayed state represents Clonker's successfully transmitted command, not independently queried receiver state.
+
+Failed or pending commands do not generate a completed mute message.
+
+### Display design principles
+
+The OLED remains a lightweight, event-driven output device.
+
+- The SH1106 controller maintains displayed pixels without continuous framebuffer updates.
+- Text requests do not perform immediate I2C transfers.
+- Actual display updates occur through the existing cooperative OLED poller.
+- Repeated volume events extend activity without requesting redraws.
+- The latest relevant interaction replaces the previous display message.
+- The OLED automatically switches off after approximately 15 seconds of inactivity.
+- No continuous blinking, animation, or additional periodic display workload was introduced.
+
+Standalone experiments in `firmware/tests/test_oled.py` remain the reference for SH1106 hardware capabilities, including display persistence, inversion, contrast, and display on/off behavior.
+
+Future display ownership or notification-priority features may be considered if additional requirements justify them.
+
+### Hardware verification
+
+The updated firmware was deployed to the Pico 2 W and tested with the physical controls.
+
+All reported functional tests passed:
+
+- Clockwise volume rotation displayed `VOL UP +`.
+- Counterclockwise volume rotation displayed `- VOL DOWN`.
+- Volume encoder press displayed `MUTE ON`.
+- Subsequent mute press displayed `MUTE OFF`.
+- Custom-action encoder selection correctly displayed the selected Custom Action.
+- Custom-action messages replaced previous volume or mute messages.
+- The OLED switched off after approximately 15 seconds of inactivity.
+
+The custom-action encoder remained operational following the fast configuration accessor changes.
+
+The display implementation avoids repeated same-direction text requests by design. Additional I2C instrumentation was not required for this functional verification.
+
+### Chapter 8 checkpoint
+
+The physical polling performance investigation is resolved.
+
+Additional unnecessary configuration validation has been removed from physical control paths.
+
+Volume, mute, and custom-action OLED feedback are operational and hardware-tested.
+
+The Dumb Queue™, network adapters, and existing physical control behavior remain intact.
+
+**Chapter 8 OLED feedback checkpoint: COMPLETE.**
+
+The Monster has learned to speak, without becoming a chatterbox.
+
+Less rendering. More CLONK.
+
 ---
 
 **THE CLONKER 10000**
