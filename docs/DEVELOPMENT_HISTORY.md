@@ -2973,6 +2973,78 @@ Chapter 8 gets to teach it some manners.
 
 Less sleek. More CLONK.
 
+## Chapter 8 — Physical Polling Performance Resolution — November 8, 2026
+
+### Investigation
+
+Chapter 8 continued the investigation of recurring 40–50 ms `physical.exec` spikes during volume encoder activity.
+
+Targeted PERF instrumentation separated GPIO scanning, complete physical polling, volume event handling, and action dispatch. Additional experiments included explicit garbage collection at 30-second and 2-second intervals.
+
+The spikes persisted during those GC experiments. GPIO scanning and measured action dispatch remained comparatively fast.
+
+### Root cause
+
+Source inspection revealed that `controls/physical.py` checked room availability using:
+
+```python
+room_id not in device_config.current()["rooms"]
+```
+
+However, `device_config.current()` calls `validate_config(_current)`, constructing a validated configuration copy on every invocation.
+
+This expensive operation ran for each physical action and occurred **before** the `physical.dispatch` timer started.
+
+The existing dispatch measurements therefore excluded the very operation responsible for the delay.
+
+### Fix
+
+Added `device_config.has_room(room_id)`, a lightweight internal convenience function that checks room membership directly against the already-validated `_current` configuration.
+
+Updated `dispatch_selected()` to use this function.
+
+The implementation follows the established fast-access pattern of `action_details()` and `custom_action_details()`.
+
+The public `current()` behavior remains unchanged. No changes were required to the action queue, network adapters, or physical control mappings.
+
+### Verification
+
+After deploying the fix, a controlled idle/volume test showed:
+
+| Measurement | Before fix | After fix |
+|---|---|---|
+| Maximum physical execution | Approximately 48 ms | Approximately 8 ms |
+| Physical polls exceeding 20 ms | Approximately 50 during activity | 0 during activity |
+| GPIO scanning | Fast | Fast |
+| Action dispatch | Fast | Fast |
+
+The result strongly implicates repeated configuration validation as the cause of the previously observed physical polling spikes.
+
+The observed worst-case physical execution time improved by approximately 84%. Additional repetitions may further establish consistency.
+
+Longer cooperative scheduler gaps associated with blocking network requests remain a separate architectural consideration.
+
+### Lessons learned
+
+- Measure complete operations, including preparation, lookups, and cleanup.
+- Treat unexplained time between nested timers as an investigation priority.
+- Inspect inexpensive-looking convenience functions for hidden validation, copying, allocation, or I/O.
+- Revisit previously identified architectural risks before expanding experimental instrumentation.
+- Use already-validated internal configuration accessors on frequent execution paths, without exposing mutable configuration unnecessarily.
+- Preserve historical test results while clearly documenting later resolutions.
+
+### Closeout
+
+The fast room-membership check is retained as a permanent optimization.
+
+Performance instrumentation remains available for future diagnostics, with normal-operation flags disabled after testing.
+
+**Chapter 8 performance investigation: RESOLVED, with strong initial before-and-after verification.**
+
+The Dumb Queue™ was innocent. The configuration paperwork department was not.
+
+Less validation. More CLONK.
+
 ---
 
 **THE CLONKER 10000**
