@@ -234,7 +234,7 @@ def dispatch_hold_button(button_name, action_id, event):
     if event == "pressed":
         room_id = selectors.selected_room()
 
-        if room_id not in device_config.current()["rooms"]:
+        if not device_config.has_room(room_id):
             logger.info(
                 "PHYSICAL HOLD NO-OP: {} / {} "
                 "(room unavailable)".format(room_id, action_id)
@@ -500,7 +500,7 @@ def poll():
             )
 
             message = (
-                "Volume UP ->" if step > 0 else "<- Volume Dn"
+                "VOL UP +" if step > 0 else "- VOL DOWN"
             )
 
             if oled.is_showing_or_pending(message):
