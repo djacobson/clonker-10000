@@ -76,6 +76,8 @@ _FONT = {
 _i2c = None
 _awake = False
 _text = ""
+_second_line = None
+_display_two_lines = False
 _dirty = False
 _last_activity = 0
 _last_refresh = 0
@@ -151,6 +153,31 @@ def _render(message):
     return upper, lower
 
 
+def _render_small(message):
+    """Render a centered 1x heading into one SH1106 page."""
+    text = str(message).upper()
+
+    # Six pixels per character, including spacing.
+    if len(text) > 21:
+        text = text[:20] + "."
+
+    pixels = bytearray(WIDTH)
+    x = max(0, (WIDTH - len(text) * 6) // 2)
+
+    for ch in text:
+        glyph = _FONT.get(ch, _FONT["?"])
+
+        for bits in glyph:
+            if x >= WIDTH:
+                break
+            pixels[x] = bits
+            x += 1
+
+        x += 1
+
+    return pixels
+
+
 def initialize():
     """Initialize the display and leave it blank and asleep."""
     global _i2c, _awake, _dirty, _last_activity, _last_refresh
@@ -195,28 +222,37 @@ def initialize():
         raise
 
 
-def show_text(message):
-    """Record text and activity without performing any I2C work."""
-    global _text, _dirty, _last_activity
+def show_text(message, second_line=None):
+    """Queue one or two centered lines without performing I2C."""
+    global _text, _second_line, _dirty, _last_activity
 
     if _i2c is None:
         return
 
     message = str(message)
+    if second_line is not None:
+        second_line = str(second_line)
 
-    if message != _text or not _awake:
+    if (
+        message != _text
+        or second_line != _second_line
+        or not _awake
+    ):
         _text = message
+        _second_line = second_line
         _dirty = True
 
-    # Repeated messages count as activity too.
     _last_activity = time.monotonic_ns()
 
 
-def is_showing_or_pending(message):
-    """Check whether this text is displayed or awaiting refresh."""
+def is_showing_or_pending(message, second_line=None):
+    """Check the complete requested display content."""
     return (
         _i2c is not None
-        and _text == message
+        and _text == str(message)
+        and _second_line == (
+            None if second_line is None else str(second_line)
+        )
         and (_awake or _dirty)
     )
 
@@ -237,8 +273,8 @@ def set_count(value):
 
 
 def poll():
-    """Do at most one partial refresh, or one display-off command."""
-    global _awake, _dirty, _last_refresh
+    """Refresh requested text or turn off the idle display."""
+    global _awake, _dirty, _last_refresh, _display_two_lines
 
     if _i2c is None:
         return
@@ -254,15 +290,38 @@ def poll():
         return
 
     upper, lower = _render(_text)
+    two_lines = _second_line is not None
 
-    if not _page(3, upper) or not _page(4, lower):
-        return
+    if two_lines:
+        heading = _render_small(_text)
+        upper, lower = _render(_second_line)
+
+        if not _page(1, heading):
+            return
+
+        # Clear the old single-line upper page.
+        if not _page(3, bytes(WIDTH)):
+            return
+
+        if not _page(4, upper) or not _page(5, lower):
+            return
+
+    else:
+        if _display_two_lines:
+            if not _page(1, bytes(WIDTH)):
+                return
+            if not _page(5, bytes(WIDTH)):
+                return
+
+        if not _page(3, upper) or not _page(4, lower):
+            return
 
     if not _awake:
         if not _command(0xAF):
             return
         _awake = True
 
+    _display_two_lines = two_lines
     _dirty = False
     _refresh_count[0] += 1
     _last_refresh = time.monotonic_ns()
