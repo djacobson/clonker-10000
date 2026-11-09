@@ -81,6 +81,8 @@ _display_two_lines = False
 _dirty = False
 _last_activity = 0
 _last_refresh = 0
+_inverted = False
+_invert_requested = False
 
 # Successful screen updates since module initialization.
 _refresh_count = [0]
@@ -181,6 +183,7 @@ def _render_small(message):
 def initialize():
     """Initialize the display and leave it blank and asleep."""
     global _i2c, _awake, _dirty, _last_activity, _last_refresh
+    global _inverted, _invert_requested
 
     if _i2c is not None:
         return True
@@ -214,6 +217,8 @@ def initialize():
         _dirty = False
         _last_activity = time.monotonic_ns()
         _last_refresh = 0
+        _inverted = False
+        _invert_requested = False
         return True
 
     except Exception:
@@ -225,6 +230,7 @@ def initialize():
 def show_text(message, second_line=None):
     """Queue one or two centered lines without performing I2C."""
     global _text, _second_line, _dirty, _last_activity
+    global _invert_requested
 
     if _i2c is None:
         return
@@ -240,9 +246,18 @@ def show_text(message, second_line=None):
     ):
         _text = message
         _second_line = second_line
+        _invert_requested = False
         _dirty = True
 
     _last_activity = time.monotonic_ns()
+
+
+def acknowledge():
+    """Request persistent inversion without performing I2C."""
+    global _invert_requested
+
+    if _i2c is not None:
+        _invert_requested = True
 
 
 def is_showing_or_pending(message, second_line=None):
@@ -273,8 +288,9 @@ def set_count(value):
 
 
 def poll():
-    """Refresh requested text or turn off the idle display."""
+    """Refresh text, apply inversion, or turn off idle display."""
     global _awake, _dirty, _last_refresh, _display_two_lines
+    global _inverted, _invert_requested
 
     if _i2c is None:
         return
@@ -282,49 +298,63 @@ def poll():
     now = time.monotonic_ns()
 
     if _awake and now - _last_activity >= IDLE_TIMEOUT_NS:
+        # Restore normal mode before sleeping.
+        if _inverted:
+            if not _command(0xA6):
+                return
+            _inverted = False
+
         if _command(0xAE):
             _awake = False
+            _invert_requested = False
         return
 
-    if not _dirty or now - _last_refresh < REFRESH_INTERVAL_NS:
-        return
-
-    upper, lower = _render(_text)
-    two_lines = _second_line is not None
-
-    if two_lines:
-        heading = _render_small(_text)
-        upper, lower = _render(_second_line)
-
-        if not _page(1, heading):
+    if _dirty:
+        if now - _last_refresh < REFRESH_INTERVAL_NS:
             return
 
-        # Clear the old single-line upper page.
-        if not _page(3, bytes(WIDTH)):
-            return
+        upper, lower = _render(_text)
+        two_lines = _second_line is not None
 
-        if not _page(4, upper) or not _page(5, lower):
-            return
+        if two_lines:
+            heading = _render_small(_text)
+            upper, lower = _render(_second_line)
 
-    else:
-        if _display_two_lines:
-            if not _page(1, bytes(WIDTH)):
-                return
-            if not _page(5, bytes(WIDTH)):
+            if not _page(1, heading):
                 return
 
-        if not _page(3, upper) or not _page(4, lower):
-            return
+            # Clear the old single-line upper page.
+            if not _page(3, bytes(WIDTH)):
+                return
 
-    if not _awake:
-        if not _command(0xAF):
-            return
-        _awake = True
+            if not _page(4, upper) or not _page(5, lower):
+                return
 
-    _display_two_lines = two_lines
-    _dirty = False
-    _refresh_count[0] += 1
-    _last_refresh = time.monotonic_ns()
+        else:
+            if _display_two_lines:
+                if not _page(1, bytes(WIDTH)):
+                    return
+                if not _page(5, bytes(WIDTH)):
+                    return
+
+            if not _page(3, upper) or not _page(4, lower):
+                return
+
+        if not _awake:
+            if not _command(0xAF):
+                return
+            _awake = True
+
+        _display_two_lines = two_lines
+        _dirty = False
+        _refresh_count[0] += 1
+        _last_refresh = time.monotonic_ns()
+
+    # Hardware inversion needs no framebuffer redraw.
+    if _awake and _inverted != _invert_requested:
+        command = 0xA7 if _invert_requested else 0xA6
+        if _command(command):
+            _inverted = _invert_requested
 
 
 def get_refresh_count():
@@ -335,6 +365,7 @@ def get_refresh_count():
 def close():
     """Switch off the panel and release the I2C peripheral."""
     global _i2c, _awake, _dirty
+    global _inverted, _invert_requested
 
     if _i2c is None:
         return
@@ -346,3 +377,5 @@ def close():
         _i2c = None
         _awake = False
         _dirty = False
+        _inverted = False
+        _invert_requested = False
