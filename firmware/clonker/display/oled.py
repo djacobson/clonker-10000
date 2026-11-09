@@ -212,6 +212,23 @@ def show_text(message):
     _last_activity = time.monotonic_ns()
 
 
+def is_showing_or_pending(message):
+    """Check whether this text is displayed or awaiting refresh."""
+    return (
+        _i2c is not None
+        and _text == message
+        and (_awake or _dirty)
+    )
+
+
+def touch():
+    """Extend display activity without rendering or I2C."""
+    global _last_activity
+
+    if _i2c is not None:
+        _last_activity = time.monotonic_ns()
+
+
 def set_count(value):
     """Compatibility helper for the encoder counter test."""
     show_text(

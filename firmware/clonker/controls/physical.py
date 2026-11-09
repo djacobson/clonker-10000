@@ -499,6 +499,15 @@ def poll():
                 "volume-up" if step > 0 else "volume-down"
             )
 
+            message = (
+                "Volume UP ->" if step > 0 else "<- Volume Dn"
+            )
+
+            if oled.is_showing_or_pending(message):
+                oled.touch()
+            else:
+                oled.show_text(message)
+
             dispatch_selected(action_id)
 
             if measure_volume:
