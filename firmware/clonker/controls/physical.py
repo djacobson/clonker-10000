@@ -445,6 +445,14 @@ def poll():
 
         _action_index = 0
 
+        room_number = room_id[-1]
+
+        if device_config.has_room(room_id):
+            room_name = device_config.room(room_id)["name"]
+            oled.show_text("ROOM " + room_number, room_name)
+        else:
+            oled.show_text("ROOM " + room_number, "UNASSIGNED")
+
     # Momentary buttons.
     for button in _buttons:
         if measure_scan:
