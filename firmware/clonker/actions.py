@@ -197,7 +197,7 @@ def dispatch_hold(
         target, method, path = command
 
     if adapter is None:
-        adapter = device_adapters.lookup(room_id, action_id)
+        adapter = device_adapters.lookup_hold(room_id, action_id)
 
     if adapter == device_adapters.GENERIC_HTTP:
         raise ValueError(

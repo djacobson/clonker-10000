@@ -132,7 +132,7 @@ def rebuild(config):
 
 
 def lookup(room_id, action_id):
-    """Return the cached adapter selection for a fundamental action.
+    """Return the cached adapter for an ordinary fundamental action.
 
     Unknown or unrecognized actions use generic HTTP.
     """
@@ -220,36 +220,18 @@ def execute_hold(adapter, endpoint, method, path, event):
     """Execute a held-button event through its selected adapter."""
     start = time.monotonic_ns()
 
-    if adapter != ROKU_BUTTON:
+    if adapter == ROKU_BUTTON:
+        detail = roku.execute_hold(
+            endpoint, method, path, event
+        )
+    else:
         raise ValueError(
             "Unsupported held-button adapter: {}".format(adapter)
         )
 
-    if method != "POST":
-        raise ValueError("Roku held-button adapter requires POST")
-
-    key = roku.BUTTON_COMMANDS.get(path)
-
-    if key is None:
-        raise ValueError(
-            "Unsupported Roku held-button path: {}".format(path)
-        )
-
-    if not endpoint:
-        raise ValueError("Roku held-button endpoint is empty")
-
-    if event == "pressed":
-        roku.button_down(endpoint, key)
-        operation = "keydown"
-    elif event == "released":
-        roku.button_up(endpoint, key)
-        operation = "keyup"
-    else:
-        raise ValueError("Invalid held-button event")
-
     return {
         "accepted": True,
-        "detail": "ROKU {} {}".format(operation, key),
+        "detail": detail,
         "total_ms": round(
             (time.monotonic_ns() - start) / 1_000_000, 1
         ),

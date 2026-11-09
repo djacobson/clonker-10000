@@ -274,3 +274,29 @@ def button_poll():
         return button_up()
 
     return False
+
+
+def execute_hold(endpoint, method, path, event):
+    """Execute a configured physical-button hold event."""
+    if method != "POST":
+        raise ValueError("Roku held-button adapter requires POST")
+
+    key = BUTTON_COMMANDS.get(path)
+    if key is None:
+        raise ValueError(
+            "Unsupported Roku held-button path: {}".format(path)
+        )
+
+    if not endpoint:
+        raise ValueError("Roku held-button endpoint is empty")
+
+    if event == "pressed":
+        button_down(endpoint, key)
+        operation = "keydown"
+    elif event == "released":
+        button_up(endpoint, key)
+        operation = "keyup"
+    else:
+        raise ValueError("Invalid held-button event")
+
+    return "ROKU {} {}".format(operation, key)
