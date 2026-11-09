@@ -496,7 +496,12 @@ def poll():
             if dispatched and event == "pressed" and button.name in (
                 "UP", "DOWN", "LEFT", "RIGHT"
             ):
-                oled.show_text(button.name)
+                oled.show_text({
+                    "UP": "^ UP",
+                    "DOWN": "~ DOWN",
+                    "LEFT": "< LEFT",
+                    "RIGHT": "RIGHT >",
+                }[button.name])
             continue
 
         if event == "pressed":
