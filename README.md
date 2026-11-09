@@ -312,7 +312,6 @@ The OLED provides event-driven feedback for Custom Actions, volume direction, an
 ### Still on the Workbench
 
 - Audible CLONK feedback.
-- Final internal wiring and strain relief.
 - Enclosure finishing and assembly.
 - Rechargeable power and sleep/wake behavior.
 - Additional reliability testing.
