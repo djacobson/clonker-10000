@@ -925,7 +925,7 @@ Both actions pass through the selected room and shared Dumb Queue™.
 
 The encoder driver does not know whether the destination is Denon or Roku.
 
-11.6 ### Custom-action encoder
+### 11.6 Custom-action encoder
 
 The second Bourns encoder uses GP11/GP12 for rotation and GP13 for its pushbutton.
 
