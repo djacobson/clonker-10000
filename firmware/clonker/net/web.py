@@ -8,8 +8,11 @@
 
 Only one client is serviced at a time. poll() advances one accept, receive,
 or send operation so the main loop can service physical controls later.
-Configuration saves use the active JSON engine's revision and path safeguards.
 
+Static HTML is streamed from flash in bounded chunks rather than loaded
+into RAM as a complete response.
+
+Configuration saves use the active JSON engine's revision and path safeguards.
 Connection diagnostics are maintained separately by net/web_diag.py.
 """
 
@@ -19,6 +22,7 @@ import socketpool
 import json
 import errno
 import storage
+import os
 
 from clonker.system import clock, logger
 from clonker.net import web_diag
@@ -26,8 +30,6 @@ from clonker import device_config_v2 as device_config
 from clonker import actions
 
 
-# HTTP service and request limits. JSON payloads are larger than
-# the original XML v1 payloads.
 WEB_ROOT = "/clonker/www"
 PORT = 9090
 HTTP_DIAGNOSTICS = False
@@ -43,14 +45,19 @@ IDLE_CLIENT_TIMEOUT_NS = 200_000_000    # 200 ms
 # Allow active requests and responses more time.
 CLIENT_TIMEOUT_NS = 4_000_000_000       # 4 seconds
 
-# Connection state is kept across poll() calls rather than blocking on I/O.
+# Connection state persists across cooperative poll() calls.
 _pool = None
 _listener = None
 _client = None
 _request = None
 _response = None
 _sent = 0
+_sent_total = 0
+_response_total = 0
 _last_activity = 0
+
+# Optional static-file stream for the current response.
+_file = None
 
 
 def http_trace(message):
@@ -63,22 +70,25 @@ def _socket_would_block(error):
     return error.errno == errno.EAGAIN
 
 
-def clock_page():
-    with open(WEB_ROOT + "/index.html", "r") as file:
-        return file.read()
-
-
 def clock_status():
     return {"source": clock.source(), "timestamp": clock.timestamp()}
 
 
 def _close_client(reason="closed"):
-    """Reset the entire current connection after completion or failure."""
-    global _client, _request, _response, _sent, _last_activity
+    """Release all resources belonging to the current connection."""
+    global _client, _request, _response
+    global _sent, _sent_total, _last_activity, _file
 
     if _client is not None:
-        web_diag.close(reason, _sent)
+        web_diag.close(reason, _sent_total)
 
+    if _file is not None:
+        try:
+            _file.close()
+        except OSError:
+            pass
+
+    if _client is not None:
         try:
             _client.close()
         except OSError:
@@ -87,7 +97,9 @@ def _close_client(reason="closed"):
     _client = None
     _request = None
     _response = None
+    _file = None
     _sent = 0
+    _sent_total = 0
     _last_activity = 0
 
 
@@ -106,7 +118,9 @@ def start():
 
     try:
         try:
-            listener.setsockopt(_pool.SOL_SOCKET, _pool.SO_REUSEADDR, 1)
+            listener.setsockopt(
+                _pool.SOL_SOCKET, _pool.SO_REUSEADDR, 1
+            )
         except (AttributeError, OSError):
             pass
 
@@ -199,14 +213,42 @@ def _action_request(first_line):
     return actions.dispatch(room_id, action_id)
 
 
+def _http_header(status, content_type, content_length):
+    """Build a small HTTP response header."""
+    return (
+        "HTTP/1.1 {}\r\n"
+        "Content-Type: {}\r\n"
+        "Content-Length: {}\r\n"
+        "Cache-Control: no-store\r\n"
+        "Connection: close\r\n\r\n"
+    ).format(
+        status, content_type, content_length
+    ).encode("utf-8")
+
+
 def _build_response(first_line, request=None):
-    """Route a completed request and return an entire HTTP response as bytes."""
+    """Build response bytes or prepare a static-file stream.
+
+    Returns:
+        (initial_bytes, file_path, total_response_bytes)
+
+    For static HTML, initial_bytes contains only the HTTP header.
+    The file is opened and streamed separately by poll().
+
+    For other routes, initial_bytes contains the complete response.
+    """
     logger.debug("HTTP request: {}".format(first_line))
     content_type = "application/json"
+    file_path = None
 
-    # Serve the browser interface from Pico flash.
+    # Static HTML is streamed directly from Pico flash.
     if first_line.startswith(b"GET / "):
-        body = clock_page()
+        file_path = WEB_ROOT + "/index.html"
+        status = "200 OK"
+        content_type = "text/html; charset=utf-8"
+
+    elif first_line.startswith(b"GET /remote.html "):
+        file_path = WEB_ROOT + "/remote.html"
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
 
@@ -315,12 +357,6 @@ def _build_response(first_line, request=None):
                     "500 Internal Server Error"
                 )
 
-    elif first_line.startswith(b"GET /remote.html "):
-        with open(WEB_ROOT + "/remote.html", "r") as file:
-            body = file.read()
-        status = "200 OK"
-        content_type = "text/html; charset=utf-8"
-
     elif first_line.startswith(b"POST /api/action?"):
         try:
             result = _action_request(first_line)
@@ -335,22 +371,51 @@ def _build_response(first_line, request=None):
         status = "404 Not Found"
         content_type = "text/plain"
 
-    # Send a complete Content-Length so the browser knows when to stop reading.
-    payload = body.encode("utf-8")
-    header = (
-        "HTTP/1.1 {}\r\n"
-        "Content-Type: {}\r\n"
-        "Content-Length: {}\r\n"
-        "Cache-Control: no-store\r\n"
-        "Connection: close\r\n\r\n"
-    ).format(status, content_type, len(payload))
+    if file_path is not None:
+        file_size = os.stat(file_path)[6]
+        header = _http_header(
+            status, content_type, file_size
+        )
+        return header, file_path, len(header) + file_size
 
-    return header.encode("utf-8") + payload
+    # Dynamic API responses retain the existing in-memory behavior.
+    payload = body.encode("utf-8")
+    header = _http_header(
+        status, content_type, len(payload)
+    )
+    response = header + payload
+
+    return response, None, len(response)
+
+
+def _advance_file():
+    """Load the next bounded file chunk after the previous one was sent.
+
+    Returns True when another chunk is ready, False when the file
+    has reached EOF or a read error has closed the connection.
+    """
+    global _response, _sent
+
+    try:
+        data = _file.read(IO_CHUNK_BYTES)
+    except OSError as error:
+        logger.warning("HTTP file read error: {}".format(error))
+        _close_client("file_read_error")
+        return False
+
+    if not data:
+        _close_client("complete")
+        return False
+
+    _response = data
+    _sent = 0
+    return True
 
 
 def poll():
     """Advance at most one accept, receive, or send operation per call."""
-    global _client, _request, _response, _sent, _last_activity
+    global _client, _request, _response
+    global _sent, _sent_total, _last_activity, _file
 
     if _listener is None:
         return
@@ -379,7 +444,9 @@ def poll():
         _client = client
         _request = bytearray()
         _response = None
+        _file = None
         _sent = 0
+        _sent_total = 0
         _last_activity = now
 
         web_diag.begin(now)
@@ -409,8 +476,8 @@ def poll():
             "request_bytes={}, sent_bytes={}, response_bytes={}".format(
                 phase,
                 len(_request) if _request is not None else 0,
-                _sent,
-                len(_response) if _response is not None else 0
+                _sent_total,
+                web_diag_response_size()
             )
         )
 
@@ -463,18 +530,43 @@ def poll():
             web_diag.request(first_line, len(_request))
             build_started = time.monotonic_ns()
 
-        _response = _build_response(first_line, _request)
+        try:
+            response, file_path, total_bytes = _build_response(
+                first_line, _request
+            )
+
+            if file_path is not None:
+                _file = open(file_path, "rb")
+
+        except OSError as error:
+            logger.warning(
+                "HTTP response preparation error: {}".format(error)
+            )
+            _close_client("response_error")
+            return
+
+        _response = response
+        _sent = 0
         _request = None
 
         if web_diag.WEB_DIAGNOSTICS_ENABLED:
             web_diag.response(
-                len(_response),
+                total_bytes,
                 time.monotonic_ns() - build_started
             )
 
         return
 
-    # Send the prepared response incrementally, then release the client.
+    # If the current buffer has finished, advance the file stream.
+    # Dynamic responses close immediately when their buffer finishes.
+    if _sent >= len(_response):
+        if _file is None:
+            _close_client("complete")
+        else:
+            _advance_file()
+        return
+
+    # Send the current response buffer incrementally.
     chunk = memoryview(_response)[
         _sent:_sent + IO_CHUNK_BYTES
     ]
@@ -501,10 +593,37 @@ def poll():
     web_diag.send_success(time.monotonic_ns())
 
     _sent += count
+    _sent_total += count
     _last_activity = now
 
-    if _sent >= len(_response):
+    # Dynamic responses are complete once their buffer is sent.
+    # Static streams continue with the next file chunk on a later poll.
+    if _sent >= len(_response) and _file is None:
         _close_client("complete")
+
+
+def web_diag_response_size():
+    """Return the current response size for timeout reporting.
+
+    Static responses are represented by the complete byte count recorded
+    when the file stream was prepared.
+    """
+    if _response is None:
+        return 0
+
+    if _file is None:
+        return len(_response)
+
+    try:
+        return os.stat(_file.name)[6] + len(
+            _http_header(
+                "200 OK",
+                "text/html; charset=utf-8",
+                os.stat(_file.name)[6]
+            )
+        )
+    except (AttributeError, OSError):
+        return 0
 
 
 def stop():
