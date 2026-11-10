@@ -15,6 +15,7 @@ Outbound HTTP requests are synchronous and blocking.
 """
 
 import time
+import gc
 
 from clonker.system import logger
 from clonker.system import perf
@@ -421,6 +422,17 @@ def main():
 
                     try:
                         web.poll()
+
+                    except MemoryError:
+                        # HTTP memory exhaustion must not terminate
+                        # the physical remote application.
+                        web.abort_low_memory()
+                        gc.collect()
+                        logger.warning(
+                            "HTTP memory allocation failed; "
+                            "client discarded"
+                        )
+
                     finally:
                         if PERF_ENABLED:
                             perf.stop("web.exec", started)

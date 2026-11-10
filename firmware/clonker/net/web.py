@@ -607,6 +607,44 @@ def poll():
         _close_client("complete")
 
 
+def abort_low_memory():
+    """Discard the active HTTP transaction with minimal allocation.
+
+    Keep the listening socket open so a later request can succeed.
+    The caller performs garbage collection after cleanup.
+    """
+    global _client, _request, _response, _file
+    global _sent, _sent_total, _response_total, _last_activity
+
+    # Release large references before doing anything else.
+    client = _client
+    file_handle = _file
+
+    _client = None
+    _request = None
+    _response = None
+    _file = None
+
+    _sent = 0
+    _sent_total = 0
+    _response_total = 0
+    _last_activity = 0
+
+    web_diag.discard()
+
+    if file_handle is not None:
+        try:
+            file_handle.close()
+        except Exception:
+            pass
+
+    if client is not None:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+
 def stop():
     """Close the HTTP service when leaving CONFIG mode."""
     global _listener, _pool

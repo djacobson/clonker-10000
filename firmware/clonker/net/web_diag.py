@@ -22,6 +22,12 @@ WEB_DIAGNOSTICS_ENABLED = True
 _connection = None
 
 
+def discard():
+    """Discard diagnostics without logging or allocating."""
+    global _connection
+    _connection = None
+
+
 def begin(now):
     """Start diagnostics for one accepted connection."""
     global _connection
