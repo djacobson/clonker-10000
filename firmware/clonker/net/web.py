@@ -655,14 +655,24 @@ def abort_low_memory():
 
 
 def stop():
-    """Close the HTTP service when leaving CONFIG mode."""
+    """Release the HTTP listener and its connection resources."""
     global _listener, _pool
 
-    _close_client("server_stopped")
+    listener = _listener
 
-    if _listener is not None:
-        _listener.close()
-        _listener = None
-
+    # Clear listener state before closing the socket.
+    _listener = None
     _pool = None
+
+    try:
+        _close_client("server_stopped")
+    finally:
+        if listener is not None:
+            try:
+                listener.close()
+            except OSError as error:
+                logger.warning(
+                    "HTTP listener close error: {}".format(error)
+                )
+
     logger.info("Clonker HTTP stopped")
