@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** November 8, 2026  
+**Updated:** November 10, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Baseline:** Chapter 7 — Config v4, three-room physical control, Bourns encoders, navigation/playback buttons, Roku holds, shared Dumb Queue™, and PERF diagnostics  
+**Baseline:** Chapter 8 — Config v4, three-room physical control, completed OLED feedback, resolved physical execution overhead, bounded CONFIG HTML streaming, and HTTP failure recovery  
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
@@ -260,8 +260,10 @@ Tests are development tools, not necessarily part of the normal Clonker runtime 
 
 | Symptom | First checks |
 |---|---|
-| Browser unavailable | GP18 CONFIG, Wi-Fi, port 9090, listener diagnostics |
-| Browser stalls | Single-client listener, silent connections, blocking outbound operations, web polling cadence |
+| Browser unavailable | GP18 CONFIG, Wi-Fi connection, port 9090, listener startup warnings, five-second retry interval |
+| Browser stalls | `WEB DIAG` close reason, `send_zero`, `EAGAIN`, response progress, single-client contention, blocking outbound operations |
+| HTTP allocation failure | `MemoryError` warning, client discard, subsequent browser recovery; investigate heap pressure |
+| HTTP listener restarts | Unexpected `OSError`, listener cleanup, five-second backoff, subsequent successful startup |
 | Save rejected | GP17 DEVICE, stale revision, schema/size validation, filesystem state |
 | Action queued but equipment unchanged | Actual queue execution, configured endpoint/path, adapter choice, transport result, equipment state |
 | Volume turns but nothing changes | GP8/GP9 wiring, detent events, selected room, Denon path signature, TCP connection/pacing |
@@ -293,14 +295,15 @@ After meaningful work, record the date, changed files, deployed version if known
 
 ### Remaining work
 
-- Investigate the unresolved 40–50 ms physical execution spikes during sustained volume activity; distinguish runtime pauses from input-processing overhead.
-- Complete the individual `PERF_DISPATCH` and `PERF_HOLD` diagnostic switches when needed.
-- Continue physical control reliability testing, particularly rapid encoder input during blocking Roku network operations.
-- Complete the custom-action encoder experience and OLED status feedback.
-- Integrate audible CLONK feedback, battery management, sleep/wake behavior, and final enclosure wiring.
+- Continue physical-control reliability testing, particularly rapid encoder input during blocking Roku network operations.
+- Investigate remaining cooperative scheduler gaps separately from the resolved physical execution overhead.
+- Extend targeted PERF diagnostics when a specific investigation requires them.
+- Integrate audible CLONK feedback, battery management, and sleep/wake behavior.
 - Verify blank-command safety for physical held-button actions in Room 3.
-- Expand regression coverage for network failures, long uptime, and interrupted writes.
+- Expand regression coverage for genuine Wi-Fi failures, long uptime, simultaneous browser/physical activity, and interrupted writes.
 - Pursue custom destination slots and Apple TV discovery/pairing/authentication later.
+
+Chapter 8 resolved the repeated configuration-validation overhead in physical dispatch, completed primary physical-control OLED feedback, and verified CONFIG HTTP recovery using controlled fault injection.
 
 ### Reference map
 
