@@ -537,10 +537,6 @@ def poll():
 
         first_line = bytes(_request).split(b"\r\n", 1)[0]
 
-        # TEMPORARY B3 TEST -- REMOVE AFTER TESTING.
-        # Simulate an unexpected network error escaping web.poll().
-        if first_line.startswith(b"GET /remote.html "):
-            raise OSError(104)
         http_trace("REQUEST: {}".format(first_line))
 
         if web_diag.WEB_DIAGNOSTICS_ENABLED:
