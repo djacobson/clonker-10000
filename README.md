@@ -570,7 +570,7 @@ And maybe install a couple of lunchbox latches.
 
 ---
 
-## The Monster Will Never Be Finished 🏎️
+## The Clonker Will Never Be Finished 🏎️
 
 <p align="center">
   <img src="images/custom-vette.jpeg"
