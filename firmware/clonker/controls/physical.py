@@ -512,11 +512,9 @@ def poll():
                     oled.show_text("PLAY/PAUSE")
                 elif button.name == "POWER_TOGGLE":
                     oled.show_text("POW!")
-                elif button.name == "HOME":
-                    oled.show_text("HOME :)")
-                elif button.name == "BACK":
-                    oled.show_text("BACK :(")
-                elif button.name == "SELECT":
+                elif button.name in (
+                    "HOME", "BACK", "SELECT"
+                ):
                     oled.show_text(button.name)
 
     # Volume encoder.
