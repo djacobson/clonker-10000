@@ -535,6 +535,12 @@ def poll():
             build_started = time.monotonic_ns()
 
         try:
+            # TEMPORARY B2 TEST:
+            # Simulate allocation failure during response preparation.
+            # Remove immediately after the recovery test.
+            if first_line.startswith(b"GET /remote.html "):
+                raise MemoryError
+
             response, file_path, total_bytes = _build_response(
                 first_line, _request
             )
