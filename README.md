@@ -588,7 +588,7 @@ Not because anything is wrong with it.
 
 That's The Clonker 10000.
 
-There will always be another obscure Roku API command to investigate, another performance number to chase, or another ridiculous idea worth trying.
+There will always be another obscure Roku or Apple TV API command to investigate, another performance number to chase, or another ridiculous idea worth trying.
 
 Some experiments will become improvements. Others will never leave the workbench.
 
