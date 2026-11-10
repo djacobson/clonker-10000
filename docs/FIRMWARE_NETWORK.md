@@ -252,25 +252,30 @@ The Roku adapter maintains logical held-key state, not a persistent HTTP socket.
 
 ## 5. Inbound management HTTP
 
-**Module:** `clonker/net/web.py`  
+**Modules:** `clonker/net/web.py`, `clonker/net/web_diag.py`, `clonker/main.py`  
 **Port:** `9090`  
 **Availability:** CONFIG mode only  
-**Model:** Nonblocking cooperative listener, one active client.
+**Model:** Nonblocking cooperative listener with one active client.
 
-The listener accepts a connection, receives a bounded request, prepares a response, sends bounded chunks, and closes the client.
+The management server accepts one client, receives a bounded request, prepares a response, sends bounded chunks, and closes the connection. It is not a concurrent web server.
 
-A single active-client slot is not concurrent request processing.
+Physical controls, the Dumb Queue™, and device-adapter maintenance remain part of the same cooperative application. CONFIG-mode networking is not intended to own or terminate the physical remote.
 
-| Setting | Current documented value |
+| Setting | Current value |
 |---|---:|
-| `MAX_REQUEST_BYTES` | 10,240 |
-| `MAX_HEADER_BYTES` | 2,048 |
-| `IO_CHUNK_BYTES` | 512 |
-| `IDLE_CLIENT_TIMEOUT_SECONDS` | 0.2 s |
-| `CLIENT_TIMEOUT_SECONDS` | 4.0 s |
+| `MAX_REQUEST_BYTES` | 10,240 bytes |
+| `MAX_HEADER_BYTES` | 2,048 bytes |
+| `IO_CHUNK_BYTES` | 512 bytes |
+| `IDLE_CLIENT_TIMEOUT_NS` | 200,000,000 (0.2 s) |
+| `CLIENT_TIMEOUT_NS` | 4,000,000,000 (4 s) |
+| `WEB_POLL_INTERVAL_NS` | 1,000,000 (1 ms) |
+| `WEB_LISTENER_RETRY_NS` | 5,000,000,000 (5 s) |
 | `HTTP_DIAGNOSTICS` | `False` |
+| `WEB_DIAGNOSTICS_ENABLED` | `True` |
 
-Config's separate maximum serialized size is 8,192 UTF-8 bytes. HTTP headers and framing also consume request capacity.
+The polling and listener-retry intervals are defined in `main.py`; request limits and connection timeouts are defined in `web.py`. Detailed connection diagnostics are controlled separately in `web_diag.py`.
+
+Config's maximum serialized size is 8,192 UTF-8 bytes. HTTP framing and headers also consume request capacity.
 
 ### 5.1 Management routes
 
@@ -286,27 +291,116 @@ Config's separate maximum serialized size is 8,192 UTF-8 bytes. HTTP headers and
 
 An API response reporting `queued` means admission, not network transmission or equipment execution.
 
-The browser and physical controls converge at the shared action system.
+Browser and physical commands converge at the shared action system.
 
-### 5.2 Silent clients and browser pacing
+### 5.2 Browser connections and bounded streaming
 
-Some browser connections arrived without sending request data and occupied the single client slot.
+The single-client model requires careful handling of idle connections, incomplete requests, and slow or blocked sends.
 
-A short idle timeout abandons completely silent connections.
+Completely silent clients receive a short idle timeout. Active requests and responses have a longer progress timeout.
 
-During Chapter 5, CONFIG pages sometimes stalled or returned `ERR_EMPTY_RESPONSE`.
+Earlier chapters improved browser responsiveness by increasing management polling frequency to approximately 1 ms and reducing diagnostic overhead.
 
-Disabling GPIO polling did not resolve the issue.
+Chapter 8 investigated intermittent Chrome stalls and HTTP memory pressure.
 
-Changing `WEB_POLL_INTERVAL` from 10 ms to 1 ms substantially improved repeated Chrome and Safari tests.
+Previously, static HTML responses could require multiple large allocations: reading the entire file, encoding the body, and combining the HTTP header and body. One observed allocation failure involved a 13,824-byte request.
 
-Physical controls were re-enabled and inbound diagnostics disabled.
+Static HTML is now streamed directly from flash using bounded 512-byte chunks. The response header and current file chunk are retained instead of constructing a complete HTML response in RAM.
 
-Chapter 7 continued performance tuning while adding more physical inputs.
+Dynamic API responses continue to use the existing response-building path.
 
-The latest browser tests were responsive, although long-term concurrent-load behavior has not been exhaustively established.
+The streaming implementation maintains separate counters for the current buffer, total bytes transmitted, and expected response length. Static files advance one chunk at a time through the cooperative poller.
 
-### 5.3 Saves and active state
+Chapter 8 browser testing confirmed successful delivery of:
+
+- Configuration HTML: 40,679 bytes.
+- Test Remote HTML: 13,806 bytes.
+- Configuration JSON: approximately 5,399 bytes in the tested installation.
+- Clock responses: approximately 181 bytes in the tested installation.
+
+Repeated Chrome navigation and refreshes completed without observed zero-byte sends in the reported tests.
+
+These results demonstrate improved behavior under the tested conditions. They do not conclusively identify the original cause of every browser stall or establish unlimited long-uptime reliability.
+
+### 5.3 Connection-level failure recovery
+
+Chapter 8 introduced explicit recovery boundaries for inbound HTTP failures.
+
+**Memory allocation failure (`MemoryError`):**
+
+- `main.py` catches allocation failures escaping `web.poll()`.
+- `web.abort_low_memory()` discards the active HTTP transaction.
+- Active response, request, file, and client references are released.
+- Connection diagnostics are discarded without normal diagnostic formatting.
+- Garbage collection runs after cleanup.
+- The application continues without deliberately restarting the listener.
+
+**Unexpected network error (`OSError`):**
+
+- Expected nonblocking `EAGAIN` conditions remain ordinary control flow.
+- Receive and send errors normally close the affected client.
+- Unexpected errors escaping `web.poll()` trigger listener teardown and delayed restart.
+- Client cleanup clears connection state before closing resources, so diagnostic failures are less likely to interfere with cleanup.
+
+These recovery paths are intentionally distinct. A connection failure does not necessarily require rebuilding the listening socket.
+
+Chapter 8 used temporary fault injection to verify that simulated `MemoryError` and `OSError` failures were caught and that normal browser operation could resume without restarting the Pico.
+
+The tests establish recovery control-flow behavior, not immunity to every genuine memory-exhaustion or network-stack failure.
+
+### 5.4 Listener lifecycle and recovery
+
+The CONFIG/RUN switch controls the management listener independently of physical command execution.
+
+- Entering CONFIG starts the listener.
+- Entering RUN stops the listener.
+- Startup failures are logged and retried only while CONFIG remains selected.
+- Unexpected listener `accept()` errors other than `EAGAIN` propagate to the main scheduler.
+- The scheduler closes the failed listener and schedules a new startup.
+- The retry interval is controlled by `WEB_LISTENER_RETRY_NS` in `main.py`.
+- Leaving CONFIG resets the retry deadline, allowing the next CONFIG entry to attempt startup immediately.
+
+The current retry interval is five seconds. Failed startup attempts are paced rather than repeated on every scheduler iteration.
+
+Listener shutdown clears internal listener references before socket closure, allowing later startup attempts to create a replacement listener.
+
+Chapter 8 verified two recovery scenarios using temporary fault injection:
+
+1. **Unexpected accept failure:** An injected `OSError(104)` caused listener shutdown followed by successful restart approximately five seconds later. Both browser pages subsequently worked.
+2. **Startup failure:** An injected first-attempt `OSError(104)` caused a logged startup failure, followed by a successful retry approximately five seconds later. Configuration, Test Remote, and API requests completed afterward.
+
+Normal CONFIG → RUN → CONFIG switching was also tested successfully.
+
+These tests validate the implemented retry mechanism. They do not prove recovery from all Wi-Fi radio failures, persistent socket-stack faults, or physical network outages.
+
+### 5.5 Diagnostics and remaining limitations
+
+`web_diag.py` records request and response progress, including:
+
+- Route and request size.
+- Response construction duration.
+- Send attempts and successful sends.
+- Nonblocking `EAGAIN` occurrences.
+- Zero-byte send occurrences.
+- Bytes transmitted and expected response size.
+- Connection closure reason and elapsed time.
+
+Detailed `WEB DIAG` output was useful during Chapter 8 testing and remains separately configurable from low-level HTTP tracing.
+
+A successful `close=complete` entry confirms the HTTP response was transmitted through the server's socket interface. It does not prove that a browser rendered the page or that a queued equipment command executed.
+
+Remaining limitations include:
+
+- One active management client at a time.
+- Cooperative scheduling rather than concurrent request processing.
+- Temporary physical polling delays during synchronous outbound network operations.
+- No application-level authentication; trusted LAN only.
+- No guarantee of recovery from every Wi-Fi or socket-stack failure.
+- Long-uptime behavior and simultaneous high-rate physical/network activity are not exhaustively tested.
+
+The design goal is graceful isolation: a malfunctioning CONFIG interface should not take the physical remote down with it.
+
+### 5.6 Saves and active state
 
 The configuration engine validates schema, revision, filesystem writability, and persistence safeguards.
 
