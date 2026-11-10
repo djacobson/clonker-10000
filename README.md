@@ -568,6 +568,32 @@ Throw away the button farms, the rubber chiclets, the programming rituals, the s
 
 And maybe install a couple of lunchbox latches.
 
+---
+
+## The Monster Will Never Be Finished 🏎️
+
+![A custom Corvette in its garage, hood open for another round of tinkering](images/custom-vette.jpg)
+
+Every great garage project eventually reaches that wonderful stage where everything works.
+
+And yet, the owner still rolls his custom Corvette into the garage, opens the hood, and starts tinkering.
+
+Not because anything is wrong with it.
+
+**Just because he likes to.**
+
+That's The Clonker 10000.
+
+There will always be another obscure Roku API command to investigate, another performance number to chase, or another ridiculous idea worth trying.
+
+Some experiments will become improvements. Others will never leave the workbench.
+
+**Clonker no longer needs to be broken to justify opening the hood.**
+
+It's a working remote control. It's also a hobby that may never be completely finished.
+
+And that's exactly the point.
+
 **THE CLONKER 10000**
 
 **Less sleek. More CLONK.**
