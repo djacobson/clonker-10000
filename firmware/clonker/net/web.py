@@ -59,6 +59,8 @@ _last_activity = 0
 # Optional static-file stream for the current response.
 _file = None
 
+# TEMPORARY B4 STARTUP TEST -- REMOVE AFTER TESTING.
+_b4_start_test_done = False
 
 def http_trace(message):
     if HTTP_DIAGNOSTICS:
@@ -120,6 +122,13 @@ def start():
 
     if _listener is not None:
         return
+
+    # TEMPORARY B4 STARTUP TEST -- REMOVE AFTER TESTING.
+    # Fail the first startup attempt, then allow normal startup.
+    global _b4_start_test_done
+    if not _b4_start_test_done:
+        _b4_start_test_done = True
+        raise OSError(104)
 
     if not wifi.radio.connected:
         raise RuntimeError("Wi-Fi is not connected")
