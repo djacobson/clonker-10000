@@ -40,7 +40,7 @@ WEB_POLL_INTERVAL_NS = 1_000_000
 ACTION_POLL_INTERVAL_NS = 10_000_000
 
 # Periodic performance reporting.
-PERF_ENABLED = True
+PERF_ENABLED = False
 PERF_INTERVAL_NS = 30_000_000_000
 
 # Share the scheduler's PERF switch with outbound HTTP.
