@@ -77,7 +77,8 @@ def clock_status():
 def _close_client(reason="closed"):
     """Release all resources belonging to the current connection."""
     global _client, _request, _response
-    global _sent, _sent_total, _last_activity, _file
+    global _sent, _sent_total, _response_total
+    global _last_activity, _file
 
     if _client is not None:
         web_diag.close(reason, _sent_total)
@@ -100,6 +101,7 @@ def _close_client(reason="closed"):
     _file = None
     _sent = 0
     _sent_total = 0
+    _response_total = 0
     _last_activity = 0
 
 
@@ -415,7 +417,8 @@ def _advance_file():
 def poll():
     """Advance at most one accept, receive, or send operation per call."""
     global _client, _request, _response
-    global _sent, _sent_total, _last_activity, _file
+    global _sent, _sent_total, _response_total
+    global _last_activity, _file
 
     if _listener is None:
         return
@@ -447,6 +450,7 @@ def poll():
         _file = None
         _sent = 0
         _sent_total = 0
+        _response_total = 0
         _last_activity = now
 
         web_diag.begin(now)
@@ -477,7 +481,7 @@ def poll():
                 phase,
                 len(_request) if _request is not None else 0,
                 _sent_total,
-                web_diag_response_size()
+                _response_total
             )
         )
 
@@ -546,6 +550,7 @@ def poll():
             return
 
         _response = response
+        _response_total = total_bytes
         _sent = 0
         _request = None
 
@@ -600,30 +605,6 @@ def poll():
     # Static streams continue with the next file chunk on a later poll.
     if _sent >= len(_response) and _file is None:
         _close_client("complete")
-
-
-def web_diag_response_size():
-    """Return the current response size for timeout reporting.
-
-    Static responses are represented by the complete byte count recorded
-    when the file stream was prepared.
-    """
-    if _response is None:
-        return 0
-
-    if _file is None:
-        return len(_response)
-
-    try:
-        return os.stat(_file.name)[6] + len(
-            _http_header(
-                "200 OK",
-                "text/html; charset=utf-8",
-                os.stat(_file.name)[6]
-            )
-        )
-    except (AttributeError, OSError):
-        return 0
 
 
 def stop():
