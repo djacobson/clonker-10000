@@ -75,26 +75,16 @@ def clock_status():
 
 
 def _close_client(reason="closed"):
-    """Release all resources belonging to the current connection."""
+    """Release the current connection even if diagnostics fail."""
     global _client, _request, _response
     global _sent, _sent_total, _response_total
     global _last_activity, _file
 
-    if _client is not None:
-        web_diag.close(reason, _sent_total)
+    client = _client
+    file_handle = _file
+    sent_total = _sent_total
 
-    if _file is not None:
-        try:
-            _file.close()
-        except OSError:
-            pass
-
-    if _client is not None:
-        try:
-            _client.close()
-        except OSError:
-            pass
-
+    # Release references before potentially failing operations.
     _client = None
     _request = None
     _response = None
@@ -103,6 +93,25 @@ def _close_client(reason="closed"):
     _sent_total = 0
     _response_total = 0
     _last_activity = 0
+
+    if file_handle is not None:
+        try:
+            file_handle.close()
+        except OSError:
+            pass
+
+    if client is not None:
+        try:
+            client.close()
+        except OSError:
+            pass
+
+    # Diagnostics must never prevent connection cleanup.
+    if client is not None:
+        try:
+            web_diag.close(reason, sent_total)
+        except Exception:
+            web_diag.discard()
 
 
 def start():
