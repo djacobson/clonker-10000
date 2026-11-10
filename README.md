@@ -307,7 +307,7 @@ The navigation and skip buttons support Roku keydown/keyup behavior, allowing a 
 
 The second Bourns encoder selects and executes room-specific Custom Actions. The OLED uses persistent hardware inversion to acknowledge execution.
 
-The OLED also provides two-line room identification, volume-direction and mute feedback, with automatic display-off after inactivity. Updates are event-driven rather than continuously rendered.
+The OLED provides two-line room identification, navigation and playback labels, `POW!` power-toggle feedback, volume-direction and mute feedback, and automatic display-off after inactivity. Custom arrowhead glyphs give directional buttons their own personality. Updates are event-driven rather than continuously rendered.
 
 ### Still on the Workbench
 

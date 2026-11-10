@@ -589,11 +589,13 @@ The no-redraw test confirmed that the successful framebuffer refresh count remai
 
 Potential enhancements include:
 
-- Additional feedback for Home, Back, playback, and other controls.
 - CONFIG/RUN indication where useful.
 - Network and battery status.
 - Additional application status messages.
+- Larger custom icons for expressive or status feedback.
 - Further user-interface edge-case testing.
+
+All primary physical controls now provide OLED feedback, including navigation, Home, Back, Select, playback, Power, volume, mute, room selection, and Custom Actions. These messages were verified on the assembled controller.
 
 Not every button requires inversion. Persistent inversion is currently reserved for the two-stage Custom Action selection/execution interaction.
 

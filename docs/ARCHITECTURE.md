@@ -972,6 +972,15 @@ Implemented feedback includes:
 - **Volume:** `VOL UP +` or `- VOL DOWN` according to rotation direction.
 - **Mute:** `MUTE ON` or `MUTE OFF` following successful toggle-command transmission.
 
+- **Navigation:** Directional labels using custom arrowhead glyphs, displayed on press.
+- **Home, Back, Select:** Direct button labels.
+- **Playback:** `< SKIP BK`, `SKIP FWD >`, and `PLAY/PAUSE`.
+- **Power toggle:** `POW!`, indicating command dispatch rather than confirmed equipment state.
+
+Navigation and skip-button OLED feedback is requested only on successful press dispatch, not on release. Existing held-button routing remains unchanged.
+
+The bitmap font also supports multi-character emoticon glyphs through a shared tokenizer. Experimental 5×7 faces were tested but are not currently used in production messages.
+
 Volume feedback uses `is_showing_or_pending()` and `touch()` to avoid redundant rendering during repeated detents in the same direction.
 
 The OLED provides two text layouts: enlarged single-line text and an optional smaller heading above enlarged text.

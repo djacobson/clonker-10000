@@ -3243,6 +3243,28 @@ The Monster now knows the difference between *choosing* something and *CLONKing*
 
 Less redraw. More CLONK.
 
+### Chapter 8 — Complete Physical-Control OLED Feedback — November 9, 2026
+
+OLED feedback was extended to the remaining physical controls and verified on the assembled Clonker.
+
+- Navigation: directional labels with custom arrowhead glyphs.
+- Home, Back, and Select: direct button labels.
+- Skip Back / Forward: directional playback labels.
+- Play/Pause: `PLAY/PAUSE`, without assuming playback state.
+- Power toggle: `POW!`, without assuming equipment power state.
+- Volume and Mute: existing feedback retained, including `MUTE ON` and `MUTE OFF`.
+- Room selection and Custom Actions: existing two-line display and execution acknowledgment retained.
+
+Physical testing confirmed the new button messages displayed correctly. The navigation group was also tested for normal hold behavior.
+
+The OLED font gained custom arrowheads, an exclamation mark, and experimental `:)` / `:(` glyphs. The emoticons were tested on hardware but proved insufficiently legible at 5×7 resolution. Their temporary button messages were reverted; larger icons remain a possible future enhancement.
+
+All primary physical controls now provide OLED feedback. Display requests remain nonblocking, and persistent inversion remains reserved for Custom Action execution.
+
+**Chapter 8 physical-control OLED feedback milestone: COMPLETE.**
+
+Less guessing. More `POW!`.
+
 ---
 
 **THE CLONKER 10000**
