@@ -3265,6 +3265,122 @@ All primary physical controls now provide OLED feedback. Display requests remain
 
 Less guessing. More `POW!`.
 
+### Chapter 8 — CONFIG HTTP Resilience and Recovery — November 10, 2026
+
+Chapter 8 returned to the CONFIG management server after intermittent Chrome stalls and a real `MemoryError` exposed weaknesses in its handling of large responses and exceptional network conditions.
+
+The objective was not to build a more elaborate web server. It was to make the existing cooperative, single-client server more predictable, reduce memory pressure, and prevent management HTTP failures from terminating the physical remote.
+
+The work proceeded in four stages.
+
+#### B1 — Bounded static HTML streaming
+
+The original static-page response path could temporarily hold several large copies of an HTML response in memory: the file contents, encoded response body, and combined HTTP response.
+
+A previously observed allocation failure involved a 13,824-byte allocation.
+
+Static HTML delivery was changed to stream directly from flash in 512-byte chunks. The implementation retains a small response header and one file chunk instead of constructing the complete response in RAM.
+
+Dynamic API response construction was left unchanged.
+
+Live Chrome testing included repeated Configuration ↔ Test Remote navigation and aggressive refreshes.
+
+Observed successful responses included:
+
+| Request | Response size |
+|---|---:|
+| Configuration HTML | 40,679 bytes |
+| Test Remote HTML | 13,806 bytes |
+| Configuration API | Approximately 5,399 bytes |
+| Clock API | Approximately 181 bytes |
+
+The tested requests completed without observed zero-byte sends or browser stalls.
+
+A memory-monitor checkpoint showed approximately 321,744 bytes free initially and 307,984 bytes after extended navigation, a decrease of 13,760 bytes. This was not sufficient evidence to establish a memory leak.
+
+**B1 result:** Streaming implementation operational and verified under repeated browser navigation. The original cause of every historical stall was not conclusively established.
+
+#### B2 — MemoryError recovery
+
+The main scheduler gained a `MemoryError` exception boundary around `web.poll()`.
+
+The recovery path uses `web.abort_low_memory()` to discard active request, response, file, client, and diagnostic state without ordinary diagnostic formatting, followed by garbage collection.
+
+A temporary `MemoryError` injection on the Test Remote route exercised this path.
+
+The application logged the allocation failure, discarded the affected client, and continued serving subsequent Configuration and API requests without restarting the Pico.
+
+The temporary injection was removed after testing.
+
+**B2 result:** Simulated allocation-failure recovery passed. Genuine severe heap exhaustion remains a distinct condition that was not deliberately reproduced.
+
+#### B3 — Unexpected network OSError recovery
+
+The inbound HTTP exception boundary was extended to handle unexpected `OSError` conditions escaping `web.poll()`.
+
+Client cleanup was hardened so that connection state is cleared before resource closure, and ordinary diagnostic failures do not prevent cleanup.
+
+A temporary `OSError(104)` injection on the Test Remote route exercised the recovery path.
+
+The application logged the injected `ECONNRESET`, discarded the affected connection, and subsequently served Configuration and API requests successfully.
+
+The temporary injection was removed.
+
+**B3 result:** Simulated unexpected network-error recovery passed.
+
+The later B4 implementation refined the policy for an `OSError` escaping `web.poll()`: such errors now trigger listener teardown and delayed restart, rather than only discarding the client.
+
+#### B4 — Listener failure detection and restart
+
+Listener cleanup was hardened to clear listener state before closing the socket.
+
+Unexpected `accept()` errors now propagate to the main scheduler, while expected nonblocking `EAGAIN` conditions remain normal control flow.
+
+The scheduler gained a configurable listener-retry interval:
+
+```python
+WEB_LISTENER_RETRY_NS = 5_000_000_000  # 5 seconds
+```
+
+Startup failures are logged and retried after the configured interval while CONFIG mode remains selected.
+
+Unexpected errors escaping management polling cause listener teardown and a delayed restart.
+
+Switching to RUN stops the listener and resets the retry deadline, allowing the next CONFIG entry to attempt startup immediately.
+
+Normal Chrome navigation and physical CONFIG → RUN → CONFIG switching passed before fault injection.
+
+Two separate controlled failures were then tested:
+
+| Failure injected | Observed recovery |
+|---|---|
+| `OSError(104)` during listener accept | Listener stopped, restarted approximately 5.0 seconds later, and served both browser pages |
+| `OSError(104)` during first listener startup | Startup failure logged, listener started approximately 5.0 seconds later, and subsequent browser/API requests completed |
+
+Both temporary injections were removed and the production `web.py` was verified clean in GitHub.
+
+**B4 result:** Listener startup and accept-failure recovery passed simulated-failure tests.
+
+#### Diagnostics and conclusions
+
+`web_diag.py` provided connection-level measurements including request and response sizes, response preparation time, send attempts, `EAGAIN` events, zero-byte sends, and connection closure reasons.
+
+Successful responses consistently reported `close=complete` in the observed post-change tests, with `send_zero=0`.
+
+The work preserved the existing cooperative scheduler, single-client management model, shared Dumb Queue™, and CONFIG/RUN operating modes. No threads, second queue, or general-purpose HTTP framework were introduced.
+
+The distinction between demonstrated recovery and guaranteed recovery remains important:
+
+- Controlled fault injection verified application exception handling, cleanup, and retry timing.
+- It did not establish recovery from every genuine Wi-Fi radio failure, persistent socket-stack fault, or severe heap-exhaustion condition.
+- Long-uptime behavior and concurrent high-rate physical/network activity remain worthwhile future investigations.
+
+**Chapter 8 CONFIG HTTP resilience milestone: COMPLETE.**
+
+The Monster can now lose a browser connection, discard a failed HTTP transaction, and resurrect its CONFIG listener without deliberately taking the physical remote down with it.
+
+*Less panic. More CLONK.*
+
 ---
 
 **THE CLONKER 10000**
