@@ -433,6 +433,16 @@ def main():
                             "client discarded"
                         )
 
+                    except OSError as error:
+                        # Unexpected network error escaping web.poll().
+                        # Discard the current connection, not the app.
+                        web.abort_low_memory()
+                        logger.warning(
+                            "HTTP network error; client discarded: {}".format(
+                                error
+                            )
+                        )
+
                     finally:
                         if PERF_ENABLED:
                             perf.stop("web.exec", started)
