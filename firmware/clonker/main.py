@@ -15,10 +15,10 @@ Outbound HTTP requests are synchronous and blocking.
 """
 
 import time
-import gc
 
 from clonker.system import logger
 from clonker.system import perf
+from clonker.system import memory_monitor
 from clonker.net import web
 from clonker.net import http_transport
 from clonker.devices import denon
@@ -46,11 +46,7 @@ PERF_INTERVAL_NS = 30_000_000_000
 # Share the scheduler's PERF switch with outbound HTTP.
 http_transport.HTTP_PERF_ENABLED = PERF_ENABLED
 denon.DENON_PERF_ENABLED = PERF_ENABLED
-
-# TEST 7: Periodic explicit garbage collection.
-GC_TEST_ENABLED = False
-GC_INTERVAL_NS = 2_000_000_000  # 2 seconds
-perf.register("gc.collect")
+memory_monitor.GC_PERF_ENABLED = PERF_ENABLED
 
 # Scheduler measurements, in reporting order.
 PERF_SCHEDULER = (
@@ -303,8 +299,8 @@ def main():
     perf_last_physical = None
     perf_oled_refresh_start = oled.get_refresh_count()
 
-    # TEST 7: First explicit GC after two seconds.
-    next_gc_at = now + GC_INTERVAL_NS
+    # Initialize memory monitoring after startup configuration.
+    memory_monitor.initialize()
 
     # OLED is optional; failure must not stop Clonker.
     oled_ready = False
@@ -471,19 +467,8 @@ def main():
                     )
                     perf_report_at = time.monotonic_ns()
 
-            # TEST 7: Periodic explicit garbage collection.
-            # Run outside physical.poll(), once every 2 seconds.
-            if GC_TEST_ENABLED:
-                gc_now = time.monotonic_ns()
-
-                if gc_now >= next_gc_at:
-                    started = perf.start()
-                    gc.collect()
-                    perf.stop("gc.collect", started)
-
-                    next_gc_at = (
-                        time.monotonic_ns() + GC_INTERVAL_NS
-                    )
+            # Scheduled memory diagnostics and optional GC experiment.
+            memory_monitor.poll()
 
             # Yield briefly to the CircuitPython runtime.
             # Keep this INSIDE the while True loop.
