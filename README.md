@@ -301,6 +301,35 @@ The physical build includes an aluminum faceplate, substantial controls, and a g
 | SERVICE/DEVICE switch | Operational |
 | CONFIG/RUN switch | Operational |
 
+### The Big Honkin' CONFIG Switch
+
+You may notice that the CONFIG/RUN switch is somewhat... exaggerated.
+
+This is not an accident.
+
+In RUN mode, the Clonker is a dedicated physical remote. Buttons, knobs, and the Dumb Queue™ go about their business without inviting a web browser into the proceedings.
+
+Throw the big switch into CONFIG mode, however, and the Pico opens the network gates, inviting Chrome into the house.
+
+**What could possibly go wrong?**
+
+Now we're dealing with browser connections, TCP buffers, timeouts, memory allocation, and whatever mysterious behavior Chrome has decided to exhibit today.
+
+**The switch is not just a control. It's a physical declaration of distrust.**
+
+CONFIG mode is deliberately separate from everyday operation. The web server is only needed occasionally, and it has its own diagnostics because experience has taught us that browsers are not always cooperative houseguests.
+
+The engineering objective is serious: **a misbehaving browser must never be allowed to take down the physical remote.**
+
+The industrial design objective is equally serious: make the switch big enough that nobody accidentally invites the gremlins inside.
+
+*RUN MODE: Business as usual.*
+
+*CONFIG MODE: HERE BE GREMLINS.*
+
+**Less sleek. More CLONK. Trust no browser.**
+
+
 The volume encoder controls real equipment in two rooms using different network protocols.
 
 The navigation and skip buttons support Roku keydown/keyup behavior, allowing a physical button to remain held rather than merely sending repeated individual keypresses.
