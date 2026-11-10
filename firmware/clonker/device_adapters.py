@@ -239,7 +239,12 @@ def execute_hold(adapter, endpoint, method, path, event):
 
 
 def poll():
-    """Advance adapters requiring background maintenance."""
+    """Advance adapters requiring background maintenance.
+
+    Roku currently needs periodic polling for held-button
+    and volume release. Add other stateful adapters here
+    when their implementations require maintenance.
+    """
     return roku.poll()
 
 
