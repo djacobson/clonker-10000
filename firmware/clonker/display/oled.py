@@ -150,7 +150,7 @@ def _render(message):
     lower = bytearray(WIDTH)
 
     char_width = 12
-    x = max(0, (WIDTH - len(glyphs) * char_width) // 2)2)
+    x = max(0, (WIDTH - len(glyphs) * char_width) // 2)
 
     for ch in glyphs:
         glyph = _FONT.get(ch, _FONT["?"])
