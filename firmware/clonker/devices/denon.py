@@ -27,10 +27,27 @@ import time
 import socketpool
 import wifi
 
+from clonker.system import perf
+
 
 TCP_PORT = 23
 SOCKET_TIMEOUT = 1.0
 MIN_COMMAND_INTERVAL_NS = 50_000_000  # 50 ms
+
+# Aggregate TCP timing, controlled by main.py.
+DENON_PERF_ENABLED = False
+
+PERF_NAMES = (
+    "denon.connect",
+    "denon.send",
+    "denon.total",
+    "denon.failure.connect",
+    "denon.failure.send",
+    "denon.failure.total",
+)
+
+for _name in PERF_NAMES:
+    perf.register(_name)
 
 # Recognized HTTP paths with equivalent native TCP commands.
 # Other Denon commands continue through generic HTTP.
@@ -43,6 +60,12 @@ _pool = None
 _socket = None
 _host = None
 _next_send_time = 0
+
+
+def _record(name, elapsed_ns):
+    """Record timing only when Denon PERF is enabled."""
+    if DENON_PERF_ENABLED:
+        perf.record(name, elapsed_ns)
 
 
 def _socket_pool():
@@ -129,6 +152,7 @@ def connect(endpoint):
     close()
 
     sock = None
+    started = time.monotonic_ns() if DENON_PERF_ENABLED else 0
 
     try:
         pool = _socket_pool()
@@ -139,7 +163,19 @@ def connect(endpoint):
         _socket = sock
         _host = host
 
+        if DENON_PERF_ENABLED:
+            _record(
+                "denon.connect",
+                time.monotonic_ns() - started,
+            )
+
     except Exception:
+        if DENON_PERF_ENABLED:
+            _record(
+                "denon.failure.connect",
+                time.monotonic_ns() - started,
+            )
+
         if sock is not None:
             try:
                 sock.close()
@@ -165,18 +201,52 @@ def send_volume(endpoint, command):
     if not ready():
         return False
 
+    started = time.monotonic_ns() if DENON_PERF_ENABLED else 0
+    stage = "connect"
+
     try:
         connect(endpoint)
 
+        stage = "send"
+        send_started = (
+            time.monotonic_ns() if DENON_PERF_ENABLED else 0
+        )
+
         data = (command + "\r").encode("ascii")
         _socket.sendall(data)
+
+        if DENON_PERF_ENABLED:
+            _record(
+                "denon.send",
+                time.monotonic_ns() - send_started,
+            )
 
         _next_send_time = (
             time.monotonic_ns() + MIN_COMMAND_INTERVAL_NS
         )
 
+        if DENON_PERF_ENABLED:
+            _record(
+                "denon.total",
+                time.monotonic_ns() - started,
+            )
+
         return True
 
     except Exception:
+        if DENON_PERF_ENABLED:
+            now = time.monotonic_ns()
+
+            if stage == "send":
+                _record(
+                    "denon.failure.send",
+                    now - send_started,
+                )
+
+            _record(
+                "denon.failure.total",
+                now - started,
+            )
+
         close()
         raise
