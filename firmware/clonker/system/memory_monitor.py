@@ -37,6 +37,11 @@ _baseline_free = None
 _lowest_free = None
 
 
+def free_bytes():
+    """Return currently available heap memory."""
+    return gc.mem_free()
+
+
 def _collect():
     """Collect garbage with optional PERF timing."""
     if GC_PERF_ENABLED:
@@ -47,7 +52,7 @@ def _collect():
         gc.collect()
 
 
-def _sample(initial=False):
+def _sample():
     """Report retained heap usage after garbage collection."""
     global _baseline_free, _lowest_free
 
@@ -101,7 +106,7 @@ def initialize():
     _lowest_free = None
 
     if MEMORY_MONITOR_ENABLED:
-        _sample(initial=True)
+        _sample()
 
 
 def poll():

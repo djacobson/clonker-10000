@@ -223,7 +223,7 @@ def _report_performance(config_mode, oled_refresh_start):
 
     logger.info(
         "PERF: free memory={} bytes".format(
-            gc.mem_free()
+            memory_monitor.free_bytes()
         )
     )
 
@@ -299,9 +299,6 @@ def main():
     perf_last_physical = None
     perf_oled_refresh_start = oled.get_refresh_count()
 
-    # Initialize memory monitoring after startup configuration.
-    memory_monitor.initialize()
-
     # OLED is optional; failure must not stop Clonker.
     oled_ready = False
 
@@ -314,6 +311,9 @@ def main():
             logger.warning(
                 "OLED unavailable: {}".format(exc)
             )
+
+    # Initialize memory monitoring after startup configuration.
+    memory_monitor.initialize()
 
     try:
         while True:
