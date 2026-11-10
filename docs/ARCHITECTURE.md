@@ -794,7 +794,7 @@ The shared `system/perf.py` module now provides named timing measurements and ac
 
 Optional internal measurements in `controls/physical.py` permit more focused investigation without permanently enabling detailed instrumentation.
 
-Testing identified occasional physical execution spikes around 40–50 ms. Their cause remains unresolved.
+Chapter 8 traced the observed 40–50 ms physical execution spikes to repeated validation and copying of active configuration during physical dispatch. Lightweight accessors into the already-validated configuration reduced observed maximum physical execution to approximately 8 ms in verification testing.
 
 These execution spikes must be distinguished from longer physical polling gaps caused by synchronous network operations.
 
@@ -814,15 +814,33 @@ The adapter layer may attempt a release or defer a retry until its deadline.
 
 This preserves a cooperative design without adding another action queue or worker.
 
-### 10.5 Management HTTP
+### 10.5 Management HTTP and failure isolation
 
-The CONFIG-mode management server uses a cooperative single-client listener.
+The CONFIG-mode management server is a cooperative, single-client listener. It is not a concurrent web server.
 
-It is not a concurrent web server.
+Its responsibilities are deliberately divided:
 
-The application has no management authentication and is intended for a trusted LAN only.
+- `net/web.py` owns HTTP request handling, bounded static-file streaming, client state, and listener socket resources.
+- `net/web_diag.py` owns per-connection diagnostic state.
+- `main.py` owns CONFIG/RUN lifecycle decisions, exception boundaries, and listener retry scheduling.
 
-Browser actions and physical actions continue sharing the same queue.
+Static HTML is streamed from flash in bounded chunks rather than assembled into a large in-memory response.
+
+A `MemoryError` escaping management polling causes the active HTTP transaction to be discarded and garbage collection to run, without intentionally restarting the listener.
+
+An unexpected `OSError` escaping management polling causes listener teardown and a delayed restart. Listener startup failures are also retried, using the configurable `WEB_LISTENER_RETRY_NS` interval, currently five seconds.
+
+Expected nonblocking socket conditions do not trigger listener recovery.
+
+The management listener runs only in CONFIG mode. Switching to RUN stops it and resets the retry deadline for a future CONFIG entry.
+
+**Architectural invariant:** Management HTTP failure must not deliberately terminate the physical-control application. Physical inputs, the shared Dumb Queue™, and device-adapter maintenance remain independent of listener availability, although synchronous operations can still delay the cooperative scheduler.
+
+Browser and physical actions continue sharing the same queue. The management service has no application-level authentication and is intended for a trusted LAN only.
+
+Chapter 8 verified the recovery paths using controlled fault injection. The implementation does not guarantee recovery from every underlying Wi-Fi or socket-stack failure.
+
+Implementation details, diagnostics, and test results belong in [Firmware, Network & Clock](FIRMWARE_NETWORK.md) and [Development History](DEVELOPMENT_HISTORY.md).
 
 ---
 
