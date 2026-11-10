@@ -20,6 +20,7 @@ import gc
 from clonker.system import logger
 from clonker.system import perf
 from clonker.net import web
+from clonker.net import http_transport
 from clonker import actions
 from clonker import device_adapters
 from clonker.controls import switches
@@ -38,8 +39,11 @@ WEB_POLL_INTERVAL_NS = 1_000_000
 ACTION_POLL_INTERVAL_NS = 10_000_000
 
 # Periodic performance reporting.
-PERF_ENABLED = False
+PERF_ENABLED = True
 PERF_INTERVAL_NS = 30_000_000_000
+
+# Share the scheduler's PERF switch with outbound HTTP.
+http_transport.HTTP_PERF_ENABLED = PERF_ENABLED
 
 # TEST 7: Periodic explicit garbage collection.
 GC_TEST_ENABLED = False
@@ -67,6 +71,19 @@ PERF_PHYSICAL = (
     "physical.volume",
     "physical.dispatch",
     "physical.hold",
+)
+
+# Outbound HTTP transport measurements, in reporting order.
+PERF_HTTP = (
+    "http.connect",
+    "http.send",
+    "http.response",
+    "http.total",
+    "http.failure.total",
+    "http.failure.socket",
+    "http.failure.connect",
+    "http.failure.send",
+    "http.failure.response",
 )
 
 # Register all scheduler measurements once.
@@ -152,6 +169,19 @@ def _report_performance(config_mode, oled_refresh_start):
         )
     else:
         logger.info("PERF: no slow branches")
+
+    # Outbound HTTP timing, separate from management web polling.
+    http_total = perf.snapshot("http.total")
+    http_failed = perf.snapshot("http.failure.total")
+
+    if (
+        (http_total is not None and http_total["count"])
+        or (http_failed is not None and http_failed["count"])
+    ):
+        logger.info("PERF: outbound HTTP")
+
+        for name in PERF_HTTP:
+            _report_stat(name)
 
     # Preserve useful context without duplicating timing data.
     _report_stat("loop.exec", "main loop")
