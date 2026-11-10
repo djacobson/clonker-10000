@@ -39,6 +39,7 @@ PHYSICAL_CONTROLS_ENABLED = True
 PHYSICAL_POLL_INTERVAL_NS = 1_000_000
 WEB_POLL_INTERVAL_NS = 1_000_000
 ACTION_POLL_INTERVAL_NS = 10_000_000
+WEB_LISTENER_RETRY_NS = 5_000_000_000  # 5 seconds
 
 # Periodic performance reporting.
 PERF_ENABLED = False
@@ -293,6 +294,7 @@ def main():
 
     now = time.monotonic_ns()
     next_web_poll = now
+    next_web_retry = now
     next_action_poll = now
     next_physical_poll = now
 
@@ -387,14 +389,34 @@ def main():
             config_mode = switches.config_enabled()
             config_source = switches.config_source()
 
-            # Start/stop the management listener only when needed.
+            # Start/retry the CONFIG listener with bounded backoff.
             if config_mode and not web_running:
-                web.start()
-                web_running = True
+                if now >= next_web_retry:
+                    try:
+                        web.start()
+                    except (OSError, RuntimeError) as error:
+                        logger.warning(
+                            "HTTP listener start failed: {}".format(error)
+                        )
+                        next_web_retry = (
+                            time.monotonic_ns()
+                            + WEB_LISTENER_RETRY_NS
+                        )
+                    else:
+                        web_running = True
 
             elif not config_mode and web_running:
-                web.stop()
                 web_running = False
+                try:
+                    web.stop()
+                except OSError as error:
+                    logger.warning(
+                        "HTTP listener stop failed: {}".format(error)
+                    )
+
+            if not config_mode:
+                # Next CONFIG entry can attempt startup immediately.
+                next_web_retry = now
 
             # Announce the application mode source and state on startup
             # and whenever either changes. Never log every poll.
@@ -434,13 +456,25 @@ def main():
                         )
 
                     except OSError as error:
-                        # Unexpected network error escaping web.poll().
-                        # Discard the current connection, not the app.
-                        web.abort_low_memory()
+                        # Unexpected listener/accept failure.
+                        # Tear down and retry after the configured delay.
                         logger.warning(
-                            "HTTP network error; client discarded: {}".format(
+                            "HTTP network error; restarting listener: {}".format(
                                 error
                             )
+                        )
+                        web_running = False
+                        try:
+                            web.stop()
+                        except OSError as close_error:
+                            logger.warning(
+                                "HTTP listener cleanup failed: {}".format(
+                                    close_error
+                                )
+                            )
+                        next_web_retry = (
+                            time.monotonic_ns()
+                            + WEB_LISTENER_RETRY_NS
                         )
 
                     finally:

@@ -440,11 +440,12 @@ def poll():
             client, address = _listener.accept()
 
         except OSError as error:
-            if not _socket_would_block(error):
-                logger.warning(
-                    "HTTP accept error: {}".format(error)
-                )
-            return
+            if _socket_would_block(error):
+                return
+
+            # Unexpected accept failure may indicate a broken listener.
+            # Let main.py manage listener teardown and retry backoff.
+            raise
 
         try:
             client.settimeout(0)
