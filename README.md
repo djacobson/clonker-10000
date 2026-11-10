@@ -572,7 +572,11 @@ And maybe install a couple of lunchbox latches.
 
 ## The Monster Will Never Be Finished 🏎️
 
-![A custom Corvette in its garage, hood open for another round of tinkering](images/custom-vette.jpeg)
+<p align="center">
+  <img src="images/custom-vette.jpeg"
+       height="300"
+       alt="Custom Corvette in the garage">
+</p>
 
 Every great garage project eventually reaches that wonderful stage where everything works.
 
