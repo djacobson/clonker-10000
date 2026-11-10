@@ -21,6 +21,8 @@ import time
 import socketpool
 import wifi
 
+from clonker.system import perf
+
 
 DEFAULT_PORT = 80
 
@@ -30,6 +32,24 @@ TOTAL_TIMEOUT_NS = 1_500_000_000  # 1.5 seconds
 
 MAX_STATUS_LINE = 128
 HTTP_DIAGNOSTICS = False
+
+# Aggregate timing collection. Enabled by the main scheduler later.
+HTTP_PERF_ENABLED = False
+
+_PERF_PHASES = (
+    "http.connect",
+    "http.send",
+    "http.response",
+    "http.total",
+    "http.failure.total",
+    "http.failure.socket",
+    "http.failure.connect",
+    "http.failure.send",
+    "http.failure.response",
+)
+
+for _name in _PERF_PHASES:
+    perf.register(_name)
 
 _pool = None
 
@@ -43,6 +63,12 @@ def _elapsed_ms(start):
     return round(
         (time.monotonic_ns() - start) / 1_000_000, 1
     )
+
+
+def _record(name, elapsed_ns):
+    """Record aggregate timing only when enabled."""
+    if HTTP_PERF_ENABLED:
+        perf.record(name, elapsed_ns)
 
 
 def _parse_endpoint(endpoint):
@@ -180,7 +206,9 @@ def send(endpoint, method, path):
     start = time.monotonic_ns()
     deadline = start + TOTAL_TIMEOUT_NS
     stage = "socket"
+    phase_start = start
     sock = None
+    succeeded = False
 
     connect_ms = None
     send_ms = None
@@ -196,7 +224,9 @@ def send(endpoint, method, path):
         phase_start = time.monotonic_ns()
         _prepare_socket(sock, deadline)
         sock.connect((host, port))
-        connect_ms = _elapsed_ms(phase_start)
+        phase_end = time.monotonic_ns()
+        connect_ms = round((phase_end - phase_start) / 1_000_000, 1)
+        _record("http.connect", phase_end - phase_start)
 
         stage = "send"
         phase_start = time.monotonic_ns()
@@ -211,12 +241,18 @@ def send(endpoint, method, path):
 
             offset += count
 
-        send_ms = _elapsed_ms(phase_start)
+        phase_end = time.monotonic_ns()
+        send_ms = round((phase_end - phase_start) / 1_000_000, 1)
+        _record("http.send", phase_end - phase_start)
 
         stage = "response"
         phase_start = time.monotonic_ns()
         status = _read_status_line(sock, deadline)
-        response_ms = _elapsed_ms(phase_start)
+        phase_end = time.monotonic_ns()
+        response_ms = round(
+            (phase_end - phase_start) / 1_000_000, 1
+        )
+        _record("http.response", phase_end - phase_start)
 
         if not 200 <= status <= 299:
             raise ValueError(
@@ -245,9 +281,17 @@ def send(endpoint, method, path):
             )
         )
 
+        succeeded = True
         return result
 
     except Exception as error:
+        if HTTP_PERF_ENABLED:
+            failure_end = time.monotonic_ns()
+            _record(
+                "http.failure." + stage,
+                failure_end - phase_start,
+            )
+
         _trace(
             "FAILED at {} after {} ms: {}".format(
                 stage, _elapsed_ms(start), repr(error)
@@ -261,3 +305,10 @@ def send(endpoint, method, path):
                 sock.close()
             except OSError as error:
                 _trace("Socket close error: {}".format(error))
+
+        if HTTP_PERF_ENABLED:
+            elapsed_ns = time.monotonic_ns() - start
+            if succeeded:
+                _record("http.total", elapsed_ns)
+            else:
+                _record("http.failure.total", elapsed_ns)
