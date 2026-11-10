@@ -75,6 +75,9 @@ _FONT = {
     ">": (0x00, 0x41, 0x22, 0x14, 0x08),
     "^": (0x08, 0x04, 0x02, 0x04, 0x08),
     "~": (0x08, 0x10, 0x20, 0x10, 0x08),
+    "!": (0x00, 0x00, 0x5F, 0x00, 0x00),
+    ":)": (0x3E, 0x45, 0x55, 0x45, 0x3E),
+    ":(": (0x3E, 0x55, 0x45, 0x55, 0x3E),
 }
 
 _i2c = None
@@ -117,21 +120,39 @@ def _page(page, pixels):
     return True
 
 
+def _glyphs(message):
+    """Convert text to glyph keys, recognizing emoticons."""
+    text = str(message).upper()
+    result = []
+    index = 0
+
+    while index < len(text):
+        pair = text[index:index + 2]
+        if pair in (":)", ":("):
+            result.append(pair)
+            index += 2
+        else:
+            result.append(text[index])
+            index += 1
+
+    return result
+
+
 def _render(message):
     """Render one centered line using two SH1106 pages."""
-    text = str(message).upper()
+    glyphs = _glyphs(message)
 
-    # Ten characters fit at 2x scale.
-    if len(text) > 10:
-        text = text[:9] + "."
+    # Ten glyphs fit at 2x scale.
+    if len(glyphs) > 10:
+        glyphs = glyphs[:9] + ["."]
 
     upper = bytearray(WIDTH)
     lower = bytearray(WIDTH)
 
     char_width = 12
-    x = max(0, (WIDTH - len(text) * char_width) // 2)
+    x = max(0, (WIDTH - len(glyphs) * char_width) // 2)2)
 
-    for ch in text:
+    for ch in glyphs:
         glyph = _FONT.get(ch, _FONT["?"])
 
         for bits in glyph:
@@ -161,16 +182,16 @@ def _render(message):
 
 def _render_small(message):
     """Render a centered 1x heading into one SH1106 page."""
-    text = str(message).upper()
+    glyphs = _glyphs(message)
 
-    # Six pixels per character, including spacing.
-    if len(text) > 21:
-        text = text[:20] + "."
+    # Six pixels per glyph, including spacing.
+    if len(glyphs) > 21:
+        glyphs = glyphs[:20] + ["."]
 
     pixels = bytearray(WIDTH)
-    x = max(0, (WIDTH - len(text) * 6) // 2)
+    x = max(0, (WIDTH - len(glyphs) * 6) // 2)
 
-    for ch in text:
+    for ch in glyphs:
         glyph = _FONT.get(ch, _FONT["?"])
 
         for bits in glyph:

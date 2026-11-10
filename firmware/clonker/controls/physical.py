@@ -510,6 +510,8 @@ def poll():
             if dispatched:
                 if button.name == "PLAY_PAUSE":
                     oled.show_text("PLAY/PAUSE")
+                elif button.name == "POWER_TOGGLE":
+                    oled.show_text("POW!")
                 elif button.name in (
                     "HOME", "BACK", "SELECT"
                 ):
