@@ -9,6 +9,8 @@
 Only one client is serviced at a time. poll() advances one accept, receive,
 or send operation so the main loop can service physical controls later.
 Configuration saves use the active JSON engine's revision and path safeguards.
+
+Connection diagnostics are maintained separately by net/web_diag.py.
 """
 
 import time
@@ -19,6 +21,7 @@ import errno
 import storage
 
 from clonker.system import clock, logger
+from clonker.net import web_diag
 from clonker import device_config_v2 as device_config
 from clonker import actions
 
@@ -28,6 +31,7 @@ from clonker import actions
 WEB_ROOT = "/clonker/www"
 PORT = 9090
 HTTP_DIAGNOSTICS = False
+
 # 8192-byte maximum config plus HTTP headers and revision metadata.
 MAX_REQUEST_BYTES = 10240
 MAX_HEADER_BYTES = 2048
@@ -68,14 +72,18 @@ def clock_status():
     return {"source": clock.source(), "timestamp": clock.timestamp()}
 
 
-def _close_client():
+def _close_client(reason="closed"):
     """Reset the entire current connection after completion or failure."""
     global _client, _request, _response, _sent, _last_activity
+
     if _client is not None:
+        web_diag.close(reason, _sent)
+
         try:
             _client.close()
         except OSError:
             pass
+
     _client = None
     _request = None
     _response = None
@@ -86,24 +94,31 @@ def _close_client():
 def start():
     """Open a nonblocking listener only when CONFIG mode is enabled."""
     global _pool, _listener
+
     if _listener is not None:
         return
+
     if not wifi.radio.connected:
         raise RuntimeError("Wi-Fi is not connected")
+
     _pool = socketpool.SocketPool(wifi.radio)
     listener = _pool.socket(_pool.AF_INET, _pool.SOCK_STREAM)
+
     try:
         try:
             listener.setsockopt(_pool.SOL_SOCKET, _pool.SO_REUSEADDR, 1)
         except (AttributeError, OSError):
             pass
+
         listener.bind(("0.0.0.0", PORT))
         listener.listen(2)
         listener.settimeout(0)
+
     except Exception:
         listener.close()
         _pool = None
         raise
+
     _listener = listener
     logger.info("Clonker HTTP listening on port {}".format(PORT))
 
@@ -115,28 +130,40 @@ def _request_complete(request):
     additionally require one valid Content-Length and the entire body.
     """
     header_end = request.find(b"\r\n\r\n")
+
     if header_end < 0:
         if len(request) > MAX_HEADER_BYTES:
             raise ValueError("HTTP headers too large")
         return False
+
     if header_end + 4 > MAX_HEADER_BYTES:
         raise ValueError("HTTP headers too large")
+
     headers = bytes(request[:header_end]).split(b"\r\n")
+
     if not headers[0].startswith(b"POST /api/config "):
         return True
+
     lengths = []
+
     for header in headers[1:]:
         if header.lower().startswith(b"content-length:"):
             try:
-                lengths.append(int(header.split(b":", 1)[1].strip()))
+                lengths.append(
+                    int(header.split(b":", 1)[1].strip())
+                )
             except ValueError:
                 raise ValueError("Invalid Content-Length")
+
     if len(lengths) != 1 or lengths[0] < 0:
         raise ValueError("Missing or invalid Content-Length")
+
     if lengths[0] > device_config.MAX_CONFIG_BYTES + 256:
         raise ValueError("Configuration body too large")
+
     if header_end + 4 + lengths[0] > MAX_REQUEST_BYTES:
         raise ValueError("Configuration request too large")
+
     return len(request) >= header_end + 4 + lengths[0]
 
 
@@ -200,12 +227,15 @@ def _build_response(first_line, request=None):
         try:
             path = first_line.split(b" ", 2)[1]
             value = path.split(b"utc=", 1)[1]
+
             if not value.isdigit():
                 raise ValueError("Invalid timestamp")
+
             clock.set_utc(int(value), "BROWSER")
             logger.info("Clock synchronized from browser")
             body = json.dumps(clock_status())
             status = "200 OK"
+
         except (ValueError, OverflowError):
             body, status = _json_error("Invalid UTC timestamp")
 
@@ -214,26 +244,49 @@ def _build_response(first_line, request=None):
     # disk-vs-RAM consistency, and the path bound by the initial load().
     elif first_line.startswith(b"POST /api/config "):
         if storage.getmount("/").readonly:
-            body, status = _json_error("Filesystem is read-only", "403 Forbidden")
+            body, status = _json_error(
+                "Filesystem is read-only", "403 Forbidden"
+            )
         else:
             try:
                 header_end = request.find(b"\r\n\r\n")
-                headers = bytes(request[:header_end]).split(b"\r\n")
+                headers = bytes(
+                    request[:header_end]
+                ).split(b"\r\n")
+
                 length = None
+
                 for header in headers[1:]:
                     if header.lower().startswith(b"content-length:"):
-                        length = int(header.split(b":", 1)[1].strip())
+                        length = int(
+                            header.split(b":", 1)[1].strip()
+                        )
                         break
+
                 if length is None or length < 0:
                     raise ValueError("Missing Content-Length")
-                body_start = header_end + 4
-                body_bytes = bytes(request[body_start:body_start + length])
-                submitted = json.loads(body_bytes.decode("utf-8"))
-                if not isinstance(submitted, dict):
-                    raise ValueError("Configuration must be a JSON object")
-                expected_revision = submitted.pop("revision", None)
 
-                changed = device_config.save(submitted, expected_revision)
+                body_start = header_end + 4
+                body_bytes = bytes(
+                    request[body_start:body_start + length]
+                )
+                submitted = json.loads(
+                    body_bytes.decode("utf-8")
+                )
+
+                if not isinstance(submitted, dict):
+                    raise ValueError(
+                        "Configuration must be a JSON object"
+                    )
+
+                expected_revision = submitted.pop(
+                    "revision", None
+                )
+
+                changed = device_config.save(
+                    submitted, expected_revision
+                )
+
                 if changed:
                     actions.clear(
                         "Configuration changed",
@@ -241,16 +294,26 @@ def _build_response(first_line, request=None):
                     )
 
                 body = json.dumps({
-                    "message": "Configuration saved" if changed else "Configuration unchanged",
+                    "message": (
+                        "Configuration saved"
+                        if changed else "Configuration unchanged"
+                    ),
                     "saved": changed,
                     "revision": device_config.revision()
                 })
                 status = "200 OK"
+
             except (ValueError, TypeError, UnicodeError) as error:
                 body, status = _json_error(error)
+
             except OSError as error:
-                logger.warning("Configuration persistence error: {}".format(error))
-                body, status = _json_error("Configuration storage failed", "500 Internal Server Error")
+                logger.warning(
+                    "Configuration persistence error: {}".format(error)
+                )
+                body, status = _json_error(
+                    "Configuration storage failed",
+                    "500 Internal Server Error"
+                )
 
     elif first_line.startswith(b"GET /remote.html "):
         with open(WEB_ROOT + "/remote.html", "r") as file:
@@ -263,6 +326,7 @@ def _build_response(first_line, request=None):
             result = _action_request(first_line)
             body = json.dumps(result)
             status = "200 OK"
+
         except (ValueError, IndexError, UnicodeError) as error:
             body, status = _json_error(str(error))
 
@@ -280,34 +344,46 @@ def _build_response(first_line, request=None):
         "Cache-Control: no-store\r\n"
         "Connection: close\r\n\r\n"
     ).format(status, content_type, len(payload))
+
     return header.encode("utf-8") + payload
 
 
 def poll():
     """Advance at most one accept, receive, or send operation per call."""
     global _client, _request, _response, _sent, _last_activity
+
     if _listener is None:
         return
+
     now = time.monotonic_ns()
 
     # Accept a new client if the server is idle.
     if _client is None:
         try:
             client, address = _listener.accept()
+
         except OSError as error:
             if not _socket_would_block(error):
-                logger.warning("HTTP accept error: {}".format(error))
+                logger.warning(
+                    "HTTP accept error: {}".format(error)
+                )
             return
+
         try:
             client.settimeout(0)
+
         except OSError:
             client.close()
             return
+
         _client = client
         _request = bytearray()
         _response = None
         _sent = 0
         _last_activity = now
+
+        web_diag.begin(now)
+
         http_trace("ACCEPTED connection")
         return
 
@@ -338,66 +414,108 @@ def poll():
             )
         )
 
-        _close_client()
+        _close_client("timeout")
         return
 
     # Read a bounded chunk, accumulating until the request is complete.
     if _response is None:
         buf = bytearray(IO_CHUNK_BYTES)
+
         try:
             count = _client.recv_into(buf)
+
         except OSError as error:
             if not _socket_would_block(error):
-                logger.warning("HTTP receive error: {}".format(error))
-                _close_client()
+                logger.warning(
+                    "HTTP receive error: {}".format(error)
+                )
+                _close_client("receive_error")
             return
+
         if count == 0:
-            _close_client()
+            _close_client("peer_closed")
             return
+
         _last_activity = now
         _request.extend(memoryview(buf)[:count])
+
         if len(_request) > MAX_REQUEST_BYTES:
             logger.warning("HTTP request exceeded size limit")
-            _close_client()
+            _close_client("request_too_large")
             return
+
         try:
             if not _request_complete(_request):
                 return
+
         except ValueError as error:
-            logger.warning("HTTP invalid request: {}".format(error))
-            _close_client()
+            logger.warning(
+                "HTTP invalid request: {}".format(error)
+            )
+            _close_client("invalid_request")
             return
+
         first_line = bytes(_request).split(b"\r\n", 1)[0]
 
         http_trace("REQUEST: {}".format(first_line))
 
+        if web_diag.WEB_DIAGNOSTICS_ENABLED:
+            web_diag.request(first_line, len(_request))
+            build_started = time.monotonic_ns()
+
         _response = _build_response(first_line, _request)
         _request = None
+
+        if web_diag.WEB_DIAGNOSTICS_ENABLED:
+            web_diag.response(
+                len(_response),
+                time.monotonic_ns() - build_started
+            )
+
         return
 
     # Send the prepared response incrementally, then release the client.
-    chunk = memoryview(_response)[_sent:_sent + IO_CHUNK_BYTES]
+    chunk = memoryview(_response)[
+        _sent:_sent + IO_CHUNK_BYTES
+    ]
+
+    web_diag.send_attempt()
+
     try:
         count = _client.send(chunk)
+
     except OSError as error:
-        if not _socket_would_block(error):
-            logger.warning("HTTP send error: {}".format(error))
-            _close_client()
+        if _socket_would_block(error):
+            web_diag.send_blocked()
+        else:
+            logger.warning(
+                "HTTP send error: {}".format(error)
+            )
+            _close_client("send_error")
         return
+
     if count is None or count <= 0:
+        web_diag.send_zero()
         return
+
+    web_diag.send_success(time.monotonic_ns())
+
     _sent += count
     _last_activity = now
+
     if _sent >= len(_response):
-        _close_client()
+        _close_client("complete")
 
 
 def stop():
     """Close the HTTP service when leaving CONFIG mode."""
     global _listener, _pool
-    _close_client()
+
+    _close_client("server_stopped")
+
     if _listener is not None:
         _listener.close()
         _listener = None
+
     _pool = None
     logger.info("Clonker HTTP stopped")
