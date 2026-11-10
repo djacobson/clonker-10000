@@ -445,8 +445,7 @@ def poll():
         if measure_events:
             event_seen = True
 
-        if PHYSICAL_EVENT_LOGGING:
-            logger.info("ROOM SELECTED: {}".format(room_id))
+        logger.info("ROOM SELECTED: {}".format(room_id))
 
         _action_index = 0
 

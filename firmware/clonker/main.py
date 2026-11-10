@@ -21,6 +21,7 @@ from clonker.system import logger
 from clonker.system import perf
 from clonker.net import web
 from clonker.net import http_transport
+from clonker.devices import denon
 from clonker import actions
 from clonker import device_adapters
 from clonker.controls import switches
@@ -44,6 +45,7 @@ PERF_INTERVAL_NS = 30_000_000_000
 
 # Share the scheduler's PERF switch with outbound HTTP.
 http_transport.HTTP_PERF_ENABLED = PERF_ENABLED
+denon.DENON_PERF_ENABLED = PERF_ENABLED
 
 # TEST 7: Periodic explicit garbage collection.
 GC_TEST_ENABLED = False
@@ -84,6 +86,16 @@ PERF_HTTP = (
     "http.failure.connect",
     "http.failure.send",
     "http.failure.response",
+)
+
+# Persistent Denon TCP measurements, in reporting order.
+PERF_DENON = (
+    "denon.connect",
+    "denon.send",
+    "denon.total",
+    "denon.failure.connect",
+    "denon.failure.send",
+    "denon.failure.total",
 )
 
 # Register all scheduler measurements once.
@@ -181,6 +193,19 @@ def _report_performance(config_mode, oled_refresh_start):
         logger.info("PERF: outbound HTTP")
 
         for name in PERF_HTTP:
+            _report_stat(name)
+
+    # Persistent Denon TCP timing, separate from outbound HTTP.
+    denon_total = perf.snapshot("denon.total")
+    denon_failed = perf.snapshot("denon.failure.total")
+
+    if (
+        (denon_total is not None and denon_total["count"])
+        or (denon_failed is not None and denon_failed["count"])
+    ):
+        logger.info("PERF: Denon TCP")
+
+        for name in PERF_DENON:
             _report_stat(name)
 
     # Preserve useful context without duplicating timing data.
