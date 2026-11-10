@@ -59,6 +59,8 @@ _last_activity = 0
 # Optional static-file stream for the current response.
 _file = None
 
+# TEMPORARY B4 TEST -- REMOVE AFTER TESTING.
+_b4_accept_test_done = False
 
 def http_trace(message):
     if HTTP_DIAGNOSTICS:
@@ -437,6 +439,13 @@ def poll():
     # Accept a new client if the server is idle.
     if _client is None:
         try:
+            # TEMPORARY B4 TEST -- REMOVE AFTER TESTING.
+            # Inject one listener failure per Pico boot.
+            global _b4_accept_test_done
+            if not _b4_accept_test_done:
+                _b4_accept_test_done = True
+                raise OSError(104)
+
             client, address = _listener.accept()
 
         except OSError as error:
