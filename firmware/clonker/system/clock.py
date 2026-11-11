@@ -14,6 +14,9 @@
 # print(clock.timestamp())
 
 import time
+# Shared application-relative reference.
+# Independent of optional browser/NTP UTC synchronization.
+_application_started_at = time.monotonic_ns()
 
 _source = "DEFAULTTIME"
 _reference_utc = None
@@ -42,11 +45,16 @@ def set_utc(unix_seconds, source_name="BROWSER"):
     _source = source_name
 
 
+def uptime_ns():
+    """Return elapsed nanoseconds since the Clonker clock initialized."""
+    return time.monotonic_ns() - _application_started_at
+
+
 def timestamp():
     """Return a printable timestamp for log messages."""
     if _reference_utc is None:
         return "[DEFAULTTIME +{:07.1f}s]".format(
-            time.monotonic_ns() / 1_000_000_000
+            uptime_ns() / 1_000_000_000
         )
 
     elapsed_ns = time.monotonic_ns() - _reference_monotonic

@@ -15,6 +15,7 @@ import gc
 import time
 
 from clonker.system import logger
+from clonker.system import clock
 from clonker.system import perf
 
 
@@ -30,7 +31,6 @@ GC_PERF_ENABLED = False
 
 perf.register("gc.collect")
 
-_started_at = None
 _next_memory_at = None
 _next_gc_at = None
 _baseline_free = None
@@ -68,9 +68,7 @@ def _sample():
     if free < _lowest_free:
         _lowest_free = free
 
-    elapsed_seconds = (
-        (time.monotonic_ns() - _started_at) // 1_000_000_000
-    )
+    elapsed_seconds = clock.uptime_ns() // 1_000_000_000
 
     hours = elapsed_seconds // 3600
     minutes = (elapsed_seconds % 3600) // 60
@@ -94,12 +92,11 @@ def _sample():
 
 def initialize():
     """Initialize independent monitoring schedules."""
-    global _started_at, _next_memory_at, _next_gc_at
+    global _next_memory_at, _next_gc_at
     global _baseline_free, _lowest_free
 
     now = time.monotonic_ns()
 
-    _started_at = now
     _next_memory_at = now + MEMORY_MONITOR_INTERVAL_NS
     _next_gc_at = now + GC_INTERVAL_NS
     _baseline_free = None
@@ -113,7 +110,7 @@ def poll():
     """Run scheduled memory diagnostics without blocking for delays."""
     global _next_memory_at, _next_gc_at
 
-    if _started_at is None:
+    if _next_memory_at is None:
         return
 
     now = time.monotonic_ns()
