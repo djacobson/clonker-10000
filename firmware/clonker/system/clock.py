@@ -14,6 +14,7 @@
 # print(clock.timestamp())
 
 import time
+
 # Shared application-relative reference.
 # Independent of optional browser/NTP UTC synchronization.
 _application_started_at = time.monotonic_ns()
