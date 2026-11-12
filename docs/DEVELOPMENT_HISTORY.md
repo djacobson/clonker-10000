@@ -3383,6 +3383,114 @@ The Monster can now lose a browser connection, discard a failed HTTP transaction
 
 ---
 
+## Chapter 9 — Portable Power Comes Alive
+
+**November 12, 2026 — Battery-powered operation demonstrated**
+
+Chapter 9 continued the reliability work with a practical question:
+
+Could THE CLONKER 10000 operate independently of a computer, powered by its own rechargeable batteries?
+
+The first bench tests answered that question: **yes**.
+
+### Battery hardware
+
+The portable power configuration used:
+
+- DFRobot DFR0969 dual-18650 battery module.
+- Two rechargeable 18650 lithium-ion cells.
+- Inline Color TFT USB power tester.
+- USB-A to Micro-USB cable connecting the module to the Pico 2 W.
+
+Both new cells measured approximately **3.560 V** individually before installation.
+
+The DFRobot module was tested with its HOLD/NORMAL selector in HOLD.
+
+### Establishing the USB power baseline
+
+Before switching to battery power, the Clonker was operated from a Lenovo laptop through the inline USB tester.
+
+The USB tester passed through the USB data connection successfully:
+
+- Windows recognized the Pico.
+- The CircuitPython filesystem remained accessible.
+- PuTTY serial communication worked.
+- The Clonker application started normally.
+
+This established that the tester could be used for electrical measurements without preventing the normal USB development workflow.
+
+Typical observed current consumption was approximately 34–35 mA at 5.01 V.
+
+The tester's current graph also responded to physical and software activity:
+
+- Volume encoder detents produced visible current changes.
+- Operating the CONFIG/RUN switch produced a current transient.
+- Loading the Configuration and Test Remote browser pages produced visible current peaks.
+
+These observations demonstrated that the tester could reveal small changes in the controller's electrical load.
+
+### First battery-powered operation
+
+The laptop was disconnected from the Clonker power path.
+
+The DFRobot battery module supplied the Pico through its regulated USB output, with the USB tester remaining inline.
+
+The Clonker booted and operated successfully.
+
+Initial observed measurements:
+
+| Measurement | Approximate result |
+|---|---:|
+| USB output voltage | 5.12 V |
+| Typical idle current | 33–37 mA |
+| Typical idle power | 0.17–0.19 W |
+| CircuitPython and application startup | 10–12 seconds |
+
+The physical controls and OLED continued operating normally.
+
+The measurements represent USB-side electrical consumption, not direct battery-cell current. Battery conversion efficiency and practical runtime remain unmeasured.
+
+### Startup READY feedback
+
+A small application enhancement was introduced during testing.
+
+After initialization, the OLED displays a brief READY indication and then clears it automatically.
+
+This provides confirmation that the Clonker has started successfully even when no computer or serial console is attached.
+
+During battery testing, the READY indication appeared approximately 10–12 seconds after power was applied.
+
+The behavior was successfully tested after deploying the updated application.
+
+### Results and next steps
+
+**Established:**
+
+- The battery module can power the complete Clonker prototype.
+- CircuitPython and the application start successfully.
+- The OLED and physical controls remain operational.
+- The USB tester provides useful voltage, current, power, and activity measurements.
+- The existing USB development workflow works through the inline tester.
+
+**Not yet established:**
+
+- Total battery runtime.
+- Discharge behavior near battery depletion.
+- Charging and simultaneous charging/load behavior.
+- Long-term reliability under battery power.
+- Permanent module mounting and internal cable routing.
+- Future sleep/wake implementation.
+
+An extended battery-powered observation period was started, but its final endurance result had not yet been recorded at this milestone.
+
+**Chapter 9 portable-power milestone: INITIAL BENCH TEST PASSED.**
+
+The Monster has officially learned to roam without its USB umbilical cord.
+
+*Less tethered. More CLONK.*
+
+---
+
 **THE CLONKER 10000**
 
 *Less sleek. More CLONK.*
