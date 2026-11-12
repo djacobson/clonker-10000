@@ -217,7 +217,7 @@ HDMI-CEC, another remote, or direct equipment operation can change that state in
 
 **Important distinction:** The Power Toggle currently controls home-theater equipment. It does not power the Pico on or off, enter deep sleep, or wake the controller.
 
-Battery and sleep/wake integration are future work.
+Battery-powered operation was demonstrated in Chapter 9. Sleep/wake integration remains future work.
 
 ---
 
@@ -651,38 +651,87 @@ Routine assembly repairs are not maintained as individual milestones in this har
 
 ---
 
-## 11. Guarded power and future battery operation
+## 11. Guarded power and battery operation
 
-### 11.1 Current power behavior
+### 11.1 Equipment power versus controller power
 
-The existing Power Toggle dispatches equipment commands.
+The guarded Power Toggle is a momentary input on GP2.
 
-It does not control the Pico's power supply.
+It dispatches the selected room's `power-toggle` fundamental action. It does not electrically switch power to the Pico, control battery charging, or currently initiate sleep/wake.
 
 The broader **SYSTEM MASTER** concept remains a future power-management design.
 
-A guarded control may eventually participate in waking the controller, initializing the application, and issuing the appropriate equipment command.
+### 11.2 Battery power architecture — Chapter 9
 
-### 11.2 Battery planning — Chapter 8
+The Clonker's portable power system uses a DFRobot DFR0969 module containing two rechargeable 18650 lithium-ion cells.
 
-Rechargeable battery selection is planned for Chapter 8, following additional software iterations.
+The initial bench-tested power path is:
 
-Evaluation should consider:
+    Two 18650 cells
+          |
+          v
+    DFRobot DFR0969
+    Battery / power module
+          |
+          | USB-A, regulated ~5 V
+          v
+    Inline USB power tester
+          |
+          | USB-A to Micro-USB cable
+          v
+    Raspberry Pi Pico 2 W
+          |
+          v
+    Clonker application and controls
 
-- Battery chemistry and protection.
-- Voltage compatibility and regulation.
-- Charging method and safety.
-- Capacity and practical runtime.
-- Idle and active current consumption.
-- Physical dimensions and mounting.
-- Access for charging and service.
-- Sleep and wake behavior.
-- Startup latency and Wi-Fi reconnection.
-- Avoiding unintended duplicate power commands.
+This arrangement powers the existing controller through its normal USB power input without changing the GPIO wiring or application architecture.
 
-No battery pack has been selected or integrated.
+The module's HOLD/NORMAL selector was placed in HOLD during battery testing.
 
-### 11.3 Sleep/wake — design only
+The module remains external to the Clonker enclosure while its operation and physical installation are evaluated.
+
+### 11.3 Initial electrical measurements
+
+Bench testing on November 12, 2026 established successful standalone battery operation.
+
+| Measurement | Observed result |
+|---|---|
+| Individual cell voltage before testing | Approximately 3.560 V |
+| Regulated USB output | Approximately 5.12 V |
+| Typical idle USB current | Approximately 33–37 mA |
+| Typical idle USB power | Approximately 0.17–0.19 W |
+| CircuitPython and application startup | Approximately 10–12 seconds |
+
+The measured current is the USB load seen by the inline tester, not the current drawn directly from the 18650 cells.
+
+Battery-side conversion losses, usable capacity, and total runtime have not yet been characterized.
+
+Physical controls, Wi-Fi application operation, and OLED feedback were successfully exercised during battery-powered testing.
+
+### 11.4 Application startup feedback
+
+The OLED now displays a brief READY message after the Clonker application initializes.
+
+The message clears automatically.
+
+This provides visual confirmation that the controller has completed startup, particularly when operating from battery power without an attached computer or serial console.
+
+The observed startup time is approximately 10–12 seconds from power application to the READY indication.
+
+The READY message confirms application initialization, not necessarily successful communication with every configured external device.
+
+### 11.5 Remaining battery integration work
+
+- Complete extended runtime testing.
+- Measure discharge behavior and practical operating life.
+- Verify charging and power-path behavior.
+- Confirm battery cell specifications and compatibility.
+- Determine permanent battery module placement.
+- Provide appropriate access to charging and power controls.
+- Secure internal USB wiring and provide strain relief.
+- Evaluate low-battery indication and shutdown behavior.
+
+### 11.6 Sleep/wake — design only
 
 A possible future sequence is:
 
@@ -693,17 +742,19 @@ A possible future sequence is:
 5. The initiating action is interpreted safely.
 6. Normal operation resumes.
 
-RP2350 and CircuitPython wake capabilities, GPIO limitations, and current consumption require testing before implementation.
+RP2350 and CircuitPython wake capabilities, GPIO limitations, and actual low-power consumption require testing before implementation.
 
-A reboot-based wake sequence is acceptable as a design option.
+A reboot-based wake sequence remains an acceptable design option.
 
-### 11.4 Electrical safety
+### 11.7 Electrical safety
 
-Do not connect unknown battery voltages directly to Pico GPIO.
+Do not connect raw lithium-ion cell voltage directly to Pico GPIO.
+
+Use the battery module's regulated output and verify voltage, polarity, current capacity, and charging behavior before permanent installation.
 
 Any switch illumination circuit must be evaluated separately from its mechanical contacts.
 
-Battery charging, protection, regulation, and power distribution require a complete electrical design before connection.
+Battery protection, charging, and mechanical mounting remain important parts of the final electrical design.
 
 ---
 
@@ -752,7 +803,7 @@ This table describes the current design and major components. For detailed part 
 | Grayhill encoder | Earlier volume candidate | Superseded |
 | Small SSD1306 concept | Earlier OLED candidate | Historical |
 | Piezo / amplifier / speaker | Audible feedback | Planned |
-| Rechargeable battery system | Portable power | Planned |
+| Rechargeable battery system | Portable power | Bench-tested; installation pending |
 | Sleep/wake implementation | Power management | Planned |
 
 Installed and operational components should not be confused with future software features.
@@ -858,7 +909,7 @@ See [Development History](DEVELOPMENT_HISTORY.md) for detailed test results and 
 | Mounting and strain relief | Complete |
 | Pico Cowbell connections | Complete |
 | Shared PERF instrumentation | Operational |
-| Battery power | Not implemented |
+| Battery power | Bench-tested successfully in Chapter 9; permanent integration pending |
 | Sleep/wake | Not implemented |
 | Audible CLONK | Not implemented |
 
