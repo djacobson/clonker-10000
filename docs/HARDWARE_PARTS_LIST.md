@@ -16,7 +16,7 @@ It serves as a permanent reference for:
 
 This is a hardware inventory and specifications reference, not a construction guide or development-status report.
 
-For GPIO assignments, wiring, and control behavior, see [Hardware Controls](HARDWARE_CONTROLS.md).
+For GPIO assignments, wiring, and control behavior, see [Hardware Design](HARDWARE_DESIGN.md).
 
 For the system design, see [Architecture](ARCHITECTURE.md).
 

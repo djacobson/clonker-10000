@@ -1030,7 +1030,7 @@ The orientation concept would exchange navigation and skip directions through an
 
 No general panel-orientation feature is currently implemented.
 
-See [Hardware & Physical Controls](HARDWARE_CONTROLS.md).
+See [Hardware Design](HARDWARE_DESIGN.md).
 
 ---
 
@@ -1215,7 +1215,7 @@ The physical assembly is complete. Battery power, sleep/wake behavior, audible f
 - [Configuration & Recovery](CONFIGURATION.md) — schema, validation, revisions, persistence, recovery.
 - [Firmware, Network & Clock](FIRMWARE_NETWORK.md) — scheduler details, adapters, transports, diagnostics.
 - [Operating Modes](OPERATING_MODES.md) — GP17 and GP18 behavior.
-- [Hardware & Physical Controls](HARDWARE_CONTROLS.md) — GPIO assignments, components, mechanical plans.
+- [Hardware Design](HARDWARE_DESIGN.md) — GPIO assignments, components, mechanical plans.
 - [Development & Deployment](DEVELOPMENT.md) — deployment workflow and regression tests.
 - [Development History](DEVELOPMENT_HISTORY.md) — chronological engineering milestones.
 - [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — historical reference.

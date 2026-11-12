@@ -2072,7 +2072,7 @@ The room selector has not yet been integrated into the running Clonker applicati
 
 The next chapter will begin with permanent selector-terminal soldering and insulation, followed by application-level room-selection integration.
 
-Detailed wiring and terminal mapping are maintained in [Hardware Controls](HARDWARE_CONTROLS.md).
+Detailed wiring and terminal mapping are maintained in [Hardware Design](HARDWARE_DESIGN.md).
 
 ### Engineering conclusion
 
@@ -2747,7 +2747,7 @@ Following the Chapter 7 implementation work, the documentation was updated to re
 
 The updated references include:
 
-- `HARDWARE_CONTROLS.md` — physical wiring, controls, GPIO assignments, and verification.
+- `HARDWARE_DESIGN.md` — physical wiring, controls, GPIO assignments, and verification.
 - `ARCHITECTURE.md` — action routing, shared queue, physical holds, and adapter responsibilities.
 - `FIRMWARE_NETWORK.md` — execution mechanics, Roku holds, scheduler behavior, and diagnostics.
 - `CONFIGURATION.md` — three-room installation and blank-command semantics.

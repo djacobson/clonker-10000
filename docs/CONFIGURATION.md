@@ -15,7 +15,7 @@ This is the authoritative **configuration schema, validation, persistence, and r
 
 The source repository holds maintained firmware and an example configuration; the running Pico's `/clonker/device_config.json` is the active, potentially newer, user-edited configuration. Never overwrite that file casually during firmware deployment.
 
-Other responsibilities: [Architecture](ARCHITECTURE.md) covers boundaries; [Firmware, Network & Clock](FIRMWARE_NETWORK.md) covers execution, queue, adapters, and timing; [Operating Modes](OPERATING_MODES.md) covers filesystem ownership; [Hardware & Controls](HARDWARE_CONTROLS.md) covers wiring; [Development & Deployment](DEVELOPMENT.md) covers procedure; [Development History](DEVELOPMENT_HISTORY.md) preserves dated evidence.
+Other responsibilities: [Architecture](ARCHITECTURE.md) covers boundaries; [Firmware, Network & Clock](FIRMWARE_NETWORK.md) covers execution, queue, adapters, and timing; [Operating Modes](OPERATING_MODES.md) covers filesystem ownership; [Hardware Design](HARDWARE_DESIGN.md) covers wiring; [Development & Deployment](DEVELOPMENT.md) covers procedure; [Development History](DEVELOPMENT_HISTORY.md) preserves dated evidence.
 
 ### Design commitments
 

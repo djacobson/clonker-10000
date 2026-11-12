@@ -204,7 +204,7 @@ The Chapter 7 implementation expanded physical input support beyond the original
 | OLED | Integration and feedback work ongoing |
 | Audible CLONK, battery, final enclosure | Planned or in progress |
 
-GPIO assignments are maintained in `controls/pins.py` and documented in [Hardware & Physical Controls](HARDWARE_CONTROLS.md).
+GPIO assignments are maintained in `controls/pins.py` and documented in [Hardware Design](HARDWARE_DESIGN.md).
 
 Physical inputs use room-aware generic actions routed through the shared dispatcher and queue. Roku held-button behavior uses explicit keydown/keyup handling.
 
@@ -311,7 +311,7 @@ Chapter 8 resolved the repeated configuration-validation overhead in physical di
 - [Configuration & Recovery](CONFIGURATION.md)
 - [Firmware, Network & Clock](FIRMWARE_NETWORK.md)
 - [Operating Modes](OPERATING_MODES.md)
-- [Hardware & Physical Controls](HARDWARE_CONTROLS.md)
+- [Hardware Design](HARDWARE_DESIGN.md)
 - [Development History](DEVELOPMENT_HISTORY.md)
 - [Chapter 2 Handoff](CHAPTER_2_HANDOFF.md) — historical.
 

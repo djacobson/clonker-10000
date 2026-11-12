@@ -17,7 +17,7 @@ Related responsibilities:
 
 - [Architecture](ARCHITECTURE.md) — component boundaries and invariants.
 - [Configuration](CONFIGURATION.md) — configuration schema, persistence, and recovery.
-- [Hardware & Physical Controls](HARDWARE_CONTROLS.md) — GPIO, components, and mechanical integration.
+- [Hardware Design](HARDWARE_DESIGN.md) — GPIO, components, and mechanical integration.
 - [Development History](DEVELOPMENT_HISTORY.md) — chronological experiments, decisions, and test evidence.
 
 ### Implemented and exercised
@@ -1600,7 +1600,7 @@ Do not introduce speculative protocol modules or a second action execution path 
 - [Architecture](ARCHITECTURE.md) — component boundaries and system invariants.
 - [Configuration & Recovery](CONFIGURATION.md) — Config v4 schema, revisions, persistence, recovery.
 - [Operating Modes](OPERATING_MODES.md) — GP17/GP18 procedures.
-- [Hardware & Physical Controls](HARDWARE_CONTROLS.md) — components, GPIO, mechanical integration.
+- [Hardware Design](HARDWARE_DESIGN.md) — components, GPIO, mechanical integration.
 - [Development & Deployment](DEVELOPMENT.md) — iPad-first workflow and tests.
 - [Development History](DEVELOPMENT_HISTORY.md) — chronological experiments and evidence.
 - [`samples/device_config_roku_denon_sample.json`](../samples/device_config_roku_denon_sample.json) — readable Config v4 example.

@@ -18,7 +18,7 @@ Useful documents:
 - `docs/FIRMWARE_NETWORK.md` — HTTP and cooperative scheduling.
 - `docs/OPERATING_MODES.md` — SERVICE/DEVICE versus CONFIG/RUN.
 - `docs/DEVELOPMENT.md` — deployment workflow.
-- `docs/HARDWARE_CONTROLS.md` — eventual physical inputs.
+- `docs/HARDWARE_DESIGN.md` — eventual physical inputs.
 - `docs/DEVELOPMENT_HISTORY.md` — development milestones and dated tests; do not mistake older pending lists for current status.
 
 ## Platform and workflow

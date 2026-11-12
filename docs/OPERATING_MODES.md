@@ -194,7 +194,7 @@ The selected physical room is independent of both operating-mode switches. Room 
 
 Power and mute toggles maintain **volatile last-successful-command direction**, not verified receiver state. Other remotes, HDMI-CEC, and equipment controls may change actual state independently. A mode switch must never transmit an equipment power command simply because its position changed.
 
-For wiring, layout, parts, and mechanical plans, see [Hardware & Physical Controls](HARDWARE_CONTROLS.md).
+For wiring, layout, parts, and mechanical plans, see [Hardware Design](HARDWARE_DESIGN.md).
 
 ## 8. Deployment and recovery checklist
 
@@ -235,7 +235,7 @@ Confirm the selected room is configured, its destination and action mapping are 
 
 - [Architecture](ARCHITECTURE.md) — ownership boundaries, shared action path, adapter architecture.
 - [Firmware, Network & Clock](FIRMWARE_NETWORK.md) — scheduler, HTTP/TCP transports, queue pacing, and tests.
-- [Hardware & Physical Controls](HARDWARE_CONTROLS.md) — GPIO, wiring, mechanical design, and inventory.
+- [Hardware Design](HARDWARE_DESIGN.md) — GPIO, wiring, mechanical design, and inventory.
 - [Configuration & Recovery](CONFIGURATION.md) — schema, persistence, revision protection, backups.
 - [Development & Deployment](DEVELOPMENT.md) — development workflow and deployment procedures.
 - [Development History](DEVELOPMENT_HISTORY.md) — dated experiments and verification records.
