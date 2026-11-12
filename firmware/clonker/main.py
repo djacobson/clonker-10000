@@ -315,6 +315,11 @@ def main():
                 "OLED unavailable: {}".format(exc)
             )
 
+    # Announce successful application initialization.
+    # The normal OLED idle timeout clears this automatically.
+    if oled_ready:
+        oled.show_text("CLONKER", "READY!")
+
     # Initialize memory monitoring after startup configuration.
     memory_monitor.initialize()
 
