@@ -1,38 +1,106 @@
+
 """THE CLONKER 10000 - Test Kitchen Sink - Piezo Laboratory v4
 
 Repository: firmware/tests/test_piezo_v4.py
 Pico:       /tests/test_piezo_v4.py
-Run in CircuitPython REPL (after Ctrl+C):
+REPL (after Ctrl+C):
     exec(open('/tests/test_piezo_v4.py').read())
 
 Hardware: Raspberry Pi Pico 2 W, CircuitPython 10.3.1,
           Adafruit #160 passive piezo, GP0 -> piezo -> GND.
 Standalone experiment; no production Clonker imports.
 
-LISTENING NOTES FROM v2/v3 (subjective, specific to this piezo):
-- Strong, narrow resonance around 4150 Hz. Musical notes 262-1047 Hz
-  were inaudible; 3500-3800 Hz faint, 4100-4200 loudest, 4500 fades.
-- 50% PWM duty sounded strongest. Duty changes produced remarkably
-  smooth apparent volume changes, though PWM duty also changes timbre.
-- Clicks: 20 ms at 50% duty was pleasant and clearly audible;
-  10 ms also audible; low-duty alternatives were too faint.
-- Fast rattles/alarms/chatter mostly sounded like cricket chirps.
-- A 3-second duty swell/fade sounded exceptionally smooth.
-- Continuous pitch sweeps sounded like birds; a few discrete steps
-  were perceptible, especially in longer sweeps.
-- Power-down: smooth descending pitch and fading level, but ~1 sec
-  seemed a little fast. Power-up: a human-like rising whistle.
-- Opposing pitch/duty directions were more expressive than both rising.
-- Breathing-cricket variants resembled nearly identical tuning forks.
-- Descending 4500->3700 Hz chirps: 100 ms most natural; 200 ms
-  revealed individual frequency steps; all sounded bird-like.
-- 'Alien transmission' sounded like birds having a conversation.
+PURPOSE
+-------
+Characterize a passive piezo and collect useful sound-design ingredients.
+This is NOT a decision to install the piezo in the Clonker. Keep evaluation
+of the eventual production sound hardware separate from this experiment.
 
-v4 is a new, focused lab; v3 remains available as test_piezo.py.
-Experiments are not calibrated acoustic measurements. Timing results
-include CircuitPython interpreter and time.sleep overhead.
+LISTENING JOURNAL - v2/v3 (subjective, this hardware only)
+----------------------------------------------------------
+* The conventional musical scale (262-1047 Hz) was inaudible.
+* Strong, narrow audible region near 4150 Hz: 3500-3800 Hz faint,
+  4100-4200 Hz loudest, with output fading by about 4500 Hz.
+* 50% PWM duty was strongest. Changing duty produced strikingly smooth
+  perceived swells and fades, although duty also alters waveform harmonics.
+* 20 ms at 50% duty was a pleasant confirmation click; 10 ms was audible.
+  Lower-duty click candidates were too faint.
+* Rattles, alarms and pseudo-speech mostly sounded like crickets/chirps,
+  not mechanical impacts or intelligible speech.
+* Three-second duty swell/fade was exceptionally smooth.
+* Continuous glides resembled bird calls; longer glides sometimes revealed
+  individual pitch steps. A 100 ms 4500->3700 Hz chirp sounded most natural;
+  200 ms revealed more steps.
+* Power-up resembled a human whistle; power-down was smooth but initially
+  a little quick. Opposing pitch/duty movements sounded more expressive.
+* Breathing patterns sounded like tuning forks rather than crickets.
+* Alternating pitch/duty modulation sounded like birds conversing.
+
+LISTENING JOURNAL - v4 (15 tests, observations as reported)
+----------------------------------------------------------
+ 1-2: No new v4 listening notes recorded; earlier duty and resonance
+      characterization remains the reference.
+ 3. Glide resolution: First chirp initially sounded different, but this
+      could not be reproduced after restarting the test program. Later
+      chirps sounded almost alike; no clear resolution winner.
+ 4. Glide duration: Progressively longer chirps, moderately audible;
+      slight frequency-step perception in the last two.
+ 5. Click candidates: First sounded like short tics; latter candidates
+      sounded smoother; third seemed loudest. (Subjective impression.)
+ 6. Double confirmations: Quick short tones, not bird-like.
+ 7. Smooth swell/fade: Smooth, rising/tuning-fork-like impression followed
+      by a fade. Note: this test holds frequency constant at 4150 Hz;
+      the apparent pitch rise was perceptual, not a programmed glide.
+ 8. Power-down durations: All smooth; first possibly too quick; third
+      resembled a bomb falling from the sky.
+ 9. Power-up durations: Similar smooth sounds, primarily differentiated
+      by length; perceived as a sigh rather than a tuning fork.
+10. Opposing pitch/duty: Two related, reversed-sounding variations;
+      second had a slightly sharper onset.
+11. Whistle phrases: Three variations very difficult to distinguish.
+12. Bird calls: All three sounded like identical bird chirps.
+13. Bird conversation: Smooth, blended bird-like conversation.
+14. Percussive envelopes: First sharp/short; second smoother; third
+      smooth with a quick fade-away.
+15. Resonance compensation: Both frequency series started very faint,
+      became loudest around the third tone, then faded stepwise. The
+      third frequency is 4150 Hz in both series. No compelling evidence
+      that the exploratory duty changes flattened perceived loudness.
+
+WHAT THESE OBSERVATIONS SUPPORT
+-------------------------------
+* Frequency is a strong determinant of audible level on this resonant
+  piezo; near-4150-Hz sounds are easiest to hear.
+* Duty envelopes and continuous frequency changes offer more expressive
+  results than simple rapid on/off sequences.
+* Some differences in step count, chirp shape and whistle phrases were
+  too subtle to identify reliably by ear in these informal trials.
+* A sound's perceived pitch or loudness can differ from the programmed
+  parameter: resonance, PWM harmonics and hearing all contribute.
+* The one-off first-chirp anomaly remains unexplained and unreproduced.
+* These are informal listening impressions, not calibrated measurements;
+  do not infer temperature warm-up, timing bugs or true acoustic amplitude
+  from these results alone.
+
+POTENTIAL SOUND-DESIGN INGREDIENTS (NOT PRODUCT DECISIONS)
+---------------------------------------------------------
+* Crisp feedback: short 10-20 ms resonant burst; or sharp attack plus
+  a brief smooth decay (v4 test 14).
+* Gentle indication: fixed-frequency duty swell/fade (v4 test 7).
+* Dramatic descending cue: longer pitch/duty power-down (v4 test 8).
+* Soft rising/sigh-like cue: extended power-up envelope (v4 test 9).
+* Character sounds: 100 ms descending chirp, or blended bird phrases
+  (v4 tests 12-13). These may be fun without being practical UI feedback.
+* For future experiments, compare effects at matched perceived loudness,
+  consider long silence before a first chirp, and measure PWM timing if
+  audible stepping becomes a real design constraint.
+
+VERSIONING
+----------
+The original v3 test module remains firmware/tests/test_piezo.py.
+This v4 module is a standalone, focused lab; its executable tests and
+menu are preserved unchanged by this documentation update.
 """
-
 import board
 import pwmio
 import time
