@@ -1,196 +1,409 @@
 """
-THE CLONKER 10000 -- Test Kitchen Sink
-Standalone Adafruit #160 Passive Piezo Experiments
+THE CLONKER 10000
+Test Kitchen Sink - Piezo Laboratory v2
 
-Repository: firmware/tests/test_piezo.py
-Pico path:  /tests/test_piezo.py
+Repository:
+    firmware/tests/test_piezo.py
+
+Pico:
+    /tests/test_piezo.py
 
 Hardware:
     Raspberry Pi Pico 2 W
-    Adafruit #160 passive piezo buzzer
-    Piezo leg 1 -> GP0
-    Piezo leg 2 -> GND
+    CircuitPython 10.3.1
+    Adafruit #160 passive piezo
+    GP0 -> piezo -> GND
 
-Run from CircuitPython REPL:
+REPL:
     exec(open("/tests/test_piezo.py").read())
 
-Stop Clonker before running. No external libraries.
-Ctrl+C interrupts playback and releases GP0.
+Standalone hardware experiment.
+Does not import or modify the Clonker application.
+
+OBSERVED HARDWARE RESULTS
+-------------------------
+Initial broad frequency test:
+    4000 Hz was the only clearly audible tone.
+
+Detailed 3500-4500 Hz test:
+    3500-3800 Hz: very faint
+    4100-4200 Hz: loudest
+    4500 Hz: starting to fade
+
+Modulation at 4150 Hz:
+    5, 15, 30, 60 and 100 Hz patterns were
+    audibly distinguishable.
+
+These are observations from one device and
+test setup, not manufacturer specifications.
+
+All tests use GP0 hardware PWM.
 """
 
-import time
 import board
 import pwmio
+import time
 
 PIN = board.GP0
-DUTY = 32768  # 50% duty cycle
+
+CARRIER = 4150
+DUTY = 32768
+
+MIN_HZ = 100
+MAX_HZ = 10000
 
 
 class Piezo:
     def __init__(self):
         self.pwm = pwmio.PWMOut(
             PIN,
-            frequency=1000,
+            frequency=CARRIER,
             duty_cycle=0,
             variable_frequency=True,
         )
 
-    def tone(self, hz, seconds, duty=DUTY):
-        hz = max(100, min(10000, int(hz)))
-
+    def on(self, hz=CARRIER, duty=DUTY):
         self.pwm.duty_cycle = 0
-        self.pwm.frequency = hz
+        self.pwm.frequency = max(
+            MIN_HZ, min(MAX_HZ, int(hz))
+        )
         self.pwm.duty_cycle = duty
 
-        try:
-            time.sleep(max(0, seconds))
-        finally:
-            self.pwm.duty_cycle = 0
-
-    def rest(self, seconds):
+    def off(self):
         self.pwm.duty_cycle = 0
-        time.sleep(seconds)
 
-    def sweep(self, start, stop, seconds, steps=60):
-        delay = seconds / steps
+    def tone(self, hz, duration, duty=DUTY):
+        self.on(hz, duty)
+        try:
+            time.sleep(duration)
+        finally:
+            self.off()
+
+    def rest(self, duration):
+        self.off()
+        time.sleep(duration)
+
+    def pulse(self, on_time, off_time, count,
+              hz=CARRIER, duty=DUTY):
+        for _ in range(count):
+            self.tone(hz, on_time, duty)
+            self.rest(off_time)
+
+    def sweep(self, start, stop, duration, steps=40):
+        delay = duration / steps
 
         for i in range(steps + 1):
             hz = start + (stop - start) * i / steps
             self.tone(hz, delay)
 
     def close(self):
-        self.pwm.duty_cycle = 0
+        self.off()
         self.pwm.deinit()
 
 
-def scale(p):
+# -----------------------------------------
+# CHARACTERIZATION
+# -----------------------------------------
+
+def original_scale(p):
+    print("Original musical scale")
+
     for hz in (262, 330, 392, 523, 659, 784, 1047):
-        p.tone(hz, 0.16)
-        p.rest(0.035)
+        print(hz, "Hz")
+        p.tone(hz, 0.2)
+        p.rest(0.05)
 
 
-def sweeps(p):
-    p.sweep(250, 3000, 0.9)
-    p.rest(0.2)
-    p.sweep(3000, 250, 0.9)
+def broad_frequency(p):
+    print("Broad frequency response")
+
+    for hz in (
+        250, 440, 880, 1500,
+        2500, 3000, 3500, 4000,
+        4150, 4500, 5000, 6000
+    ):
+        print(hz, "Hz")
+        p.tone(hz, 0.6)
+        p.rest(0.3)
 
 
-def chirps(p):
-    for _ in range(3):
-        p.sweep(1100, 2300, 0.11, steps=12)
-        p.rest(0.12)
+def resonance_map(p):
+    print("Resonance map: 3500-4600 Hz")
 
-    p.rest(0.3)
+    for hz in range(3500, 4601, 100):
+        print(hz, "Hz")
+        p.tone(hz, 0.7)
+        p.rest(0.35)
 
-    for _ in range(2):
-        p.tone(880, 0.08)
-        p.rest(0.06)
-        p.tone(1320, 0.1)
+
+def fine_resonance(p):
+    print("Fine resonance: 3900-4400 Hz")
+
+    for hz in range(3900, 4401, 25):
+        print(hz, "Hz")
+        p.tone(hz, 0.35)
         p.rest(0.2)
 
 
-def alarm(p):
-    for _ in range(4):
-        p.tone(700, 0.13)
-        p.rest(0.07)
-        p.tone(1100, 0.13)
-        p.rest(0.16)
+def duty_cycle_test(p):
+    print("Duty-cycle experiment at 4150 Hz")
+
+    for percent in (5, 10, 20, 30, 40, 50):
+        duty = int(65535 * percent / 100)
+
+        print(percent, "% duty")
+        p.tone(CARRIER, 0.8, duty)
+        p.rest(0.4)
 
 
-def clonk(p):
-    # Descending pitched thunk.
-    # A piezo cannot reproduce genuine bass.
+# -----------------------------------------
+# SOUND EFFECTS
+# -----------------------------------------
 
-    for start in (2400, 1700, 1000):
-        p.sweep(
-            start,
-            max(150, start // 4),
-            0.095,
-            steps=15,
-        )
-        p.rest(0.045)
+def clicks(p):
+    print("Short resonant bursts")
 
+    for duration in (
+        0.005, 0.01, 0.02,
+        0.04, 0.08, 0.15
+    ):
+        print("Burst:", duration, "seconds")
 
-def retro_voice(p):
-    # Experimental PC-speaker-style buzzing.
-    # This is NOT actual speech synthesis.
+        for _ in range(3):
+            p.tone(CARRIER, duration)
+            p.rest(0.25)
 
-    for base in (180, 230, 195, 260, 170):
-        for i in range(12):
-            hz = base * (2 if i % 3 == 0 else 1)
-            p.tone(hz, 0.014)
-            p.rest(0.004)
-
-        p.rest(0.07)
+        p.rest(0.3)
 
 
-def frequency_test(p):
-    frequencies = (
-        150, 250, 440, 880, 1500,
-        2500, 4000, 6000, 8000,
+def double_clonk(p):
+    print("Double CLONK")
+
+    for gap in (0.04, 0.08, 0.15, 0.3):
+        print("Gap:", gap)
+
+        p.tone(CARRIER, 0.035)
+        p.rest(gap)
+        p.tone(CARRIER, 0.075)
+        p.rest(0.7)
+
+
+def rattles(p):
+    print("Mechanical rattles")
+
+    patterns = (
+        (0.015, 0.025, 12),
+        (0.025, 0.035, 10),
+        (0.04, 0.025, 8),
+        (0.01, 0.015, 20),
     )
 
-    for hz in frequencies:
-        print("  {} Hz".format(hz))
-        p.tone(hz, 0.35)
-        p.rest(0.15)
+    for on_time, off_time, count in patterns:
+        p.pulse(on_time, off_time, count)
+        p.rest(0.5)
+
+
+def alarm(p):
+    print("Resonant alarm patterns")
+
+    p.pulse(0.15, 0.15, 4)
+    p.rest(0.5)
+
+    p.pulse(0.06, 0.06, 10)
+    p.rest(0.5)
+
+    p.pulse(0.4, 0.2, 3)
+
+
+def falling_clonk(p):
+    print("Descending resonant bursts")
+
+    for start, stop in (
+        (4400, 3900),
+        (4300, 4000),
+        (4250, 4050),
+    ):
+        p.sweep(start, stop, 0.18, steps=20)
+        p.rest(0.45)
+
+
+# -----------------------------------------
+# RETRO AUDIO MISCHIEF
+# -----------------------------------------
+
+def modulation_tour(p):
+    print("Amplitude modulation tour")
+
+    for rate in (5, 15, 30, 60, 100):
+        print("Modulation:", rate, "Hz")
+
+        period = 1.0 / rate
+
+        p.pulse(
+            period / 2,
+            period / 2,
+            rate,
+        )
+
+        p.rest(0.5)
+
+
+def envelope_test(p):
+    print("Duty-cycle envelope")
+
+    envelopes = (
+        (5, 10, 20, 35, 50),
+        (50, 35, 20, 10, 5),
+        (5, 20, 50, 20, 5),
+    )
+
+    for envelope in envelopes:
+        for percent in envelope:
+            duty = int(65535 * percent / 100)
+            p.tone(CARRIER, 0.055, duty)
+
+        p.rest(0.5)
+
+
+def retro_chatter(p):
+    print("Retro digital chatter")
+
+    patterns = (
+        (0.02, 0.02, 15),
+        (0.04, 0.015, 12),
+        (0.01, 0.04, 15),
+        (0.03, 0.01, 20),
+    )
+
+    for on_time, off_time, count in patterns:
+        p.pulse(on_time, off_time, count)
+        p.rest(0.2)
+
+
+def fake_speech(p):
+    print("Primitive speech-like modulation")
+    print("Not actual speech synthesis")
+
+    syllables = (
+        (30, 0.25),
+        (65, 0.15),
+        (20, 0.35),
+        (90, 0.12),
+        (40, 0.3),
+    )
+
+    for rate, duration in syllables:
+        count = max(1, int(rate * duration))
+        period = 1.0 / rate
+
+        p.pulse(
+            period * 0.55,
+            period * 0.45,
+            count,
+        )
+
+        p.rest(0.08)
 
 
 TESTS = {
-    "1": ("Ascending scale", scale),
-    "2": ("Up/down sweeps", sweeps),
-    "3": ("Chirps", chirps),
-    "4": ("Two-tone alarm", alarm),
-    "5": ("Mechanical-ish CLONK", clonk),
-    "6": ("Retro voice-like buzz", retro_voice),
-    "7": ("Frequency response tour", frequency_test),
+    "1": ("Original musical scale", original_scale),
+    "2": ("Broad frequency response", broad_frequency),
+    "3": ("Resonance map", resonance_map),
+    "4": ("Fine resonance map", fine_resonance),
+    "5": ("Duty-cycle response", duty_cycle_test),
+
+    "6": ("Short clicks", clicks),
+    "7": ("Double CLONK", double_clonk),
+    "8": ("Mechanical rattles", rattles),
+    "9": ("Alarm patterns", alarm),
+    "10": ("Descending CLONK", falling_clonk),
+
+    "11": ("Modulation tour", modulation_tour),
+    "12": ("Duty-cycle envelopes", envelope_test),
+    "13": ("Retro chatter", retro_chatter),
+    "14": ("Fake speech", fake_speech),
 }
 
 
-def main():
+def menu():
     print()
-    print("THE CLONKER 10000 -- PIEZO KITCHEN SINK")
-    print("Adafruit #160 | GP0 + GND")
+    print("=" * 45)
+    print("THE CLONKER 10000")
+    print("PIEZO LABORATORY v2")
+    print("=" * 45)
+
+    print()
+    print("CHARACTERIZATION")
+
+    for key in ("1", "2", "3", "4", "5"):
+        print(" {:>2}. {}".format(
+            key, TESTS[key][0]
+        ))
+
+    print()
+    print("SOUND EFFECTS")
+
+    for key in ("6", "7", "8", "9", "10"):
+        print(" {:>2}. {}".format(
+            key, TESTS[key][0]
+        ))
+
+    print()
+    print("RETRO AUDIO")
+
+    for key in ("11", "12", "13", "14"):
+        print(" {:>2}. {}".format(
+            key, TESTS[key][0]
+        ))
+
+    print()
+    print("  a. Run all sound effects (6-14)")
+    print("  q. Quit")
     print()
 
-    piezo = Piezo()
+
+def main():
+    p = Piezo()
 
     try:
         while True:
-            print()
-            print("Choose an experiment:")
+            menu()
 
-            for key in sorted(TESTS):
-                print(
-                    "  {}. {}".format(
-                        key, TESTS[key][0]
-                    )
-                )
+            choice = input("Select test: ").strip().lower()
 
-            print("  q. Quit")
-
-            choice = input("> ").strip().lower()
-
-            if choice in ("q", "quit", "exit"):
+            if choice == "q":
                 break
 
+            if choice == "a":
+                for number in range(6, 15):
+                    name, function = TESTS[str(number)]
+
+                    print()
+                    print("Running:", name)
+
+                    function(p)
+                    p.rest(0.5)
+
+                continue
+
             if choice not in TESTS:
-                print("Unknown choice.")
+                print("Unknown selection")
                 continue
 
             name, function = TESTS[choice]
 
-            print("Playing: {}".format(name))
-            function(piezo)
-            print("Done.")
+            print()
+            print("Running:", name)
+
+            function(p)
+            p.rest(0.25)
 
     except KeyboardInterrupt:
-        print("\nInterrupted.")
+        print("\nInterrupted")
 
     finally:
-        piezo.close()
-        print("GP0 released.")
+        p.close()
+        print("Piezo released; GP0 deinitialized")
 
 
-# Execute immediately when run using exec(open(...).read()).
 main()
