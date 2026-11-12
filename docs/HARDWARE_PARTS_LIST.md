@@ -4,21 +4,21 @@
 
 ## Purpose
 
-This document identifies the physical components used in THE CLONKER 10000, including the electronics, controls, enclosure, mounting hardware, and power system.
+This document identifies the physical components used in THE CLONKER 10000, including electronics, controls, enclosure materials, mounting hardware, and the planned battery system.
 
 It serves as a permanent reference for:
 
 - Component identification and replacement parts.
 - Manufacturer names and model numbers.
-- Important hardware specifications.
+- Important electrical and mechanical specifications.
 - Actual faceplate and enclosure drilling measurements.
-- Mechanical details useful when repairing or reproducing the hardware.
+- Details useful when repairing or reproducing the hardware.
 
 This is a hardware inventory and specifications reference, not a construction guide or development-status report.
 
 For GPIO assignments, wiring, and control behavior, see [Hardware Design](HARDWARE_DESIGN.md).
 
-For the system design, see [Architecture](ARCHITECTURE.md).
+For system architecture, see [Architecture](ARCHITECTURE.md).
 
 ---
 
@@ -26,14 +26,14 @@ For the system design, see [Architecture](ARCHITECTURE.md).
 
 | Component | Manufacturer / Part # | Description |
 |---|---|---|
-| **Microcontroller** | Raspberry Pi Pico 2 W, UeeKKoo pre-soldered header version | RP2350-based microcontroller with onboard Wi-Fi; the Clonker's main processor |
-| **GPIO expansion** | Adafruit Pico Cowbell — exact model to confirm | GPIO breakout and connection platform for the Pico |
-| **OLED display** | Hosyond B077, 1.3-inch SH1106 | 128 × 64 monochrome I2C OLED display; purchased as a five-pack |
-| **Wire connectors** | WAGO 221-415 | Compact five-conductor lever connectors used for internal wiring distribution |
+| **Microcontroller** | Raspberry Pi Pico 2 W, UeeKKoo pre-soldered header version | RP2350-based microcontroller with onboard Wi-Fi |
+| **GPIO expansion** | Adafruit Terminal PiCowbell #5907 | Pre-soldered Pico sockets, 40 screw-terminal connections, reset button, STEMMA QT, and prototyping area |
+| **OLED display** | Hosyond B077, 1.3-inch SH1106 | 128 × 64 monochrome I2C OLED display |
+| **Wire connectors** | WAGO 221-415 | Five-conductor compact lever connectors for internal wiring distribution |
 
 ### Raspberry Pi Pico 2 W
 
-The Raspberry Pi Pico 2 W is the Clonker's main processor, running the firmware, managing physical controls, and communicating with network devices.
+The Raspberry Pi Pico 2 W is the Clonker's main processor, managing the physical controls, display, configuration, and network communication.
 
 **Hardware specifications:**
 
@@ -63,19 +63,34 @@ The Raspberry Pi Pico 2 W is the Clonker's main processor, running the firmware,
 
 The Pico's limited RAM makes memory management and long-running reliability particularly important to the project.
 
-### GPIO Expansion — Pico Cowbell
+### GPIO Expansion — Adafruit Terminal PiCowbell
 
-The Cowbell provides convenient access to the Pico's GPIO and power connections.
+The Terminal PiCowbell provides convenient, serviceable connections to the Pico's GPIO and power pins.
+
+**Hardware specifications:**
 
 - **Manufacturer:** Adafruit
-- **Model:** To be confirmed
-- **Application:** Internal Pico connection and GPIO breakout platform
+- **Product:** Terminal PiCowbell for Pico with Pre-Soldered Sockets
+- **Adafruit product ID:** 5907
+- **Pico connection:** Two single-row socket headers
+- **Screw terminals:** 40 connections, one for each Pico pin
+- **Terminal blocks:** Four 10-position blocks, 2.54 mm pitch
+- **Wire compatibility:** 18–26 AWG solid or stranded conductors
+- **Reset button:** Integrated
+- **I2C connector:** STEMMA QT / Qwiic, four-pin JST SH
+- **Additional I2C breakout:** Four adjacent breakout holes
+- **Prototyping area:** Twelve rows of four connected holes
+- **Additional solder pads:** Duplicate pads for Pico pins
+- **Power distribution:** Ground and 3.3 V connection strips
+- **Solder pads:** Gold-plated
 
-Exact product specifications will be added when confirmed.
+The STEMMA QT connector provides 3.3 V, ground, SDA, and SCL. The board does not include dedicated I2C pull-up resistors.
+
+**Manufacturer reference:** [Adafruit Terminal PiCowbell #5907](https://www.adafruit.com/product/5907)
 
 ### OLED Display — Hosyond SH1106
 
-The OLED provides local visual feedback for the Clonker's physical controls and operating state.
+The installed OLED provides local visual feedback for the Clonker's physical controls and operating state.
 
 **Hardware specifications:**
 
@@ -93,6 +108,8 @@ The OLED provides local visual feedback for the Clonker's physical controls and 
 
 The display uses a four-wire connection: GND, VCC, SCL, and SDA.
 
+The Clonker firmware uses GP4 (SDA) and GP5 (SCL) for the display.
+
 ### Internal Wiring Connectors — WAGO
 
 **Hardware specifications:**
@@ -106,39 +123,87 @@ The display uses a four-wire connection: GND, VCC, SCL, and SDA.
 - **Supported conductors:** Solid, stranded, and fine-stranded copper conductors, within the manufacturer's specified ranges
 - **Amazon ASIN:** B01M6Y2UEK
 
-The connectors provide convenient, serviceable junctions for internal wiring without requiring permanent soldered splices.
+The connectors provide serviceable junctions for internal wiring without requiring permanent soldered splices.
 
 ---
 
 ## Controls Parts List
 
-The following table preserves the actual drilling measurements used for the Clonker's physical controls.
+The following table identifies the Clonker's physical controls and preserves the actual drilling measurements used during construction.
 
 **✓ = Actual drilled and verified hole size.**
 
 | Control | Manufacturer / Part # | Hole / Drill Size |
 |---|---|---|
 | **Volume / Mute** | Bourns PEC11R-4215F-S0024 rotary encoder | 7.14 mm (9/32") — twist ✓ |
-| ↳ Volume knob | Kilo OEJNI-90-3-5 | — |
+| ↳ Volume knob | Kilo International OEJNI-90-3-5 | — |
 | **Custom Actions / Run** | Bourns PEC11R-4215F-S0024 rotary encoder | 7.14 mm (9/32") — twist ✓ |
-| ↳ Action knob | Kilo OEJL-63-4-7 | — |
-| **Home (red)** | E-Switch PS1023, red square pushbutton | 12.7 mm (1/2") — twist ✓ |
-| **Back (black)** | E-Switch PS1023ABLK, black square pushbutton | 12.7 mm (1/2") — twist ✓ |
+| ↳ Action knob | Kilo International OEJL-63-4-7 | — |
+| **Home (red)** | E-Switch PS1023ARED, SPST-NO momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
+| **Back (black)** | E-Switch PS1023ABLK, SPST-NO momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
 | **Nav Up** | Philmore 30-146 momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
 | **Nav Down** | Philmore 30-146 momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
 | **Nav Left** | Philmore 30-146 momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
 | **Nav Right** | Philmore 30-146 momentary pushbutton | 12.7 mm (1/2") — twist ✓ |
-| **Nav Select / OK** | YMJSAN 19 mm metal momentary pushbutton, high head | 20 mm (≈25/32") — step ✓ |
-| **Skip Back (red)** | Philmore 30-2289 sub-mini SPST NO momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
+| **Nav Select / OK** | YMJSAN YM0010HIGH2PCS, 19 mm high-head momentary pushbutton | 20 mm (≈25/32") — step ✓ |
+| **Skip Back (red)** | Philmore 30-2289 sub-mini SPST-NO momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
 | **Play / Pause** | Philmore 30-111 momentary pushbutton | 10 mm (≈25/64") — step ✓ |
-| **Skip Forward (red)** | Philmore 30-2289 sub-mini SPST NO momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
+| **Skip Forward (red)** | Philmore 30-2289 sub-mini SPST-NO momentary pushbutton | 7.14 mm (9/32") — twist ✓ |
 | **Room Selector** | uxcell 2P3T, 3-position rotary switch | 10 mm (≈25/64") — step ✓ |
 | ↳ Selector knob | uxcell s18102300ux0967, 6 mm D-shaft | — |
-| **Power Toggle** | YMJSAN 19 mm metal momentary pushbutton, high head | 20 mm (≈25/32") — step ✓ |
+| **Power Toggle** | YMJSAN YM0010HIGH2PCS, 19 mm high-head momentary pushbutton | 20 mm (≈25/32") — step ✓ |
 | **CONFIG / RUN (side)** | Dorman Conduct-Tite 84815 racing-style switch | 12.7 mm (1/2") ✓ |
 | **SERVICE / DEVICE (internal)** | Philmore 30-10007 SPST toggle switch | No exterior hole required |
 
 The Power Toggle uses a separate red flip-up protective guard.
+
+### Rotary Encoders and Knobs
+
+Both control encoders use the same Bourns mechanical rotary encoder with an integrated pushbutton.
+
+| Component | Manufacturer Part # | DigiKey Part # |
+|---|---|---|
+| Rotary encoder | Bourns PEC11R-4215F-S0024 | PEC11R-4215F-S0024-ND |
+| Volume knob | Kilo International OEJNI-90-3-5 | 226-4246-ND |
+| Custom Action knob | Kilo International OEJL-63-4-7 | 226-4093-ND |
+
+The Kilo knobs are knurled metal components. The DigiKey listings identify 0.250-inch and 0.236-inch dimensions respectively.
+
+### Home and Back Buttons — E-Switch
+
+- **Manufacturer:** E-Switch
+- **Home:** PS1023ARED, red
+- **Back:** PS1023ABLK, black
+- **Contact type:** SPST normally open
+- **Operation:** Momentary
+- **Published rating:** 3 A at 125 V
+- **DigiKey Home part:** EG2005-ND
+- **DigiKey Back part:** EG2001-ND
+
+The two button models use the same verified 1/2-inch mounting hole.
+
+### Nav Select and Power Buttons — YMJSAN
+
+Both controls use the same high-head metal momentary pushbutton.
+
+**Hardware specifications:**
+
+- **Manufacturer:** YMJSAN
+- **Model:** YM0010HIGH2PCS
+- **Nominal mounting size:** 19 mm
+- **Actual Clonker mounting hole:** 20 mm
+- **Operation:** Momentary, self-resetting
+- **Contacts:** Normally-open operation; listing also references 1NO1NC
+- **Terminals:** Screw terminals
+- **Advertised operating voltage:** 12 V DC
+- **Advertised protection:** IP65
+- **Advertised mechanical life:** Up to 1,000,000 cycles
+- **Original package:** Two buttons
+- **Amazon ASIN:** B0FJMQ7P53
+
+The 12 V listing does not mean the passive switch contacts require a 12 V supply. The Clonker uses these controls with the Pico's 3.3 V GPIO circuitry.
+
+The Power Toggle additionally uses a separate flip-up protective guard.
 
 ---
 
@@ -194,7 +259,7 @@ The Clonker uses a repurposed protective carrying case originally designed for 3
 - **Listed weight:** 7.4 oz (approximately 210 g)
 - **Amazon ASIN:** B0D6K9NT32
 
-The case provides a lightweight protective enclosure for the Pico, internal electronics, wiring, and power system.
+The case provides a lightweight protective enclosure for the Pico, internal electronics, wiring, and future battery system.
 
 Its internal foam has been trimmed to provide clearance for the controls and wiring.
 
@@ -210,18 +275,30 @@ Its internal foam has been trimmed to provide clearance for the controls and wir
 
 ## Battery and Power Hardware
 
-The Clonker's battery system uses a separate rechargeable power module.
+The Clonker's planned portable power system uses a separate two-cell 18650 battery module.
 
 | Component | Manufacturer / Part # | Description |
 |---|---|---|
-| **Battery power module** | DFRobot 18650 lithium battery shield — exact model to confirm | Two-cell battery holder with USB power connections and regulated outputs |
-| **Rechargeable cells** | Exact production battery model to confirm | 18650 lithium-ion cells for portable operation |
+| **Battery power module** | DFRobot DFR0969 | Two-cell 18650 battery holder/power module; integration pending |
+| **Rechargeable cells** | Production battery model to confirm | Two 18650 lithium-ion cells for portable operation |
 
-The DFRobot module includes USB-C connectivity, a USB-A connection, additional power connections, and a NORMAL / HOLD switch.
+### DFRobot 18650 Battery Module
 
-Exact electrical ratings, charging behavior, and Pico power connections should be documented only after confirming the specific DFRobot board revision and completing electrical verification.
+- **Manufacturer:** DFRobot
+- **Manufacturer part number:** DFR0969
+- **DigiKey part number:** 1738-DFR0969-ND
+- **Battery positions:** Two 18650 cells
+- **USB connections:** USB-C and USB-A observed
+- **Additional power connections:** Present; electrical specifications to confirm
+- **NORMAL / HOLD switch:** Present; behavior to verify
+- **Charging and protection:** To be verified from manufacturer specifications
+- **Clonker integration:** Not yet electrically connected or validated
 
-**Battery safety:** Old, deeply discharged, or damaged lithium-ion cells must not be used as the Clonker's production power source. Battery polarity, cell compatibility, output voltage, and power-path behavior must be verified before connecting the module to the Pico.
+The module is intended to support portable operation.
+
+Battery selection, charging behavior, output regulation, and safe power-path operation must be verified before connecting it to the Pico.
+
+**Battery safety:** Old, deeply discharged, or damaged lithium-ion cells must not be used as the Clonker's production power source. Battery polarity, cell compatibility, output voltage, and power-path behavior must be verified before integration.
 
 ---
 
