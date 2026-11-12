@@ -51,7 +51,7 @@ SKIP_BACK_BUTTON_PIN = 26     # GP26 -- Cowbell A0 -- yellow
 PLAY_PAUSE_BUTTON_PIN = 27    # GP27 -- Cowbell A1 -- yellow
 SKIP_FORWARD_BUTTON_PIN = 28  # GP28 -- Cowbell A2 -- yellow
 
-# OLED display - I2C (SSD1306, 64x32)
+# OLED display - I2C (SH1106, 128x64, 1.3-inch)
 # Pin numbers are printed on the OLED PCB.
 #
 # Pin 4 -- SDA -- yellow -- GP4

@@ -4,15 +4,115 @@
 
 ## Purpose
 
-This document identifies the physical controls and mounting hardware used in THE CLONKER 10000.
+This document identifies the physical components used in THE CLONKER 10000, including the electronics, controls, enclosure, mounting hardware, and power system.
 
-It serves as a reference for component identification, replacement parts, and the actual drill sizes used during construction of the aluminum faceplate and enclosure.
+It serves as a permanent reference for:
+
+- Component identification and replacement parts.
+- Manufacturer names and model numbers.
+- Important hardware specifications.
+- Actual faceplate and enclosure drilling measurements.
+- Mechanical details useful when repairing or reproducing the hardware.
+
+This is a hardware inventory and specifications reference, not a construction guide or development-status report.
 
 For GPIO assignments, wiring, and control behavior, see [Hardware Controls](HARDWARE_CONTROLS.md).
 
+For the system design, see [Architecture](ARCHITECTURE.md).
+
+---
+
+## Main Electronics
+
+| Component | Manufacturer / Part # | Description |
+|---|---|---|
+| **Microcontroller** | Raspberry Pi Pico 2 W, UeeKKoo pre-soldered header version | RP2350-based microcontroller with onboard Wi-Fi; the Clonker's main processor |
+| **GPIO expansion** | Adafruit Pico Cowbell — exact model to confirm | GPIO breakout and connection platform for the Pico |
+| **OLED display** | Hosyond B077, 1.3-inch SH1106 | 128 × 64 monochrome I2C OLED display; purchased as a five-pack |
+| **Wire connectors** | WAGO 221-415 | Compact five-conductor lever connectors used for internal wiring distribution |
+
+### Raspberry Pi Pico 2 W
+
+The Raspberry Pi Pico 2 W is the Clonker's main processor, running the firmware, managing physical controls, and communicating with network devices.
+
+**Hardware specifications:**
+
+- **Board:** Raspberry Pi Pico 2 W
+- **Purchased version:** UeeKKoo, with pre-soldered color-coded headers
+- **Microcontroller:** Raspberry Pi RP2350
+- **Processor architecture:** Dual-core Arm Cortex-M33 or dual-core Hazard3 RISC-V
+- **Maximum processor clock:** 150 MHz
+- **SRAM:** 520 KB
+- **Onboard flash:** 4 MB
+- **Wireless controller:** Infineon CYW43439
+- **Wi-Fi:** 2.4 GHz IEEE 802.11n (Wi-Fi 4)
+- **Bluetooth hardware:** Bluetooth 5.2
+- **GPIO:** 26 multifunction user GPIO pins
+- **Interfaces:** 2 SPI, 2 I2C, 2 UART
+- **ADC:** 3 externally available 12-bit ADC inputs
+- **PWM:** 16 controllable PWM channels
+- **Programmable I/O:** 12 PIO state machines
+- **USB:** USB 1.1 controller with device and host support
+- **Amazon ASIN:** B0DP54FWX1
+
+**Clonker software:**
+
+- CircuitPython 10.3.1
+- Custom network-based remote-control firmware
+- Physical input handling, configuration management, and HTTP communication
+
+The Pico's limited RAM makes memory management and long-running reliability particularly important to the project.
+
+### GPIO Expansion — Pico Cowbell
+
+The Cowbell provides convenient access to the Pico's GPIO and power connections.
+
+- **Manufacturer:** Adafruit
+- **Model:** To be confirmed
+- **Application:** Internal Pico connection and GPIO breakout platform
+
+Exact product specifications will be added when confirmed.
+
+### OLED Display — Hosyond SH1106
+
+The OLED provides local visual feedback for the Clonker's physical controls and operating state.
+
+**Hardware specifications:**
+
+- **Manufacturer:** Hosyond
+- **Model:** B077
+- **Display size:** 1.3 inches
+- **Resolution:** 128 × 64 pixels
+- **Display controller:** SH1106
+- **Interface:** I2C
+- **Supply voltage:** Advertised 3–5 V
+- **Display type:** Monochrome OLED
+- **Viewing angle:** Advertised greater than 160 degrees
+- **Original package:** Five modules
+- **Amazon ASIN:** B0C3L7N917
+
+The display uses a four-wire connection: GND, VCC, SCL, and SDA.
+
+### Internal Wiring Connectors — WAGO
+
+**Hardware specifications:**
+
+- **Manufacturer:** WAGO
+- **Series:** 221
+- **Model:** 221-415
+- **Connection positions:** Five
+- **Connection method:** Lever-operated spring clamps
+- **Housing:** Transparent
+- **Supported conductors:** Solid, stranded, and fine-stranded copper conductors, within the manufacturer's specified ranges
+- **Amazon ASIN:** B01M6Y2UEK
+
+The connectors provide convenient, serviceable junctions for internal wiring without requiring permanent soldered splices.
+
+---
+
 ## Controls Parts List
 
-All listed exterior mounting holes have been drilled and successfully test-fitted.
+The following table preserves the actual drilling measurements used for the Clonker's physical controls.
 
 **✓ = Actual drilled and verified hole size.**
 
@@ -38,6 +138,10 @@ All listed exterior mounting holes have been drilled and successfully test-fitte
 | **CONFIG / RUN (side)** | Dorman Conduct-Tite 84815 racing-style switch | 12.7 mm (1/2") ✓ |
 | **SERVICE / DEVICE (internal)** | Philmore 30-10007 SPST toggle switch | No exterior hole required |
 
+The Power Toggle uses a separate red flip-up protective guard.
+
+---
+
 ## OLED Mounting Hardware
 
 The OLED is mounted to the aluminum faceplate using four machine screws, matching nuts, and nylon spacers.
@@ -50,27 +154,76 @@ The OLED is mounted to the aluminum faceplate using four machine screws, matchin
 
 The OLED connector cable passes through a separate hand-cut slot near the upper edge of the display.
 
+---
+
 ## Faceplate and Enclosure
 
-**Faceplate material:**
+### Aluminum Faceplate
 
-- Manufacturer: PATIKIL
-- Material: 6061-T651 aluminum
-- Dimensions: 152.4 × 203.2 mm (6 × 8 inches)
-- Thickness: Approximately 1.5 mm (1/16 inch)
-- Finish: Brushed aluminum
-- Manufacturer part: pta240807tt001253
-- Amazon ASIN: B0DHR7TLNX
+The Clonker's control panel is fabricated from 6061-T651 aluminum sheet.
 
-**Mounting arrangement:**
+**Material specifications:**
+
+- **Supplier:** PATIKIL
+- **Material:** 6061-T651 aluminum alloy
+- **Original sheet dimensions:** 152.4 × 203.2 mm (6 × 8 inches)
+- **Thickness:** 1/16 inch (0.0625 inch, approximately 1.59 mm)
+- **Finish:** Brushed aluminum
+- **Original packaging:** Three sheets with protective film
+- **Manufacturer part number:** pta240807tt001253
+- **Amazon ASIN:** B0DHR7TLNX
+
+The original sheet dimensions should not be confused with the finished faceplate dimensions.
+
+The faceplate serves as the rigid mounting surface for the rotary encoders, navigation buttons, playback controls, room selector, power button, and OLED display.
+
+### Enclosure — Lebakort B115
+
+The Clonker uses a repurposed protective carrying case originally designed for 3D printing pens.
+
+**Manufacturer specifications:**
+
+- **Manufacturer:** Lebakort
+- **Model:** B115
+- **Original application:** Protective case for 3D printing pens
+- **Color:** Black
+- **Shell material:** Hard EVA (ethylene-vinyl acetate)
+- **Closure:** Zipper
+- **Interior:** Soft protective lining and mesh storage pockets
+- **Compartments:** Two
+- **Listed weight:** 7.4 oz (approximately 210 g)
+- **Amazon ASIN:** B0D6K9NT32
+
+The case provides a lightweight protective enclosure for the Pico, internal electronics, wiring, and power system.
+
+Its internal foam has been trimmed to provide clearance for the controls and wiring.
+
+### Faceplate Mounting
 
 - Aluminum faceplate secured to the enclosure using ten perimeter mounting points.
 - Fender washers used beneath the plate where clearance permits.
 - Smaller washers retained where internal component clearance is limited.
 - Nuts secure the plate from inside the enclosure.
-- The enclosure's internal foam was trimmed to provide clearance for the controls and wiring.
+- The original protective film was retained during drilling and removed after completion.
 
-The original protective film was retained during drilling and removed after completion.
+---
+
+## Battery and Power Hardware
+
+The Clonker's battery system uses a separate rechargeable power module.
+
+| Component | Manufacturer / Part # | Description |
+|---|---|---|
+| **Battery power module** | DFRobot 18650 lithium battery shield — exact model to confirm | Two-cell battery holder with USB power connections and regulated outputs |
+| **Rechargeable cells** | Exact production battery model to confirm | 18650 lithium-ion cells for portable operation |
+
+The DFRobot module includes USB-C connectivity, a USB-A connection, additional power connections, and a NORMAL / HOLD switch.
+
+Exact electrical ratings, charging behavior, and Pico power connections should be documented only after confirming the specific DFRobot board revision and completing electrical verification.
+
+**Battery safety:** Old, deeply discharged, or damaged lithium-ion cells must not be used as the Clonker's production power source. Battery polarity, cell compatibility, output voltage, and power-path behavior must be verified before connecting the module to the Pico.
+
+---
 
 ## Drilling Notes
 
@@ -93,7 +246,7 @@ Hole dimensions are listed in millimeters first, followed by imperial equivalent
 
 Where the final hole was enlarged using a twist drill after an initial step-drilled opening, the table identifies the finishing drill.
 
-These measurements document the actual construction results rather than relying solely on manufacturer mounting recommendations.
+These measurements document actual construction results rather than relying solely on manufacturer mounting recommendations.
 
 ### Important Findings
 
@@ -119,34 +272,22 @@ These measurements document the actual construction results rather than relying 
 
 **Power Toggle:** Uses a guarded momentary pushbutton with a red flip-up protective guard. The guard is a separate component.
 
-## Construction Status
-
-As of November 5, 2026:
-
-- All 14 faceplate control holes completed and verified.
-- All four OLED mounting holes completed and verified.
-- Side-mounted CONFIG / RUN switch hole completed and verified.
-- Aluminum faceplate installed on the enclosure.
-- All front-panel controls mechanically mounted.
-- OLED mechanically mounted.
-- Raspberry Pi Pico 2 W and associated electronics moved inside the enclosure.
-- Internal wiring, soldering, strain relief, and final electrical integration remain in progress.
-
-**Total: 19 completed and verified control/display mounting holes.**
-
-The faceplate drilling phase is complete.
+---
 
 ## Maintenance
 
 Update this document when:
 
-- A physical control is replaced or changed.
+- A physical component is replaced or changed.
 - A manufacturer or part number is confirmed.
 - Additional mounting hardware is installed.
 - The enclosure or faceplate design changes.
 - New electronics or internal mounting arrangements are finalized.
+- Previously provisional specifications are verified.
 
-The goal is to preserve enough information to repair, reproduce, or rebuild the hardware without having to reverse-engineer the original build.
+Development milestones, implementation status, and test history belong in the project's development documentation rather than this inventory.
+
+The goal is to preserve enough information to identify, repair, reproduce, or rebuild the hardware without reverse-engineering the original machine.
 
 ---
 
