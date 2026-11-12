@@ -1,5 +1,5 @@
 # THE CLONKER 10000
-## Hardware & Physical Controls
+## Hardware Design
 
 **Updated:** November 9, 2026  
 **Controller:** Raspberry Pi Pico 2 W (RP2350), CircuitPython 10.3.1  
