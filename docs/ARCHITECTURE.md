@@ -37,6 +37,8 @@ The remote does not maintain authoritative equipment state. It sends commands an
 
 **Be resilient in our dumbness.**
 
+For a standalone, reusable discussion of cooperative HTTP server design, bounded memory usage, and failure recovery, see [Cooperative HTTP Server](COOPERATIVE_HTTP_SERVER.md). This is an independent technical reference, not a Clonker-specific architecture component.
+
 ---
 
 ## 2. Architecture at a glance
