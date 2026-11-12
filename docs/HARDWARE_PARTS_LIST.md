@@ -123,7 +123,7 @@ The Clonker firmware uses GP4 (SDA) and GP5 (SCL) for the display.
 - **Supported conductors:** Solid, stranded, and fine-stranded copper conductors, within the manufacturer's specified ranges
 - **Amazon ASIN:** B01M6Y2UEK
 
-The connectors provide serviceable junctions for internal wiring without requiring permanent soldered splices.
+The connectors are primarily daisy-chained to form the Clonker's common ground bus, providing convenient, serviceable ground connections for the physical controls and electronics without requiring permanent soldered splices.
 
 ---
 
