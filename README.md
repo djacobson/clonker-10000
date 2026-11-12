@@ -336,13 +336,13 @@ The navigation and skip buttons support Roku keydown/keyup behavior, allowing a 
 
 The second Bourns encoder selects and executes room-specific Custom Actions. The OLED uses persistent hardware inversion to acknowledge execution.
 
-The OLED provides two-line room identification, navigation and playback labels, `POW!` power-toggle feedback, volume-direction and mute feedback, and automatic display-off after inactivity. Custom arrowhead glyphs give directional buttons their own personality. Updates are event-driven rather than continuously rendered.
+The OLED provides two-line room identification, navigation and playback labels, `POW!` power-toggle feedback, volume-direction and mute feedback, and automatic display-off after inactivity. Custom arrowhead glyphs give directional buttons their own personality. A startup `CLONKER / READY!` greeting now confirms application initialization, especially useful when running untethered. Updates are event-driven rather than continuously rendered.
 
 ### Still on the Workbench
 
 - Audible CLONK feedback.
 - Enclosure finishing and assembly.
-- Rechargeable power and sleep/wake behavior.
+- Permanent battery installation, charging validation, and sleep/wake behavior.
 - Additional reliability testing.
 
 The previously considered Grayhill volume encoder was set aside in favor of the Bourns units.
@@ -500,14 +500,15 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 - **A screen that speaks:** The OLED identifies rooms, displays selected actions, reports volume direction and mute feedback, and sleeps after inactivity. All without constantly redrawing itself.
 - **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom actions, and the Dumb Queue™.
 - **A more responsive workshop:** CONFIG-mode browser improvements and Chapter 8 physical polling optimizations are operational.
+- **The Monster goes cordless:** Chapter 9 demonstrated successful battery-powered operation using two rechargeable 18650 cells and a DFRobot power module. Permanent installation and runtime testing remain in progress.
 
 These are working firmware and physical-control capabilities, not just plans on a drawing board.
 
 ### What's Still on the Operating Table 🔧
 
 - Add satisfying audible CLONK feedback.
-- Finish enclosure details and the rechargeable power system.
-- Investigate battery management and sleep/wake behavior.
+- Finish enclosure details and permanently integrate the battery system.
+- Validate battery runtime, charging, and future sleep/wake behavior.
 - Continue reliability and failure-recovery testing.
 - Expand compatibility, including Apple TV.
 - Explore additional OLED feedback where it provides real value.
@@ -518,7 +519,7 @@ The physical controls are assembled and operational, including both Bourns encod
 
 The Custom Action encoder selects and executes room-specific actions, with OLED inversion acknowledging execution. The display also provides two-line room identification, volume-direction feedback, and mute feedback without continuous screen rendering.
 
-The next major frontier is making the Clonker comfortably self-contained: battery power, charging, and sensible sleep/wake behavior.
+The Clonker has now successfully operated on rechargeable batteries. The next frontier is making that power system permanent: charging, practical runtime, and sensible sleep/wake behavior.
 
 Or perhaps making it look slightly less like a bench experiment inside a very nice enclosure.
 
