@@ -404,6 +404,10 @@ def main():
             config_mode = switches.config_enabled()
             config_source = switches.config_source()
 
+            # Either CONFIG switch direction counts as activity
+            # and can wake a sleeping Clonker.
+            sleep_manager.note_config_switch(config_mode)
+
             # Start/retry the CONFIG listener with bounded backoff.
             if config_mode and not web_running:
                 if now >= next_web_retry:
