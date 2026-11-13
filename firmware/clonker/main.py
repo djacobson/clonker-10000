@@ -364,7 +364,10 @@ def main():
                     + PHYSICAL_POLL_INTERVAL_NS
                 )
 
-            if now >= next_action_poll:
+            if (
+                not sleep_manager.is_sleeping()
+                and now >= next_action_poll
+            ):
                 if PERF_ENABLED:
                     started = perf.start()
 
