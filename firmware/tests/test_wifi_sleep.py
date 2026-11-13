@@ -12,7 +12,7 @@ import wifi
 
 # Adjust to a known local host that responds to ICMP.
 # Set to None to skip ping checks.
-PING_HOST = "192.168.1.28"
+PING_HOST = "192.168.50.1"
 PING_TIMEOUT_SECONDS = 1.0
 OFF_SECONDS = 10
 CYCLE_COUNT = 100
