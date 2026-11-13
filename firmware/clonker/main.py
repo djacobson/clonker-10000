@@ -437,6 +437,15 @@ def main():
                         "CONFIG" if config_mode else "RUN"
                     )
                 )
+
+                # Display switch transitions, but preserve the
+                # startup CLONKER / READY! greeting.
+                if last_announced_mode is not None and oled_ready:
+                    if config_mode:
+                        oled.show_text("CONFIG", "MODE")
+                    else:
+                        oled.show_text("RUN", "MODE")
+
                 last_announced_mode = config_mode
 
             # Advance at most one inbound network operation per poll.
