@@ -510,14 +510,10 @@ def poll():
     if measure_scan:
         scan_ns += _perf.start() - started
 
-    if room_id is not None:
-        # Room changes count as activity while awake,
-        # but cannot wake a sleeping Clonker.
-        sleep_manager.note_activity(
-            "ROOM_SELECTOR",
-            wake_eligible=False,
-        )
-
+    if room_id is not None and not sleep_manager.note_activity(
+        "ROOM_SELECTOR",
+        wake_eligible=False,
+    ):
         if measure_events:
             event_seen = True
 
@@ -546,13 +542,18 @@ def poll():
         if event is None:
             continue
 
-        # Only a button press can wake the sleeping Clonker.
-        # Releases do not reset the inactivity timer.
+        # Presses can wake Clonker, but the wake press
+        # must not execute its normal action.
         if event == "pressed":
-            sleep_manager.note_activity(
+            if sleep_manager.note_activity(
                 button.name,
                 wake_eligible=True,
-            )
+            ):
+                continue
+
+        # Ignore releases while asleep as well.
+        elif sleep_manager.is_sleeping():
+            continue
 
         if measure_events:
             event_seen = True
@@ -610,14 +611,10 @@ def poll():
         if measure_scan:
             scan_ns += _perf.start() - started
 
-        if step:
-
-            # Rotation counts as activity but cannot wake Clonker.
-            sleep_manager.note_activity(
-                "VOLUME_ENCODER",
-                wake_eligible=False,
-            )
-
+        if step and not sleep_manager.note_activity(
+            "VOLUME_ENCODER",
+            wake_eligible=False,
+        ):
             if measure_events:
                 event_seen = True
 
@@ -652,12 +649,10 @@ def poll():
         if measure_scan:
             scan_ns += _perf.start() - started
 
-        if step:
-            sleep_manager.note_activity(
-                "ACTION_ENCODER",
-                wake_eligible=False,
-            )
-
+        if step and not sleep_manager.note_activity(
+            "ACTION_ENCODER",
+            wake_eligible=False,
+        ):
             if measure_events:
                 event_seen = True
 
