@@ -15,6 +15,7 @@ The room selector maintains its own selected-room state.
 import time
 from clonker.controls import switches
 from clonker.system import logger
+from clonker.system import sleep_manager
 from clonker import actions
 from clonker import device_config_v2 as device_config
 from clonker import device_adapters
@@ -538,6 +539,14 @@ def poll():
         if event is None:
             continue
 
+        # Only a button press can wake the sleeping Clonker.
+        # Releases do not reset the inactivity timer.
+        if event == "pressed":
+            sleep_manager.note_activity(
+                button.name,
+                wake_eligible=True,
+            )
+
         if measure_events:
             event_seen = True
 
@@ -595,6 +604,13 @@ def poll():
             scan_ns += _perf.start() - started
 
         if step:
+
+            # Rotation counts as activity but cannot wake Clonker.
+            sleep_manager.note_activity(
+                "VOLUME_ENCODER",
+                wake_eligible=False,
+            )
+
             if measure_events:
                 event_seen = True
 
@@ -630,6 +646,11 @@ def poll():
             scan_ns += _perf.start() - started
 
         if step:
+            sleep_manager.note_activity(
+                "ACTION_ENCODER",
+                wake_eligible=False,
+            )
+
             if measure_events:
                 event_seen = True
 
