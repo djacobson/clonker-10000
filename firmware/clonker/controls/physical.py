@@ -201,7 +201,7 @@ def _reboot_sequence_step(room_id):
 
     # Allow the OLED to refresh before resetting.
     oled.poll()
-    time.sleep(0.5)
+    time.sleep(1.0)
 
     import microcontroller
     microcontroller.reset()
