@@ -12,7 +12,8 @@ This module maps physical events to Clonker actions.
 The CONFIG/RUN switch is managed separately in switches.py.
 The room selector maintains its own selected-room state.
 """
-
+import time
+from clonker.controls import switches
 from clonker.system import logger
 from clonker import actions
 from clonker import device_config_v2 as device_config
@@ -143,6 +144,67 @@ _action_index = 0
 
 # Physical button name -> room selected when pressed.
 _hold_rooms = {}
+
+
+# Secret reboot handshake.
+# Physical CONFIG ON, then 2 -> 3 -> 2 -> 3 -> 2 -> 3.
+# The first room-2 event must be an actual selector transition.
+REBOOT_SEQUENCE = (
+    "room-2", "room-3", "room-2",
+    "room-3", "room-2", "room-3",
+)
+REBOOT_SEQUENCE_TIMEOUT_NS = 10_000_000_000
+
+_reboot_sequence_index = 0
+_reboot_sequence_started = 0
+
+
+def _reboot_sequence_reset():
+    """Cancel an incomplete reboot handshake."""
+    global _reboot_sequence_index, _reboot_sequence_started
+
+    _reboot_sequence_index = 0
+    _reboot_sequence_started = 0
+
+
+def _reboot_sequence_step(room_id):
+    """Observe a debounced room change for the secret handshake."""
+    global _reboot_sequence_index, _reboot_sequence_started
+
+    now = time.monotonic_ns()
+
+    if (
+        _reboot_sequence_index
+        and now - _reboot_sequence_started
+        > REBOOT_SEQUENCE_TIMEOUT_NS
+    ):
+        _reboot_sequence_reset()
+
+    expected = REBOOT_SEQUENCE[_reboot_sequence_index]
+
+    if room_id != expected:
+        _reboot_sequence_reset()
+        return
+
+    if _reboot_sequence_index == 0:
+        _reboot_sequence_started = now
+
+    _reboot_sequence_index += 1
+
+    if _reboot_sequence_index < len(REBOOT_SEQUENCE):
+        return
+
+    _reboot_sequence_reset()
+
+    logger.warning("SECRET REBOOT: Handshake accepted")
+    oled.show_text("REBOOTING!")
+
+    # Allow the OLED to refresh before resetting.
+    oled.poll()
+    time.sleep(0.5)
+
+    import microcontroller
+    microcontroller.reset()
 
 
 def _custom_actions_for_room(room_id):
@@ -437,6 +499,12 @@ def poll():
         started = _perf.start()
 
     room_id = selectors.poll()
+
+    # Secret reboot handshake: physical CONFIG + room selector.
+    if switches.config_source() != "PHYSICAL" or not switches.config_enabled():
+        _reboot_sequence_reset()
+    elif room_id is not None:
+        _reboot_sequence_step(room_id)
 
     if measure_scan:
         scan_ns += _perf.start() - started
