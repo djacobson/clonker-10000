@@ -511,6 +511,13 @@ def poll():
         scan_ns += _perf.start() - started
 
     if room_id is not None:
+        # Room changes count as activity while awake,
+        # but cannot wake a sleeping Clonker.
+        sleep_manager.note_activity(
+            "ROOM_SELECTOR",
+            wake_eligible=False,
+        )
+
         if measure_events:
             event_seen = True
 
