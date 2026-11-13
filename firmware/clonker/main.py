@@ -20,6 +20,7 @@ import gc
 from clonker.system import logger
 from clonker.system import perf
 from clonker.system import memory_monitor
+from clonker.system import sleep_manager
 from clonker.net import web
 from clonker.net import http_transport
 from clonker.devices import denon
@@ -286,6 +287,10 @@ def main():
             "Physical controls disabled (brain-only mode)"
         )
 
+    # Initialize developer-only inactivity monitoring.
+    # The initial implementation is entirely dry-run.
+    sleep_manager.initialize()
+
     web_running = False
 
     # Track announced mode and source independently.
@@ -536,6 +541,13 @@ def main():
                         oled.get_refresh_count()
                     )
                     perf_report_at = time.monotonic_ns()
+
+            # Evaluate inactivity and simulated sleep transitions.
+            # No Wi-Fi, OLED, or reboot operations occur yet.
+            sleep_manager.tick(
+                config_mode=config_mode,
+                actions_pending=(actions.status()["depth"] > 0),
+            )
 
             # Scheduled memory diagnostics and optional GC experiment.
             memory_monitor.poll()
