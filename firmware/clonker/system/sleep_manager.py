@@ -29,6 +29,7 @@ _ASLEEP = "ASLEEP"
 
 _state = _AWAKE
 _last_activity_ns = time.monotonic_ns()
+_last_config_mode = None
 
 
 def initialize():
@@ -75,6 +76,30 @@ def note_activity(name, wake_eligible=False):
     # Any physical activity while awake resets inactivity.
     _last_activity_ns = time.monotonic_ns()
     return False
+
+
+def note_config_switch(config_mode):
+    """Detect CONFIG/RUN transitions in either direction."""
+    global _last_config_mode
+
+    config_mode = bool(config_mode)
+
+    if _last_config_mode is None:
+        # Establish the initial switch position.
+        _last_config_mode = config_mode
+        return
+
+    if config_mode == _last_config_mode:
+        return
+
+    _last_config_mode = config_mode
+
+    # Both switch directions count as physical activity.
+    # During sleep, either direction requests a wake.
+    note_activity(
+        "CONFIG_SWITCH",
+        wake_eligible=True,
+    )
 
 
 def tick(config_mode=False, actions_pending=False):
