@@ -52,34 +52,29 @@ def is_sleeping():
 
 
 def note_activity(name, wake_eligible=False):
-    """Record physical activity and evaluate simulated wake."""
+    """Record activity; return True if sleep consumed the event."""
     global _state, _last_activity_ns
 
     if not SLEEP_ENABLED:
-        return
+        return False
 
     if _state == _ASLEEP:
-        # While asleep, only eligible button presses can wake us.
-        # Encoder rotation must not alter the inactivity timer.
-        if not wake_eligible:
-            return
-
-        logger.info(
-            "SLEEP: wake requested by {} (DRY RUN)".format(
-                name
+        if wake_eligible:
+            logger.info(
+                "SLEEP: wake requested by {} (DRY RUN)".format(
+                    name
+                )
             )
-        )
-        logger.info(
-            "SLEEP: would reboot; no action taken"
-        )
+            logger.info("SLEEP: would reboot; no action taken")
+            _state = _AWAKE
+            _last_activity_ns = time.monotonic_ns()
 
-        # Simulate waking and restart the inactivity countdown.
-        _state = _AWAKE
-        _last_activity_ns = time.monotonic_ns()
-        return
+        # Do not dispatch an input received during sleep.
+        return True
 
-    # Normal physical activity while awake resets inactivity.
+    # Any physical activity while awake resets inactivity.
     _last_activity_ns = time.monotonic_ns()
+    return False
 
 
 def tick(config_mode=False, actions_pending=False):
