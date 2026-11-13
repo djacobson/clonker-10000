@@ -382,21 +382,23 @@ def main():
                     + ACTION_POLL_INTERVAL_NS
                 )
 
-            # Maintain stateful adapters independently of queue depth.
-            if PERF_ENABLED:
-                started = perf.start()
-
-            try:
-                device_adapters.poll()
-            except Exception as exc:
-                logger.warning(
-                    "Device adapter maintenance failed: {}".format(
-                        exc
-                    )
-                )
-            finally:
+            # Maintain stateful adapters only while awake.
+            # Sleeping Clonker must not access the network.
+            if not sleep_manager.is_sleeping():
                 if PERF_ENABLED:
-                    perf.stop("adapter.exec", started)
+                    started = perf.start()
+
+                try:
+                    device_adapters.poll()
+                except Exception as exc:
+                    logger.warning(
+                        "Device adapter maintenance failed: {}".format(
+                            exc
+                        )
+                    )
+                finally:
+                    if PERF_ENABLED:
+                        perf.stop("adapter.exec", started)
 
             # CONFIG/RUN is an application mode, not an HTTP command.
             config_mode = switches.config_enabled()
