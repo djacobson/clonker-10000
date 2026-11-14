@@ -41,6 +41,7 @@ PHYSICAL_POLL_INTERVAL_NS = 1_000_000
 WEB_POLL_INTERVAL_NS = 1_000_000
 ACTION_POLL_INTERVAL_NS = 10_000_000
 WEB_LISTENER_RETRY_NS = 5_000_000_000  # 5 seconds
+SLEEP_IDLE_POLL_S = 0.025  # 25 ms during software sleep
 
 # Periodic performance reporting.
 PERF_ENABLED = False
@@ -565,9 +566,12 @@ def main():
             # Scheduled memory diagnostics and optional GC experiment.
             memory_monitor.poll()
 
-            # Yield briefly to the CircuitPython runtime.
-            # Keep this INSIDE the while True loop.
-            time.sleep(0.001)
+            # Yield longer during software sleep to reduce
+            # scheduler activity while preserving GPIO polling.
+            if sleep_manager.is_sleeping():
+                time.sleep(SLEEP_IDLE_POLL_S)
+            else:
+                time.sleep(0.001)
 
     finally:
         if web_running:
