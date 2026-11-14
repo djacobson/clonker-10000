@@ -949,7 +949,117 @@ Priorities include:
 
 ---
 
-## 18. Related documents
+## 18. Chapter 9 — Rechargeable power and charging
+
+### Battery and power hardware
+
+Clonker's rechargeable power system uses:
+
+- DFRobot DFR0969 dual-18650 charging and 5 V boost module.
+- Two rechargeable 18650 lithium-ion cells.
+- USB-A 5 V output to power the Raspberry Pi Pico 2 W.
+- USB-C input for external charging power.
+- Panel-mounted USB-C charging connector on the enclosure.
+- DFRobot HOLD/NORMAL operating-mode switch.
+
+The module has successfully powered Clonker independently of
+a laptop or external USB supply.
+
+The USB-C panel connector has been physically fitted to the
+enclosure. Final internal battery-module mounting, wiring,
+and strain relief remain pending.
+
+### Charging and power transitions
+
+The DFRobot's behavior is asymmetric under the tested
+conditions.
+
+| Transition | Observed result |
+|---|---|
+| Battery to external charging power | Seamless; Clonker continues operating |
+| External charging power to battery | Output interruption; Clonker reboots |
+| Charger removal in HOLD mode | USB power tester reboots |
+| Charger removal in NORMAL mode | USB power tester reboots |
+
+The charger-removal behavior was reproduced with the Pico
+disconnected and only the inline USB power tester connected
+to the DFRobot USB-A output.
+
+This isolates the interruption from Clonker firmware.
+
+The exact voltage transient and interruption duration have
+not been measured.
+
+Clonker's normal startup takes approximately 11 seconds
+following the observed charger-removal reset.
+
+HOLD remains the intended operating mode for battery use.
+
+### Software sleep and battery operation
+
+Chapter 9 introduced software-managed inactivity sleep.
+
+After 10 minutes of inactivity in RUN mode, Clonker can
+disable its OLED and Wi-Fi while continuing to poll
+physical wake controls.
+
+A physical pushbutton wakes Clonker through a
+microcontroller reboot.
+
+Measured current at the Pico USB input was approximately:
+
+| Condition | Current |
+|---|---:|
+| Awake, idle RUN | 33–35 mA |
+| Software sleep | 24 mA |
+
+These measurements exclude DFRobot conversion losses and
+the module's own power consumption. They must not be
+interpreted as battery-cell current.
+
+An approximately 12-hour battery-powered overnight test
+successfully demonstrated continued power availability
+and physical-button wake.
+
+This was not a full battery-discharge test.
+
+### Charging and assembly considerations
+
+The charging system should use a suitably rated external
+5 V USB supply.
+
+Charging-input current measurements have reached
+approximately 1.8 A during testing.
+
+Final enclosure integration should verify:
+
+- Secure mounting of the DFRobot module and cells.
+- Insulation and protection against accidental shorts.
+- Appropriate cable routing and strain relief.
+- Safe cell retention and clearance from other components.
+- Charging behavior and component temperatures.
+- Continued operation when charging power is connected.
+- Expected reboot behavior when charging power is removed.
+- Battery-powered sleep and wake after final assembly.
+
+Avoid placing pressure on the 18650 cells or exposing
+their terminals to conductive enclosure hardware.
+
+### Remaining power-system work
+
+- Complete internal battery and charger installation.
+- Verify the panel-mounted USB-C charging connection.
+- Perform post-assembly charging and power-transition tests.
+- Measure practical battery runtime over a longer period.
+- Investigate hardware sleep when supported by a suitable
+  stable CircuitPython release.
+
+Detailed experiments and measured results are recorded in
+[Development History](DEVELOPMENT_HISTORY.md).
+
+---
+
+## 19. Related documents
 
 - [Architecture](ARCHITECTURE.md) — system boundaries, dispatcher, queue, adapters.
 - [Configuration & Recovery](CONFIGURATION.md) — Config v4 schema, persistence, revision protection.
