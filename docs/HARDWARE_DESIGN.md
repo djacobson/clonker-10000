@@ -1063,9 +1063,16 @@ their terminals to conductive enclosure hardware.
 
 ### Remaining power-system work
 
-- Complete internal battery and charger installation.
-- Verify the panel-mounted USB-C charging connection.
-- Perform post-assembly charging and power-transition tests.
+The DFRobot module, both 18650 cells, and permanent USB-C
+charging interface are installed in the enclosure.
+
+Remaining validation:
+
+- Verify the installed USB-C charging connection.
+- Monitor cell and DFRobot temperatures during charging.
+- Verify insulation, wiring clearance, and strain relief.
+- Repeat charging and power-transition tests after assembly.
+- Verify battery-powered sleep and wake after assembly.
 - Measure practical battery runtime over a longer period.
 - Investigate hardware sleep when supported by a suitable
   stable CircuitPython release.
