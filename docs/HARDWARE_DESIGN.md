@@ -909,8 +909,8 @@ See [Development History](DEVELOPMENT_HISTORY.md) for detailed test results and 
 | Mounting and strain relief | Complete |
 | Pico Cowbell connections | Complete |
 | Shared PERF instrumentation | Operational |
-| Battery power | Bench-tested successfully in Chapter 9; permanent integration pending |
-| Sleep/wake | Not implemented |
+| Battery power | Bench-tested; overnight software-sleep endurance and wake verified in Chapter 9; permanent installation pending |
+| Sleep/wake | Software sleep and physical-button wake operational; 10-minute timeout and secret sleep toggle verified in Chapter 9 |
 | Audible CLONK | Not implemented |
 
 ### Verification boundaries
