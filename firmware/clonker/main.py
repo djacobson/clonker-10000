@@ -409,7 +409,11 @@ def main():
             sleep_manager.note_config_switch(config_mode)
 
             # Start/retry the CONFIG listener with bounded backoff.
-            if config_mode and not web_running:
+            if (
+                config_mode
+                and not web_running
+                and not sleep_manager.is_sleeping()
+            ):
                 if now >= next_web_retry:
                     try:
                         web.start()
