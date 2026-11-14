@@ -1021,11 +1021,20 @@ Mute messages represent the action dispatcher's transmitted toggle direction, no
 
 The physical assembly is mounted, soldered, wired, secured, and strain-relieved through the Pico Cowbell Terminal board.
 
+The Chapter 9 prototype now operates from a rechargeable dual-18650
+battery system and supports software-managed inactivity sleep.
+
+The sleep manager coordinates Wi-Fi shutdown, OLED shutdown, and
+wake-triggered reboot. The CPU remains active to monitor physical
+controls; this is not hardware light sleep or deep sleep.
+
 Future development includes:
 
 - Additional OLED messages where they improve usability.
 - Audible CLONK feedback.
-- Battery selection, charging, sleep, and wake behavior.
+- Permanent battery installation and charging validation.
+- Extended battery endurance and sleep/wake reliability testing.
+- Hardware light/deep sleep when supported by CircuitPython.
 - Possible alternate panel orientation.
 
 The orientation concept would exchange navigation and skip directions through an alternate action mapping rather than rewriting GPIO drivers.
