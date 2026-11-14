@@ -266,6 +266,19 @@ Or possibly the control panel of a very small submarine.
 
 *Actual prototype. Industrial design department still missing. Marketing department still disbanded.*
 
+### The Clonker's Fighting Weight 🥊
+
+| Configuration | Weight |
+|---|---:|
+| Without batteries | 1.4 lbs |
+| Fully loaded | **1.8 lbs** |
+
+Between the hefty metal switches, aluminum faceplate, and
+rechargeable power plant, this remote has absolutely no
+intention of being lightweight.
+
+**The Monster is chunky.**
+
 ---
 
 ## The Actual Hardware
