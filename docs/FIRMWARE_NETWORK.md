@@ -1594,10 +1594,25 @@ These figures do not include the battery module's conversion losses
 or its own electrical consumption.
 
 The DFRobot DFR0969 dual-18650 module successfully powered the
-application during sleep and wake testing.
+application during software sleep and wake testing.
 
-An overnight battery endurance test began November 13, 2026;
-its result remains pending.
+An approximately 12-hour overnight battery-powered endurance
+test completed successfully on November 14, 2026.
+
+After the test, a physical pushbutton woke Clonker, triggering
+the expected microcontroller reboot and normal startup.
+
+This verified extended overnight wake responsiveness, but not
+maximum battery runtime or full-discharge behavior.
+
+The current production-oriented inactivity timeout is
+600 seconds (10 minutes), replacing the initial 60-second
+development setting.
+
+The sleep manager also supports a volatile runtime enable/disable
+toggle through `toggle_enabled()`. The physical-control coordinator
+invokes it after recognizing the CONFIG-gated secret room-selector
+handshake. Reboot restores the developer-configured startup default.
 
 #### Limitations
 
