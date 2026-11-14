@@ -747,7 +747,7 @@ Current target intervals:
 | Physical controls | 1 ms |
 | Action queue | 10 ms |
 | Management HTTP | 1 ms |
-| Main-loop yield | 1 ms |
+| Main-loop yield | 1 ms awake; 25 ms during software sleep |
 
 The main loop services physical inputs, queued actions, adapter maintenance, operating-mode changes, and inbound management requests.
 
@@ -843,6 +843,141 @@ Browser and physical actions continue sharing the same queue. The management ser
 Chapter 8 verified the recovery paths using controlled fault injection. The implementation does not guarantee recovery from every underlying Wi-Fi or socket-stack failure.
 
 Implementation details, diagnostics, and test results belong in [Firmware, Network & Clock](FIRMWARE_NETWORK.md) and [Development History](DEVELOPMENT_HISTORY.md).
+
+### 10.6 Software sleep and power management — Chapter 9
+
+**Primary module:** `clonker/system/sleep_manager.py`
+
+Chapter 9 introduced software-managed inactivity sleep on the
+Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
+
+This is an application-level power state, not hardware light sleep
+or deep sleep. The CPU continues running and polling physical GPIO
+inputs.
+
+#### Responsibility boundaries
+
+The sleep manager owns:
+
+- Inactivity tracking using `time.monotonic_ns()`.
+- Sleep eligibility and state transitions.
+- Dry-run simulation for development.
+- CONFIG-switch transition detection.
+- Wake-event policy and reboot requests.
+- OLED farewell and hardware shutdown.
+- Wi-Fi radio shutdown.
+- Recovery reboot if shutdown raises an exception.
+
+The scheduler in `main.py` remains responsible for coordinating
+normal application work and respecting the sleep state.
+
+Physical controls report activity through the sleep manager.
+They do not independently manage Wi-Fi or display shutdown.
+
+The OLED driver retains ownership of its display and I²C resources.
+
+#### Sleep eligibility
+
+Software sleep is permitted only when:
+
+- Sleep is enabled.
+- CONFIG mode is inactive.
+- The inactivity timeout has elapsed.
+- No queued actions remain.
+
+CONFIG mode inhibits sleep and resets inactivity timing.
+
+Physical activity while awake restarts the inactivity timer.
+
+#### Sleep entry
+
+When the inactivity timeout expires:
+
+1. The OLED displays `Going Zzzz!` for approximately 1.5 seconds.
+2. The OLED is closed and its I²C interface released.
+3. The Wi-Fi radio is disabled.
+4. The sleep manager enters its ASLEEP state.
+
+The CPU remains running.
+
+A shutdown exception triggers a recovery reboot rather than
+deliberately continuing in a partially shut-down state.
+
+#### Scheduler behavior
+
+While asleep:
+
+- Physical GPIO polling continues.
+- Action-queue execution is suspended.
+- Device-adapter maintenance is suspended.
+- The management HTTP listener cannot start.
+- OLED polling is suspended.
+- Memory-monitor polling is suspended.
+- The main-loop delay increases from 1 ms to 25 ms.
+
+The longer delay applies only to software sleep. Normal awake-mode
+scheduling remains unchanged.
+
+The 25 ms delay is a polling optimization, not a guaranteed wake
+latency. Very short button presses may be missed; short MUTE-button
+presses were successfully tested.
+
+#### Wake policy
+
+Wake-eligible inputs are:
+
+- Any supported momentary pushbutton press.
+- A physical CONFIG/RUN switch transition in either direction.
+
+Encoder rotation and room-selector movement do not wake Clonker.
+
+The wake-triggering input is consumed and must not issue an
+equipment command.
+
+In real sleep mode, wake calls `microcontroller.reset()`.
+CircuitPython and Clonker then initialize normally, restoring
+Wi-Fi and other application services.
+
+In dry-run mode, the wake event restores the simulated awake state
+without rebooting.
+
+The CONFIG switch's position after reboot determines whether the
+application starts in CONFIG or RUN mode.
+
+#### Measurements and limitations
+
+Chapter 9 bench measurements at approximately 5 V showed:
+
+| Condition | Approximate current |
+|---|---:|
+| Awake RUN | 38 mA |
+| Software sleep, initial implementation | 25 mA |
+| Software sleep, optimized scheduler | 24 mA |
+
+The observed reduction from 38 mA to 24 mA is approximately 37%.
+
+These measurements describe the USB-side load, not total battery
+current. The DFRobot power module's conversion losses and internal
+consumption must be considered separately.
+
+Battery-powered sleep and pushbutton wake have been demonstrated.
+Extended overnight endurance testing remains pending.
+
+#### Future hardware sleep
+
+The sleep manager is intended to remain the central policy owner
+if hardware light sleep or deep sleep becomes available.
+
+A future implementation may require changes to low-level GPIO
+wake configuration, peripheral initialization, and scheduler
+coordination. The current module boundaries are designed to
+minimize those changes, not eliminate them entirely.
+
+Hardware sleep support should be investigated separately from
+the established software-sleep implementation.
+
+Detailed test results and historical measurements belong in
+[Development History](DEVELOPMENT_HISTORY.md).
 
 ---
 
