@@ -3688,34 +3688,212 @@ Four illuminated LEDs remained visible during battery operation. The module's do
 
 ### Overnight endurance test
 
-An overnight battery-powered sleep endurance test began on November 13, 2026.
+An overnight battery-powered software-sleep endurance test began
+on November 13, 2026.
 
 Test configuration:
 
 - Two rechargeable 18650 cells.
-- DFRobot battery module in HOLD mode.
+- DFRobot DFR0969 module in HOLD mode.
 - No external charging or laptop power.
 - No inline USB power meter.
-- 60-second inactivity timeout.
+- 60-second inactivity timeout (development setting).
 - 25 ms software-sleep scheduler delay.
 - Real Wi-Fi and OLED shutdown.
 - Wake by physical pushbutton.
 
-**Result: Pending.**
+**Result: PASSED — November 14, 2026.**
 
-The test is intended to establish whether Clonker remains powered and wake-responsive after an extended period of software sleep.
+After approximately 12 hours on battery power, the DFRobot
+indicated three solid battery LEDs out of four.
+
+A physical pushbutton successfully woke Clonker, triggering
+the expected microcontroller reboot. The OLED subsequently
+displayed `CLONKER READY!`.
+
+One battery cell measured approximately 3.814 V after the test.
+
+This established that the software-sleep implementation could
+remain battery-powered and wake-responsive overnight.
+
+The test was deliberately ended so the cells could be recharged
+and enclosure work could continue.
+
+It was not a full-discharge endurance test. The battery LEDs
+are approximate indicators, not calibrated runtime measurements.
+
+A longer, fully charged battery-runtime test remains future work.
+
+### Practical sleep settings and secret override
+
+Following the initial power-management experiments, the default
+inactivity timeout was increased from 60 seconds to 600 seconds
+(10 minutes).
+
+The developer setting in
+`firmware/clonker/system/sleep_manager.py` remains:
+
+`SLEEP_ENABLED = True`
+
+Changing this flag to `False` disables automatic sleep at startup.
+
+A runtime sleep toggle was also implemented using the existing
+physical room selector.
+
+With the physical CONFIG switch enabled, the sequence:
+
+`1 -> 2 -> 1 -> 2 -> 1 -> 2`
+
+completed within 10 seconds toggles sleep availability.
+
+The OLED confirms the resulting state with:
+
+- `SLEEP OFF`
+- `SLEEP ON`
+
+Both toggle directions were successfully tested on the assembled
+Clonker on November 14, 2026.
+
+The override is volatile: rebooting restores the developer's
+configured startup default.
+
+Re-enabling sleep resets the inactivity timer, providing a fresh
+10-minute interval.
+
+The existing secret reboot handshake remains separate:
+
+`2 -> 3 -> 2 -> 3 -> 2 -> 3`
+
+Both handshakes require the physical CONFIG switch.
+
+The sleep override is useful when Clonker is being operated
+continuously, particularly while connected to external charging
+power, without repeatedly entering software sleep.
+
+### DFRobot charging and power-transition experiments
+
+The DFRobot DFR0969 battery module was evaluated with two
+rechargeable 18650 cells and an inline Color TFT USB tester,
+informally nicknamed "SparkFun."
+
+The module was tested both while powering Clonker and separately
+with only the USB tester connected to its USB-A output.
+
+#### Battery to external charging power
+
+Connecting the USB-C charging input while Clonker was operating
+on battery power did not interrupt normal operation.
+
+Clonker remained awake and responsive.
+
+This established a successful battery-to-charger transition
+under the tested conditions.
+
+#### External charging power to battery
+
+Disconnecting the USB-C charging cable while Clonker was
+operating caused the Pico to restart.
+
+The normal startup sequence subsequently completed, taking
+approximately 11 seconds.
+
+To isolate the cause, Clonker was disconnected and the USB
+tester was attached directly to the DFRobot's USB-A output.
+
+Removing external charging power caused the USB tester itself
+to reboot.
+
+The behavior was reproduced after the battery module indicated
+four solid charge LEDs.
+
+The experiment was then repeated in NORMAL mode rather than
+HOLD mode, with the same result.
+
+| Mode | Charger connected | Battery-only output | Charger removal |
+|---|---:|---:|---|
+| HOLD | 5.040 V | 5.129 V | USB tester rebooted |
+| NORMAL | 4.999 V | 5.121 V | USB tester rebooted |
+
+These are representative steady-state readings taken with no
+external load beyond the USB tester.
+
+In NORMAL mode, another charger-connected reading of 5.050 V
+was observed before the charging indicator settled.
+
+The four battery indicator LEDs remained solid after the
+charger was disconnected in the fully charged tests.
+
+**Conclusion:** Under the tested conditions, the DFRobot
+supports an uninterrupted battery-to-charger transition,
+but removing charging power produces an interruption or
+sufficiently deep voltage dip to restart the connected device.
+
+This behavior occurs in both HOLD and NORMAL modes and does
+not originate in Clonker's application software.
+
+The exact transient voltage and interruption duration have
+not been measured with an oscilloscope.
+
+HOLD remains the intended operating mode because it has
+already supported the low-current software-sleep experiments.
+
+The brief reboot on charger removal is considered acceptable
+for the current design.
+
+#### Charging-input observations
+
+Charging-input measurements were also made with the USB
+tester placed between the external 5 V supply and the
+DFRobot's USB-C charging input.
+
+Observed examples included:
+
+- Approximately 4.780 V at 1.221 A using a 5 V / 1 A adapter,
+  exceeding that adapter's rated output current.
+- Approximately 4.864 V at 1.624 A using a power-strip USB port.
+- Approximately 4.895 V at 1.824 A during another charging
+  observation.
+
+These are charging-input measurements, not direct battery-cell
+charging currents.
+
+A suitably rated, reputable 5 V supply is preferred for
+continued charging tests.
+
+The USB-C PD charger compatibility experiment was inconclusive:
+one USB-C charger did not power the inline tester through the
+tested cable arrangement.
+
+### Enclosure and charging integration
+
+A panel-mounted USB-C charging port was fitted to the side
+of Clonker's enclosure.
+
+The DFRobot battery module and two 18650 cells remain part
+of the planned internal power installation.
+
+Final internal mounting, wiring, cable strain relief, and
+thermal verification remain to be completed.
 
 ### Remaining work
 
-- Record the overnight battery endurance result.
 - Verify CONFIG-switch wake during real battery-powered sleep.
-- Establish a practical production inactivity timeout.
-- Measure longer-term battery runtime and discharge behavior.
-- Investigate the DFRobot module's persistent indicator LEDs and low-load behavior if necessary.
-- Update architectural and operating-mode documentation.
-- Revisit hardware light/deep sleep when suitable CircuitPython support becomes available.
+- Conduct a longer fully charged battery-runtime test.
+- Complete safe internal mounting of the DFRobot module and cells.
+- Verify charging and power transitions after final assembly.
+- Update architectural, operating-mode, and hardware documentation.
+- Revisit hardware light/deep sleep when suitable stable
+  CircuitPython support becomes available.
 
-**Chapter 9 software-sleep milestone: INITIAL FUNCTIONAL AND POWER TESTS PASSED.**
+**Chapter 9 software-sleep milestone: FUNCTIONAL TESTS PASSED.**
+
+Overnight battery-powered sleep and wake have been demonstrated.
+The manual sleep override works in both directions, and the
+DFRobot's asymmetric charging-power behavior has been isolated.
+
+The Monster can now decide when bedtime is appropriate.
+
+*Less awake. More Zzzz. Still CLONK.*
 
 The Monster can now turn off its radio, close its eyes, and wait for someone to wake it.
 
