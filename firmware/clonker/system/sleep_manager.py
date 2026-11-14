@@ -5,15 +5,27 @@
 #
 # Developer-configurable inactivity and software sleep management.
 #
-# CircuitPython 10.3.1 on Pico 2 W lacks the alarm module.
-# RP2350 alarm support appeared in CircuitPython 11.x alpha
-# builds. Revisit hardware deep sleep when 11.x is stable.
+# CircuitPython 10.3.1 on Raspberry Pi Pico 2 W does not provide
+# the alarm module needed for our planned hardware sleep/wake.
+# RP2350 alarm support has appeared in CircuitPython 11.x alpha.
+# Revisit light/deep sleep when a suitable stable release arrives.
 #
-# Software sleep disables Wi-Fi and closes the OLED while
-# keeping the CPU active for physical-input polling.
-# Wake-eligible inputs trigger a microcontroller reboot.
+# Current approach: application-level software sleep.
+# The CPU continues polling physical inputs while the OLED and
+# Wi-Fi radio are shut down to reduce current consumption.
 #
-# Dry-run mode simulates sleep and wake without hardware changes.
+# Why reboot on wake?
+# Experiments with disabling and re-enabling the Wi-Fi radio did
+# not restore stable network operation as expected. Reconnection
+# also took approximately four seconds. A full microcontroller
+# reset provides a simpler, more predictable initialization path.
+#
+# Experiments with wifi.radio.power_management did not produce
+# useful power savings; observed Wi-Fi behavior instead appeared
+# less favorable. We therefore do not rely on that API for sleep.
+#
+# Dry-run mode simulates sleep/wake without hardware changes.
+# Real wake consumes the triggering input and reboots the Pico.
 
 import time
 
