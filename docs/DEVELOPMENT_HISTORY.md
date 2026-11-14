@@ -3895,10 +3895,6 @@ The Monster can now decide when bedtime is appropriate.
 
 *Less awake. More Zzzz. Still CLONK.*
 
-The Monster can now turn off its radio, close its eyes, and wait for someone to wake it.
-
-*Less awake. More Zzzz. Still CLONK.*
-
 ---
 
 **THE CLONKER 10000**
