@@ -3,14 +3,17 @@
 #
 # Clonker Designed by David Jacobson
 #
-# Developer-only inactivity and sleep management.
+# Developer-configurable inactivity and software sleep management.
 #
 # CircuitPython 10.3.1 on Pico 2 W lacks the alarm module.
 # RP2350 alarm support appeared in CircuitPython 11.x alpha
 # builds. Revisit hardware deep sleep when 11.x is stable.
 #
-# Initial implementation: DRY RUN ONLY.
-# No Wi-Fi changes, OLED shutdown, or microcontroller reset.
+# Software sleep disables Wi-Fi and closes the OLED while
+# keeping the CPU active for physical-input polling.
+# Wake-eligible inputs trigger a microcontroller reboot.
+#
+# Dry-run mode simulates sleep and wake without hardware changes.
 
 import time
 
@@ -49,7 +52,7 @@ def initialize():
 
 
 def is_sleeping():
-    """Return the current simulated sleep state."""
+    """Return whether software sleep is currently active."""
     return SLEEP_ENABLED and _state == _ASLEEP
 
 
@@ -110,7 +113,7 @@ def note_config_switch(config_mode):
 
 
 def tick(config_mode=False, actions_pending=False):
-    """Evaluate inactivity without changing hardware state."""
+    """Evaluate inactivity and enter software sleep when eligible."""
     global _state, _last_activity_ns
 
     if not SLEEP_ENABLED:
