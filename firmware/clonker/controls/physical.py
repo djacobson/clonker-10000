@@ -208,6 +208,63 @@ def _reboot_sequence_step(room_id):
     microcontroller.reset()
 
 
+# Secret sleep toggle handshake.
+# Physical CONFIG ON, then 1 -> 2 -> 1 -> 2 -> 1 -> 2.
+# The first room-1 event must be an actual selector transition.
+SLEEP_SEQUENCE = (
+    "room-1", "room-2", "room-1",
+    "room-2", "room-1", "room-2",
+)
+SLEEP_SEQUENCE_TIMEOUT_NS = 10_000_000_000
+
+_sleep_sequence_index = 0
+_sleep_sequence_started = 0
+
+
+def _sleep_sequence_reset():
+    """Cancel an incomplete sleep-toggle handshake."""
+    global _sleep_sequence_index, _sleep_sequence_started
+
+    _sleep_sequence_index = 0
+    _sleep_sequence_started = 0
+
+
+def _sleep_sequence_step(room_id):
+    """Observe a room change; return True on a completed handshake."""
+    global _sleep_sequence_index, _sleep_sequence_started
+
+    now = time.monotonic_ns()
+
+    if (
+        _sleep_sequence_index
+        and now - _sleep_sequence_started
+        > SLEEP_SEQUENCE_TIMEOUT_NS
+    ):
+        _sleep_sequence_reset()
+
+    expected = SLEEP_SEQUENCE[_sleep_sequence_index]
+
+    if room_id != expected:
+        _sleep_sequence_reset()
+        return False
+
+    if _sleep_sequence_index == 0:
+        _sleep_sequence_started = now
+
+    _sleep_sequence_index += 1
+
+    if _sleep_sequence_index < len(SLEEP_SEQUENCE):
+        return False
+
+    _sleep_sequence_reset()
+
+    enabled = sleep_manager.toggle_enabled()
+    logger.info("SECRET SLEEP: Handshake accepted")
+
+    oled.show_text("SLEEP ON" if enabled else "SLEEP OFF")
+    return True
+
+
 def _custom_actions_for_room(room_id):
     """Return ordered Custom Actions without revalidation."""
     return device_config.custom_actions_for_room(room_id)
