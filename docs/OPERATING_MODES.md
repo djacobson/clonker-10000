@@ -1,9 +1,9 @@
 # The Clonker 10000 — Operating Modes
 
-**Design reference:** November 3, 2026  
+**Design reference:** November 13, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Baseline:** Chapter 6 — physical controls, room selection, volume encoder, and shared action execution operational  
-**Scope:** Boot-time filesystem ownership, runtime management mode, deployment, recovery, and verified behavior.
+**Baseline:** Chapter 9 — physical controls, room selection, custom actions, rechargeable battery operation, and software-managed sleep/wake operational  
+**Scope:** Boot-time filesystem ownership, runtime management mode, deployment, sleep/wake behavior, recovery, and verified behavior.
 
 > Two switches. Two completely different jobs. One appropriately complicated monster.
 
