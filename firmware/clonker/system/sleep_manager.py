@@ -62,13 +62,19 @@ def note_activity(name, wake_eligible=False):
     if _state == _ASLEEP:
         if wake_eligible:
             logger.info(
-                "SLEEP: wake requested by {} (DRY RUN)".format(
-                    name
-                )
+                "SLEEP: wake requested by {}".format(name)
             )
-            logger.info("SLEEP: would reboot; no action taken")
-            _state = _AWAKE
-            _last_activity_ns = time.monotonic_ns()
+
+            if SLEEP_DRY_RUN:
+                logger.info(
+                    "SLEEP: would reboot; no action taken (DRY RUN)"
+                )
+                _state = _AWAKE
+                _last_activity_ns = time.monotonic_ns()
+            else:
+                logger.info("SLEEP: rebooting")
+                import microcontroller
+                microcontroller.reset()
 
         # Do not dispatch an input received during sleep.
         return True
