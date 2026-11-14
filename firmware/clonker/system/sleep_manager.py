@@ -136,7 +136,6 @@ def tick(config_mode=False, actions_pending=False):
     timeout_ns = SLEEP_IDLE_TIMEOUT_S * _NS_PER_SECOND
 
     if elapsed_ns >= timeout_ns:
-        _state = _ASLEEP
         logger.info(
             "SLEEP: inactivity timeout reached ({}s)".format(
                 SLEEP_IDLE_TIMEOUT_S
@@ -144,10 +143,13 @@ def tick(config_mode=False, actions_pending=False):
         )
 
         if SLEEP_DRY_RUN:
+            _state = _ASLEEP
             logger.info(
                 "SLEEP: would disable Wi-Fi and OLED (DRY RUN)"
             )
-        else:
+            return
+
+        try:
             import wifi
             from clonker.display import oled
 
@@ -156,3 +158,15 @@ def tick(config_mode=False, actions_pending=False):
 
             logger.info("SLEEP: disabling Wi-Fi")
             wifi.radio.enabled = False
+
+        except Exception as exc:
+            logger.warning(
+                "SLEEP: shutdown failed: {}".format(exc)
+            )
+            logger.warning("SLEEP: rebooting to recover")
+            import microcontroller
+            microcontroller.reset()
+            return
+
+        _state = _ASLEEP
+        logger.info("SLEEP: entered software sleep")
