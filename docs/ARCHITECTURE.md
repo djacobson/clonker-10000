@@ -960,8 +960,19 @@ These measurements describe the USB-side load, not total battery
 current. The DFRobot power module's conversion losses and internal
 consumption must be considered separately.
 
-Battery-powered sleep and pushbutton wake have been demonstrated.
-Extended overnight endurance testing remains pending.
+Battery-powered software sleep and physical-button wake have been demonstrated, including a successful approximately 12-hour overnight endurance test. Longer-term battery runtime and full-discharge behavior remain unverified.
+
+#### Runtime sleep override
+
+The sleep manager owns the `SLEEP_ENABLED` startup default and exposes `toggle_enabled()` for a volatile runtime override.
+
+The physical-control coordinator recognizes a secret room-selector sequence, `1 -> 2 -> 1 -> 2 -> 1 -> 2`, completed within 10 seconds while the physical CONFIG switch is enabled.
+
+On successful recognition, the coordinator calls `sleep_manager.toggle_enabled()` and requests OLED confirmation (`SLEEP ON` or `SLEEP OFF`).
+
+The sleep manager resets its state and inactivity timer when toggled. A reboot restores the developer-configured startup default.
+
+This preserves the architectural separation: physical controls recognize the handshake, while the sleep manager owns the power-management policy.
 
 #### Future hardware sleep
 
