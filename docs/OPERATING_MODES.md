@@ -81,7 +81,16 @@ Do not change GP17 as a live operating control. Never assume that a browser page
 | Grounded / LOW | CONFIG | Started on port 9090 |
 | Open / HIGH | RUN | Stopped |
 
-The switch is evaluated during the running application's cooperative loop. **CONFIG ↔ RUN transitions do not require rebooting.** A mode transition does not reload the active configuration, alter room selection, or issue an equipment power command.
+The switch is evaluated during the application's cooperative loop.
+
+While Clonker is awake, **CONFIG ↔ RUN transitions do not require
+rebooting**. A mode transition does not reload the active configuration,
+alter room selection, or issue an equipment power command.
+
+During software sleep, moving the CONFIG switch in either direction
+requests a wake and reboot. The switch position after reboot determines
+the operating mode. This is a sleep/wake behavior, not a change to
+normal CONFIG/RUN operation.
 
 ### CONFIG
 
@@ -118,6 +127,55 @@ App mode = CONFIG
 ```
 
 Source and effective mode are logged on startup and on changes, not on every poll.
+
+### Software sleep and wake — Chapter 9
+
+Clonker supports software-managed inactivity sleep while operating
+in RUN mode.
+
+This is not hardware deep sleep. The CPU remains active to monitor
+physical controls.
+
+When the configured inactivity timeout expires and no queued actions
+remain:
+
+1. The OLED briefly displays `Going Zzzz!`.
+2. The OLED shuts down.
+3. Wi-Fi is disabled.
+4. The application enters its software-sleep state.
+
+The CONFIG management service is unavailable during sleep.
+
+**Wake controls:**
+
+| Control | While sleeping |
+|---|---|
+| Momentary pushbutton | Wake and reboot |
+| CONFIG/RUN switch movement | Wake and reboot |
+| Volume encoder rotation | Ignored |
+| Custom-action encoder rotation | Ignored |
+| Room selector movement | Ignored |
+
+The first wake-eligible input is consumed and does not dispatch an
+equipment action.
+
+After reboot, Clonker restores its normal startup sequence, including
+Wi-Fi connectivity and OLED initialization.
+
+CONFIG mode prevents inactivity sleep. Returning to RUN restarts
+the inactivity countdown.
+
+The sleep implementation currently uses a 25 ms scheduler delay
+while asleep, compared with 1 ms during normal awake operation.
+
+The inactivity timeout is a developer setting in
+`clonker/system/sleep_manager.py`; it is not yet exposed in the
+browser configuration interface.
+
+For implementation details, see
+[Architecture](ARCHITECTURE.md).
+For measurements and verification, see
+[Development History](DEVELOPMENT_HISTORY.md).
 
 ## 4. Simulation and development override
 
