@@ -520,7 +520,7 @@ def main():
                     )
 
             # Service the OLED after higher-priority work.
-            if oled_ready:
+            if oled_ready and not sleep_manager.is_sleeping():
                 if PERF_ENABLED:
                     started = perf.start()
 
@@ -564,7 +564,8 @@ def main():
             )
 
             # Scheduled memory diagnostics and optional GC experiment.
-            memory_monitor.poll()
+            if not sleep_manager.is_sleeping():
+                memory_monitor.poll()
 
             # Yield longer during software sleep to reduce
             # scheduler activity while preserving GPIO polling.
