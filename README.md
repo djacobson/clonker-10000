@@ -342,7 +342,7 @@ The OLED provides two-line room identification, navigation and playback labels, 
 
 - Audible CLONK feedback.
 - Enclosure finishing and assembly.
-- Permanent battery installation, charging validation, and sleep/wake behavior.
+- Permanent battery installation, charging validation, extended sleep/wake reliability testing, and future hardware deep sleep.
 - Additional reliability testing.
 
 The previously considered Grayhill volume encoder was set aside in favor of the Bourns units.
@@ -500,7 +500,7 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 - **A screen that speaks:** The OLED identifies rooms, displays selected actions, reports volume direction and mute feedback, and sleeps after inactivity. All without constantly redrawing itself.
 - **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom actions, and the Dumb Queue™.
 - **A more responsive workshop:** CONFIG-mode browser improvements and Chapter 8 physical polling optimizations are operational.
-- **The Monster goes cordless:** Chapter 9 demonstrated successful battery-powered operation using two rechargeable 18650 cells and a DFRobot power module. Permanent installation and runtime testing remain in progress.
+- **The Monster goes cordless — and gets sleepy:** Chapter 9 demonstrated rechargeable battery operation using two 18650 cells and a DFRobot power module. Software-managed inactivity sleep now shuts down Wi-Fi and the OLED, then wakes through a physical button or CONFIG-switch movement. Permanent installation and extended runtime testing remain in progress.
 
 These are working firmware and physical-control capabilities, not just plans on a drawing board.
 
@@ -508,7 +508,7 @@ These are working firmware and physical-control capabilities, not just plans on 
 
 - Add satisfying audible CLONK feedback.
 - Finish enclosure details and permanently integrate the battery system.
-- Validate battery runtime, charging, and future sleep/wake behavior.
+- Validate battery runtime, charging, and long-term software-sleep reliability; investigate hardware deep sleep when supported.
 - Continue reliability and failure-recovery testing.
 - Expand compatibility, including Apple TV.
 - Explore additional OLED feedback where it provides real value.
@@ -519,7 +519,7 @@ The physical controls are assembled and operational, including both Bourns encod
 
 The Custom Action encoder selects and executes room-specific actions, with OLED inversion acknowledging execution. The display also provides two-line room identification, volume-direction feedback, and mute feedback without continuous screen rendering.
 
-The Clonker has now successfully operated on rechargeable batteries. The next frontier is making that power system permanent: charging, practical runtime, and sensible sleep/wake behavior.
+The Clonker has now successfully operated on rechargeable batteries, and Chapter 9 introduced software-managed sleep and wake. The next frontier is making the power system permanent: charging, practical battery runtime, and eventually hardware-level sleep when CircuitPython supports it.
 
 Or perhaps making it look slightly less like a bench experiment inside a very nice enclosure.
 
