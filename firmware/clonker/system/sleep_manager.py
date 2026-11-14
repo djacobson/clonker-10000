@@ -21,6 +21,7 @@ from clonker.system import logger
 SLEEP_ENABLED = True
 SLEEP_DRY_RUN = False
 SLEEP_IDLE_TIMEOUT_S = 60  # 600
+SLEEP_FAREWELL_S = 1.5
 
 _NS_PER_SECOND = 1_000_000_000
 
@@ -152,6 +153,18 @@ def tick(config_mode=False, actions_pending=False):
         try:
             import wifi
             from clonker.display import oled
+
+            # Brief farewell, even if the OLED is already dark.
+            logger.info("SLEEP: displaying bedtime message")
+            oled.show_text("Going Zzzz!")
+            oled.poll()
+
+            # Allow time for the queued display refresh.
+            # The OLED driver rate-limits its own updates.
+            deadline = time.monotonic() + SLEEP_FAREWELL_S
+            while time.monotonic() < deadline:
+                oled.poll()
+                time.sleep(0.05)
 
             logger.info("SLEEP: closing OLED")
             oled.close()
