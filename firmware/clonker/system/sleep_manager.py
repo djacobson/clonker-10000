@@ -149,5 +149,10 @@ def tick(config_mode=False, actions_pending=False):
             )
         else:
             import wifi
+            from clonker.display import oled
+
+            logger.info("SLEEP: closing OLED")
+            oled.close()
+
             logger.info("SLEEP: disabling Wi-Fi")
             wifi.radio.enabled = False
