@@ -130,52 +130,132 @@ Source and effective mode are logged on startup and on changes, not on every pol
 
 ### Software sleep and wake — Chapter 9
 
-Clonker supports software-managed inactivity sleep while operating
-in RUN mode.
+Clonker supports software-managed inactivity sleep in RUN mode.
 
-This is not hardware deep sleep. The CPU remains active to monitor
-physical controls.
+This is not hardware deep sleep. The CPU continues polling
+physical controls while Wi-Fi and the OLED are shut down.
 
-When the configured inactivity timeout expires and no queued actions
-remain:
+#### Developer settings
 
-1. The OLED briefly displays `Going Zzzz!`.
-2. The OLED shuts down.
-3. Wi-Fi is disabled.
-4. The application enters its software-sleep state.
+The startup behavior is controlled in
+`firmware/clonker/system/sleep_manager.py`:
 
-The CONFIG management service is unavailable during sleep.
+```python
+SLEEP_ENABLED = True
+SLEEP_DRY_RUN = False
+SLEEP_IDLE_TIMEOUT_S = 600  # 10 minutes
+SLEEP_FAREWELL_S = 1.5
+```
 
-**Wake controls:**
+`SLEEP_ENABLED` determines whether automatic sleep is enabled
+at startup. Developers may set it to `False` to disable sleep
+by default.
+
+The inactivity timeout is currently 10 minutes and is not
+exposed in the browser configuration interface.
+
+#### Entering sleep
+
+When sleep is enabled, the inactivity timeout expires, and
+no queued actions remain:
+
+1. The OLED displays `Going Zzzz!`.
+2. The farewell remains visible for approximately 1.5 seconds.
+3. The OLED shuts down.
+4. Wi-Fi is disabled.
+5. The application enters software sleep.
+
+CONFIG mode prevents inactivity sleep. Returning to RUN
+restarts the inactivity countdown.
+
+The scheduler uses a 25 ms delay while sleeping, compared
+with 1 ms during normal awake operation.
+
+#### Waking Clonker
 
 | Control | While sleeping |
 |---|---|
 | Momentary pushbutton | Wake and reboot |
-| CONFIG/RUN switch movement | Wake and reboot |
+| CONFIG/RUN switch transition | Wake and reboot |
 | Volume encoder rotation | Ignored |
 | Custom-action encoder rotation | Ignored |
 | Room selector movement | Ignored |
 
-The first wake-eligible input is consumed and does not dispatch an
-equipment action.
+The first wake-eligible input is consumed. It does not send
+an equipment command.
 
-After reboot, Clonker restores its normal startup sequence, including
-Wi-Fi connectivity and OLED initialization.
+Wake uses `microcontroller.reset()` to restore normal startup,
+including Wi-Fi connectivity and OLED initialization.
 
-CONFIG mode prevents inactivity sleep. Returning to RUN restarts
-the inactivity countdown.
+The observed wake/reboot sequence takes approximately
+11 seconds.
 
-The sleep implementation currently uses a 25 ms scheduler delay
-while asleep, compared with 1 ms during normal awake operation.
+#### Secret sleep toggle
 
-The inactivity timeout is a developer setting in
-`clonker/system/sleep_manager.py`; it is not yet exposed in the
-browser configuration interface.
+Clonker supports a physical, runtime sleep override.
+
+With the physical CONFIG switch ON, move the room selector
+through this sequence within 10 seconds:
+
+`1 -> 2 -> 1 -> 2 -> 1 -> 2`
+
+The final transition toggles automatic sleep availability.
+
+The OLED confirms the resulting state:
+
+- `SLEEP OFF` — automatic sleep disabled.
+- `SLEEP ON` — automatic sleep enabled.
+
+Both directions were verified on the assembled hardware
+on November 14, 2026.
+
+The override is volatile. Rebooting restores the developer's
+`SLEEP_ENABLED` startup setting.
+
+Enabling sleep starts a fresh inactivity countdown.
+
+This feature is useful when Clonker should remain continuously
+available, such as during extended testing or while connected
+to external charging power.
+
+#### Secret reboot handshake
+
+The existing reboot handshake remains available.
+
+With the physical CONFIG switch ON, move the room selector
+through this sequence within 10 seconds:
+
+`2 -> 3 -> 2 -> 3 -> 2 -> 3`
+
+The OLED displays `REBOOTING!` before the Pico resets.
+
+Both secret handshakes require the physical CONFIG switch;
+simulated CONFIG mode and software overrides do not qualify.
+
+#### Battery-power behavior
+
+Battery-powered overnight software sleep and physical-button
+wake were successfully verified in Chapter 9.
+
+The DFRobot DFR0969 module exhibits asymmetric power
+transitions under the tested conditions:
+
+- Connecting external charging power while running on
+  batteries does not interrupt Clonker.
+- Disconnecting external charging power causes a brief
+  power interruption and subsequent Clonker reboot.
+
+The charger-removal interruption was independently reproduced
+using a USB power tester with the Pico disconnected, in both
+HOLD and NORMAL modes.
+
+HOLD remains the intended operating mode.
 
 For implementation details, see
 [Architecture](ARCHITECTURE.md).
-For measurements and verification, see
-[Development History](DEVELOPMENT_HISTORY.md).
+
+For measurements, experimental conditions, and verification,
+see [Development History](DEVELOPMENT_HISTORY.md).
 
 ## 4. Simulation and development override
 
