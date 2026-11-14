@@ -965,9 +965,25 @@ Clonker's rechargeable power system uses:
 The module has successfully powered Clonker independently of
 a laptop or external USB supply.
 
-The USB-C panel connector has been physically fitted to the
-enclosure. Final internal battery-module mounting, wiring,
-and strain relief remain pending.
+On November 14, 2026, the DFRobot module and both 18650
+cells were installed inside the enclosure. The permanent
+external USB-C charging cable interface was also installed.
+
+The enclosure is roomy, with an open mesh partition
+separating and securing the battery system from the
+remaining electronics.
+
+Post-installation charging, temperature, and power-transition
+testing is underway.
+
+### Physical weight
+
+| Configuration | Weight |
+|---|---:|
+| Clonker without batteries | 1.4 lb |
+| Clonker with batteries | 1.8 lb |
+
+**The Monster is chunky.**
 
 ### Charging and power transitions
 
