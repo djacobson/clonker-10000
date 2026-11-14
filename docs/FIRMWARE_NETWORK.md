@@ -1498,7 +1498,120 @@ The SH1106 OLED has completed initial application integration. Additional status
 
 PERF instrumentation is operational and continues to be extended for targeted investigations.
 
-Audible feedback, rechargeable battery operation, and sleep/wake behavior remain future development.
+Audible feedback remains future development. Chapter 9 established rechargeable battery operation and software-managed sleep/wake. Permanent battery installation, charging validation, extended endurance testing, and hardware deep sleep remain future work.
+
+### Chapter 9 — Software sleep, Wi-Fi shutdown, and wake recovery
+
+**Implementation:** `firmware/clonker/system/sleep_manager.py`,
+coordinated by `firmware/clonker/main.py`.
+
+Chapter 9 introduced application-level inactivity sleep for the
+Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
+
+The implementation does not use hardware light sleep or deep sleep.
+The CPU continues running, with a reduced scheduler polling rate.
+
+#### Inactivity and eligibility
+
+The sleep manager uses `time.monotonic_ns()` to track elapsed time
+since the last recognized physical activity.
+
+Sleep is permitted only when:
+
+- `SLEEP_ENABLED` is true.
+- CONFIG mode is inactive.
+- The inactivity timeout has expired.
+- The shared action queue has no pending work.
+
+CONFIG mode inhibits sleep and restarts the inactivity timer.
+
+#### Shutdown sequence
+
+When real sleep begins:
+
+1. The OLED displays `Going Zzzz!` for approximately 1.5 seconds.
+2. `oled.close()` switches off the display and releases its I²C bus.
+3. `wifi.radio.enabled = False` disables the wireless radio.
+4. The sleep manager enters its ASLEEP state.
+
+If the shutdown sequence raises an exception, the firmware attempts
+a recovery reboot.
+
+Dry-run mode simulates the state transition without shutting down
+hardware or rebooting.
+
+#### Scheduler behavior
+
+While sleeping:
+
+- Physical GPIO polling continues.
+- Action-queue execution is suspended.
+- Device-adapter maintenance is suspended.
+- CONFIG management listener startup is suppressed.
+- OLED polling is suspended.
+- Periodic memory-monitor polling is suspended.
+- The main-loop delay increases from 1 ms to 25 ms.
+
+The longer delay reduces application activity while preserving
+physical pushbutton wake detection.
+
+Normal awake-mode scheduler timing is unchanged.
+
+#### Wake and network recovery
+
+Momentary pushbutton presses and CONFIG-switch transitions are
+wake-eligible.
+
+Encoder rotation and room-selector movement are ignored while
+sleeping.
+
+The first wake-eligible input is consumed and must not transmit an
+equipment command.
+
+In real sleep mode, the firmware calls `microcontroller.reset()`.
+
+The normal startup sequence then restores Wi-Fi connectivity,
+initializes application modules, and resumes the appropriate
+CONFIG or RUN operating mode.
+
+This deliberately avoids attempting partial Wi-Fi and socket
+reinitialization within the sleeping application.
+
+#### Electrical observations
+
+USB-side measurements at approximately 5 V:
+
+| State | Approximate current |
+|---|---:|
+| Awake RUN | 38 mA |
+| Initial software sleep | 25 mA |
+| Optimized software sleep | 24 mA |
+
+The observed reduction from awake RUN to optimized software sleep
+was approximately 37%.
+
+These figures do not include the battery module's conversion losses
+or its own electrical consumption.
+
+The DFRobot DFR0969 dual-18650 module successfully powered the
+application during sleep and wake testing.
+
+An overnight battery endurance test began November 13, 2026;
+its result remains pending.
+
+#### Limitations
+
+- Software sleep does not stop the CPU.
+- Wake detection depends on continued cooperative GPIO polling.
+- Very short button presses are not guaranteed to be captured.
+- Wi-Fi recovery depends on successful application reboot and startup.
+- The battery module's HOLD behavior and illuminated indicators
+  may affect practical battery runtime.
+- Hardware deep sleep remains a separate future investigation.
+
+See [Architecture](ARCHITECTURE.md) for ownership boundaries and
+[Development History](DEVELOPMENT_HISTORY.md) for experimental
+results.
 
 ### Denon TCP
 
