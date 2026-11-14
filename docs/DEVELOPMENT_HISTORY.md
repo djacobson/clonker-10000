@@ -3579,6 +3579,80 @@ This reduces scheduler activity without altering normal awake-mode timing.
 
 Physical controls remain polled during sleep. Short presses, including the volume encoder's MUTE pushbutton, were successfully tested.
 
+### Power-management experiments and design decisions
+
+Several experiments informed the Chapter 9 software-sleep design.
+
+#### Wi-Fi shutdown and recovery
+
+Disabling the Wi-Fi radio using `wifi.radio.enabled = False`
+provided a way to reduce power consumption while sleeping.
+
+However, experiments with turning the radio off and back on
+did not consistently restore stable network operation.
+
+Wi-Fi reconnection also required approximately four seconds,
+making this an unattractive recovery mechanism for a physical
+remote control.
+
+The chosen solution is to disable Wi-Fi when entering sleep
+and perform a full `microcontroller.reset()` on wake.
+
+This sacrifices a few seconds of wake-up time in exchange for
+a predictable initialization path through the existing startup
+logic. The triggering wake input is consumed rather than sent
+to the controlled equipment.
+
+#### CircuitPython Wi-Fi power management
+
+Experiments with `wifi.radio.power_management` did not produce
+the expected reduction in current consumption.
+
+Observed Wi-Fi behavior instead appeared less favorable, with
+the radio seemingly operating hotter rather than saving power.
+
+These were experimental observations, not a quantified thermal
+study or proof of a CircuitPython defect.
+
+The final implementation does not rely on this API.
+
+#### Hardware sleep and future CircuitPython versions
+
+CircuitPython 10.3.1 on the Raspberry Pi Pico 2 W does not
+provide the `alarm` module needed for the planned hardware
+sleep/wake implementation.
+
+RP2350 alarm support has appeared in CircuitPython 11.x alpha,
+making a future stable release worth investigating.
+
+Hardware sleep could potentially reduce consumption beyond
+the current software-sleep implementation, which continues
+running the CPU and polling physical inputs.
+
+Actual sleep current, supported wake sources, wake latency,
+and network recovery will all require testing on the eventual
+stable CircuitPython release.
+
+The current software-sleep implementation remains the
+functional baseline until a better approach is demonstrated.
+
+#### Awake current observations
+
+Additional measurements showed that normal idle RUN current
+often settles around 33–35 mA, although approximately 38 mA
+was also observed.
+
+Control actions can briefly increase current into the
+50 mA range before it settles again.
+
+The approximately 24 mA software-sleep measurement therefore
+represents a reduction of roughly 27–37% compared with the
+observed 33–38 mA awake range.
+
+All measurements were taken at the Pico's USB input, not at
+the battery cells. DFRobot converter losses, indicator LEDs,
+and other module consumption are not included.
+
 ### Electrical measurements
 
 Measurements were taken using an inline Color TFT USB tester at approximately 5 V.
