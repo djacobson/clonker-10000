@@ -142,6 +142,12 @@ def tick(config_mode=False, actions_pending=False):
                 SLEEP_IDLE_TIMEOUT_S
             )
         )
-        logger.info(
-            "SLEEP: would disable Wi-Fi and OLED (DRY RUN)"
-        )
+
+        if SLEEP_DRY_RUN:
+            logger.info(
+                "SLEEP: would disable Wi-Fi and OLED (DRY RUN)"
+            )
+        else:
+            import wifi
+            logger.info("SLEEP: disabling Wi-Fi")
+            wifi.radio.enabled = False
