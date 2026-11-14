@@ -239,14 +239,16 @@ See [Configuration & Recovery](CONFIGURATION.md) for detailed validation, revisi
 | Control | Current purpose | Status |
 |---|---|---|
 | GP17 maintained switch | SERVICE (USB) / DEVICE filesystem ownership | Operational |
-| GP18 guarded maintained switch | CONFIG / RUN management mode | Operational |
-| GP3/GP6/GP7 three-position selector | Den, Sunroom, reserved Room 3 | Operational |
+| GP18 guarded maintained switch | CONFIG / RUN management mode; sleep wake | Operational |
+| GP3/GP6/GP7 three-position selector | Select configured room; third position reserved when unconfigured | Operational |
 | GP2 momentary Power Toggle | Selected room's `power-toggle` action | Operational; real equipment verified |
 | GP8/GP9 Bourns encoder rotation | Selected room's `volume-up` / `volume-down` | Operational; real equipment verified |
-| Volume encoder shaft press | `mute-toggle` | Not yet wired/integrated |
-| Second Bourns encoder | Custom-action selection and press-to-run | Planned integration |
-| Navigation, Back, Home, playback | Generic physical actions | Pending |
-| Guarded ignition / sleep-wake | Future power-management concept | Not implemented |
+| Volume encoder shaft press | Selected room's `mute-toggle` | Operational |
+| Second Bourns encoder rotation | Select custom action for current room | Operational |
+| Second Bourns encoder shaft press | Execute selected custom action | Operational; real equipment verified |
+| Navigation, Back, Home | Generic physical navigation actions | Operational |
+| Play/Pause, Skip Back, Skip Forward | Generic physical playback actions | Operational |
+| Momentary pushbuttons during software sleep | Wake Clonker without dispatching an equipment action | Operational; battery-powered wake verified |
 
 The selected physical room is independent of both operating-mode switches. Room 3 is a valid physical position but not currently a configured room; attempts to dispatch there are safe no-ops rather than commands redirected to Den or Sunroom.
 
