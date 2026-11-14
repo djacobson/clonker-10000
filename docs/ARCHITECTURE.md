@@ -1320,7 +1320,7 @@ Chapter 8 also expanded the event-driven OLED interface:
 
 The OLED behavior, including same-text acknowledgment reset without redundant framebuffer refresh, was verified on physical hardware.
 
-The physical assembly is complete. Battery power, sleep/wake behavior, audible feedback, and further reliability testing remain future work.
+The physical control assembly is operational. Chapter 9 subsequently demonstrated rechargeable battery operation, software-managed sleep/wake, and overnight battery endurance. Permanent battery integration, longer-term runtime validation, audible feedback, and additional reliability testing remain future work.
 
 ---
 
