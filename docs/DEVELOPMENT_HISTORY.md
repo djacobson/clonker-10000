@@ -3489,6 +3489,164 @@ The Monster has officially learned to roam without its USB umbilical cord.
 
 *Less tethered. More CLONK.*
 
+## Chapter 9 — Software Sleep and Wake
+
+**November 13, 2026 — Software-managed sleep operational**
+
+Following the first successful battery-powered operation, Chapter 9 introduced an inactivity-based software sleep state.
+
+The objective was to reduce battery consumption without sacrificing reliable physical wake controls, while preserving an architecture that could eventually support hardware light sleep or deep sleep.
+
+### Sleep architecture
+
+CircuitPython 10.3.1 on the Raspberry Pi Pico 2 W does not provide the required `alarm` support for the planned hardware sleep experiments.
+
+The initial implementation therefore uses **software-managed sleep**:
+
+- The CPU remains running.
+- Physical controls continue being polled.
+- Wi-Fi is disabled.
+- The OLED is shut down and its I²C interface released.
+- Action-queue processing is suspended.
+- Device-adapter maintenance is suspended.
+- OLED polling and periodic memory monitoring are suspended.
+- The CONFIG web listener is prevented from starting during sleep.
+- The scheduler uses a longer delay between iterations.
+
+This is not hardware deep sleep. Its power savings come from disabling peripherals and reducing application activity.
+
+### Sleep manager
+
+`firmware/clonker/system/sleep_manager.py` owns inactivity tracking, sleep transitions, hardware shutdown, and wake policy.
+
+Developer settings include:
+
+- `SLEEP_ENABLED`
+- `SLEEP_DRY_RUN`
+- `SLEEP_IDLE_TIMEOUT_S`
+- `SLEEP_FAREWELL_S`
+
+The implementation was first validated in dry-run mode before enabling actual Wi-Fi and OLED shutdown.
+
+The sleep manager also tracks physical CONFIG-switch transitions.
+
+### Entering sleep
+
+Clonker enters software sleep when:
+
+- Sleep is enabled.
+- The application is in RUN mode.
+- The inactivity timeout has elapsed.
+- No queued actions remain.
+
+CONFIG mode inhibits sleep.
+
+During real sleep entry, the OLED briefly displays:
+
+**Going Zzzz!**
+
+The farewell remains visible for approximately 1.5 seconds before the OLED closes and Wi-Fi is disabled.
+
+If hardware shutdown raises an exception, Clonker attempts a recovery reboot rather than continuing with an uncertain hardware state.
+
+### Wake behavior
+
+While sleeping:
+
+| Input | Behavior |
+|---|---|
+| Momentary pushbutton | Wake and reboot |
+| CONFIG switch transition | Wake and reboot |
+| Volume encoder rotation | Ignored |
+| Custom-action encoder rotation | Ignored |
+| Room selector movement | Ignored |
+
+The first wake-eligible input is consumed; it must not dispatch an equipment command.
+
+Wake uses `microcontroller.reset()` to restore normal CircuitPython initialization and Wi-Fi connectivity.
+
+The CONFIG switch is transition-sensitive: movement in either direction is considered wake-eligible. Following reboot, its current position determines the operating mode.
+
+The existing CONFIG/room-selector reboot handshake remains separate from ordinary sleep/wake behavior.
+
+### Scheduler optimization
+
+The normal application scheduler retains its existing responsiveness.
+
+During software sleep, the main-loop delay increases from 1 ms to 25 ms.
+
+This reduces scheduler activity without altering normal awake-mode timing.
+
+Physical controls remain polled during sleep. Short presses, including the volume encoder's MUTE pushbutton, were successfully tested.
+
+### Electrical measurements
+
+Measurements were taken using an inline Color TFT USB tester at approximately 5 V.
+
+| Operating condition | Approximate current |
+|---|---:|
+| Normal RUN, awake | 38 mA |
+| Software sleep, original scheduler | 25 mA |
+| Software sleep, 25 ms scheduler delay | 24 mA |
+| Software sleep, OLED and memory polling suspended | 24 mA |
+
+The final measured reduction was approximately **14 mA, or 37%**, relative to the observed awake baseline.
+
+The 1 mA difference between the initial and optimized sleep readings is small enough that repeated measurements would be needed to establish its significance.
+
+These are USB-side measurements. They do not include the DFRobot boost converter's losses or its own indicator and control circuitry when powered separately.
+
+### Battery-powered verification
+
+The DFRobot DFR0969 module, using two 18650 cells, successfully powered Clonker independently of the laptop.
+
+Tests confirmed:
+
+- Entry into software sleep while battery-powered.
+- Continued power availability after the inactivity timeout.
+- Successful wake using the HOME pushbutton.
+- Reboot and OLED READY feedback.
+- Successful recognition of a subsequent HOME press.
+
+The DFRobot module was operated in HOLD mode.
+
+Four illuminated LEDs remained visible during battery operation. The module's double-click power-button behavior was also investigated; this controls board output power rather than providing a documented LED-only shutdown feature.
+
+### Overnight endurance test
+
+An overnight battery-powered sleep endurance test began on November 13, 2026.
+
+Test configuration:
+
+- Two rechargeable 18650 cells.
+- DFRobot battery module in HOLD mode.
+- No external charging or laptop power.
+- No inline USB power meter.
+- 60-second inactivity timeout.
+- 25 ms software-sleep scheduler delay.
+- Real Wi-Fi and OLED shutdown.
+- Wake by physical pushbutton.
+
+**Result: Pending.**
+
+The test is intended to establish whether Clonker remains powered and wake-responsive after an extended period of software sleep.
+
+### Remaining work
+
+- Record the overnight battery endurance result.
+- Verify CONFIG-switch wake during real battery-powered sleep.
+- Establish a practical production inactivity timeout.
+- Measure longer-term battery runtime and discharge behavior.
+- Investigate the DFRobot module's persistent indicator LEDs and low-load behavior if necessary.
+- Update architectural and operating-mode documentation.
+- Revisit hardware light/deep sleep when suitable CircuitPython support becomes available.
+
+**Chapter 9 software-sleep milestone: INITIAL FUNCTIONAL AND POWER TESTS PASSED.**
+
+The Monster can now turn off its radio, close its eyes, and wait for someone to wake it.
+
+*Less awake. More Zzzz. Still CLONK.*
+
 ---
 
 **THE CLONKER 10000**
