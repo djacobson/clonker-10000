@@ -63,6 +63,23 @@ def initialize():
         )
 
 
+def toggle_enabled():
+    """Toggle sleep availability until the next reboot."""
+    global SLEEP_ENABLED, _state, _last_activity_ns
+
+    SLEEP_ENABLED = not SLEEP_ENABLED
+    _state = _AWAKE
+    _last_activity_ns = time.monotonic_ns()
+
+    logger.info(
+        "SLEEP: manually {}".format(
+            "enabled" if SLEEP_ENABLED else "disabled"
+        )
+    )
+
+    return SLEEP_ENABLED
+
+
 def is_sleeping():
     """Return whether software sleep is currently active."""
     return SLEEP_ENABLED and _state == _ASLEEP
