@@ -558,11 +558,15 @@ def poll():
 
     room_id = selectors.poll()
 
-    # Secret reboot handshake: physical CONFIG + room selector.
+    # Secret handshakes require the physical CONFIG switch.
+    sleep_toggled = False
+
     if switches.config_source() != "PHYSICAL" or not switches.config_enabled():
         _reboot_sequence_reset()
+        _sleep_sequence_reset()
     elif room_id is not None:
         _reboot_sequence_step(room_id)
+        sleep_toggled = _sleep_sequence_step(room_id)
 
     if measure_scan:
         scan_ns += _perf.start() - started
@@ -570,7 +574,7 @@ def poll():
     if room_id is not None and not sleep_manager.note_activity(
         "ROOM_SELECTOR",
         wake_eligible=False,
-    ):
+    ) and not sleep_toggled:
         if measure_events:
             event_seen = True
 
