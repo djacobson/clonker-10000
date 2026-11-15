@@ -8,6 +8,10 @@
 # GitHub: https://github.com/djacobson/clonker-10000
 
 from clonker.system import clock
+from clonker.system import flight_recorder
+
+# Capture accepted log messages in the RAM flight recorder.
+FLIGHT_RECORDER_ENABLED = True
 
 DEBUG = 10
 INFO = 20
@@ -40,17 +44,22 @@ def get_level():
 
 
 def log(level, message):
-    """Write one timestamped message to serial."""
+    """Write one timestamped message to serial and recorder."""
     if level < _level:
         return
 
     name = _NAMES.get(level, "UNKNOWN")
 
-    print("{} {:<7} {}".format(
+    formatted = "{} {:<7} {}".format(
         clock.timestamp(),
         name,
         message
-    ))
+    )
+
+    if FLIGHT_RECORDER_ENABLED:
+        flight_recorder.record(formatted)
+
+    print(formatted)
 
 
 def debug(message):
