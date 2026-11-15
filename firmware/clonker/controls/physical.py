@@ -622,6 +622,9 @@ def poll():
         if event is None:
             continue
 
+        _button_events += 1
+        _last_button = button.name
+
         # Presses can wake Clonker, but the wake press
         # must not execute its normal action.
         if event == "pressed":
