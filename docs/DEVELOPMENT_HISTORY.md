@@ -3897,6 +3897,59 @@ The Monster can now decide when bedtime is appropriate.
 
 ---
 
+## Chapter 10 — The Monster Goes Heavyweight
+### November 14–15, 2026 — Installed battery endurance and charging
+
+The fully assembled Clonker completed an extended battery-only
+endurance test using the internally installed DFRobot DFR0969
+module and two 18650 cells.
+
+The test began November 14 at approximately 1:00 PM with all
+four battery indicator LEDs solid. The Clonker operated in
+RUN mode with software sleep enabled and its normal 10-minute
+inactivity timeout.
+
+Observed checkpoints:
+
+- **November 14, 1:47 PM:** Four solid LEDs; no noticeable
+  enclosure warmth; sleep behavior confirmed by inactive
+  rotary encoders.
+- **November 14, 6:00 PM:** Four solid LEDs; HOME button
+  successfully woke the Clonker, displaying `READY!`.
+  No noticeable warmth.
+- **November 14, 8:40 PM:** Four solid LEDs; MUTE button
+  successfully woke the Clonker in approximately 11 seconds.
+  No noticeable warmth.
+- **November 15, 8:26 AM:** Two solid LEDs; physical-button
+  wake successful.
+
+**Battery-only endurance demonstrated: approximately 19 hours
+26 minutes**, predominantly in software sleep. This was not
+a full-discharge runtime test.
+
+External USB charging was then connected while the Clonker
+was running. The Pico remained operational without rebooting,
+and the DFRobot began indicating charging.
+
+By approximately 10:00 AM, all four battery LEDs were
+illuminated, with LED 1 still slowly blinking. Full-charge
+termination had not yet been confirmed.
+
+No noticeable enclosure warmth was detected during the
+reported battery-operation or charging checks. These were
+external touch observations, not instrumented internal
+temperature measurements.
+
+The previously identified charger-removal reboot remains
+an accepted characteristic of the current DFRobot installation.
+
+**Result:** Extended installed-system battery operation,
+software sleep/wake, and the battery-to-charger transition
+passed their observed functional checks. Full-discharge
+runtime and complete recharge duration remain unmeasured.
+
+---
+
 **THE CLONKER 10000**
 
 *Less sleek. More CLONK.*
