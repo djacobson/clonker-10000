@@ -23,6 +23,43 @@ _next = 0
 _count = 0
 _total = 0
 
+# Registered diagnostic providers.
+# Each provider is a callable returning a small snapshot.
+_providers = {}
+
+
+def register_provider(name, callback):
+    """Register or replace a diagnostic snapshot provider."""
+    if not isinstance(name, str) or not name:
+        raise ValueError("Provider name must be a nonempty string")
+
+    if not callable(callback):
+        raise ValueError("Provider must be callable")
+
+    _providers[name] = callback
+
+
+def collect_diagnostics():
+    """Collect registered diagnostics without filesystem I/O.
+
+    Providers are evaluated only when explicitly requested.
+    A failing provider must not prevent other collections.
+    """
+    results = {}
+
+    for name, callback in _providers.items():
+        try:
+            results[name] = callback()
+        except Exception as exc:
+            results[name] = {
+                "error": "{}: {}".format(
+                    type(exc).__name__,
+                    str(exc)
+                )
+            }
+
+    return results
+
 
 def record(message):
     """Append one message, replacing the oldest when full."""
