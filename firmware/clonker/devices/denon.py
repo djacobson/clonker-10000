@@ -34,6 +34,11 @@ TCP_PORT = 23
 SOCKET_TIMEOUT = 1.0
 MIN_COMMAND_INTERVAL_NS = 50_000_000  # 50 ms
 
+# Bounded, nonblocking processing of incoming AVR status.
+RX_BUFFER_SIZE = 256
+MAX_RX_READS = 8
+_rx_buffer = bytearray(RX_BUFFER_SIZE)
+
 # Aggregate TCP timing, controlled by main.py.
 DENON_PERF_ENABLED = False
 
@@ -215,6 +220,10 @@ def send_volume(endpoint, command):
         data = (command + "\r").encode("ascii")
         _socket.sendall(data)
 
+        # Consume pending AVR status messages while retaining
+        # the persistent TCP connection.
+        poll_rx()
+
         if DENON_PERF_ENABLED:
             _record(
                 "denon.send",
@@ -250,3 +259,45 @@ def send_volume(endpoint, command):
 
         close()
         raise
+
+
+def poll_rx():
+    """Drain available Denon TCP messages without blocking.
+
+    Called by the cooperative scheduler and after sends.
+    Incoming status messages are discarded for now.
+    """
+    if _socket is None:
+        return 0
+
+    received = 0
+
+    try:
+        _socket.settimeout(0)
+
+        for _ in range(MAX_RX_READS):
+            try:
+                count = _socket.recv_into(_rx_buffer)
+            except OSError as error:
+                if error.errno in (11, 35):
+                    break
+                raise
+
+            if count == 0:
+                raise OSError("Denon closed TCP connection")
+
+            received += count
+
+        return received
+
+    except Exception:
+        close()
+        raise
+
+    finally:
+        if _socket is not None:
+            try:
+                _socket.settimeout(SOCKET_TIMEOUT)
+            except OSError:
+                close()
+                raise
