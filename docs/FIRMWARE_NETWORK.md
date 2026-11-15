@@ -1237,7 +1237,42 @@ Automated NTP synchronization is not established by the current verified baselin
 
 Serial logging records action admission, execution, failures, room changes, and operating-mode transitions.
 
-There is no persistent flash log or background logging server.
+### Flight recorder — Chapter 10
+
+**Module:** `clonker/system/flight_recorder.py`.
+
+The flight recorder retains the most recent 64 logger messages in a bounded RAM ring buffer. Older messages are overwritten as new messages arrive.
+
+Diagnostic providers are registered during application startup and evaluated only when a snapshot is requested:
+
+- `performance` — accumulated PERF statistics.
+- `memory` — heap and memory-monitor statistics.
+- `queue` — pending action queue state.
+- `physical` — button events and dispatch counters.
+
+A completed secret manual-reboot handshake requests a synchronous, streaming snapshot before `microcontroller.reset()`.
+
+Snapshots are stored on the Pico under `/clonker/`:
+
+| File | Purpose |
+|---|---|
+| `flight_recorder.txt` | Most recent completed snapshot |
+| `flight_recorder.txt.1` | Previous snapshot |
+| `flight_recorder.txt.2` | Two snapshots ago |
+| `flight_recorder.txt.3` | Three snapshots ago |
+| `flight_recorder.tmp` | Temporary file used during writing |
+
+The writer captures diagnostics and recent log messages, streams them into a human-readable text file, and rotates completed snapshots. Rotation is not fully atomic across power loss.
+
+**Filesystem ownership:** GP17 must select DEVICE mode at cold boot for successful writes. In SERVICE mode, the filesystem is normally read-only to the application. Snapshot failures are caught and recorded in RAM; they do not prevent a deliberate reboot.
+
+**Current persistence policy:** Snapshots are written only during the secret manual-reboot handshake. There are no periodic snapshots, background writes, or filesystem operations in ordinary button dispatch.
+
+The synchronous write can pause application execution for several hundred milliseconds. Earlier test writes measured approximately 225–484 ms. This is acceptable during deliberate reboot but requires further evaluation before enabling scheduled snapshots.
+
+**Verified:** Read-only write failure handling, DEVICE-mode writes, four-generation rotation, diagnostic-provider capture, and manual-reboot persistence.
+
+**Limitations:** The recorder retains only the most recent 64 messages. A manual-reboot snapshot captures the state at reboot time, not necessarily the state when an earlier malfunction began. An unexpected power loss does not automatically trigger a snapshot.
 
 Keep routine logging modest. Continuous diagnostics can distort timing and browser responsiveness.
 

@@ -229,6 +229,20 @@ through this sequence within 10 seconds:
 
 The OLED displays `REBOOTING!` before the Pico resets.
 
+The handshake also triggers a best-effort flight-recorder snapshot before reboot. In DEVICE filesystem mode, the snapshot is saved to `/clonker/flight_recorder.txt`, with up to three older snapshots retained as numbered backups.
+
+In SERVICE mode, the snapshot write fails safely because the filesystem is read-only to the Pico. The reboot still proceeds.
+
+Snapshots are currently written only for this deliberate reboot handshake, not periodically. To retrieve a snapshot, use the CircuitPython REPL:
+
+```python
+print(open("/clonker/flight_recorder.txt").read())
+```
+
+Alternatively, fully power off, select SERVICE with GP17, and power on again to inspect the file from the USB-mounted CIRCUITPY drive.
+
+Avoid performing another secret reboot before collecting evidence, because another successful snapshot will rotate the previous one into `.1`.
+
 Both secret handshakes require the physical CONFIG switch;
 simulated CONFIG mode and software overrides do not qualify.
 
