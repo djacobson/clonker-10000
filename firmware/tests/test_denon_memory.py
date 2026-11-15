@@ -54,6 +54,10 @@ def send_when_ready(endpoint, command):
     started = time.monotonic()
 
     while True:
+        # Drain responses from previous commands before
+        # attempting the next command.
+        denon.poll_rx()
+
         if denon.send_volume(endpoint, command):
             return
 
