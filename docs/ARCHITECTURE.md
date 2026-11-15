@@ -1365,6 +1365,36 @@ The physical control assembly is operational. Chapter 9 subsequently demonstrate
 
 > **Do not make the Clonker more complicated merely because we are capable of making it more complicated.**
 
+### Future architecture — Apple TV and adaptable sleep
+
+Apple TV support is a research objective, not an implemented feature. Any future implementation should preserve Clonker's generic action model, shared Dumb Queue™, physical controls, and cooperative scheduler.
+
+**Apple TV protocol research**
+
+- Investigate [pyatv](https://github.com/postlund/pyatv), particularly its modular Companion protocol implementation, as a reference for discovery, pairing, authentication, encrypted communication, and remote commands.
+- Examine protocol dependencies individually before attempting a CircuitPython port. Desktop Python modules, asynchronous networking, and cryptographic dependencies are not assumed to work unchanged on the Pico 2 W.
+- Prefer a small, purpose-built implementation over importing the complete pyatv framework.
+- Begin with experiments using an Apple TV, iOS Shortcuts, and pyatv on a desktop computer. Establish what works before integrating it into Clonker firmware.
+
+**Adapter ownership and authentication**
+
+- Apple TV-specific protocol details belong within the device adapter and its supporting modules, not the generic action queue or physical controls.
+- Treat initial pairing, stored credentials, session authentication, and ordinary command execution as distinct operations.
+- Persist reusable pairing credentials securely when feasible. Reestablish authenticated sessions when required, without repeating initial pairing unnecessarily.
+- Avoid expensive authentication work on the immediate button-command path where practical.
+- Consider lazy connection establishment or controlled preconnection rather than requiring every configured device to be reachable during boot.
+- Preserve Clonker's existing scheduling and failure-recovery principles.
+
+**Sleep remains a replaceable policy**
+
+- `system/sleep_manager.py` remains responsible for coordinating sleep and wake behavior.
+- The current software sleep implementation is a working baseline, not a permanent definition of sleep.
+- Future strategies may retain Wi-Fi connectivity, preserve selected network sessions, reduce activity without disconnecting, or use hardware-assisted deep sleep when supported.
+- Device adapters may eventually benefit from lifecycle notifications before sleep and after wake, allowing them to close or restore sessions appropriately.
+- Do not introduce additional sleep modes or lifecycle interfaces until actual requirements justify them.
+
+These are architectural intentions and research directions, not implementation commitments. Validate resource usage, security, reliability, and responsiveness on actual hardware before adopting a design.
+
 ---
 
 ## 16. Reference documents
