@@ -3948,6 +3948,117 @@ software sleep/wake, and the battery-to-charger transition
 passed their observed functional checks. Full-discharge
 runtime and complete recharge duration remain unmeasured.
 
+### November 15, 2026 — Operation Catch the Gremlin
+
+The Monster developed an unsettling personality trait.
+
+After extended use of the Denon's volume encoder, ordinary
+physical buttons could mysteriously stop responding. Navigation,
+Home, Back, and even OLED feedback could disappear, while other
+controls continued working.
+
+It looked suspiciously like a physical-control or scheduler
+problem.
+
+Naturally, we went hunting.
+
+#### Building the trap
+
+Chapter 10 introduced a flight recorder: a small in-memory
+history of recent activity that could be written to the
+filesystem through a secret physical reboot handshake.
+
+No continuous flash writes. No elaborate new diagnostics
+framework. Just enough evidence to investigate a misbehaving
+Monster after the fact.
+
+The recorder helped establish the diagnostic approach, but
+the decisive breakthrough came from targeted memory testing.
+
+#### Following the disappearing memory
+
+During aggressive Denon volume activity, free memory could
+collapse from hundreds of kilobytes to approximately 25 KB.
+
+Garbage collection didn't explain the disappearance.
+
+A standalone test reproduced the problem using only the
+Denon TCP connection and repeated volume commands.
+
+Then came the revealing experiment: closing the socket
+immediately restored the missing memory.
+
+The investigation shifted away from buttons and toward the
+persistent network connection.
+
+#### The Denon was talking back
+
+The Denon receiver sends status information over the same
+TCP connection used for volume commands.
+
+We were sending commands, but not consistently reading
+the replies.
+
+Those unread messages accumulated in the socket's receive
+buffers, consuming memory until the application became
+unreliable.
+
+A second standalone test explicitly drained incoming data.
+Across three cycles, it consumed 2,569 bytes in 354 reads
+without reproducing the progressive memory collapse.
+
+Mr. Gremlin had finally shown his face.
+
+#### A surprisingly small correction
+
+The production Denon adapter gained a bounded, nonblocking
+receive-drain function, `poll_rx()`.
+
+Rather than inventing another scheduler, the correction
+reused the existing `device_adapters.poll()` maintenance
+hook alongside Roku's held-button management.
+
+This also revealed an important timing detail: draining
+immediately after sending wasn't sufficient, because the
+receiver's responses could arrive later.
+
+Regular polling solved that problem while preserving the
+fast persistent TCP connection.
+
+#### Back to the Den
+
+Aggressive full-application testing showed stable memory,
+responsive physical controls, and Denon command execution
+remaining around 2–3 milliseconds.
+
+The Clonker returned to battery-powered operation in the
+Den, where initial real-world testing showed no noticeable
+performance problems with aggressive volume changes,
+navigation, or Select.
+
+The correction remains subject to longer-term observation,
+but the initial results are encouraging.
+
+Two useful regression tests now live in `firmware/tests/`:
+
+- `test_denon_memory.py`
+- `test_denon_memory_drain.py`
+
+The flight recorder remains available should another
+gremlin appear.
+
+For measurements, implementation details, and evidence
+limits, see
+[Network Firmware — Chapter 10](FIRMWARE_NETWORK.md#november-1415--chapter-10-operation-catch-the-gremlin).
+
+**Chapter 10 lesson:** When a microcontroller seems to be
+losing its mind, make sure the equipment isn't filling
+its ears with unread TCP messages.
+
+*The Monster learned to listen. Mr. Gremlin lost his lease.*
+
+**Less sleek. More CLONK.**
+
 ---
 
 **THE CLONKER 10000**
