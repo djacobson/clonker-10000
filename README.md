@@ -417,8 +417,8 @@ The software architecture is intentionally straightforward.
                        DUMB QUEUE
                             |
                             v
-                      Device Adapters
-                            |
+                      Device Adapters  <-- Reference implementations
+                            |              with battle scars.
               +-------------+-------------+
               |             |             |
               v             v             v
