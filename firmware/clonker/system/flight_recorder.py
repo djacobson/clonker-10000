@@ -117,8 +117,8 @@ def clear():
 import os
 import time
 
-SNAPSHOT_PATH = "/flight_recorder.txt"
-SNAPSHOT_TEMP = "/flight_recorder.tmp"
+SNAPSHOT_PATH = "/clonker/flight_recorder.txt"
+SNAPSHOT_TEMP = "/clonker/flight_recorder.tmp"
 SNAPSHOT_BACKUPS = 3
 
 _flush_attempts = 0
