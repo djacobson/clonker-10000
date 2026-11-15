@@ -1515,6 +1515,106 @@ The fix introduced `device_config.has_room()`, which checks the already-validate
 
 The original investigations, unsuccessful experiments, resolution, and performance-debugging lessons are preserved in [Development History](DEVELOPMENT_HISTORY.md).
 
+### November 14–15 — Chapter 10: Operation Catch the Gremlin
+
+An intermittent failure appeared during extended operation in the
+Den. After aggressive volume-encoder activity, ordinary physical
+buttons could stop producing both equipment commands and OLED
+feedback. Other controls, including the custom-action encoder and
+room selector, could remain responsive.
+
+The symptoms initially suggested a physical-input or scheduler
+problem. A manually triggered flight recorder was introduced to
+capture recent logs, memory, queue, performance, and physical-input
+state without continuous filesystem writes.
+
+#### Isolating the memory loss
+
+Full-application diagnostics showed free memory falling dramatically
+during repeated Denon volume commands, at times approaching 25 KB.
+
+A standalone regression test,
+`firmware/tests/test_denon_memory.py`, reproduced the behavior
+without the physical controls or application scheduler.
+
+The test repeatedly sent `MVUP` and `MVDOWN` over the persistent
+Denon TCP connection.
+
+Observed behavior included:
+
+- Large reductions in free heap, sometimes in approximately
+  57 KB increments.
+- Little corresponding increase in GC-managed allocations.
+- Immediate memory recovery when the Denon socket was closed.
+
+These observations implicated resources associated with the
+persistent socket rather than ordinary retained Python objects.
+
+The precise internal allocation mechanism within CircuitPython
+was not independently established.
+
+#### Testing the hypothesis
+
+A second standalone test,
+`firmware/tests/test_denon_memory_drain.py`, consumed incoming
+TCP data using nonblocking `recv_into()` calls.
+
+Across three test cycles, it consumed 2,569 incoming bytes in
+354 reads while maintaining a stable heap. The final free-memory
+measurement matched the initial baseline of 359,872 bytes.
+
+This provided strong evidence that unread Denon responses were
+responsible for the observed memory loss.
+
+#### Production correction
+
+The Denon adapter gained bounded, nonblocking receive draining
+through `poll_rx()`.
+
+Initial testing showed that draining immediately after a command
+was not enough, because responses could arrive after that call.
+
+The correction was integrated into the existing
+`device_adapters.poll()` maintenance path, ensuring that incoming
+data is consumed during normal scheduler operation.
+
+The standalone tests subsequently completed without reproducing
+the original progressive memory collapse.
+
+#### Full-application verification
+
+Aggressive bench testing exercised Denon volume, Roku navigation,
+Home, Back, and custom actions.
+
+Free memory remained near 301–306 KB over the observed interval,
+rather than collapsing toward the earlier low-memory condition.
+
+Denon command timing remained approximately 2–3 ms, preserving
+the performance advantage of persistent TCP.
+
+Initial battery-powered use in the Den also showed normal volume,
+navigation, and Select behavior without noticeable performance
+degradation.
+
+The correction is considered provisionally successful. Extended
+real-world operation remains useful for establishing confidence.
+
+#### Engineering lessons
+
+- Persistent TCP connections require receive-side maintenance
+  even when the application only intends to send commands.
+- Socket-associated memory pressure may not resemble an ordinary
+  Python-object memory leak.
+- Closing a socket can be an important diagnostic experiment.
+- A small standalone test can isolate a network problem from
+  an otherwise complicated physical-control application.
+- Existing adapter maintenance hooks should be reused rather
+  than introducing a second scheduler or execution path.
+
+The flight recorder remains available for future investigations.
+The standalone tests remain under `firmware/tests/`, alongside
+other hardware and firmware experiments.
+
 ---
 
 ## 15. Operational limitations and next investigations
@@ -1665,9 +1765,42 @@ results.
 
 ### Denon TCP
 
-The adapter maintains one persistent receiver socket.
+The adapter maintains one persistent TCP connection to the receiver
+for low-latency volume commands. Commands are paced, and uncertain
+transmissions are not automatically retried.
 
-There is no response parser, state polling, or automatic retry of uncertain sends.
+#### Incoming status and socket maintenance — Chapter 10
+
+The Denon receiver sends status information back over the persistent
+connection. These incoming messages must be consumed even when the
+application does not need to interpret them.
+
+During Chapter 10, unread incoming data was found to accumulate in
+the socket's receive buffers, progressively reducing available heap
+memory during sustained volume activity.
+
+`devices/denon.py` now provides `poll_rx()`:
+
+- Uses a reusable 256-byte receive buffer.
+- Performs nonblocking `recv_into()` operations.
+- Limits each invocation to eight reads.
+- Discards incoming status messages without parsing them.
+- Closes the connection on unexpected socket errors.
+
+The existing `device_adapters.poll()` maintenance hook invokes
+`denon.poll_rx()` alongside `roku.poll()`. The main cooperative
+scheduler already calls this hook during normal awake operation.
+
+`send_volume()` also invokes `poll_rx()` after sending a command.
+However, testing demonstrated that immediate post-send draining
+alone was insufficient: receiver responses can arrive later.
+Regular adapter polling is therefore essential.
+
+The design preserves the persistent connection and avoids the
+connection overhead of opening a new socket for each volume command.
+
+No Denon status parser or equipment-state synchronization is
+implemented. Incoming status is intentionally discarded for now.
 
 ### Roku held-volume
 
