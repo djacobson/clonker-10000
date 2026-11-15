@@ -90,6 +90,27 @@ def _sample():
     )
 
 
+def snapshot():
+    """Return current heap diagnostics without collecting garbage.
+
+    Intended for occasional flight-recorder snapshots.
+    Does not reset statistics, log, or perform filesystem I/O.
+    """
+    free = gc.mem_free()
+
+    return {
+        "uptime_s": clock.uptime_ns() // 1_000_000_000,
+        "free": free,
+        "allocated": gc.mem_alloc(),
+        "baseline_free": _baseline_free,
+        "lowest_free": _lowest_free,
+        "change": (
+            free - _baseline_free
+            if _baseline_free is not None else None
+        ),
+    }
+
+
 def initialize():
     """Initialize independent monitoring schedules."""
     global _next_memory_at, _next_gc_at
