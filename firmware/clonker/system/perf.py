@@ -99,6 +99,18 @@ def snapshot(name):
     }
 
 
+def snapshot_all():
+    """Return summaries of all registered measurements.
+
+    Intended for occasional diagnostic collection.
+    Does not reset counters or perform I/O.
+    """
+    return {
+        name: snapshot(name)
+        for name in _stats
+    }
+
+
 def reset(name=None):
     """Reset one measurement or all registered measurements.
 
