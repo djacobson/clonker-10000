@@ -21,6 +21,7 @@ from clonker.system import logger
 from clonker.system import perf
 from clonker.system import memory_monitor
 from clonker.system import sleep_manager
+from clonker.system import flight_recorder
 from clonker.net import web
 from clonker.net import http_transport
 from clonker.devices import denon
@@ -328,6 +329,21 @@ def main():
 
     # Initialize memory monitoring after startup configuration.
     memory_monitor.initialize()
+
+    # Flight recorder diagnostic providers.
+    # These are evaluated only when a snapshot is requested.
+    flight_recorder.register_provider(
+        "performance", perf.snapshot_all
+    )
+    flight_recorder.register_provider(
+        "memory", memory_monitor.snapshot
+    )
+    flight_recorder.register_provider(
+        "queue", actions.status
+    )
+    flight_recorder.register_provider(
+        "physical", physical.snapshot
+    )
 
     try:
         while True:

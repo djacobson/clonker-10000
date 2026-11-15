@@ -16,6 +16,7 @@ import time
 from clonker.controls import switches
 from clonker.system import logger
 from clonker.system import sleep_manager
+from clonker.system import flight_recorder
 from clonker import actions
 from clonker import device_config_v2 as device_config
 from clonker import device_adapters
@@ -249,6 +250,17 @@ def _reboot_sequence_step(room_id):
     # Allow the OLED to refresh before resetting.
     oled.poll()
     time.sleep(1.0)
+
+    # Best-effort persistent diagnostic snapshot.
+    # Failure must never prevent the deliberate reboot.
+    saved = flight_recorder.flush_now("manual_reboot")
+
+    if not saved:
+        logger.warning(
+            "FLIGHT RECORDER: Reboot snapshot failed: {}".format(
+                flight_recorder.persistence_status()["last_error"]
+            )
+        )
 
     import microcontroller
     microcontroller.reset()
