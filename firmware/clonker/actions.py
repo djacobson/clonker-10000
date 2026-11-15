@@ -120,6 +120,7 @@ def dispatch(room_id, action_id, delay_seconds=0):
         "kind": kind,
         "step": 0,
         "due": due,
+        "enqueued_at": time.monotonic_ns(),
     })
 
     if len(_queue) > _peak_depth:
@@ -219,6 +220,7 @@ def dispatch_hold(
         "path": path,
         "adapter": adapter,
         "due": 0,
+        "enqueued_at": time.monotonic_ns(),
     })
 
     _peak_depth = max(_peak_depth, len(_queue))
@@ -518,11 +520,30 @@ def clear(reason="Manual reset", reset_toggles=False):
 
 
 def status():
-    """Return a small diagnostic snapshot."""
+    """Return queue diagnostics without changing queue state."""
+    now = time.monotonic_ns()
+
+    oldest_age_ms = None
+    oldest_action = None
+
+    if _queue:
+        oldest = min(
+            _queue,
+            key=lambda task: task["enqueued_at"]
+        )
+
+        oldest_age_ms = (
+            now - oldest["enqueued_at"]
+        ) // NS_PER_MS
+
+        oldest_action = oldest["action"]
+
     return {
         "depth": len(_queue),
         "capacity": QUEUE_CAPACITY,
         "peak_depth": _peak_depth,
+        "oldest_age_ms": oldest_age_ms,
+        "oldest_action": oldest_action,
         "last_result": _last_result,
         "last_error": _last_error,
     }
