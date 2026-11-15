@@ -104,3 +104,135 @@ def clear():
     _next = 0
     _count = 0
     _total = 0
+
+
+# Persistent flight recorder snapshots.
+#
+# One synchronous streaming writer serves both scheduled
+# snapshots and deliberate reboot captures.
+#
+# Filesystem errors are nonfatal. No logging is performed
+# here to avoid recursion through logger -> flight_recorder.
+
+import os
+import time
+
+SNAPSHOT_PATH = "/flight_recorder.txt"
+SNAPSHOT_TEMP = "/flight_recorder.tmp"
+SNAPSHOT_BACKUPS = 3
+
+_flush_attempts = 0
+_flush_successes = 0
+_flush_failures = 0
+_last_flush_ms = None
+_last_flush_error = None
+_last_flush_reason = None
+
+
+def persistence_status():
+    """Return persistence statistics without filesystem I/O."""
+    return {
+        "attempts": _flush_attempts,
+        "successes": _flush_successes,
+        "failures": _flush_failures,
+        "last_ms": _last_flush_ms,
+        "last_error": _last_flush_error,
+        "last_reason": _last_flush_reason,
+    }
+
+
+def _exists(path):
+    """Check whether a snapshot file exists."""
+    try:
+        os.stat(path)
+        return True
+    except OSError:
+        return False
+
+
+def _rotate_snapshots():
+    """Rotate completed snapshots, oldest first.
+
+    Called only after the temporary snapshot is fully written.
+    """
+    for index in range(SNAPSHOT_BACKUPS, 0, -1):
+        destination = "{}.{}".format(SNAPSHOT_PATH, index)
+
+        if index == 1:
+            source = SNAPSHOT_PATH
+        else:
+            source = "{}.{}".format(SNAPSHOT_PATH, index - 1)
+
+        if not _exists(source):
+            continue
+
+        if _exists(destination):
+            os.remove(destination)
+
+        os.rename(source, destination)
+
+    os.rename(SNAPSHOT_TEMP, SNAPSHOT_PATH)
+
+
+def flush_now(reason="manual"):
+    """Write a complete snapshot, returning True on success.
+
+    A failed write or rotation never raises to the caller.
+    Previous completed snapshots are preserved where possible.
+    """
+    global _flush_attempts, _flush_successes
+    global _flush_failures, _last_flush_ms
+    global _last_flush_error, _last_flush_reason
+
+    _flush_attempts += 1
+    _last_flush_reason = reason
+    _last_flush_error = None
+
+    started = time.monotonic_ns()
+
+    try:
+        # Capture diagnostic values once per snapshot.
+        diagnostics = collect_diagnostics()
+        recorder_stats = stats()
+
+        with open(SNAPSHOT_TEMP, "w") as output:
+            output.write("=== CLONKER FLIGHT RECORDER ===\n")
+            output.write("Reason: {}\n".format(reason))
+            output.write(
+                "Uptime ns: {}\n".format(
+                    time.monotonic_ns()
+                )
+            )
+
+            output.write("\n=== RECORDER ===\n")
+            for name, value in recorder_stats.items():
+                output.write("{}: {}\n".format(name, value))
+
+            output.write("\n=== DIAGNOSTICS ===\n")
+            for name, values in diagnostics.items():
+                output.write("{}: {}\n".format(name, values))
+
+            output.write("\n=== RECENT LOG ===\n")
+            for message in entries():
+                output.write(message)
+                output.write("\n")
+
+            output.write("=== END SNAPSHOT ===\n")
+
+        # Rotate only after the temporary file closes.
+        _rotate_snapshots()
+
+        _flush_successes += 1
+        return True
+
+    except Exception as exc:
+        _flush_failures += 1
+        _last_flush_error = "{}: {}".format(
+            type(exc).__name__, exc
+        )
+        return False
+
+    finally:
+        _last_flush_ms = (
+            time.monotonic_ns() - started
+        ) / 1_000_000
