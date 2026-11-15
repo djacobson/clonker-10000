@@ -137,6 +137,24 @@ HOLD_BUTTONS = (
 )
 
 _initialized = False
+
+# Flight recorder diagnostics.
+# Counters are updated without logging or filesystem I/O.
+_button_events = 0
+_button_presses = 0
+_last_button = None
+
+
+def snapshot():
+    """Return lightweight physical-control diagnostics."""
+    return {
+        "initialized": _initialized,
+        "button_events": _button_events,
+        "button_presses": _button_presses,
+        "last_button": _last_button,
+    }
+
+
 _buttons = []
 
 _volume_encoder = None
@@ -536,6 +554,7 @@ def initialize():
 def poll():
     """Poll physical inputs and route button presses."""
     global _action_index
+    global _button_events, _button_presses, _last_button
 
     if not _initialized:
         return
@@ -606,6 +625,7 @@ def poll():
         # Presses can wake Clonker, but the wake press
         # must not execute its normal action.
         if event == "pressed":
+            _button_presses += 1
             if sleep_manager.note_activity(
                 button.name,
                 wake_eligible=True,
