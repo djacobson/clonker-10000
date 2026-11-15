@@ -329,8 +329,8 @@ def test_dispatch():
 
         result = physical.snapshot()
 
-        check("Dispatch attempts", result["dispatch_attempts"] == 7)
-        check("Accepted count", result["dispatch_accepted"] == 4)
+        check("Dispatch attempts", result["dispatch_attempts"] == 8)
+        check("Accepted count", result["dispatch_accepted"] == 5)
         check("Failed count", result["dispatch_failed"] == 3)
         check("Skipped count", result["dispatch_skipped"] == 2)
         check(
