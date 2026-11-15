@@ -143,6 +143,11 @@ _initialized = False
 _button_events = 0
 _button_presses = 0
 _last_button = None
+_dispatch_attempts = 0
+_dispatch_accepted = 0
+_dispatch_failed = 0
+_dispatch_skipped = 0
+_last_dispatch = None
 
 
 def snapshot():
@@ -152,7 +157,30 @@ def snapshot():
         "button_events": _button_events,
         "button_presses": _button_presses,
         "last_button": _last_button,
+        "dispatch_attempts": _dispatch_attempts,
+        "dispatch_accepted": _dispatch_accepted,
+        "dispatch_failed": _dispatch_failed,
+        "dispatch_skipped": _dispatch_skipped,
+        "last_dispatch": _last_dispatch,
     }
+
+
+def _record_dispatch(action_id, outcome):
+    """Count a physical dispatch outcome without logging."""
+    global _dispatch_attempts, _dispatch_accepted
+    global _dispatch_failed, _dispatch_skipped
+    global _last_dispatch
+
+    if outcome == "skipped":
+        _dispatch_skipped += 1
+    else:
+        _dispatch_attempts += 1
+        if outcome == "accepted":
+            _dispatch_accepted += 1
+        else:
+            _dispatch_failed += 1
+
+    _last_dispatch = (action_id, outcome)
 
 
 _buttons = []
@@ -348,6 +376,7 @@ def dispatch_selected(action_id):
     room_id = selectors.selected_room()
 
     if not device_config.has_room(room_id):
+        _record_dispatch(action_id, "skipped")
         logger.info(
             "PHYSICAL NO-OP: {} / {} (room unavailable)".format(
                 room_id, action_id
@@ -360,8 +389,10 @@ def dispatch_selected(action_id):
 
     try:
         actions.dispatch(room_id, action_id)
+        _record_dispatch(action_id, "accepted")
         return True
     except Exception as exc:
+        _record_dispatch(action_id, "failed")
         logger.warning(
             "PHYSICAL dispatch failed: {} / {}: {}".format(
                 room_id, action_id, exc
@@ -379,6 +410,7 @@ def dispatch_hold_button(button_name, action_id, event):
         room_id = selectors.selected_room()
 
         if not device_config.has_room(room_id):
+            _record_dispatch(action_id, "skipped")
             logger.info(
                 "PHYSICAL HOLD NO-OP: {} / {} "
                 "(room unavailable)".format(room_id, action_id)
@@ -386,6 +418,7 @@ def dispatch_hold_button(button_name, action_id, event):
             return False
 
         if button_name in _hold_rooms:
+            _record_dispatch(action_id, "skipped")
             return False
 
         measure = PHYSICAL_PERF_ENABLED and PERF_HOLD
@@ -410,7 +443,9 @@ def dispatch_hold_button(button_name, action_id, event):
                 room_id, action_id, event,
                 endpoint, command, adapter
             )
+            _record_dispatch(action_id, "accepted")
         except Exception as exc:
+            _record_dispatch(action_id, "failed")
             logger.warning(
                 "PHYSICAL hold dispatch failed: {}".format(exc)
             )
@@ -440,8 +475,10 @@ def dispatch_hold_button(button_name, action_id, event):
                 room_id, action_id, event,
                 endpoint, command, adapter
             )
+            _record_dispatch(action_id, "accepted")
             return True
         except Exception as exc:
+            _record_dispatch(action_id, "failed")
             logger.warning(
                 "PHYSICAL hold release failed: {}".format(exc)
             )
