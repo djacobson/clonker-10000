@@ -174,6 +174,34 @@ def _rotate_snapshots():
     os.rename(SNAPSHOT_TEMP, SNAPSHOT_PATH)
 
 
+def _write_values(output, values, indent=0):
+    """Stream nested diagnostic values as readable text."""
+    prefix = " " * indent
+
+    if isinstance(values, dict):
+        for name, value in values.items():
+            if isinstance(value, (dict, list, tuple)):
+                output.write("{}{}:\n".format(prefix, name))
+                _write_values(output, value, indent + 2)
+            else:
+                output.write(
+                    "{}{}: {}\n".format(prefix, name, value)
+                )
+
+    elif isinstance(values, (list, tuple)):
+        for index, value in enumerate(values):
+            if isinstance(value, (dict, list, tuple)):
+                output.write("{}[{}]:\n".format(prefix, index))
+                _write_values(output, value, indent + 2)
+            else:
+                output.write(
+                    "{}[{}]: {}\n".format(prefix, index, value)
+                )
+
+    else:
+        output.write("{}{}\n".format(prefix, values))
+
+
 def flush_now(reason="manual"):
     """Write a complete snapshot, returning True on success.
 
@@ -210,7 +238,8 @@ def flush_now(reason="manual"):
 
             output.write("\n=== DIAGNOSTICS ===\n")
             for name, values in diagnostics.items():
-                output.write("{}: {}\n".format(name, values))
+                output.write("\n[{}]\n".format(name))
+                _write_values(output, values, 2)
 
             output.write("\n=== RECENT LOG ===\n")
             for message in entries():
