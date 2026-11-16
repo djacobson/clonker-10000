@@ -1039,6 +1039,67 @@ and physical-button wake.
 
 This was not a full battery-discharge test.
 
+### Chapter 10 — Awake endurance and DFRobot low-load behavior
+
+On November 15–16, 2026, the assembled Clonker completed
+another battery-only overnight test, this time with software
+sleep disabled and the CONFIG switch in RUN mode.
+
+After approximately six hours, all four DFRobot battery
+indicator LEDs remained solid. The Custom Action encoder
+responded immediately, without a wake/reboot sequence.
+
+This demonstrates successful overnight awake operation,
+but does not establish remaining battery capacity or
+maximum runtime. The four LEDs are not precision
+capacity measurements.
+
+#### The low-load question
+
+Our SparkFun USB measurements showed approximately:
+
+| Operating state | Pico USB current |
+|---|---:|
+| Awake RUN | 38 mA |
+| Software sleep | 24–25 mA |
+
+These measurements confirm that software sleep reduces
+the Clonker's own power consumption.
+
+However, the DFRobot DFR0969 contains its own charging,
+boost-conversion, and power-management circuitry.
+Its behavior may not be optimal at very low output loads.
+
+Third-party reports have questioned whether the HOLD
+setting completely prevents low-load shutdown. Those
+reports have not been independently verified on our
+particular module.
+
+Two distinct possibilities warrant investigation:
+
+1. **Minimum-load shutdown:** The DFRobot may disable
+   its output below a load threshold, leaving usable
+   energy in the batteries.
+2. **Light-load conversion efficiency:** The boost
+   converter may operate less efficiently at lower
+   currents. Reduced efficiency alone does not prove
+   greater total battery consumption.
+
+The overnight awake test does not establish either
+mechanism.
+
+**Engineering lesson:** Optimizing the Pico's current
+consumption does not necessarily optimize usable
+battery runtime for the complete system.
+
+Software sleep remains functional, but is temporarily
+disabled during awake-mode endurance testing.
+No firmware redesign is justified by these results alone.
+
+Future measurements should distinguish Pico USB output
+current from actual battery-side current and account
+for the DFRobot's own consumption.
+
 ### Charging and assembly considerations
 
 The charging system should use a suitably rated external
