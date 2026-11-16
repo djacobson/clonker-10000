@@ -1108,7 +1108,7 @@ The charging system should use a suitably rated external
 Charging-input current measurements have reached
 approximately 1.8 A during testing.
 
-Final enclosure integration should verify:
+Post-installation inspection and continued testing should verify:
 
 - Secure mounting of the DFRobot module and cells.
 - Insulation and protection against accidental shorts.
@@ -1117,7 +1117,6 @@ Final enclosure integration should verify:
 - Charging behavior and component temperatures.
 - Continued operation when charging power is connected.
 - Expected reboot behavior when charging power is removed.
-- Battery-powered sleep and wake after final assembly.
 
 Avoid placing pressure on the 18650 cells or exposing
 their terminals to conductive enclosure hardware.
@@ -1127,16 +1126,16 @@ their terminals to conductive enclosure hardware.
 The DFRobot module, both 18650 cells, and permanent USB-C
 charging interface are installed in the enclosure.
 
-Remaining validation:
+Remaining validation and investigation:
 
-- Verify the installed USB-C charging connection.
-- Monitor cell and DFRobot temperatures during charging.
-- Verify insulation, wiring clearance, and strain relief.
-- Repeat charging and power-transition tests after assembly.
-- Verify battery-powered sleep and wake after assembly.
-- Measure practical battery runtime over a longer period.
-- Investigate hardware sleep when supported by a suitable
-  stable CircuitPython release.
+- Continue monitoring cell and DFRobot temperatures during charging.
+- Complete final insulation, wiring-clearance, and strain-relief inspection.
+- Establish practical battery runtime under normal RUN-mode operation.
+- Investigate DFRobot HOLD-mode minimum-load behavior and conversion efficiency.
+- Obtain and review the DFRobot DFR0969 schematic and power-management specifications.
+- Compare battery-side consumption with Pico USB-side measurements.
+- Revisit software sleep after characterizing the complete power system.
+- Investigate hardware sleep when supported by a suitable stable CircuitPython release.
 
 Detailed experiments and measured results are recorded in
 [Development History](DEVELOPMENT_HISTORY.md).
