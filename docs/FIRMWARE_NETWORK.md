@@ -1515,6 +1515,16 @@ The fix introduced `device_config.has_room()`, which checks the already-validate
 
 The original investigations, unsuccessful experiments, resolution, and performance-debugging lessons are preserved in [Development History](DEVELOPMENT_HISTORY.md).
 
+### November 15–16 — CONFIG HTTP: The 10-Second Socket Send Stall
+
+Repeated Safari configuration saves and reloads intermittently froze the management HTTP server and physical/OLED responsiveness for approximately 10 seconds. Flight-recorder and HTTP diagnostics isolated the pause to `firmware/clonker/net/web.py`, specifically `count = _client.send(chunk)` (line 622 at investigation time). The measured call duration repeatedly reached approximately **10,005 ms**, even though the accepted client socket had been configured with `settimeout(0)`.
+
+The stall occurred on both large GET responses and a small POST success response. Configuration persistence could complete successfully before Safari reported failure. No consistent memory exhaustion, zero-byte send, or `EAGAIN` explanation was established.
+
+A standalone reproducer, `firmware/tests/socket_send_stall.py`, exercised POST/GET traffic, including flash writes and backup rotation, without reproducing the production stall. Reducing HTTP chunks from 512 to 128 bytes, slowing web polling, and temporarily disabling adapter polling did not eliminate it. SERVICE/DEVICE boot mode, battery versus USB power, and an attached serial console did not establish a reliable trigger.
+
+**Status: unresolved, currently intermittent/not reproducing.** Repeated subsequent configuration saves succeeded, including battery-only operation. Do not mistake the disappearance of symptoms for a proven fix. If it returns, start with the timed `_client.send(chunk)` call and the existing standalone test rather than reopening the entire scheduler or persistence investigation.
+
 ### November 14–15 — Chapter 10: Operation Catch the Gremlin
 
 An intermittent failure appeared during extended operation in the
