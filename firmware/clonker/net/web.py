@@ -36,7 +36,7 @@ HTTP_DIAGNOSTICS = False
 # 8192-byte maximum config plus HTTP headers and revision metadata.
 MAX_REQUEST_BYTES = 10240
 MAX_HEADER_BYTES = 2048
-IO_CHUNK_BYTES = 512
+IO_CHUNK_BYTES = 128
 
 # Abandon silent browser connections quickly.
 IDLE_CLIENT_TIMEOUT_NS = 200_000_000    # 200 ms
