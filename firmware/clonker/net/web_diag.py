@@ -46,6 +46,8 @@ def begin(now):
         "send_ok": 0,
         "send_blocked": 0,
         "send_zero": 0,
+        "send_max_ns": 0,
+        "send_slow": 0,
         "last_send": None,
     }
 
@@ -85,6 +87,18 @@ def send_zero():
     """Count a send returning zero bytes or None."""
     if _connection is not None:
         _connection["send_zero"] += 1
+
+
+def send_duration(elapsed_ns):
+    """Track socket send latency without per-send logging."""
+    if _connection is None:
+        return
+
+    if elapsed_ns > _connection["send_max_ns"]:
+        _connection["send_max_ns"] = elapsed_ns
+
+    if elapsed_ns > 20_000_000:
+        _connection["send_slow"] += 1
 
 
 def send_success(now):
@@ -141,5 +155,12 @@ def close(reason, sent_bytes):
             stats["send_blocked"],
             stats["send_zero"],
             since_send,
+        )
+    )
+
+    logger.info(
+        "WEB DIAG: send_max={:.1f}ms, send_slow={}".format(
+            stats["send_max_ns"] / 1_000_000,
+            stats["send_slow"],
         )
     )

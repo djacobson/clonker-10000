@@ -610,6 +610,8 @@ def poll():
 
     web_diag.send_attempt()
 
+    send_started = time.monotonic_ns()
+
     try:
         count = _client.send(chunk)
 
@@ -622,6 +624,11 @@ def poll():
             )
             _close_client("send_error")
         return
+
+    finally:
+        web_diag.send_duration(
+            time.monotonic_ns() - send_started
+        )
 
     if count is None or count <= 0:
         web_diag.send_zero()
