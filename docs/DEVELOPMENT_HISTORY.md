@@ -4059,6 +4059,56 @@ its ears with unread TCP messages.
 
 **Less sleek. More CLONK.**
 
+### November 15–16, 2026 — The CONFIG Gremlin Strikes Back
+
+Just when the Denon memory gremlin appeared defeated,
+another intermittent problem emerged in CONFIG mode.
+
+During Safari configuration saves and page reloads,
+the Clonker occasionally became unresponsive for
+approximately 10 seconds. The management web server,
+physical controls, and OLED feedback could all stall.
+
+The flight recorder and targeted HTTP diagnostics
+identified a blocking socket-send operation in
+`firmware/clonker/net/web.py`.
+
+Despite the accepted client socket being configured
+with `settimeout(0)`, individual `_client.send(chunk)`
+calls repeatedly took approximately 10,005 milliseconds.
+
+The stall affected both large GET responses and a
+small POST success response. Importantly, configuration
+persistence could succeed even when the browser
+subsequently reported a failure.
+
+A standalone reproducer and several targeted experiments
+failed to reproduce or eliminate the production stall.
+Battery versus USB power was not established as the
+cause.
+
+The investigation also produced a useful improvement:
+successful saves of changed configurations now display
+`CONFIG` / `SAVED!` on the OLED, independently of the
+browser response.
+
+**Status:** The HTTP stall remains unresolved. Later
+configuration saves succeeded, but that does not
+establish a fix.
+
+For the technical evidence, experiments, and current
+investigation starting point, see
+[Network Firmware — CONFIG HTTP Stall](FIRMWARE_NETWORK.md#november-1516--config-http-the-10-second-socket-send-stall).
+
+**Chapter 10 lesson:** A browser error doesn't
+necessarily mean a failed save, and a nonblocking
+socket setting doesn't guarantee every operation
+will return promptly.
+
+*One gremlin evicted. Another still has a key.*
+
+**Less sleek. More CLONK.**
+
 ---
 
 **THE CLONKER 10000**
