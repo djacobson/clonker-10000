@@ -24,6 +24,8 @@ SLOW_SEND_NS = 20_000_000
 CLIENT_TIMEOUT_NS = 4_000_000_000
 IDLE_TIMEOUT_NS = 200_000_000
 MAX_REQUEST_BYTES = 10240
+# Disposable test data only. Never touch device_config.json.
+PROBE_PATH = "/tests/socket_write_probe.json"
 
 TEST_PAGE = """<!doctype html>
 <html>
@@ -33,7 +35,7 @@ TEST_PAGE = """<!doctype html>
 </head>
 <body>
 <h2>Clonker POST / GET Test</h2>
-<p>No configuration or flash writes.</p>
+<p>Writes disposable test data to Pico flash on every POST.</p>
 <label>Cycles:
 <input id="cycles" type="number" value="20" min="1" max="100">
 </label>
@@ -235,6 +237,36 @@ def complete_request(data):
     return len(data) >= boundary + 4 + length
 
 
+def write_probe(data):
+    """Write disposable POST data and measure flash I/O."""
+    payload = json.dumps(
+        data, separators=(",", ":")
+    ).encode("utf-8")
+
+    start = time.monotonic_ns()
+
+    with open(PROBE_PATH, "wb") as output:
+        opened = time.monotonic_ns()
+        output.write(payload)
+        written = time.monotonic_ns()
+
+    closed = time.monotonic_ns()
+
+    print(
+        "FLASH #{} bytes={} open={:.1f}ms "
+        "write={:.1f}ms close={:.1f}ms "
+        "total={:.1f}ms free={}".format(
+            requests,
+            len(payload),
+            (opened - start) / 1_000_000,
+            (written - opened) / 1_000_000,
+            (closed - written) / 1_000_000,
+            (closed - start) / 1_000_000,
+            gc.mem_free()
+        )
+    )
+
+
 def build_for_request(data):
     global route
 
@@ -251,8 +283,18 @@ def build_for_request(data):
     if route.startswith("POST /api/config "):
         body = bytes(data[boundary + 4:])
         parsed = json.loads(body.decode("utf-8"))
+
         if not isinstance(parsed, dict) or "rooms" not in parsed:
             raise ValueError("Invalid configuration")
+
+        try:
+            write_probe(parsed)
+        except OSError as error:
+            print("FLASH ERROR:", error)
+            return make_http(
+                '{"saved":false,"error":"Flash write failed"}',
+                status="500 Internal Server Error"
+            )
 
         return make_http('{"saved":true}')
 
@@ -389,7 +431,7 @@ print("Clonker POST/GET socket experiment ready")
 print("Open http://{}:{}".format(
     wifi.radio.ipv4_address, PORT
 ))
-print("No filesystem writes")
+print("Flash write probe:", PROBE_PATH)
 
 try:
     while True:
