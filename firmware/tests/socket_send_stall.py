@@ -1,7 +1,7 @@
 # The Clonker 10000
 # firmware/tests/socket_send_stall.py
 #
-# Experiment 4: cooperative POST -> GET, no flash writes.
+# Experiment 6: verified flash writes, backup rotation, POST -> GET.
 # CircuitPython 10.3.1 / Raspberry Pi Pico 2 W.
 #
 # REPL:
@@ -35,7 +35,7 @@ TEST_PAGE = """<!doctype html>
 </head>
 <body>
 <h2>Clonker POST / GET Test</h2>
-<p>Writes disposable test data to Pico flash on every POST.</p>
+<p>Tests verified flash writes and backup rotation on every POST.</p>
 <label>Cycles:
 <input id="cycles" type="number" value="20" min="1" max="100">
 </label>
@@ -238,30 +238,94 @@ def complete_request(data):
 
 
 def write_probe(data):
-    """Write disposable POST data and measure flash I/O."""
+    """Verified temp write and backup rotation, test files only."""
     payload = json.dumps(
         data, separators=(",", ":")
     ).encode("utf-8")
 
+    temp_path = PROBE_PATH + ".tmp"
+    backup_path = PROBE_PATH + ".bak"
+    older_path = backup_path + ".old"
+
+    def elapsed_ms(start, end):
+        return (end - start) / 1_000_000
+
+    def read_verified(path):
+        with open(path, "rb") as source:
+            actual = source.read()
+
+        if actual != payload:
+            raise OSError("Verification mismatch: " + path)
+
+        parsed = json.loads(actual.decode("utf-8"))
+        if not isinstance(parsed, dict) or "rooms" not in parsed:
+            raise ValueError("Invalid probe JSON")
+
+    def exists(path):
+        try:
+            os.stat(path)
+            return True
+        except OSError as error:
+            if error.errno == 2:
+                return False
+            raise
+
     start = time.monotonic_ns()
 
-    with open(PROBE_PATH, "wb") as output:
-        opened = time.monotonic_ns()
-        output.write(payload)
-        written = time.monotonic_ns()
+    # Verify the existing primary before touching the backups.
+    # Its contents differ between cycles, so validate structure.
+    if exists(PROBE_PATH):
+        with open(PROBE_PATH, "rb") as source:
+            previous = json.loads(source.read().decode("utf-8"))
+        if not isinstance(previous, dict) or "rooms" not in previous:
+            raise ValueError("Existing probe is invalid")
 
-    closed = time.monotonic_ns()
+    checked = time.monotonic_ns()
+
+    # Write a temporary file and flush it.
+    with open(temp_path, "wb") as output:
+        output.write(payload)
+        output.flush()
+
+    written = time.monotonic_ns()
+
+    # Read back and verify before rotating anything.
+    read_verified(temp_path)
+    verified_temp = time.monotonic_ns()
+
+    # Rotate .bak -> .bak.old.
+    # Explicitly remove the oldest test generation first,
+    # avoiding reliance on rename-over-existing behavior.
+    if exists(older_path):
+        os.remove(older_path)
+
+    if exists(backup_path):
+        os.rename(backup_path, older_path)
+
+    # Rotate primary -> .bak, then temp -> primary.
+    if exists(PROBE_PATH):
+        os.rename(PROBE_PATH, backup_path)
+
+    os.rename(temp_path, PROBE_PATH)
+    rotated = time.monotonic_ns()
+
+    # Verify the installed primary.
+    read_verified(PROBE_PATH)
+    finished = time.monotonic_ns()
 
     print(
-        "FLASH #{} bytes={} open={:.1f}ms "
-        "write={:.1f}ms close={:.1f}ms "
+        "FLASH #{} bytes={} check={:.1f}ms "
+        "write={:.1f}ms temp_verify={:.1f}ms "
+        "rotate={:.1f}ms final_verify={:.1f}ms "
         "total={:.1f}ms free={}".format(
             requests,
             len(payload),
-            (opened - start) / 1_000_000,
-            (written - opened) / 1_000_000,
-            (closed - written) / 1_000_000,
-            (closed - start) / 1_000_000,
+            elapsed_ms(start, checked),
+            elapsed_ms(checked, written),
+            elapsed_ms(written, verified_temp),
+            elapsed_ms(verified_temp, rotated),
+            elapsed_ms(rotated, finished),
+            elapsed_ms(start, finished),
             gc.mem_free()
         )
     )
