@@ -18,6 +18,15 @@ No automatic logging, flushing, or scheduling occurs here.
 
 CAPACITY = 64
 
+# Identifies this boot across flight recorder snapshots.
+# Generated once in RAM; no persistent counter or flash writes.
+import os
+
+BOOT_ID = "".join(
+    "{:02x}".format(value)
+    for value in os.urandom(8)
+)
+
 _entries = [None] * CAPACITY
 _next = 0
 _count = 0
@@ -226,6 +235,7 @@ def flush_now(reason="manual"):
         with open(SNAPSHOT_TEMP, "w") as output:
             output.write("=== CLONKER FLIGHT RECORDER ===\n")
             output.write("Reason: {}\n".format(reason))
+            output.write("Boot ID: {}\n".format(BOOT_ID))
             output.write(
                 "Uptime ns: {}\n".format(
                     time.monotonic_ns()
