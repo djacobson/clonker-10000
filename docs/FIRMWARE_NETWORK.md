@@ -1525,6 +1525,31 @@ A standalone reproducer, `firmware/tests/socket_send_stall.py`, exercised POST/G
 
 **Status: unresolved, currently intermittent/not reproducing.** Repeated subsequent configuration saves succeeded, including battery-only operation. Do not mistake the disappearance of symptoms for a proven fix. If it returns, start with the timed `_client.send(chunk)` call and the existing standalone test rather than reopening the entire scheduler or persistence investigation.
 
+#### OLED confirmation of successful configuration persistence
+
+Chapter 10 added an independent OLED acknowledgment for
+successful configuration changes.
+
+In `firmware/clonker/net/web.py`, immediately after
+`device_config.save()` returns successfully:
+
+- A changed configuration displays `CONFIG` / `SAVED!`.
+- An unchanged configuration produces no notification.
+- A rejected or failed save produces no success notification.
+
+The notification uses `oled.show_text()`, which queues the
+display update without performing I2C communication in the
+HTTP request handler.
+
+This confirmation is independent of whether Safari receives
+the HTTP response or successfully reloads the configuration.
+
+It establishes that the configuration engine reported
+successful persistence, not that the HTTP transaction
+completed successfully.
+
+The existing OLED idle timeout clears the notification.
+
 ### November 14–15 — Chapter 10: Operation Catch the Gremlin
 
 An intermittent failure appeared during extended operation in the
@@ -1758,6 +1783,31 @@ The sleep manager also supports a volatile runtime enable/disable
 toggle through `toggle_enabled()`. The physical-control coordinator
 invokes it after recognizing the CONFIG-gated secret room-selector
 handshake. Reboot restores the developer-configured startup default.
+
+#### Chapter 10 — Awake-mode battery endurance
+
+On November 15–16, the assembled Clonker completed
+approximately six hours of battery-only operation with
+software sleep disabled and CONFIG mode OFF.
+
+All four DFRobot battery indicators remained solid,
+and the Custom Action encoder responded immediately.
+
+This confirms overnight awake-mode operation and
+responsiveness, but does not establish maximum battery
+runtime or superior energy efficiency.
+
+Software sleep remains available and has demonstrated
+lower Pico USB current consumption. However, the DFRobot
+DFR0969's minimum-load behavior and light-load efficiency
+have not been characterized.
+
+Sleep is temporarily disabled for further RUN-mode
+endurance testing. This is a runtime setting, not a
+removal of the sleep implementation.
+
+For battery hardware details and the unresolved DFRobot
+hypothesis, see [Hardware Design](HARDWARE_DESIGN.md).
 
 #### Limitations
 
