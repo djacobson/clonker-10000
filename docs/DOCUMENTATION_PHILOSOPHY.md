@@ -117,6 +117,56 @@ Development history should preserve the experiments, alternatives, failures, and
 
 Both are valuable. They simply serve different purposes.
 
+## Document Responsibilities
+
+Each document should have a clear purpose and an
+authoritative scope.
+
+| Document | Primary Responsibility |
+|---|---|
+| **README.md** | Introduce the project, its personality, capabilities, and navigation to detailed references. |
+| **HARDWARE_PARTS_LIST.md** | Inventory of actual installed hardware: manufacturer part numbers, quantities, specifications, verified mounting dimensions, and useful component-specific details. |
+| **HARDWARE_DESIGN.md** | Explain hardware integration, wiring, electrical relationships, mechanical design, and design rationale. |
+| **ARCHITECTURE.md** | Describe the software system, major components, responsibilities, and interactions. |
+| **CONFIGURATION.md** | Define configuration structure, validation, persistence, and recovery behavior. |
+| **FIRMWARE_NETWORK.md** | Document networking implementation, protocols, transport behavior, and related technical constraints. |
+| **OPERATING_MODES.md** | Define operating modes, transitions, and expected runtime behavior. |
+| **DEVELOPMENT_HISTORY.md** | Preserve experiments, test results, debugging investigations, decisions, failures, and superseded approaches. |
+
+### Reference, Design, and History
+
+**Reference documents describe the current system.**
+They should be maintained as authoritative sources
+of information, not chronological progress reports.
+
+**Design documents explain how and why.**
+They describe relationships, constraints, and
+engineering decisions relevant to the current design.
+
+**Development history records what happened.**
+It preserves experiments, investigations, alternatives,
+and the reasoning behind changes.
+
+When hardware changes, update its authoritative
+reference to describe what is actually installed.
+Record the reason for the change in development
+history when that reason has lasting value.
+
+Do not append dated testing narratives, project
+status reports, or future-work checklists to a
+parts inventory.
+
+Component-specific explanations are welcome in
+a parts list when they help identify, replace,
+mount, or reproduce the actual hardware.
+
+Before adding material to a document, ask:
+
+> Is this the authoritative home for this information,
+> or am I putting it here simply because this is
+> the document I'm currently editing?
+```
+
 ## A Practical Test for Every Document
 
 When reviewing the documentation structure, ask:
