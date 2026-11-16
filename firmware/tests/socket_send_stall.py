@@ -79,7 +79,9 @@ try:
 
             while b"\r\n\r\n" not in request:
                 try:
-                    data = client.recv(512)
+                    buffer = bytearray(512)
+                    count = client.recv_into(buffer)
+                    data = buffer[:count]
                 except OSError as error:
                     if error.errno == errno.EAGAIN:
                         time.sleep(0.001)
