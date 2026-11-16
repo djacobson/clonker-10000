@@ -15,7 +15,7 @@ FLIGHT_RECORDER_ENABLED = True
 
 # Diagnostic test: disable USB serial output without disabling
 # RAM flight-recorder capture.
-SERIAL_LOGGING_ENABLED = False
+SERIAL_LOGGING_ENABLED = True
 
 DEBUG = 10
 INFO = 20
