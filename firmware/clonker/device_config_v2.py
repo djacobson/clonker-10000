@@ -18,6 +18,8 @@ A successful load binds the file path for all subsequent save() operations.
 
 import json
 import os
+import time
+from clonker.system import logger
 from clonker import device_adapters
 
 
@@ -515,13 +517,15 @@ def _replace_with_backup(path, contents):
 def save(config, expected_revision, path=None):
     """Save only to the primary path selected by the last successful load."""
     global _current
+
+    started = time.monotonic_ns()
+
     if _current is None or _current_path is None:
         raise RuntimeError("Configuration not loaded")
     if path is None:
         path = _current_path
 
-    # The explicit path guard prevents a disposable-file test from writing
-    # to production merely because a module-level default was changed.
+    # Preserve existing path and revision safeguards.
     if path != _current_path:
         raise ValueError("Save path differs from loaded configuration")
     if not isinstance(expected_revision, str) or expected_revision != revision():
@@ -529,18 +533,42 @@ def save(config, expected_revision, path=None):
 
     validated = validate_config(config)
     serialized = to_json(validated)
+    validated_at = time.monotonic_ns()
 
-    # A backup-loaded configuration is not permission to overwrite bad primary.
-    # Reject out-of-band edits between the original load and this save.
+    # Verify disk consistency before any write.
     disk = _load_existing(path)
     if disk != _current:
         raise ValueError("Configuration changed on disk; reload required")
+
     if serialized == to_json(_current):
         return False
 
+    checked_at = time.monotonic_ns()
+
+    # Existing verified persistence and backup rotation.
     _replace_with_backup(path, serialized)
+    persisted_at = time.monotonic_ns()
+
+    # Publish only after successful persistence.
     device_adapters.rebuild(validated)
+    rebuilt_at = time.monotonic_ns()
+
     _current = validated
+
+    logger.info(
+        "CONFIG PERF: validation={:.1f}ms, "
+        "disk_check={:.1f}ms, "
+        "persistence={:.1f}ms, "
+        "adapter_rebuild={:.1f}ms, "
+        "total={:.1f}ms".format(
+            (validated_at - started) / 1_000_000,
+            (checked_at - validated_at) / 1_000_000,
+            (persisted_at - checked_at) / 1_000_000,
+            (rebuilt_at - persisted_at) / 1_000_000,
+            (rebuilt_at - started) / 1_000_000,
+        )
+    )
+
     return True
 
 
