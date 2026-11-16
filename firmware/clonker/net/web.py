@@ -336,15 +336,22 @@ def _build_response(first_line, request=None):
                     "revision", None
                 )
 
+                post_started = time.monotonic_ns()
+
                 changed = device_config.save(
                     submitted, expected_revision
                 )
+                saved_at = time.monotonic_ns()
 
                 if changed:
                     actions.clear(
                         "Configuration changed",
                         reset_toggles=True
                     )
+                cleared_at = time.monotonic_ns()
+
+                new_revision = device_config.revision()
+                revised_at = time.monotonic_ns()
 
                 body = json.dumps({
                     "message": (
@@ -352,9 +359,24 @@ def _build_response(first_line, request=None):
                         if changed else "Configuration unchanged"
                     ),
                     "saved": changed,
-                    "revision": device_config.revision()
+                    "revision": new_revision
                 })
                 status = "200 OK"
+                finished_at = time.monotonic_ns()
+
+                logger.info(
+                    "HTTP POST PERF: save={:.1f}ms, "
+                    "queue_clear={:.1f}ms, "
+                    "revision={:.1f}ms, "
+                    "response={:.1f}ms, "
+                    "total={:.1f}ms".format(
+                        (saved_at - post_started) / 1_000_000,
+                        (cleared_at - saved_at) / 1_000_000,
+                        (revised_at - cleared_at) / 1_000_000,
+                        (finished_at - revised_at) / 1_000_000,
+                        (finished_at - post_started) / 1_000_000,
+                    )
+                )
 
             except (ValueError, TypeError, UnicodeError) as error:
                 body, status = _json_error(error)
