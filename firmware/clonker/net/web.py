@@ -23,22 +23,11 @@ import json
 import errno
 import storage
 import os
-import gc
 
-from clonker.system import clock, logger, flight_recorder
+from clonker.system import clock, logger
 from clonker.net import web_diag
 from clonker import device_config_v2 as device_config
 from clonker import actions
-
-
-# EXPERIMENT 8 -- TEMPORARY. Remove after diagnosis.
-def _trace(stage):
-    flight_recorder.record(
-        "E8 {} t_ns={}".format(
-            stage, time.monotonic_ns()
-        )
-    )
-
 
 WEB_ROOT = "/clonker/www"
 PORT = 9090
@@ -280,34 +269,13 @@ def _build_response(first_line, request=None):
     # Include the active revision and filesystem ownership state.
     # current() returns a copy, so these response-only fields are not saved.
     elif first_line.startswith(b"GET /api/config "):
-        flight_recorder.record(
-            "E9 GET_START free={}".format(gc.mem_free())
-        )
-        _trace("GET_BEGIN")
-
-        _trace("CURRENT_ENTER")
         config = device_config.current()
-        _trace("CURRENT_EXIT")
-
-        _trace("FS_ENTER")
         config["filesystem_writable"] = (
             not storage.getmount("/").readonly
         )
-        _trace("FS_EXIT")
-
-        _trace("REVISION_ENTER")
         config["revision"] = device_config.revision()
-        _trace("REVISION_EXIT")
-
-        _trace("JSON_ENTER")
         body = json.dumps(config)
-        _trace("JSON_EXIT")
-
         status = "200 OK"
-        _trace("GET_BODY_READY")
-        flight_recorder.record(
-            "E9 GET_BODY_READY free={}".format(gc.mem_free())
-        )
 
     elif first_line.startswith(b"POST /api/clock?utc="):
         try:
@@ -444,26 +412,11 @@ def _build_response(first_line, request=None):
         )
         return header, file_path, len(header) + file_size
 
-    # EXPERIMENT 8 -- TEMPORARY.
-    _trace("ENCODE_ENTER")
     payload = body.encode("utf-8")
-    _trace("ENCODE_EXIT")
-
-    _trace("HEADER_ENTER")
     header = _http_header(
         status, content_type, len(payload)
     )
-    _trace("HEADER_EXIT")
-
-    _trace("COMBINE_ENTER")
     response = header + payload
-    _trace("COMBINE_EXIT")
-
-    flight_recorder.record(
-        "E9 RESPONSE_READY free={} bytes={}".format(
-            gc.mem_free(), len(response)
-        )
-    )
 
     return response, None, len(response)
 
@@ -657,9 +610,6 @@ def poll():
 
     web_diag.send_attempt()
 
-    # EXPERIMENT 9 -- TEMPORARY.
-    # Sample before sending; do not allocate a log entry yet.
-    free_before_send = gc.mem_free()
     send_started = time.monotonic_ns()
 
     try:
@@ -676,26 +626,8 @@ def poll():
         return
 
     finally:
-        send_finished = time.monotonic_ns()
-        send_duration = send_finished - send_started
-
+        send_duration = time.monotonic_ns() - send_started
         web_diag.send_duration(send_duration)
-
-        # EXPERIMENT 8 -- TEMPORARY.
-        if send_duration >= 20_000_000:
-            flight_recorder.record(
-                "E9 SLOW_SEND start_ns={} end_ns={} "
-                "duration_ms={:.1f} sent={}/{} "
-                "free_before={} free_after={}".format(
-                    send_started,
-                    send_finished,
-                    send_duration / 1_000_000,
-                    _sent_total,
-                    _response_total,
-                    free_before_send,
-                    gc.mem_free()
-                )
-            )
 
     if count is None or count <= 0:
         web_diag.send_zero()
