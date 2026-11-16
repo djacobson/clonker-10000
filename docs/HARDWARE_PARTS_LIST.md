@@ -3,11 +3,14 @@
 Clonker's portable power system uses a DFRobot DFR0969
 module with two rechargeable 18650 lithium-ion cells.
 
-Battery-powered operation, overnight software sleep, and
-physical-button wake have been demonstrated successfully.
+Battery-powered operation, overnight software sleep,
+physical-button wake, and extended awake operation
+have been demonstrated successfully.
 
-Permanent enclosure integration and full-discharge runtime
-testing remain pending.
+The DFRobot module, both 18650 cells, and the external
+USB-C charging interface are installed in the enclosure.
+
+Full-discharge runtime characterization remains pending.
 
 ## Components
 
@@ -30,14 +33,14 @@ testing remain pending.
 - **Additional connections:** Board-mounted power pads
 - **Operating switch:** NORMAL / HOLD
 - **Selected Clonker mode:** HOLD
-- **Integration status:** Bench-tested; permanent mounting pending
+- **Integration status:** Installed inside Clonker's enclosure
 
 The module powers the Pico through its USB-A output and
 the Pico's Micro-USB connector.
 
-A panel-mounted USB-C charging connector has been fitted
-to Clonker's enclosure. Final internal connections and
-strain relief remain to be verified.
+A panel-mounted USB-C charging connector provides
+external charging access. Final wiring, insulation,
+and strain-relief inspection remains part of validation.
 
 ## Initial Battery-Powered Testing — November 12, 2026
 
@@ -105,6 +108,32 @@ After the overnight period:
 This demonstrates overnight power availability and
 wake responsiveness, not maximum battery endurance.
 
+## Installed Battery System — November 14–16, 2026
+
+On November 14, the DFRobot module and two 18650 cells
+were installed inside Clonker's enclosure, together with
+the external USB-C charging connection.
+
+Subsequent testing demonstrated:
+
+- Approximately 19 hours of battery-powered operation,
+  predominantly in software sleep.
+- Successful physical-button wake after extended sleep.
+- Seamless operation when connecting external charging power.
+- A brief output interruption and Pico reboot when
+  disconnecting charging power.
+- Approximately six hours of battery-only awake operation
+  with software sleep disabled and responsive physical controls.
+
+The DFRobot's battery indicator LEDs provide only an
+approximate indication of remaining capacity.
+
+These tests establish functional battery operation,
+not maximum runtime or complete discharge characteristics.
+
+For power-system analysis, see
+[Hardware Design](HARDWARE_DESIGN.md).
+
 ## Charging and Power Transitions
 
 The DFRobot exhibited asymmetric power-path behavior.
@@ -141,12 +170,11 @@ for continued testing.
 ## Remaining Validation
 
 - Confirm the final 18650 cell model and specifications.
-- Complete permanent mounting and internal wiring.
-- Verify the panel-mounted USB-C charging connection.
-- Inspect insulation, cell retention, and strain relief.
-- Check charging behavior and temperatures after assembly.
-- Repeat power-transition tests in the completed enclosure.
-- Establish longer-term battery runtime and discharge behavior.
+- Complete final inspection of mounting, insulation, cell retention, and strain relief.
+- Continue monitoring charging behavior and temperatures.
+- Characterize practical battery runtime and discharge behavior.
+- Investigate DFRobot HOLD-mode minimum-load behavior.
+- Compare battery-side consumption with Pico USB-side measurements.
 - Investigate hardware sleep when supported by a suitable
   stable CircuitPython release.
 
