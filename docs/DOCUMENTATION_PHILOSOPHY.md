@@ -124,7 +124,7 @@ authoritative scope.
 
 | Document | Primary Responsibility |
 |---|---|
-| **README.md** | Introduce the project, its personality, capabilities, and navigation to detailed references. |
+| **README.md** | Public-facing GitHub project README, optimized for GitHub's audience and presentation. Introduce the project, its personality and capabilities, engage newcomers and experienced developers alike, and guide readers to deeper technical references without overwhelming them. |
 | **HARDWARE_PARTS_LIST.md** | Inventory of actual installed hardware: manufacturer part numbers, quantities, specifications, verified mounting dimensions, and useful component-specific details. |
 | **HARDWARE_DESIGN.md** | Explain hardware integration, wiring, electrical relationships, mechanical design, and design rationale. |
 | **ARCHITECTURE.md** | Describe the software system, major components, responsibilities, and interactions. |
