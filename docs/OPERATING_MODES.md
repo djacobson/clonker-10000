@@ -218,6 +218,35 @@ This feature is useful when Clonker should remain continuously
 available, such as during extended testing or while connected
 to external charging power.
 
+#### Chapter 10 — Awake-mode endurance testing
+
+On November 15–16, 2026, Clonker completed approximately
+six hours of battery-only RUN-mode operation with automatic
+sleep disabled.
+
+All four DFRobot battery indicators remained solid, and
+the Custom Action encoder responded immediately the
+following morning.
+
+This demonstrated successful overnight awake operation,
+but did not establish maximum battery runtime or prove
+that awake operation is more energy-efficient than sleep.
+
+SparkFun USB measurements previously demonstrated lower
+Pico current consumption during software sleep. However,
+the DFRobot DFR0969's minimum-load behavior and
+light-load conversion efficiency remain uncharacterized.
+
+**Current testing preference:** Leave automatic sleep
+disabled while evaluating battery endurance and DFRobot
+power behavior.
+
+This is a reversible runtime choice, not a change to
+the sleep implementation or its startup default.
+
+For electrical measurements and the DFRobot investigation,
+see [Hardware Design](HARDWARE_DESIGN.md).
+
 #### Secret reboot handshake
 
 The existing reboot handshake remains available.
