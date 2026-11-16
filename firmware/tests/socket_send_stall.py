@@ -14,6 +14,8 @@ import time
 import errno
 import wifi
 import socketpool
+import json
+import gc
 
 PORT = 9091
 CHUNK_SIZE = 512
@@ -46,16 +48,40 @@ listener.bind(("0.0.0.0", PORT))
 listener.listen(2)
 listener.settimeout(0)
 
-body = b"X" * BODY_SIZE
-header = (
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Type: text/plain\r\n"
-    "Content-Length: {}\r\n"
-    "Cache-Control: no-store\r\n"
-    "Connection: close\r\n\r\n"
-).format(len(body)).encode("utf-8")
 
-response_bytes = header + body
+def build_response():
+    """Build a fresh JSON HTTP response for every request."""
+    config = {
+        "version": 4,
+        "rooms": {
+            "room-1": {
+                "name": "Den",
+                "actions": ["Movie", "Music", "Vinyl"],
+            },
+            "room-2": {
+                "name": "Sunroom",
+                "actions": ["Movie", "Music"],
+            },
+            "room-3": {
+                "name": "Test Room",
+                "actions": [],
+            },
+        },
+        "padding": "X" * 4950,
+    }
+
+    body = json.dumps(config).encode("utf-8")
+
+    header = (
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: {}\r\n"
+        "Cache-Control: no-store\r\n"
+        "Connection: close\r\n\r\n"
+    ).format(len(body)).encode("utf-8")
+
+    return header + body
+
 
 client = None
 request = None
@@ -188,8 +214,25 @@ def poll():
         if b"\r\n\r\n" not in request:
             return
 
-        # BUILD: prepare the complete response.
-        response = response_bytes
+        # BUILD: construct a fresh response for every request.
+        build_started = time.monotonic_ns()
+
+        response = build_response()
+
+        build_ms = (
+            time.monotonic_ns() - build_started
+        ) / 1_000_000
+
+        print(
+            "BUILD: request={}, bytes={}, "
+            "build={:.1f}ms, free={}".format(
+                requests,
+                len(response),
+                build_ms,
+                gc.mem_free()
+            )
+        )
+
         request = None
         sent = 0
         return
@@ -249,7 +292,7 @@ print("Cooperative socket test ready")
 print("Address: http://{}:{}".format(
     wifi.radio.ipv4_address, PORT
 ))
-print("Response bytes:", len(response_bytes))
+print("Dynamic JSON responses enabled")
 
 try:
     while True:
