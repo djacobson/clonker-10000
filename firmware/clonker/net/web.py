@@ -23,6 +23,7 @@ import json
 import errno
 import storage
 import os
+import gc
 
 from clonker.system import clock, logger, flight_recorder
 from clonker.net import web_diag
@@ -279,6 +280,9 @@ def _build_response(first_line, request=None):
     # Include the active revision and filesystem ownership state.
     # current() returns a copy, so these response-only fields are not saved.
     elif first_line.startswith(b"GET /api/config "):
+        flight_recorder.record(
+            "E9 GET_START free={}".format(gc.mem_free())
+        )
         _trace("GET_BEGIN")
 
         _trace("CURRENT_ENTER")
@@ -301,6 +305,9 @@ def _build_response(first_line, request=None):
 
         status = "200 OK"
         _trace("GET_BODY_READY")
+        flight_recorder.record(
+            "E9 GET_BODY_READY free={}".format(gc.mem_free())
+        )
 
     elif first_line.startswith(b"POST /api/clock?utc="):
         try:
@@ -451,6 +458,12 @@ def _build_response(first_line, request=None):
     _trace("COMBINE_ENTER")
     response = header + payload
     _trace("COMBINE_EXIT")
+
+    flight_recorder.record(
+        "E9 RESPONSE_READY free={} bytes={}".format(
+            gc.mem_free(), len(response)
+        )
+    )
 
     return response, None, len(response)
 
@@ -644,6 +657,9 @@ def poll():
 
     web_diag.send_attempt()
 
+    # EXPERIMENT 9 -- TEMPORARY.
+    # Sample before sending; do not allocate a log entry yet.
+    free_before_send = gc.mem_free()
     send_started = time.monotonic_ns()
 
     try:
@@ -668,13 +684,16 @@ def poll():
         # EXPERIMENT 8 -- TEMPORARY.
         if send_duration >= 20_000_000:
             flight_recorder.record(
-                "E8 SLOW_SEND start_ns={} end_ns={} "
-                "duration_ms={:.1f} sent={}/{}".format(
+                "E9 SLOW_SEND start_ns={} end_ns={} "
+                "duration_ms={:.1f} sent={}/{} "
+                "free_before={} free_after={}".format(
                     send_started,
                     send_finished,
                     send_duration / 1_000_000,
                     _sent_total,
-                    _response_total
+                    _response_total,
+                    free_before_send,
+                    gc.mem_free()
                 )
             )
 
