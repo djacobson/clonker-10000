@@ -13,6 +13,10 @@ from clonker.system import flight_recorder
 # Capture accepted log messages in the RAM flight recorder.
 FLIGHT_RECORDER_ENABLED = True
 
+# Diagnostic test: disable USB serial output without disabling
+# RAM flight-recorder capture.
+SERIAL_LOGGING_ENABLED = False
+
 DEBUG = 10
 INFO = 20
 WARNING = 30
@@ -59,7 +63,8 @@ def log(level, message):
     if FLIGHT_RECORDER_ENABLED:
         flight_recorder.record(formatted)
 
-    print(formatted)
+    if SERIAL_LOGGING_ENABLED:
+        print(formatted)
 
 
 def debug(message):
