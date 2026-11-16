@@ -517,6 +517,24 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 
 These are working firmware and physical-control capabilities, not just plans on a drawing board.
 
+### The Monster Meets Physics 🔋
+
+Building a ridiculously overengineered remote control has led us into some surprisingly serious engineering territory.
+
+What started as a few switches, a Raspberry Pi Pico, and a Wi-Fi connection eventually became a lesson in battery chemistry, voltage conversion, charging efficiency, power management, and the delicate art of persuading electronics to go to sleep—and wake up again.
+
+Apple has entire engineering teams working to squeeze every possible minute from an iPhone battery while keeping the device thin, cool, responsive, and reliable. The Clonker faces a much smaller version of the same fundamental problem, with one additional complication: we're combining components designed independently, each with its own assumptions about how the others behave.
+
+We discovered that reducing the Pico's current consumption doesn't necessarily maximize usable battery runtime. The DFRobot power module has its own efficiency characteristics and possible minimum-load behavior. A sleeping microcontroller might actually be a less cooperative customer for its power supply than an awake one.
+
+**Optimizing individual components doesn't necessarily optimize the whole system.**
+
+And sometimes the best engineering decision is recognizing that a device which runs reliably for days, responds instantly, and charges conveniently might already be good enough.
+
+Of course, that won't stop us from wanting to know *why* it works.
+
+**Less sleek. More CLONK. More physics.**
+
 ### What's Still on the Operating Table 🔧
 
 - Add satisfying audible CLONK feedback.
