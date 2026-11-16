@@ -28,6 +28,7 @@ from clonker.system import clock, logger
 from clonker.net import web_diag
 from clonker import device_config_v2 as device_config
 from clonker import actions
+from clonker.display import oled
 
 WEB_ROOT = "/clonker/www"
 PORT = 9090
@@ -343,6 +344,11 @@ def _build_response(first_line, request=None):
                     submitted, expected_revision
                 )
                 saved_at = time.monotonic_ns()
+
+                # Confirm actual flash persistence independently
+                # of the browser's HTTP response or reload.
+                if changed:
+                    oled.show_text("CONFIG", "SAVED!")
 
                 if changed:
                     actions.clear(
