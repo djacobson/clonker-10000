@@ -1041,18 +1041,39 @@ This was not a full battery-discharge test.
 
 ### Chapter 10 — Awake endurance and DFRobot low-load behavior
 
-On November 15–16, 2026, the assembled Clonker completed
-another battery-only overnight test, this time with software
-sleep disabled and the CONFIG switch in RUN mode.
+From approximately 7:40 PM on November 15 to 1:00 AM on
+November 17, 2026, the fully assembled Clonker operated
+continuously on its two installed 18650 batteries through
+the DFRobot DFR0969, with software sleep disabled and
+the CONFIG switch in RUN mode.
 
-After approximately six hours, all four DFRobot battery
-indicator LEDs remained solid. The Custom Action encoder
-responded immediately, without a wake/reboot sequence.
+**Demonstrated awake-mode endurance: approximately
+29 hours and 20 minutes.**
 
-This demonstrates successful overnight awake operation,
-but does not establish remaining battery capacity or
-maximum runtime. The four LEDs are not precision
-capacity measurements.
+Observed battery-indicator checkpoints:
+
+| Date / Time (CST) | Elapsed Runtime | Solid LEDs |
+|---|---:|---:|
+| Nov 16, 7:46 AM | 12h 06m | 4 |
+| Nov 16, 2:40 PM | 19h 00m | 3 |
+| Nov 16, 5:10 PM | 21h 30m | 3 |
+| Nov 16, 6:30 PM | 22h 50m | 2 |
+| Nov 16, 9:46 PM | 26h 06m | 2 |
+| Nov 17, 1:00 AM | 29h 20m | 1 |
+
+The Clonker remained responsive at test completion.
+Only very slight enclosure warmth was reported along
+one edge during the test. External USB charging was
+then connected without interrupting operation.
+
+The test ended voluntarily at one solid LED, not at
+battery exhaustion. Therefore, 29h 20m represents
+demonstrated runtime, not maximum battery endurance.
+The DFRobot LEDs are coarse indicators, not calibrated
+measurements of remaining battery capacity.
+
+The starting time is approximate, based on the
+operator's recollection.
 
 #### The low-load question
 
