@@ -4109,6 +4109,33 @@ will return promptly.
 
 **Less sleek. More CLONK.**
 
+### November 17, 2026 — The Monster Refuses to Sleep
+
+The fully assembled Clonker completed its first extended
+awake-mode battery endurance test.
+
+From approximately 7:40 PM on November 15 to 1:00 AM
+on November 17, it operated continuously on its two
+installed 18650 batteries, with software sleep disabled.
+
+**Demonstrated runtime: 29 hours and 20 minutes.**
+
+The DFRobot battery indicator declined from four solid
+LEDs to one during the test. The Clonker remained
+responsive, with only slight enclosure warmth reported.
+Connecting external charging power did not interrupt
+operation.
+
+The test ended voluntarily, before battery exhaustion.
+Maximum runtime remains unknown.
+
+For the complete checkpoints and engineering caveats,
+see [Hardware Design — Chapter 10](HARDWARE_DESIGN.md#chapter-10--awake-endurance-and-dfrobot-low-load-behavior).
+
+*Apparently, the Monster doesn't believe in bedtime.*
+
+**Less sleek. More CLONK.**
+
 ---
 
 **THE CLONKER 10000**
