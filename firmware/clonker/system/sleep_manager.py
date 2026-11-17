@@ -33,7 +33,7 @@ from clonker.system import logger
 
 
 # Developer settings
-SLEEP_ENABLED = True
+SLEEP_ENABLED = False
 SLEEP_DRY_RUN = False
 SLEEP_IDLE_TIMEOUT_S = 600  # 600 = 10 mins
 SLEEP_FAREWELL_S = 1.5
