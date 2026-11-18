@@ -509,24 +509,29 @@ These states do not constitute separate action queues.
 
 **Module:** `clonker/device_adapters.py`
 
-The adapter layer separates generic command intent from protocol-specific transmission.
+The adapter layer separates command intent, device-specific behavior, and network transport.
 
-Selection for ordinary fundamental actions is based on recognized command signatures, not room names, manufacturer labels, or fixed device positions.
+The Dumb Queue™ owns scheduling, ordering, and failure policy. The parent adapter router recognizes supported fundamental commands and delegates execution. Individual device modules own command interpretation, stateful behavior, transport selection when needed, and device-specific lifecycle management.
 
-Explicit physical-button holds use a dedicated Roku execution path.
+**Specialize where necessary. Keep the common architecture simple.**
+
+Adapter selection uses recognized command signatures, not room names, manufacturer labels, or fixed device positions. Specialized adapters are available to fundamental actions; custom-action steps remain straightforward, configurable HTTP commands.
 
 ### 8.1 Current adapter matrix
 
-| Adapter / path | Recognized command | Delivery |
+| Adapter | Recognized behavior | Delivery |
 |---|---|---|
-| `denon-tcp` | Denon fundamental volume GET signatures | Persistent TCP port 23 |
-| `roku-hold` | Roku fundamental volume POST signatures | ECP held-volume |
-| Roku physical-button hold | Six supported navigation/skip signatures | ECP keydown/keyup |
-| `generic-http` | Other supported configured commands | Bounded HTTP GET/POST |
+| `denon-tcp` | Denon fundamental volume commands | Persistent native TCP, port 23 |
+| `roku-volume-hold` | Roku encoder volume up/down | Stateful ECP keydown/keyup; persistent HTTP |
+| `roku-button-tap` | Roku navigation/skip taps | Single ECP keypress; persistent HTTP |
+| `roku-button-hold` | Roku navigation/skip physical holds | ECP keydown/keyup; generic HTTP |
+| `generic-http` | Other supported configured commands | Generic bounded HTTP GET/POST |
 
-Ordinary fundamental volume actions select specialized adapters when their command signatures are recognized.
+Roku selects HTTP transport independently of control behavior. Its code-defined transport policy currently uses persistent HTTP for volume and navigation/skip taps, while physical-button holds and other controls use generic HTTP.
 
-Other fundamental actions and current custom-action steps use generic HTTP unless explicitly routed through the physical-button hold mechanism.
+The Roku volume adapter turns individual encoder detents into a temporary held key. The Denon adapter instead sends discrete `MVUP` and `MVDOWN` commands with pacing. Both serve the same physical volume encoder without requiring device-specific logic in the physical controls or the Dumb Queue™.
+
+Unrecognized ordinary commands fall back to generic HTTP. Custom-action steps use generic HTTP even when their command paths resemble specialized fundamental commands.
 
 ### 8.2 Signature-based selection
 
@@ -561,7 +566,7 @@ It should not be confused with generic HTTP dispatch of a fundamental action fro
 
 ### 8.3 Adapter cache
 
-Specialized fundamental-volume selections are cached by `(room_id, action_id)`.
+Specialized fundamental volume and Roku navigation/skip tap selections are cached by `(room_id, action_id)`. Physical-button hold selections use separate `("hold", room_id, action_id)` cache keys.
 
 The cache is derived from active validated configuration and is not persisted in Config v4 JSON.
 
@@ -641,9 +646,7 @@ Current timing parameters:
 | Maximum volume hold | 2 seconds |
 | Failed-release retry interval | 500 ms |
 
-The Roku adapter uses the generic outbound HTTP transport for its ECP requests.
-
-It does not maintain a persistent HTTP socket.
+Roku volume keydown and keyup requests currently use persistent HTTP through the device's transport policy. Persistent connections may be reused when available; the existing release safeguards remain responsible for safely ending held keys.
 
 The adapter's release-retry mechanism is a specialized safety measure, not a general action retry system.
 
