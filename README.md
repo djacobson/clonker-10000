@@ -436,14 +436,20 @@ Physical controls generate generic actions. The selected room's configuration de
 
 The queue schedules work, preserves applicable ordering, handles custom-action waits, and cancels pending commands after execution failures.
 
-Device adapters select the appropriate transport.
+Device adapters handle the equipment-specific details.
 
-- Denon volume uses persistent TCP with command pacing.
-- Roku volume uses temporary ECP key holds.
-- Six physical navigation and skip buttons use explicit Roku keydown/keyup.
-- Other supported commands use generic HTTP.
+- **Denon volume:** Discrete commands over persistent TCP, with command pacing.
+- **Roku volume:** Stateful ECP keydown/keyup over persistent HTTP, turning encoder detents into temporary held keys.
+- **Roku navigation and skip:** Persistent HTTP for ordinary taps; separate held-button behavior for sustained physical presses.
+- **Other commands:** Generic HTTP, including configurable Custom Action steps.
 
-Roku held-key cleanup is maintained cooperatively even after the last queued command finishes.
+That means the same physical volume knob can operate two very different volume interfaces without knowing anything about either protocol.
+
+**One knob. Two protocols. The same satisfying CLONK.**
+
+The adapters handle device-specific behavior and connection management. The Dumb Queue™ remains blissfully unaware of the underlying protocol.
+
+Roku held-key cleanup continues cooperatively even after the last queued command finishes.
 
 The Clonker does not claim to know the actual state of every connected device. It tracks commands, not reality.
 
