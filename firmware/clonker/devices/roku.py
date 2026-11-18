@@ -85,6 +85,23 @@ def transport_for(action_id, hold=False):
     return transport
 
 
+def send(endpoint, method, path, action_id, hold=False):
+    """Send Roku ECP using the selected HTTP transport.
+
+    Transport selection does not change control behavior.
+    Callers remain responsible for keydown/keyup sequencing,
+    hold timing, and release safeguards.
+
+    No automatic retry of failed requests.
+    """
+    transport = transport_for(action_id, hold=hold)
+
+    if transport == "persistent":
+        return persistent_send(endpoint, method, path)
+
+    return http_transport.send(endpoint, method, path)
+
+
 _endpoint = None
 _direction = None
 _deadline = 0
