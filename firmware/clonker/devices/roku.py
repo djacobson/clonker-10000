@@ -102,6 +102,14 @@ def send(endpoint, method, path, action_id, hold=False):
     return http_transport.send(endpoint, method, path)
 
 
+def tap(endpoint, method, path, action_id):
+    """Execute a recognized Roku navigation/skip tap."""
+    if method != "POST" or path not in BUTTON_COMMANDS:
+        raise ValueError("Unsupported Roku tap command")
+
+    return send(endpoint, method, path, action_id)
+
+
 _endpoint = None
 _direction = None
 _deadline = 0

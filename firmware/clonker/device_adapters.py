@@ -208,10 +208,7 @@ def execute(adapter, endpoint, method, path, action_id=None):
         )
 
     elif adapter == ROKU_TAP:
-        if method != "POST" or path not in roku.BUTTON_COMMANDS:
-            raise ValueError("Unsupported Roku tap command")
-
-        result = roku.send(
+        result = roku.tap(
             endpoint, method, path, action_id
         )
         accepted = True
