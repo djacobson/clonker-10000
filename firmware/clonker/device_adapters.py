@@ -175,7 +175,7 @@ def ready(adapter):
     return True
 
 
-def execute(adapter, endpoint, method, path):
+def execute(adapter, endpoint, method, path, action_id=None):
     """Execute one command through the selected adapter.
 
     Returns:
