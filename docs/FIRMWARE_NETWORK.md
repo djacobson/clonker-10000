@@ -238,15 +238,15 @@ These are installation-specific addresses, not firmware defaults.
 The firmware has four distinct networking responsibilities:
 
 1. **Inbound management HTTP:** Cooperative single-client listener, CONFIG mode only.
-2. **Generic outbound HTTP:** Bounded synchronous request using a fresh TCP connection.
+2. **Generic outbound HTTP:** Bounded synchronous requests using fresh TCP connections.
 3. **Denon TCP adapter:** Persistent outbound TCP connection for recognized fundamental volume commands.
-4. **Roku ECP adapter:** State-managed keydown/keyup requests for encoder volume and physical-button holds.
+4. **Roku ECP adapter:** Device-specific keypress and held-key behavior, delivered using generic or persistent HTTP according to its transport policy.
 
 The generic HTTP transport reuses its SocketPool object but does not reuse individual HTTP TCP connections.
 
-The Denon adapter maintains its own persistent socket state.
+The Denon adapter maintains its own persistent TCP connection and command pacing.
 
-The Roku adapter maintains logical held-key state, not a persistent HTTP socket.
+The Roku adapter maintains logical held-key state and a separate reusable persistent HTTP connection. Volume and navigation/skip taps currently use persistent HTTP; physical-button holds and other controls use generic HTTP.
 
 ---
 
@@ -563,26 +563,25 @@ Queue admission, successful network transmission, and confirmed equipment behavi
 
 **Module:** `clonker/device_adapters.py`
 
-The adapter layer separates **what action was requested** from **how the command reaches the equipment**.
+The adapter layer separates command intent, device-specific behavior, and network delivery.
 
-Ordinary adapter selection is based on recognized command signatures, not room names, manufacturer labels, or fixed device positions.
-
-Explicit physical-button holds use a dedicated Roku execution path.
+The parent router recognizes supported fundamental command signatures and delegates execution. Individual device modules interpret their commands and own any required state, transport choices, and lifecycle safeguards. The Dumb Queue™ retains scheduling, ordering, and failure policy.
 
 ### 7.1 Supported execution paths
 
 | Adapter / execution path | Selection | Transport |
 |---|---|---|
 | `denon-tcp` | Recognized Denon fundamental volume commands | Persistent TCP port 23 |
-| `roku-hold` | Recognized Roku fundamental volume commands | ECP keydown/keyup |
-| Roku physical-button hold | Explicit supported press/release event | ECP keydown/keyup |
+| `roku-volume-hold` | Recognized Roku fundamental volume commands | ECP keydown/keyup over persistent HTTP |
+| `roku-button-tap` | Recognized Roku navigation/skip taps | ECP keypress over persistent HTTP |
+| `roku-button-hold` | Supported physical navigation/skip press/release events | ECP keydown/keyup over generic HTTP |
 | `generic-http` | Other configured commands | Bounded HTTP GET/POST |
 
-Only fundamental `volume-up` and `volume-down` actions are eligible for cached specialized adapter selection.
+Specialized adapter selection is restricted to recognized fundamental actions. Custom-action steps continue using generic HTTP, even when their command paths resemble specialized fundamental commands.
 
-Custom-action steps retain generic HTTP execution.
+The six supported navigation/skip controls have separate tap and hold adapter selections. Ordinary taps use `execute()`; physical press/release events use `execute_hold()`.
 
-Physical-button holds bypass ordinary signature-based adapter selection and use `execute_hold()`.
+Roku's code-defined transport policy selects generic or persistent HTTP independently of control behavior. It does not change the volume or physical-button hold state machines.
 
 ### 7.2 Recognized Denon signatures
 
@@ -606,7 +605,7 @@ Method: POST
 /keypress/VolumeDown -> down
 ```
 
-These signatures select `roku-hold`.
+These signatures select `roku-volume-hold`.
 
 The configured paths are used for recognition. The adapter translates them into held-key operations:
 
@@ -643,7 +642,7 @@ These restrictions distinguish explicit physical holds from ordinary generic HTT
 
 ### 7.5 Adapter cache
 
-Specialized fundamental-volume selections are cached by `(room_id, action_id)`.
+Specialized fundamental volume and Roku navigation/skip tap selections are cached by `(room_id, action_id)`. Physical-button hold selections use separate `("hold", room_id, action_id)` keys.
 
 No adapter identifiers are written into Config v4 JSON.
 
