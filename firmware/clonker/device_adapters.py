@@ -28,9 +28,11 @@ from clonker.net import http_transport
 from clonker.devices import denon
 from clonker.devices import roku
 
-ROKU_HOLD = "roku-hold"
-ROKU_BUTTON = "roku-button"
-ROKU_TAP = "roku-tap"
+
+ROKU_VOLUME_HOLD = "roku-volume-hold"
+ROKU_BUTTON_HOLD = "roku-button-hold"
+ROKU_BUTTON_TAP = "roku-button-tap"
+
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
 
@@ -62,7 +64,7 @@ def resolve(kind, action_id, method, path):
         and method == "POST"
         and path in roku.VOLUME_COMMANDS
     ):
-        return ROKU_HOLD
+        return ROKU_VOLUME_HOLD
 
     if (
         kind == "hold"
@@ -73,7 +75,7 @@ def resolve(kind, action_id, method, path):
         and method == "POST"
         and path in roku.BUTTON_COMMANDS
     ):
-        return ROKU_BUTTON
+        return ROKU_BUTTON_HOLD
 
     return GENERIC_HTTP
 
@@ -125,12 +127,12 @@ def rebuild(config):
                         ("hold", room_id, action_id)
                     ] = adapter
 
-                    # Ordinary taps use persistent Roku HTTP.
-                    # Physical holds retain their existing adapter.
-                    if adapter == ROKU_BUTTON:
+                    # Roku selects the transport for ordinary taps.
+                    # Physical holds use their separate adapter.
+                    if adapter == ROKU_BUTTON_HOLD:
                         new_map[
                             (room_id, action_id)
-                        ] = ROKU_TAP
+                        ] = ROKU_BUTTON_TAP
                 else:
                     new_map[
                         (room_id, action_id)
@@ -193,7 +195,7 @@ def execute(adapter, endpoint, method, path, action_id=None):
 
         detail = "DENON TCP {}".format(command)
 
-    elif adapter == ROKU_HOLD:
+    elif adapter == ROKU_VOLUME_HOLD:
         direction = roku.VOLUME_COMMANDS.get(path)
 
         if direction is None:
@@ -207,7 +209,7 @@ def execute(adapter, endpoint, method, path, action_id=None):
             "keydown" if started else "extended",
         )
 
-    elif adapter == ROKU_TAP:
+    elif adapter == ROKU_BUTTON_TAP:
         result = roku.tap(
             endpoint, method, path, action_id
         )
@@ -246,7 +248,7 @@ def execute_hold(adapter, endpoint, method, path, event):
     """Execute a held-button event through its selected adapter."""
     start = time.monotonic_ns()
 
-    if adapter == ROKU_BUTTON:
+    if adapter == ROKU_BUTTON_HOLD:
         detail = roku.execute_hold(
             endpoint, method, path, event
         )
