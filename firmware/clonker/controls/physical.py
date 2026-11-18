@@ -139,7 +139,7 @@ HOLD_BUTTONS = (
 
 # Short presses use one keypress command.
 # Longer presses use the existing keydown/keyup hold path.
-TAP_HOLD_THRESHOLD_MS = 150
+TAP_HOLD_THRESHOLD_MS = 250
 TAP_HOLD_THRESHOLD_NS = TAP_HOLD_THRESHOLD_MS * 1_000_000
 
 _initialized = False
