@@ -30,7 +30,7 @@ from clonker.devices import roku
 
 ROKU_HOLD = "roku-hold"
 ROKU_BUTTON = "roku-button"
-ROKU_PERSISTENT = "roku-persistent"
+ROKU_TAP = "roku-tap"
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
 
@@ -130,7 +130,7 @@ def rebuild(config):
                     if adapter == ROKU_BUTTON:
                         new_map[
                             (room_id, action_id)
-                        ] = ROKU_PERSISTENT
+                        ] = ROKU_TAP
                 else:
                     new_map[
                         (room_id, action_id)
@@ -207,7 +207,7 @@ def execute(adapter, endpoint, method, path, action_id=None):
             "keydown" if started else "extended",
         )
 
-    elif adapter == ROKU_PERSISTENT:
+    elif adapter == ROKU_TAP:
         if method != "POST" or path not in roku.BUTTON_COMMANDS:
             raise ValueError("Unsupported Roku tap command")
 
