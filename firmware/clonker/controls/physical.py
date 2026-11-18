@@ -137,6 +137,11 @@ HOLD_BUTTONS = (
     "SKIP_FORWARD",
 )
 
+# Short presses use one keypress command.
+# Longer presses use the existing keydown/keyup hold path.
+TAP_HOLD_THRESHOLD_MS = 150
+TAP_HOLD_THRESHOLD_NS = TAP_HOLD_THRESHOLD_MS * 1_000_000
+
 _initialized = False
 
 # Flight recorder diagnostics.
@@ -417,24 +422,17 @@ def dispatch_selected(action_id):
 
 
 def dispatch_hold_button(button_name, action_id, event):
-    """Queue a hold using the room and endpoint from press."""
+    """Classify a physical button gesture as a tap or hold."""
     if event == "pressed":
         room_id = selectors.selected_room()
 
         if not device_config.has_room(room_id):
             _record_dispatch(action_id, "skipped")
-            logger.info(
-                "PHYSICAL HOLD NO-OP: {} / {} "
-                "(room unavailable)".format(room_id, action_id)
-            )
             return False
 
         if button_name in _hold_rooms:
             _record_dispatch(action_id, "skipped")
             return False
-
-        measure = PHYSICAL_PERF_ENABLED and PERF_HOLD
-        started = _perf.start() if measure else None
 
         try:
             room, action = device_config.action_details(
@@ -451,55 +449,98 @@ def dispatch_hold_button(button_name, action_id, event):
             adapter = device_adapters.lookup_hold(
                 room_id, action_id
             )
-            actions.dispatch_hold(
-                room_id, action_id, event,
-                endpoint, command, adapter
+
+            if not endpoint or not action["path"]:
+                _record_dispatch(action_id, "skipped")
+                return False
+
+            if adapter == device_adapters.GENERIC_HTTP:
+                raise ValueError("No native hold adapter")
+
+            _hold_rooms[button_name] = (
+                room_id,
+                action_id,
+                endpoint,
+                command,
+                adapter,
+                time.monotonic_ns(),
+                False,
             )
-            _record_dispatch(action_id, "accepted")
+            return True
+
         except Exception as exc:
             _record_dispatch(action_id, "failed")
             logger.warning(
-                "PHYSICAL hold dispatch failed: {}".format(exc)
+                "PHYSICAL gesture press failed: {}".format(exc)
             )
             return False
-        finally:
-            if measure:
-                _perf.stop("physical.hold", started)
-
-        _hold_rooms[button_name] = (
-            room_id, endpoint, command, adapter
-        )
-        return True
 
     if event == "released":
         original = _hold_rooms.pop(button_name, None)
-
         if original is None:
             return False
 
-        room_id, endpoint, command, adapter = original
+        (
+            room_id, saved_action_id, endpoint,
+            command, adapter, pressed_ns, holding
+        ) = original
 
-        measure = PHYSICAL_PERF_ENABLED and PERF_HOLD
-        started = _perf.start() if measure else None
+        try:
+            if holding:
+                actions.dispatch_hold(
+                    room_id, saved_action_id, "released",
+                    endpoint, command, adapter
+                )
+            else:
+                # A short gesture needs only one keypress.
+                actions.dispatch(room_id, saved_action_id)
+
+            _record_dispatch(saved_action_id, "accepted")
+            return True
+
+        except Exception as exc:
+            _record_dispatch(saved_action_id, "failed")
+            logger.warning(
+                "PHYSICAL gesture release failed: {}".format(exc)
+            )
+            return False
+
+    return False
+
+
+def poll_pending_holds():
+    """Start holds that remain pressed beyond the threshold."""
+    now = time.monotonic_ns()
+
+    for button_name, state in tuple(_hold_rooms.items()):
+        (
+            room_id, action_id, endpoint,
+            command, adapter, pressed_ns, holding
+        ) = state
+
+        if holding:
+            continue
+
+        if now - pressed_ns < TAP_HOLD_THRESHOLD_NS:
+            continue
 
         try:
             actions.dispatch_hold(
-                room_id, action_id, event,
+                room_id, action_id, "pressed",
                 endpoint, command, adapter
             )
+
+            _hold_rooms[button_name] = (
+                room_id, action_id, endpoint,
+                command, adapter, pressed_ns, True
+            )
             _record_dispatch(action_id, "accepted")
-            return True
+
         except Exception as exc:
             _record_dispatch(action_id, "failed")
             logger.warning(
-                "PHYSICAL hold release failed: {}".format(exc)
+                "PHYSICAL hold start failed: {}".format(exc)
             )
-            return False
-        finally:
-            if measure:
-                _perf.stop("physical.hold", started)
-
-    return False
 
 
 def initialize():
@@ -733,6 +774,9 @@ def poll():
                     "HOME", "BACK", "SELECT"
                 ):
                     oled.show_text(button.name)
+
+    # Promote sustained presses to holds without blocking polling.
+    poll_pending_holds()
 
     # Volume encoder.
     if _volume_encoder is not None:
