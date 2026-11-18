@@ -373,7 +373,8 @@ def poll():
             )
         else:
             result = device_adapters.execute(
-                adapter, endpoint, method, path
+                adapter, endpoint, method, path,
+                action_id=action_id
             )
 
         if not result["accepted"]:
