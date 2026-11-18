@@ -61,6 +61,17 @@ VOLUME_COMMANDS = {
     "/goform/formiPhoneAppDirect.xml?MVDOWN": "MVDOWN",
 }
 
+
+def volume_command(path):
+    """Translate a recognized HTTP path to a Denon TCP command."""
+    command = VOLUME_COMMANDS.get(path)
+
+    if command is None:
+        raise ValueError("Unsupported Denon TCP command")
+
+    return command
+
+
 _pool = None
 _socket = None
 _host = None
