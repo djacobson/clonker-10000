@@ -80,16 +80,6 @@ def resolve(kind, action_id, method, path):
     return GENERIC_HTTP
 
 
-def denon_command(path):
-    """Translate a recognized HTTP path to a Denon TCP command."""
-    command = denon.VOLUME_COMMANDS.get(path)
-
-    if command is None:
-        raise ValueError("Unsupported Denon TCP command")
-
-    return command
-
-
 def rebuild(config):
     """Build and publish an adapter map from validated configuration.
 
@@ -190,7 +180,7 @@ def execute(adapter, endpoint, method, path, action_id=None):
     start = time.monotonic_ns()
 
     if adapter == DENON_TCP:
-        command = denon_command(path)
+        command = denon.volume_command(path)
         accepted = denon.send_volume(endpoint, command)
 
         detail = "DENON TCP {}".format(command)
