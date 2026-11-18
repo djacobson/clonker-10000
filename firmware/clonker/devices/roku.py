@@ -44,8 +44,8 @@ BUTTON_COMMANDS = {
 # Roku HTTP transport policy.
 #
 # Select transport independently of control behavior.
-# Navigation taps currently use persistent HTTP.
-# Holds, volume, and other controls retain generic HTTP.
+# Navigation/skip taps and volume currently use persistent HTTP.
+# Physical-button holds and other controls use generic HTTP.
 #
 # Supported values: "generic", "persistent".
 
