@@ -30,6 +30,7 @@ from clonker.devices import roku
 
 ROKU_HOLD = "roku-hold"
 ROKU_BUTTON = "roku-button"
+ROKU_PERSISTENT = "roku-persistent"
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
 
@@ -120,10 +121,20 @@ def rebuild(config):
 
             if adapter != GENERIC_HTTP:
                 if kind == "hold":
-                    key = ("hold", room_id, action_id)
+                    new_map[
+                        ("hold", room_id, action_id)
+                    ] = adapter
+
+                    # Ordinary taps use persistent Roku HTTP.
+                    # Physical holds retain their existing adapter.
+                    if adapter == ROKU_BUTTON:
+                        new_map[
+                            (room_id, action_id)
+                        ] = ROKU_PERSISTENT
                 else:
-                    key = (room_id, action_id)
-                new_map[key] = adapter
+                    new_map[
+                        (room_id, action_id)
+                    ] = adapter
 
     global _adapter_map
     _adapter_map = new_map
@@ -194,6 +205,21 @@ def execute(adapter, endpoint, method, path):
         detail = "ROKU HOLD {} ({})".format(
             direction,
             "keydown" if started else "extended",
+        )
+
+    elif adapter == ROKU_PERSISTENT:
+        if method != "POST" or path not in roku.BUTTON_COMMANDS:
+            raise ValueError("Unsupported persistent Roku command")
+
+        result = roku.persistent_send(
+            endpoint, method, path
+        )
+        accepted = True
+
+        detail = "ROKU HTTP {} ({}, {} ms)".format(
+            result["status"],
+            "reused" if result["reused"] else "new",
+            result["total_ms"],
         )
 
     elif adapter == GENERIC_HTTP:
