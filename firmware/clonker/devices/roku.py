@@ -40,6 +40,51 @@ BUTTON_COMMANDS = {
     "/keypress/Fwd": "Fwd",
 }
 
+
+# Roku HTTP transport policy.
+#
+# Select transport independently of control behavior.
+# Navigation taps currently use persistent HTTP.
+# Holds, volume, and other controls retain generic HTTP.
+#
+# Supported values: "generic", "persistent".
+
+TRANSPORT_POLICY = {
+    "power-toggle": "generic",
+    "mute-toggle": "generic",
+    "volume-up": "generic",
+    "volume-down": "generic",
+    "nav-up": "persistent",
+    "nav-down": "persistent",
+    "nav-left": "persistent",
+    "nav-right": "persistent",
+    "skip-back": "persistent",
+    "skip-forward": "persistent",
+    "home": "generic",
+    "back": "generic",
+    "select": "generic",
+    "play-pause": "generic",
+}
+
+# Physical holds are separate from ordinary taps.
+HOLD_TRANSPORT = "generic"
+
+
+def transport_for(action_id, hold=False):
+    """Return the configured Roku HTTP transport."""
+    transport = (
+        HOLD_TRANSPORT if hold
+        else TRANSPORT_POLICY.get(action_id, "generic")
+    )
+
+    if transport not in ("generic", "persistent"):
+        raise ValueError(
+            "Unsupported Roku transport: {}".format(transport)
+        )
+
+    return transport
+
+
 _endpoint = None
 _direction = None
 _deadline = 0
