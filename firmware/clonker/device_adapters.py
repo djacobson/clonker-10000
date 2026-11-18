@@ -209,18 +209,21 @@ def execute(adapter, endpoint, method, path, action_id=None):
 
     elif adapter == ROKU_PERSISTENT:
         if method != "POST" or path not in roku.BUTTON_COMMANDS:
-            raise ValueError("Unsupported persistent Roku command")
+            raise ValueError("Unsupported Roku tap command")
 
-        result = roku.persistent_send(
-            endpoint, method, path
+        result = roku.send(
+            endpoint, method, path, action_id
         )
         accepted = True
 
-        detail = "ROKU HTTP {} ({}, {} ms)".format(
-            result["status"],
-            "reused" if result["reused"] else "new",
-            result["total_ms"],
-        )
+        if "reused" in result:
+            detail = "ROKU HTTP {} ({}, {} ms)".format(
+                result["status"],
+                "reused" if result["reused"] else "new",
+                result["total_ms"],
+            )
+        else:
+            detail = "ROKU HTTP {}".format(result["status"])
 
     elif adapter == GENERIC_HTTP:
         result = http_transport.send(
