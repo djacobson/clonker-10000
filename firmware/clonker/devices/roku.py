@@ -124,11 +124,14 @@ def _path(operation, direction):
 
 
 def _send(endpoint, operation, direction):
-    """Send Roku ECP command with operation-specific error context."""
+    """Send Roku volume command using its transport policy."""
     path = _path(operation, direction)
+    action_id = (
+        "volume-up" if direction == "up" else "volume-down"
+    )
 
     try:
-        return http_transport.send(endpoint, "POST", path)
+        return send(endpoint, "POST", path, action_id)
     except (OSError, ValueError) as error:
         raise OSError(
             "ROKU {} -> {} failed: {}".format(
