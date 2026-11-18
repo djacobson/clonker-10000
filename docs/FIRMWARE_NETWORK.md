@@ -1,6 +1,5 @@
 # The Clonker 10000 — Firmware, Network & Clock
 
-
 **Updated:** November 18, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Current baseline:** Chapter 10 — assembled physical controls, Dumb Queue™, device-specific Roku and Denon adapters, persistent Roku HTTP and Denon TCP, OLED feedback, and battery-powered operation  
