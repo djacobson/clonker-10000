@@ -16,6 +16,8 @@ prove that the connected AVR actually changed volume.
 """
 
 import time
+import socketpool
+import wifi
 from clonker.net import http_transport
 
 IDLE_RELEASE_NS = 250_000_000   # 250 ms
@@ -300,3 +302,185 @@ def execute_hold(endpoint, method, path, event):
         raise ValueError("Invalid held-button event")
 
     return "ROKU {} {}".format(operation, key)
+
+
+# Roku persistent HTTP experiment -- Stage 1.
+#
+# Not connected to live action execution yet.
+# A socket may be reused only within a short idle window.
+# Failed requests are never automatically replayed.
+
+PERSIST_REUSE_NS = 100_000_000  # 100 ms
+PERSIST_TIMEOUT = 0.5
+PERSIST_MAX_HEADERS = 4096
+
+_persist_pool = None
+_persist_socket = None
+_persist_endpoint = None
+_persist_last_ns = 0
+
+
+def persistent_close():
+    """Discard the experimental Roku connection."""
+    global _persist_socket, _persist_endpoint
+    global _persist_last_ns
+
+    sock = _persist_socket
+    _persist_socket = None
+    _persist_endpoint = None
+    _persist_last_ns = 0
+
+    if sock is not None:
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+
+def _persistent_response(sock):
+    """Consume an entire, bounded HTTP response."""
+    raw = bytearray()
+    chunk = bytearray(256)
+
+    while b"\r\n\r\n" not in raw:
+        count = sock.recv_into(chunk)
+        if count <= 0:
+            raise OSError("Roku closed before HTTP headers")
+
+        raw.extend(chunk[:count])
+
+        if len(raw) > PERSIST_MAX_HEADERS:
+            raise ValueError("Roku HTTP headers too large")
+
+    header_bytes, body = bytes(raw).split(b"\r\n\r\n", 1)
+    lines = header_bytes.decode("latin-1").split("\r\n")
+
+    fields = lines[0].split(" ", 2)
+    if len(fields) < 2 or not fields[0].startswith("HTTP/"):
+        raise ValueError("Invalid Roku HTTP status line")
+
+    status = int(fields[1])
+    headers = {}
+
+    for line in lines[1:]:
+        if ":" in line:
+            name, value = line.split(":", 1)
+            headers[name.strip().lower()] = value.strip().lower()
+
+    if "transfer-encoding" in headers:
+        raise ValueError("Unsupported Roku transfer encoding")
+
+    if "content-length" not in headers:
+        raise ValueError("Roku response has no Content-Length")
+
+    length = int(headers["content-length"])
+    if length < 0 or length > 4096:
+        raise ValueError("Invalid Roku response length")
+
+    if len(body) > length:
+        raise ValueError("Unexpected bytes after Roku response")
+
+    remaining = length - len(body)
+
+    while remaining:
+        count = sock.recv_into(
+            chunk, min(len(chunk), remaining)
+        )
+        if count <= 0:
+            raise OSError("Roku closed during response body")
+        remaining -= count
+
+    if not 200 <= status <= 299:
+        raise ValueError("Roku HTTP status {}".format(status))
+
+    return status, headers.get("connection") == "close"
+
+
+def persistent_send(endpoint, method, path):
+    """Send one Roku ECP request, optionally reusing TCP.
+
+    Experimental API: not used by live controls.
+    Never automatically retries an ambiguous request.
+    """
+    global _persist_pool, _persist_socket
+    global _persist_endpoint, _persist_last_ns
+
+    if method != "POST":
+        raise ValueError("Roku persistent transport requires POST")
+
+    if (
+        not isinstance(path, str)
+        or not path.startswith("/")
+        or "\r" in path or "\n" in path
+    ):
+        raise ValueError("Invalid Roku request path")
+
+    if not wifi.radio.connected:
+        persistent_close()
+        raise OSError("Wi-Fi disconnected")
+
+    host, port = http_transport._parse_endpoint(endpoint)
+    now = time.monotonic_ns()
+
+    reuse = (
+        _persist_socket is not None
+        and _persist_endpoint == endpoint
+        and 0 <= now - _persist_last_ns <= PERSIST_REUSE_NS
+    )
+
+    if not reuse:
+        persistent_close()
+
+    start = time.monotonic_ns()
+
+    try:
+        if _persist_socket is None:
+            if _persist_pool is None:
+                _persist_pool = socketpool.SocketPool(wifi.radio)
+
+            sock = _persist_pool.socket(
+                _persist_pool.AF_INET,
+                _persist_pool.SOCK_STREAM,
+            )
+            _persist_socket = sock
+            sock.settimeout(PERSIST_TIMEOUT)
+            sock.connect((host, port))
+            _persist_endpoint = endpoint
+
+        request = (
+            "POST {} HTTP/1.1\r\n"
+            "Host: {}:{}\r\n"
+            "Connection: keep-alive\r\n"
+            "Content-Length: 0\r\n"
+            "\r\n"
+        ).format(path, host, port).encode("ascii")
+
+        offset = 0
+        while offset < len(request):
+            count = _persist_socket.send(request[offset:])
+            if count <= 0:
+                raise OSError("Roku socket send failed")
+            offset += count
+
+        status, server_close = _persistent_response(
+            _persist_socket
+        )
+
+        elapsed_ms = round(
+            (time.monotonic_ns() - start) / 1_000_000, 1
+        )
+
+        if server_close:
+            persistent_close()
+        else:
+            _persist_last_ns = time.monotonic_ns()
+
+        return {
+            "status": status,
+            "reused": reuse,
+            "total_ms": elapsed_ms,
+        }
+
+    except Exception:
+        persistent_close()
+        raise
