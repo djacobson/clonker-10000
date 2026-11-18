@@ -198,6 +198,10 @@ _action_index = 0
 # Physical button name -> room selected when pressed.
 _hold_rooms = {}
 
+# Releases awaiting space in the Dumb Queue.
+# A new press must not overtake its previous keyup.
+_pending_releases = {}
+
 
 # Secret reboot handshake.
 # Physical CONFIG ON, then 2 -> 3 -> 2 -> 3 -> 2 -> 3.
@@ -424,6 +428,13 @@ def dispatch_selected(action_id):
 def dispatch_hold_button(button_name, action_id, event):
     """Classify a physical button gesture as a tap or hold."""
     if event == "pressed":
+        # Preserve ordering if an earlier release is pending.
+        if button_name in _pending_releases:
+            retry_pending_releases()
+            if button_name in _pending_releases:
+                _record_dispatch(action_id, "skipped")
+                return False
+
         room_id = selectors.selected_room()
 
         if not device_config.has_room(room_id):
@@ -499,6 +510,13 @@ def dispatch_hold_button(button_name, action_id, event):
             return True
 
         except Exception as exc:
+            if holding:
+                # Retain the original destination for retry.
+                _pending_releases[button_name] = (
+                    room_id, saved_action_id,
+                    endpoint, command, adapter
+                )
+
             _record_dispatch(saved_action_id, "failed")
             logger.warning(
                 "PHYSICAL gesture release failed: {}".format(exc)
@@ -506,6 +524,24 @@ def dispatch_hold_button(button_name, action_id, event):
             return False
 
     return False
+
+
+def retry_pending_releases():
+    """Retry held-button releases that could not enter the queue."""
+    for button_name, state in tuple(_pending_releases.items()):
+        room_id, action_id, endpoint, command, adapter = state
+
+        try:
+            actions.dispatch_hold(
+                room_id, action_id, "released",
+                endpoint, command, adapter
+            )
+        except Exception:
+            # Keep the release pending for the next poll.
+            continue
+
+        del _pending_releases[button_name]
+        _record_dispatch(action_id, "accepted")
 
 
 def poll_pending_holds():
@@ -774,6 +810,9 @@ def poll():
                     "HOME", "BACK", "SELECT"
                 ):
                     oled.show_text(button.name)
+
+    # Retry queued releases before promoting new holds.
+    retry_pending_releases()
 
     # Promote sustained presses to holds without blocking polling.
     poll_pending_holds()
