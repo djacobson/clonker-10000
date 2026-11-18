@@ -166,11 +166,14 @@ def poll():
 
 
 def close():
-    """Attempt to release both types of held controls."""
+    """Release held controls and close persistent HTTP."""
     try:
-        release()
+        try:
+            release()
+        finally:
+            button_up()
     finally:
-        button_up()
+        persistent_close()
 
 
 # Explicit physical-button holds.
@@ -304,13 +307,14 @@ def execute_hold(endpoint, method, path, event):
     return "ROKU {} {}".format(operation, key)
 
 
-# Roku persistent HTTP experiment -- Stage 1.
+# Roku persistent HTTP transport.
 #
-# Not connected to live action execution yet.
-# A socket may be reused only within a short idle window.
+# Reuse a recent connection for ordinary navigation taps.
+# Physical holds and encoder volume retain their existing
+# keydown/keyup transport and release safeguards.
 # Failed requests are never automatically replayed.
 
-PERSIST_REUSE_NS = 100_000_000  # 100 ms
+PERSIST_REUSE_NS = 1_000_000_000  # 1 second
 PERSIST_TIMEOUT = 0.5
 PERSIST_MAX_HEADERS = 4096
 
@@ -321,7 +325,7 @@ _persist_last_ns = 0
 
 
 def persistent_close():
-    """Discard the experimental Roku connection."""
+    """Discard the persistent Roku HTTP connection."""
     global _persist_socket, _persist_endpoint
     global _persist_last_ns
 
@@ -398,8 +402,6 @@ def _persistent_response(sock):
 
 def persistent_send(endpoint, method, path):
     """Send one Roku ECP request, optionally reusing TCP.
-
-    Experimental API: not used by live controls.
     Never automatically retries an ambiguous request.
     """
     global _persist_pool, _persist_socket
