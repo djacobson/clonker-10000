@@ -1,8 +1,9 @@
 # The Clonker 10000 — Firmware, Network & Clock
 
-**Updated:** November 8, 2026  
+
+**Updated:** November 18, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Current baseline:** Chapter 7 closeout — Config v4, Dumb Queue™, completed physical assembly, both Bourns encoders, Roku holds, initial SH1106 OLED integration, and shared PERF instrumentation  
+**Current baseline:** Chapter 10 — assembled physical controls, Dumb Queue™, device-specific Roku and Denon adapters, persistent Roku HTTP and Denon TCP, OLED feedback, and battery-powered operation  
 **Scope:** Firmware behavior, networking, scheduler timing, protocol adapters, diagnostics, tests, and operational limitations.
 
 > One Monster. One Dumb Queue™. More than one way to deliver a CLONK.
@@ -1144,7 +1145,7 @@ These addresses are records of the development installation, not defaults or con
 | Room | Volume action configuration | Selected adapter |
 |---|---|---|
 | Den | Denon HTTP command signatures | `denon-tcp` |
-| Sunroom | Roku ECP VolumeUp/VolumeDown signatures | `roku-hold` |
+| Sunroom | Roku ECP VolumeUp/VolumeDown signatures | `roku-volume-hold` |
 
 The Sunroom Roku controls the Denon receiver's volume through the equipment's HDMI-CEC path.
 
@@ -1413,7 +1414,7 @@ The physical Bourns encoder was exercised at slow, moderate, and aggressive rota
 
 The Sunroom configuration was changed to use Roku ECP volume commands.
 
-Adapter inspection confirmed Den `denon-tcp` and Sunroom `roku-hold`.
+Adapter inspection confirmed Den `denon-tcp` and Sunroom `roku-hold` (subsequently renamed `roku-volume-hold`).
 
 Observed physical tests:
 
