@@ -52,8 +52,8 @@ BUTTON_COMMANDS = {
 TRANSPORT_POLICY = {
     "power-toggle": "generic",
     "mute-toggle": "generic",
-    "volume-up": "generic",
-    "volume-down": "generic",
+    "volume-up": "persistent",
+    "volume-down": "persistent",
     "nav-up": "persistent",
     "nav-down": "persistent",
     "nav-left": "persistent",
