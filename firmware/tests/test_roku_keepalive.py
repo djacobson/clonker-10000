@@ -109,4 +109,89 @@ def probe(count=3, key='VolumeUp'):
     finally:
         sock.close()
 
+
+def probe_idle(delay_seconds=5, key='VolumeUp'):
+    """Test whether one Roku TCP socket survives an idle interval."""
+    global _pool
+
+    if key not in ('VolumeUp', 'VolumeDown', 'VolumeMute'):
+        raise ValueError('Unsupported test key')
+    if delay_seconds < 0 or delay_seconds > 300:
+        raise ValueError('Idle delay must be 0..300 seconds')
+    if not wifi.radio.connected:
+        raise OSError('Wi-Fi not connected')
+
+    host, port = _endpoint()
+
+    if _pool is None:
+        _pool = socketpool.SocketPool(wifi.radio)
+
+    sock = _pool.socket(_pool.AF_INET, _pool.SOCK_STREAM)
+    sock.settimeout(TIMEOUT)
+
+    request = (
+        'POST /keypress/{} HTTP/1.1\r\n'
+        'Host: {}:{}\r\n'
+        'Connection: keep-alive\r\n'
+        'Content-Length: 0\r\n'
+        '\r\n'
+    ).format(key, host, port).encode('ascii')
+
+    print('Roku idle test: {} seconds -> {}:{}'.format(
+        delay_seconds, host, port
+    ))
+
+    try:
+        started = time.monotonic()
+        sock.connect((host, port))
+        print('Connect: {:.1f} ms'.format(
+            (time.monotonic() - started) * 1000
+        ))
+
+        for number in (1, 2):
+            if number == 2:
+                print('Idle wait: {} seconds'.format(delay_seconds))
+                time.sleep(delay_seconds)
+
+            started = time.monotonic()
+            sent = 0
+
+            while sent < len(request):
+                n = sock.send(request[sent:])
+                if not n:
+                    raise OSError('Socket send failed')
+                sent += n
+
+            status, headers = _read_response(sock)
+            elapsed_ms = (time.monotonic() - started) * 1000
+
+            print('Request {}: {} | {:.1f} ms'.format(
+                number, status, elapsed_ms
+            ))
+            print('  Connection: {} | Content-Length: {}'.format(
+                headers.get('connection', '(absent)'),
+                headers.get('content-length', '(absent)')
+            ))
+
+            if not status.startswith(('HTTP/1.1 2', 'HTTP/1.0 2')):
+                print('FAIL: Non-success HTTP response')
+                return False
+
+            if headers.get('connection', '').lower() == 'close':
+                print('FAIL: Server requested connection close')
+                return False
+
+        print('PASS: Socket survived {} seconds idle'.format(
+            delay_seconds
+        ))
+        return True
+
+    except Exception as exc:
+        print('FAIL:', repr(exc))
+        return False
+
+    finally:
+        sock.close()
+
+
 print('Roku keep-alive test loaded. Run probe(2) to start.')
