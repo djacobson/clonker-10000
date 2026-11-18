@@ -4136,6 +4136,71 @@ see [Hardware Design — Chapter 10](HARDWARE_DESIGN.md#chapter-10--awake-endura
 
 **Less sleek. More CLONK.**
 
+### November 18, 2026 — The Monster Learns to Sprint
+
+Rapid physical navigation exposed an important distinction
+between correct command execution and responsive remote-control
+behavior.
+
+The initial Roku implementation opened a fresh TCP connection
+for each ordinary HTTP command. This worked reliably, but
+repeated navigation taps incurred unnecessary connection overhead.
+
+#### The experiments
+
+Standalone Roku ECP tests demonstrated that multiple HTTP/1.1
+requests could share one TCP connection.
+
+Additional tests explored connection survival after idle periods:
+
+- Short idle intervals, including 0.1 and 0.5 seconds, succeeded.
+- Three-second reuse sometimes succeeded.
+- Four- and five-second idle intervals produced connection failures.
+
+The tests established that short-term reuse was practical, but
+that longer-lived connections could become stale.
+
+A conservative one-second reuse window was selected.
+
+#### Implementation
+
+The Roku adapter gained persistent HTTP support using a
+monotonic timestamp, endpoint matching, and explicit connection
+cleanup.
+
+Ordinary Roku commands can reuse the connection when eligible.
+
+The physical navigation coordinator also distinguishes quick
+taps from sustained presses using a 250 ms threshold.
+
+The existing Dumb Queue™, generic HTTP transport, Denon TCP
+adapter, and Roku held-button semantics remain separate.
+
+#### Hardware verification
+
+Live testing on the Sunroom Roku demonstrated:
+
+- First requests around 135–146 ms.
+- Reused requests generally around 34–43 ms.
+- Repeated HTTP 200 responses during rapid navigation.
+- Successful sustained keydown/keyup behavior.
+- Responsive physical controls without an action-queue redesign.
+
+The user reported that rapid navigation now felt like the
+original Roku remote.
+
+**Status: PASS — persistent Roku HTTP and tap/hold regression
+verified on real hardware.**
+
+#### Engineering lesson
+
+Sometimes the fastest queue optimization is not changing
+the queue at all.
+
+*The Monster still CLONKs. It just gets there faster.*
+
+**Less sleek. More CLONK.**
+
 ---
 
 **THE CLONKER 10000**

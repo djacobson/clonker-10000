@@ -1862,6 +1862,80 @@ connection overhead of opening a new socket for each volume command.
 No Denon status parser or equipment-state synchronization is
 implemented. Incoming status is intentionally discarded for now.
 
+### Roku persistent HTTP — November 18, 2026
+
+The Roku adapter supports short-lived HTTP/1.1 connection reuse
+for ordinary Roku ECP commands.
+
+The shared Dumb Queue™ still owns command ordering and execution.
+Protocol-specific connection management remains in
+`devices/roku.py`.
+
+#### Connection policy
+
+- Open a new TCP connection when no reusable connection exists.
+- Reuse the connection for subsequent commands to the same endpoint.
+- Allow reuse only when the previous request completed within
+  the last 1 second, measured using `time.monotonic_ns()`.
+- Close a stale connection before sending another request.
+- Close the connection when the endpoint changes.
+- Close and discard the connection on transport or response errors.
+- Do not automatically replay commands after uncertain failures.
+
+The transport uses HTTP/1.1 keep-alive, bounded socket timeouts,
+and explicit response parsing.
+
+The one-second threshold is a conservative client-side policy,
+not a guaranteed Roku server timeout.
+
+#### Physical navigation
+
+Six physical buttons support tap/hold classification:
+
+- Up, Down, Left, Right
+- Skip Back, Skip Forward
+
+The physical coordinator uses a 250 ms threshold.
+
+A short tap sends an ordinary `/keypress/` command through the
+shared action queue. Eligible commands can use persistent HTTP.
+
+A sustained press uses Roku `/keydown/` and `/keyup/` operations.
+These retain their existing held-button safety behavior and do
+not depend on the persistent HTTP optimization.
+
+#### Verified performance
+
+Sunroom Roku testing demonstrated:
+
+| Operation | Approximate duration |
+|---|---:|
+| First command, new TCP connection | 135–146 ms |
+| Subsequent command, reused connection | 34–43 ms |
+
+Rapid physical navigation produced repeated HTTP 200 responses,
+successful connection reuse, and substantially improved perceived
+responsiveness.
+
+A separate press-and-hold regression test confirmed successful
+keydown and keyup operations.
+
+These results demonstrate a substantial reduction in repeated
+command latency. They do not establish guaranteed timing under
+all network conditions.
+
+#### Architectural outcome
+
+No general-purpose connection pool, command batching mechanism,
+or action-queue redesign was required.
+
+Roku-specific optimization remains in the Roku adapter. Generic
+HTTP continues to use its existing transport behavior, and
+Denon retains its separate persistent TCP implementation.
+
+PERF instrumentation remains available for future diagnostics
+and can be disabled during ordinary operation.
+
 ### Roku held-volume
 
 The adapter is time-based rather than detent-count-based.
