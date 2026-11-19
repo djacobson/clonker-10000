@@ -137,6 +137,19 @@ HOLD_BUTTONS = (
     "SKIP_FORWARD",
 )
 
+# Experimental navigation gesture:
+# True  = send initial keypress on press, then hold if sustained.
+# False = original release-first tap/hold classification.
+# Skip buttons retain release-first behavior.
+NAV_PRESS_FIRST = True
+
+NAV_BUTTONS = (
+    "UP",
+    "DOWN",
+    "LEFT",
+    "RIGHT",
+)
+
 # Short presses use one keypress command.
 # Longer presses use the existing keydown/keyup hold path.
 TAP_HOLD_THRESHOLD_MS = 250
@@ -468,13 +481,21 @@ def dispatch_hold_button(button_name, action_id, event):
             if adapter == device_adapters.GENERIC_HTTP:
                 raise ValueError("No native hold adapter")
 
+            pressed_ns = time.monotonic_ns()
+
+            if NAV_PRESS_FIRST and button_name in NAV_BUTTONS:
+                # The initial tap is part of the gesture,
+                # even when the press later becomes a hold.
+                # If queue admission fails, do not start a hold.
+                actions.dispatch(room_id, action_id)
+
             _hold_rooms[button_name] = (
                 room_id,
                 action_id,
                 endpoint,
                 command,
                 adapter,
-                time.monotonic_ns(),
+                pressed_ns,
                 False,
             )
             return True
@@ -502,8 +523,10 @@ def dispatch_hold_button(button_name, action_id, event):
                     room_id, saved_action_id, "released",
                     endpoint, command, adapter
                 )
-            else:
-                # A short gesture needs only one keypress.
+            elif not (
+                NAV_PRESS_FIRST and button_name in NAV_BUTTONS
+            ):
+                # Release-first mode: send one keypress.
                 actions.dispatch(room_id, saved_action_id)
 
             _record_dispatch(saved_action_id, "accepted")
