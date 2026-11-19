@@ -23,11 +23,20 @@ import digitalio
 class Button:
     """One active-low, debounced momentary button."""
 
-    def __init__(self, name, pin_number, debounce_seconds=0.03):
+    def __init__(
+        self, name, pin_number,
+        debounce_seconds=0.03,
+        release_debounce_seconds=None
+    ):
         self.name = name
         self.pin_number = pin_number
         self.debounce_seconds = debounce_seconds
         self.debounce_ns = int(debounce_seconds * 1_000_000_000)
+        if release_debounce_seconds is None:
+            release_debounce_seconds = debounce_seconds
+        self.release_debounce_ns = int(
+            release_debounce_seconds * 1_000_000_000
+        )
 
         self._input = None
         self._last_raw_state = True
@@ -76,9 +85,14 @@ class Button:
             self._last_raw_state = raw_state
             self._last_change_time = now
 
+        debounce_ns = (
+            self.release_debounce_ns
+            if raw_state else self.debounce_ns
+        )
+
         if (
             raw_state != self._stable_state
-            and now - self._last_change_time >= self.debounce_ns
+            and now - self._last_change_time >= debounce_ns
         ):
             self._stable_state = raw_state
 

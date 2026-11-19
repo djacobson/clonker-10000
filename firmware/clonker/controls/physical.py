@@ -608,7 +608,13 @@ def initialize():
         if pin_number is None:
             continue
 
-        button = Button(name, pin_number)
+        button = Button(
+            name,
+            pin_number,
+            release_debounce_seconds=(
+                0.01 if name in HOLD_BUTTONS else None
+            ),
+        )
 
         try:
             button.initialize()
