@@ -1,27 +1,17 @@
-CLONKER 10000 — Audio Laboratory V2
-===================================
-All WAV files: mono, 16,000 samples/sec, 16-bit PCM. Copy to Pico /tests/audio/.
-Run Audio Laboratory v5 option 22 and type the full path, for example:
-/tests/audio/female_synthetic_systems_ready.wav
+Clonker Audio Laboratory — Natural female voice test
 
-VOICE NOTE: The four female_synthetic_* files use an offline female-styled
-synthetic voice (eSpeak), NOT a recording or a modern natural-sounding TTS
-voice. They are useful for speech clarity but will still sound robotic.
-A real natural female voice recording is a separate future audition.
+Original recording: "Julie Etchingham voice.ogg"
+Source: https://commons.wikimedia.org/wiki/File:Julie_Etchingham_voice.ogg
+Speaker: Julie Etchingham
+License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+License URL: https://creativecommons.org/licenses/by-sa/4.0/
 
-FILES:
-female_synthetic_systems_ready.wav — “The Clonker ten thousand. Systems ready.”
-female_synthetic_soft.wav — “Hello there. Ready when you are.”
-female_synthetic_clonk.wav — “Clonk! Mission accomplished.”
-female_synthetic_confirmations.wav — “Ready. Done. Power on.”
-mechanical_clatter_original.wav — prior test baseline
-mechanical_clatter_louder.wav — peak normalized to ~70% full scale
-mechanical_clatter_maximum_clean.wav — peak normalized to ~92% full scale
-percussion_rhythm_original.wav — prior test baseline
-percussion_rhythm_louder.wav — peak normalized to ~70% full scale
-percussion_rhythm_maximum_clean.wav — peak normalized to ~92% full scale
-short_mechanical_clonk.wav — newly synthesized noise-rich impact (not a real recording)
+Modifications:
+- julie_natural_16k.wav: resampled and converted to 16 kHz mono 16-bit PCM WAV.
+- julie_natural_louder_16k.wav: same recording, high-pass filtering, dynamic range compression, and limiting; converted to 16 kHz mono 16-bit PCM WAV.
 
-Volume changes are peak normalization, not dynamic range compression.
-If a source is already louder than the target, the resulting version can be
-quieter; compare by ear. Avoid playback with speaker near ears.
+Place WAVs under /tests/audio/ on the Pico and use Audio Laboratory option 22:
+/tests/audio/julie_natural_16k.wav
+/tests/audio/julie_natural_louder_16k.wav
+
+These are existing recorded words, not a voice clone or newly generated speech.
