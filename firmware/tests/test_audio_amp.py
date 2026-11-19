@@ -1,6 +1,6 @@
 """
 THE CLONKER 10000
-Audio Amplifier Laboratory v2
+Audio Amplifier Laboratory v3 - Beyond the Beep!
 
 Repository: firmware/tests/test_audio_amp.py
 Pico:       /tests/test_audio_amp.py
@@ -22,22 +22,27 @@ REPL:
 
 Standalone experiment. No Clonker app imports.
 
-v1 observations:
-    440 Hz: smooth but faint
-    660 Hz: smooth, louder
-    880 Hz: smooth, louder still
+v1-v2:
+    Three-tone Hello World
+    Adjustable volume and duration
+    Individual tones and frequency sweeps
+    Continuous glides and simple effects
+    Fade-in/fade-out
 
-    200 ms tones were difficult to identify.
-    750 ms tones were clearly recognizable.
+v3:
+    Sine, triangle, square, sawtooth waveforms
+    Side-by-side waveform comparison
+    Adjustable comparison frequency and volume
+    Selected-waveform custom tone and glide
+    Preserve original tests 1-9 as sine waves
 
-v2:
-    Interactive menu
-    Adjustable volume and tone duration
-    Individual tones
-    Stepped frequency sweeps
-    Continuous frequency glides
-    Simple sound effects
-    Gentle fade-in/fade-out
+Listening notes:
+    Speaker produces smooth tones at 50-70%
+    inside the closed foam Clonker case.
+    Loose speaker contact with hard surfaces
+    can produce mechanical buzzing.
+
+No production Clonker app imports.
 """
 
 import board
@@ -60,13 +65,55 @@ SAMPLE_RATE = 16000
 DEFAULT_VOLUME = 20
 DEFAULT_DURATION = 750
 
+# Independent settings for richer waveforms.
+DEFAULT_COMPARE_VOLUME = 20
+DEFAULT_COMPARE_FREQUENCY = 800
+
 MIN_FREQUENCY = 100
 MAX_FREQUENCY = 4000
 
 FADE_MS = 15
 
-# Avoid excessively large sample buffers.
+# 1 second maximum at 16 kHz.
 MAX_SAMPLES = 16000
+
+WAVEFORMS = (
+    "sine",
+    "triangle",
+    "square",
+    "sawtooth",
+)
+
+
+# --------------------------------------------------
+# Waveform generation
+# --------------------------------------------------
+
+def waveform_value(kind, phase):
+    """
+    Return a waveform value from -1.0 to +1.0.
+
+    phase is measured in radians and may grow
+    continuously across sample boundaries.
+    """
+
+    cycle = (phase / (2 * math.pi)) % 1.0
+
+    if kind == "sine":
+        return math.sin(phase)
+
+    if kind == "triangle":
+        return 1.0 - 4.0 * abs(cycle - 0.5)
+
+    if kind == "square":
+        return 1.0 if cycle < 0.5 else -1.0
+
+    if kind == "sawtooth":
+        return 2.0 * cycle - 1.0
+
+    raise ValueError(
+        "Unknown waveform: {}".format(kind)
+    )
 
 
 # --------------------------------------------------
@@ -78,6 +125,11 @@ class AudioLab:
     def __init__(self):
         self.volume = DEFAULT_VOLUME
         self.duration = DEFAULT_DURATION
+
+        self.compare_volume = DEFAULT_COMPARE_VOLUME
+        self.compare_frequency = DEFAULT_COMPARE_FREQUENCY
+        self.waveform = "sine"
+
         self.audio = audiopwmio.PWMAudioOut(PIN)
 
     def close(self):
@@ -86,17 +138,26 @@ class AudioLab:
             self.audio.deinit()
             self.audio = None
 
-    def make_samples(self, frequencies, duration_ms,
-                     volume=None, fade=True):
+    def make_samples(
+        self,
+        frequencies,
+        duration_ms,
+        volume=None,
+        fade=True,
+        waveform="sine"
+    ):
         """
-        Generate unsigned 16-bit PCM samples.
+        Generate unsigned 16-bit mono PCM samples.
 
         frequencies:
-            A number for a constant tone, or
+            Number for a constant tone, or
             (start_hz, end_hz) for a glide.
 
-        Volume is percentage of full-scale
-        waveform amplitude.
+        volume:
+            Percentage of full-scale peak amplitude.
+
+        waveform:
+            sine, triangle, square, sawtooth
         """
 
         if volume is None:
@@ -174,12 +235,17 @@ class AudioLab:
                         fade_count
                     )
 
+            shape = waveform_value(
+                waveform,
+                phase
+            )
+
             value = (
                 32768 +
                 int(
                     amplitude *
                     envelope *
-                    math.sin(phase)
+                    shape
                 )
             )
 
@@ -192,8 +258,14 @@ class AudioLab:
 
         return samples
 
-    def play(self, frequencies, duration_ms=None,
-             volume=None, fade=True):
+    def play(
+        self,
+        frequencies,
+        duration_ms=None,
+        volume=None,
+        fade=True,
+        waveform="sine"
+    ):
 
         if duration_ms is None:
             duration_ms = self.duration
@@ -202,7 +274,8 @@ class AudioLab:
             frequencies,
             duration_ms,
             volume,
-            fade
+            fade,
+            waveform
         )
 
         sample = audiocore.RawSample(
@@ -215,9 +288,9 @@ class AudioLab:
         while self.audio.playing:
             time.sleep(0.01)
 
-        # Keep references alive until playback ends.
         self.audio.stop()
 
+        # Keep samples alive until playback ends.
         del sample
         del samples
         gc.collect()
@@ -237,6 +310,10 @@ class AudioLab:
 
     def pause(self, ms=200):
         time.sleep(ms / 1000)
+
+    # ----------------------------------------------
+    # Original v2 tests
+    # ----------------------------------------------
 
     def hello_world(self):
         print()
@@ -277,8 +354,12 @@ class AudioLab:
             self.tone(hz)
             self.pause(150)
 
-    def glide(self, start_hz, end_hz,
-              duration=750):
+    def glide(
+        self,
+        start_hz,
+        end_hz,
+        duration=750
+    ):
         print(
             "Glide:",
             start_hz,
@@ -338,7 +419,7 @@ class AudioLab:
         )
 
         print(
-            "Volume set to",
+            "Original-test volume:",
             self.volume,
             "%"
         )
@@ -357,9 +438,143 @@ class AudioLab:
             "ms"
         )
 
+    # ----------------------------------------------
+    # New v3 waveform experiments
+    # ----------------------------------------------
+
+    def compare_waveforms(self):
+        print()
+        print("WAVEFORM COMPARISON")
+        print(
+            "Frequency:",
+            self.compare_frequency,
+            "Hz"
+        )
+        print(
+            "Amplitude:",
+            self.compare_volume,
+            "%"
+        )
+
+        for kind in WAVEFORMS:
+            print("Playing:", kind)
+
+            self.play(
+                self.compare_frequency,
+                750,
+                volume=self.compare_volume,
+                waveform=kind
+            )
+
+            self.pause(350)
+
+        print("Comparison complete.")
+
+    def select_waveform(self):
+        print()
+        print("Available waveforms:")
+
+        for i, kind in enumerate(WAVEFORMS):
+            print(
+                " {}  {}".format(
+                    i + 1,
+                    kind
+                )
+            )
+
+        choice = ask_int(
+            "Waveform number",
+            WAVEFORMS.index(self.waveform) + 1,
+            1,
+            len(WAVEFORMS)
+        )
+
+        self.waveform = WAVEFORMS[choice - 1]
+
+        print(
+            "Selected waveform:",
+            self.waveform
+        )
+
+    def waveform_tone(self):
+        print()
+        print("SELECTED-WAVEFORM TONE")
+
+        print(
+            "Waveform:",
+            self.waveform
+        )
+
+        print(
+            "Frequency:",
+            self.compare_frequency,
+            "Hz"
+        )
+
+        print(
+            "Amplitude:",
+            self.compare_volume,
+            "%"
+        )
+
+        self.play(
+            self.compare_frequency,
+            self.duration,
+            volume=self.compare_volume,
+            waveform=self.waveform
+        )
+
+    def waveform_glide(self):
+        print()
+        print("SELECTED-WAVEFORM GLIDE")
+
+        print(
+            "Waveform:",
+            self.waveform
+        )
+
+        print(
+            "300 -> 1500 Hz"
+        )
+
+        self.play(
+            (300, 1500),
+            750,
+            volume=self.compare_volume,
+            waveform=self.waveform
+        )
+
+    def set_compare_frequency(self):
+        self.compare_frequency = ask_int(
+            "Comparison frequency Hz",
+            self.compare_frequency,
+            MIN_FREQUENCY,
+            MAX_FREQUENCY
+        )
+
+        print(
+            "Comparison frequency:",
+            self.compare_frequency,
+            "Hz"
+        )
+
+    def set_compare_volume(self):
+        self.compare_volume = ask_int(
+            "Comparison amplitude percentage",
+            self.compare_volume,
+            0,
+            50
+        )
+
+        print(
+            "Comparison amplitude:",
+            self.compare_volume,
+            "%"
+        )
+
 
 # --------------------------------------------------
-# Input helpers
+# Input helper
 # --------------------------------------------------
 
 def ask_int(prompt, default, minimum, maximum):
@@ -399,45 +614,67 @@ def ask_int(prompt, default, minimum, maximum):
 def show_menu(lab):
 
     print()
-    print("=" * 38)
+    print("=" * 42)
     print("THE CLONKER 10000")
-    print("AUDIO LABORATORY v2")
-    print("=" * 38)
+    print("AUDIO LABORATORY v3")
+    print("=" * 42)
 
     print(
-        "Volume: {}% | Duration: {} ms".format(
+        "Sine volume: {}% | Duration: {} ms".format(
             lab.volume,
             lab.duration
         )
     )
 
+    print(
+        "Waveform: {} | {} Hz | {}%".format(
+            lab.waveform,
+            lab.compare_frequency,
+            lab.compare_volume
+        )
+    )
+
     print()
-    print("TONES")
+    print("ORIGINAL TONES")
     print(" 1  Hello World (440/660/880)")
-    print(" 2  Custom frequency")
+    print(" 2  Custom sine frequency")
     print(" 3  Stepped sweep ascending")
     print(" 4  Stepped sweep descending")
 
     print()
     print("GLIDES")
-    print(" 5  Ascending glide")
-    print(" 6  Descending glide")
+    print(" 5  Ascending sine glide")
+    print(" 6  Descending sine glide")
 
     print()
     print("SOUND EFFECTS")
-    print(" 7  Three chirps")
+    print(" 7  Three sine chirps")
     print(" 8  Confirmation")
     print(" 9  Warning")
 
     print()
+    print("WAVEFORM LAB")
+    print("10  Compare all four waveforms")
+    print("11  Select waveform")
+    print("12  Play selected-waveform tone")
+    print("13  Play selected-waveform glide")
+    print("14  Repeat waveform comparison")
+
+    print()
     print("SETTINGS")
-    print(" v  Set volume")
+    print(" v  Set original sine-test volume")
     print(" d  Set tone duration")
+    print(" f  Set waveform comparison frequency")
+    print(" a  Set waveform comparison amplitude")
     print(" m  Show menu")
     print(" q  Quit")
 
     print()
 
+
+# --------------------------------------------------
+# Main
+# --------------------------------------------------
 
 def main():
 
@@ -489,11 +726,29 @@ def main():
                 elif choice == "9":
                     lab.warning()
 
+                elif choice in ("10", "14"):
+                    lab.compare_waveforms()
+
+                elif choice == "11":
+                    lab.select_waveform()
+
+                elif choice == "12":
+                    lab.waveform_tone()
+
+                elif choice == "13":
+                    lab.waveform_glide()
+
                 elif choice == "v":
                     lab.set_volume()
 
                 elif choice == "d":
                     lab.set_duration()
+
+                elif choice == "f":
+                    lab.set_compare_frequency()
+
+                elif choice == "a":
+                    lab.set_compare_volume()
 
                 elif choice == "m":
                     show_menu(lab)
@@ -523,3 +778,4 @@ def main():
 
 
 main()
+b
