@@ -137,10 +137,11 @@ HOLD_BUTTONS = (
     "SKIP_FORWARD",
 )
 
-# Experimental navigation gesture:
-# True  = send initial keypress on press, then hold if sustained.
-# False = original release-first tap/hold classification.
-# Skip buttons retain release-first behavior.
+# Physical navigation/skip gesture experiment:
+# True  = keypress immediately on press; sustained presses
+#         also start a Roku keydown hold after 250 ms.
+# False = classify tap/hold first; send taps on release.
+# The initial keypress may add one step when a hold begins.
 NAV_PRESS_FIRST = True
 
 NAV_BUTTONS = (
@@ -152,8 +153,8 @@ NAV_BUTTONS = (
     "SKIP_FORWARD",
 )
 
-# Short presses use one keypress command.
-# Longer presses use the existing keydown/keyup hold path.
+# Sustained presses start keydown/keyup holds after this delay.
+# In release-first mode, shorter presses send one keypress.
 TAP_HOLD_THRESHOLD_MS = 250
 TAP_HOLD_THRESHOLD_NS = TAP_HOLD_THRESHOLD_MS * 1_000_000
 

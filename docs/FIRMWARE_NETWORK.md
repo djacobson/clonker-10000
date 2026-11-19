@@ -192,7 +192,7 @@ Current GPIO assignments:
 
 The room selector requires a valid grounded input and 50 ms stability.
 
-Momentary buttons use a default 30 ms debounce.
+Momentary buttons use a default 30 ms debounce. The six navigation/skip buttons retain 30 ms press debounce but use 10 ms release debounce for improved responsiveness.
 
 Encoder transitions are decoded by the reusable `Encoder` class.
 
@@ -914,33 +914,38 @@ Other physical buttons continue using ordinary fundamental-action dispatch.
 
 ### 10.2 Press handling
 
-When a supported button is pressed:
+The six navigation/skip buttons use a switchable gesture policy controlled by `NAV_PRESS_FIRST` in `controls/physical.py`.
+
+In the currently tested press-first mode:
 
 1. The button driver reports a debounced press.
-2. `physical.py` determines the selected room.
-3. The configured endpoint and action command are resolved.
-4. The press context is retained in physical coordination state.
-5. `actions.dispatch_hold()` admits the event.
-6. The queue executes the event through `device_adapters.execute_hold()`.
-7. The Roku module sends the appropriate ECP keydown.
+2. `physical.py` resolves the selected room, endpoint, and action.
+3. `actions.dispatch()` queues an immediate Roku `keypress`.
+4. The coordinator retains the original destination and press time.
+5. If the press continues beyond 250 ms, `actions.dispatch_hold()` queues a `keydown`.
+6. Roku handles automatic repetition while the key remains held.
 
-Example:
+Example sustained press:
 
 ```text
 Physical NAV_UP pressed
     |
     v
-actions.dispatch_hold(..., "pressed")
+Dumb Queue -> POST /keypress/Up
+    |
+    | Still pressed after 250 ms
+    v
+Dumb Queue -> POST /keydown/Up
     |
     v
-Dumb Queue
-    |
-    v
-device_adapters.execute_hold()
-    |
-    v
-POST /keydown/Up
+Roku automatic repeat
 ```
+
+A short press sends only the initial `keypress`.
+
+With `NAV_PRESS_FIRST = False`, the original release-first policy remains available. Short presses dispatch `keypress` on release; sustained presses start `keydown` after the same 250 ms threshold.
+
+The initial `keypress` and later `keydown` may each produce a navigation movement. Hardware testing confirmed this additional movement before automatic repetition, while single taps, rapid taps, sustained holds, and releases behaved well.
 
 The button driver itself does not send HTTP.
 
@@ -950,8 +955,9 @@ On physical release:
 
 1. The button driver reports a debounced release.
 2. `physical.py` retrieves the saved press context.
-3. The release is queued using the original endpoint and command.
-4. The adapter sends the corresponding Roku ECP keyup.
+3. If a hold started, its release is queued using the original endpoint and command.
+4. The adapter sends the corresponding Roku ECP `keyup`.
+5. If no hold started, press-first mode requires no additional command; release-first mode queues one `keypress`.
 
 Example:
 

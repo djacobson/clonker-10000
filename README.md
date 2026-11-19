@@ -345,7 +345,7 @@ The industrial design objective is equally serious: make the switch big enough t
 
 The volume encoder controls real equipment in two rooms using different network protocols.
 
-The navigation and skip buttons support Roku keydown/keyup behavior, allowing a physical button to remain held rather than merely sending repeated individual keypresses.
+The navigation and skip buttons respond immediately to a press, using Roku's persistent HTTP connection for fast single and repeated taps. Hold a button longer and the Clonker engages Roku's native key-repeat behavior, releasing it when you let go. All six buttons use the same press-first gesture, with the original release-first behavior retained as a firmware fallback.
 
 The second Bourns encoder selects and executes room-specific Custom Actions. The OLED uses persistent hardware inversion to acknowledge execution.
 

@@ -652,11 +652,13 @@ The adapter's release-retry mechanism is a specialized safety measure, not a gen
 
 ### 9.3 Roku physical-button holds — Chapter 7
 
-The six physical navigation and skip buttons use explicit press/release semantics.
+The six physical navigation and skip buttons support a switchable tap/hold gesture in `controls/physical.py`.
 
-The application sends a Roku keydown when the physical button is pressed and a matching keyup when it is released.
+With `NAV_PRESS_FIRST = True`, a debounced press immediately queues one Roku `keypress` over persistent HTTP. If the button remains pressed for 250 ms, the coordinator also starts a Roku `keydown` hold. Releasing an active hold queues the matching `keyup`. Short presses require no additional release command.
 
-This allows Roku's native held-button behavior, including repeated navigation while a direction is held.
+With `NAV_PRESS_FIRST = False`, the original release-first behavior remains available: short presses dispatch a single `keypress` on release, while sustained presses use `keydown`/`keyup`.
+
+The press-first behavior was tested on all six buttons. Single and rapid presses were responsive, and holds released correctly. A sustained press produces an additional initial movement when `keydown` begins, before Roku's automatic repetition. This behavior was accepted as a reasonable tradeoff for immediate tap responsiveness.
 
 The implementation spans:
 
@@ -674,14 +676,15 @@ When a hold-capable button is pressed:
 
 1. The physical coordinator reads the selected room.
 2. It resolves the configured action and destination.
-3. It queues the press event.
-4. It remembers the room, endpoint, and command for that button.
+3. In press-first mode, it queues an immediate `keypress`.
+4. It remembers the original room, endpoint, command, and press time.
+5. After 250 ms, if still pressed, it queues a `keydown` hold.
 
 When the button is released:
 
 1. The physical coordinator retrieves the original press context.
-2. It queues the release against that original endpoint.
-3. The adapter sends the matching Roku keyup.
+2. If a hold started, it queues `keyup` against the original endpoint.
+3. Otherwise, it queues a single `keypress` only in release-first mode.
 
 Changing rooms while a button is held must not redirect the release to another room.
 
