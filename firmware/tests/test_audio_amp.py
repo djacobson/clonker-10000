@@ -1,18 +1,211 @@
-"""THE CLONKER 10000 - Audio Amplifier Laboratory v5
+"""
+THE CLONKER 10000 - Audio Amplifier Laboratory v5
 
 Repository: firmware/tests/test_audio_amp.py
-Pico: /tests/test_audio_amp.py
-REPL: exec(open('/tests/test_audio_amp.py').read())
+Pico:       /tests/test_audio_amp.py
+REPL:       exec(open('/tests/test_audio_amp.py').read())
 
-Standalone Pico 2 W / CircuitPython 10.3.1 experiment.
-GP0 -> Adafruit STEMMA Audio Amp #5647; 3V3 and GND shared.
-Speaker: 23 mm 8 ohm / 1 W, connected ONLY to amplifier outputs.
+STATUS (November 2026)
+----------------------
+Experimental audio hardware evaluation completed through v5.
+Audio integration into the Clonker is UNDECIDED.
+This is a standalone test program, not production firmware.
+The amplifier experiment may be shelved indefinitely.
 
-v1-v4: tones, glides, waveforms, software audio lifecycle.
-v5: mechanical effects, precomputed samples, WAV generation/playback,
-    timing and memory observations. No production firmware changes.
+HARDWARE
+--------
+MCU:       Raspberry Pi Pico 2 W
+Firmware:  CircuitPython 10.3.1
+Amplifier: Adafruit STEMMA Audio Amp #5647
+Speaker:   23 mm, 8 ohm, 1 W
+Signal:    GP0 -> amplifier input
+Power:     3V3 -> amplifier power
+Ground:    Common GND
+Speaker:   Connected ONLY to amplifier speaker outputs
 
-Software audio deinit does NOT power down the amplifier.
+Speaker was tested free-standing, resting on different
+surfaces, and inside the zipped foam Clonker case with
+its aluminum faceplate.
+
+The amplifier has an illuminated green power LED.
+Deinitializing PWMAudioOut releases the Pico audio
+peripheral but DOES NOT remove amplifier power.
+
+For temporary storage, power off the Pico before
+disconnecting the amplifier. Prefer disconnecting
+both 3V3 and GP0, leaving GND connected. Avoid
+driving GP0 into an unpowered amplifier.
+
+EXPERIMENT HISTORY
+------------------
+v1-v2:
+    Basic tones, frequency sweeps, glides and effects.
+
+v3:
+    Sine, triangle, square and sawtooth comparisons.
+
+v4:
+    Audio initialization, release, warm idle and
+    repeated lifecycle tests.
+
+v5:
+    Mechanical effects, precomputed samples,
+    8-bit and 16-bit WAV generation and playback,
+    timing and memory observations.
+
+RESULTS - BASIC AUDIO
+---------------------
+* 440 Hz was relatively faint.
+* 660 and 880 Hz were clearly audible.
+* Approximately 200-400 Hz sounded weak.
+* Higher frequencies, including 3-4 kHz, were audible.
+* No calibrated frequency-response measurements exist.
+* Sine and triangle sounded smooth and similar.
+* Square and sawtooth sounded brighter or buzzier.
+* Some apparent buzzing was mechanical coupling to
+  the surface supporting the speaker.
+* Suspending the speaker or placing it on foam
+  substantially reduced this buzzing.
+* Speaker inside zipped case remained audible and
+  generally clean at previously tested amplitudes.
+* Case enclosure reduced apparent loudness, especially
+  for speech. Final mounting is not established.
+
+RESULTS - SOFTWARE LIFECYCLE (v4)
+---------------------------------
+Test 15, cold initialization/release:
+    Initialization: approximately 0.214 ms
+    Release:        approximately 0.122 ms
+    Free memory:    310176 before and after
+    No audible pops reported.
+
+Test 16, warm idle:
+    Three confirmation sequences sounded consistent.
+    Elapsed times: approximately 786.7, 786.7,
+    and 786.3 ms, including synthesis overhead.
+
+Test 17, five restart cycles:
+    Average initialization: approximately 0.189 ms
+    Average release:        approximately 0.159 ms
+    Free memory: 310176 -> 310080 bytes
+    No audible pops or behavioral differences.
+    Small memory difference does not establish a leak.
+
+RESULTS - SYNTHESIZED EFFECTS (v5)
+----------------------------------
+Five initial mechanical-effect candidates:
+    Clonk, Ratchet, Bell, Click and Power.
+
+They generally sounded like electronic tones rather
+than convincing mechanical sounds.
+The Power effect resembled a smooth siren.
+
+Conclusion:
+    Simple periodic waveforms and pitch glides were
+    not convincing substitutes for mechanical impacts.
+
+RESULTS - WAV PLAYBACK
+----------------------
+* 8-bit and 16-bit mono PCM WAV playback worked.
+* Test WAVs used a 16 kHz sample rate.
+* The two formats sounded virtually identical for
+  a simple 700-1050 Hz sine glide.
+* Playback durations were approximately 404 ms.
+* External WAV playback succeeded without changing
+  the production Clonker firmware.
+
+COMPLEX SOUND AUDITIONS
+-----------------------
+Original robotic male speech:
+    Understandable, with an obviously robotic sound.
+
+Synthetic female speech:
+    Unnatural and less intelligible than the male
+    robot. Rejected as a natural-voice test.
+
+Mechanical clatter:
+    Convincing metallic character.
+    Somewhat quiet.
+    Louder versions produced little perceived
+    improvement.
+
+Metallic bell:
+    More tonal than expected; less convincingly
+    metallic than the mechanical clatter.
+
+Percussion rhythm:
+    Convincing hi-hat character.
+    Could benefit from greater loudness.
+
+Musical chords:
+    Pleasant, distinct simultaneous notes.
+    Resembled a vibrating string instrument.
+
+Natural female speech:
+    Julie Etchingham recording converted to
+    16-bit mono 16 kHz PCM WAV.
+    Natural, clear and intelligible outside case.
+    Still understandable inside zipped case when
+    listening carefully, but noticeably subdued.
+    Louder processed version offered little
+    perceived improvement.
+
+    Full-length WAVs occupied substantial storage.
+    Short phrases would require much less space.
+    Both Julie WAVs were backed up externally and
+    approved for deletion from the Pico.
+
+    Recording was used for hardware evaluation,
+    not for voice cloning or custom speech.
+    Source: Wikimedia Commons / VocalEyes project.
+    License: CC BY-SA 4.0; retain attribution
+    and license information with archived copies.
+
+LOUDNESS OBSERVATIONS
+---------------------
+* Good audio quality does not guarantee sufficient
+  acoustic output for practical remote-control alerts.
+* Increased WAV peak levels did not necessarily
+  produce noticeably greater perceived loudness.
+* Short alert tones may be more effective than speech.
+* No calibrated SPL, distortion, amplifier output
+  power, or electrical power measurements were made.
+* The maximum clean loudness has NOT been established.
+* Frequency, waveform, amplitude and enclosure effects
+  require further controlled testing.
+
+STORAGE / TEST ASSETS
+---------------------
+Test script:
+    firmware/tests/test_audio_amp.py
+
+Audio assets:
+    firmware/tests/audio/ (where retained)
+    /tests/audio/ on Pico
+
+Some generated comparison WAVs use /tests directly;
+consult the constants in this test program.
+
+Large speech files and rejected effects need not
+remain on Pico flash after external backup.
+
+FUTURE EXPERIMENTS (OPTIONAL)
+-----------------------------
+1. Frequency versus perceived loudness, speaker
+   mounted inside the zipped case.
+2. Compare sine, triangle and limited square waves
+   at the strongest audible frequencies.
+3. Explore increasing amplitude while listening
+   for distortion and mechanical rattling.
+4. Compare short alert patterns and transient sounds.
+5. Measure system current draw with amplifier powered
+   versus disconnected, if power budget matters.
+6. Evaluate speaker mounting or acoustic opening if
+   the case significantly reduces usable loudness.
+
+No decision has been made to integrate audio.
+No production firmware changes are authorized by
+these experimental results.
 """
 import board
 import time
