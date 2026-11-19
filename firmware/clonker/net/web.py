@@ -31,6 +31,7 @@ from clonker import actions
 from clonker.display import oled
 
 WEB_ROOT = "/clonker/www"
+FLIGHT_RECORDER_PATH = "/clonker/flight_recorder.txt"
 PORT = 9090
 HTTP_DIAGNOSTICS = False
 
@@ -224,17 +225,26 @@ def _action_request(first_line):
     return actions.dispatch(room_id, action_id)
 
 
-def _http_header(status, content_type, content_length):
+def _http_header(status, content_type, content_length,
+                 download_name=None):
     """Build a small HTTP response header."""
-    return (
+    header = (
         "HTTP/1.1 {}\r\n"
         "Content-Type: {}\r\n"
         "Content-Length: {}\r\n"
         "Cache-Control: no-store\r\n"
-        "Connection: close\r\n\r\n"
+        "Connection: close\r\n"
     ).format(
         status, content_type, content_length
-    ).encode("utf-8")
+    )
+
+    if download_name is not None:
+        header += (
+            'Content-Disposition: attachment; '
+            'filename="{}"\r\n'
+        ).format(download_name)
+
+    return (header + "\r\n").encode("utf-8")
 
 
 def _build_response(first_line, request=None):
@@ -262,6 +272,19 @@ def _build_response(first_line, request=None):
         file_path = WEB_ROOT + "/remote.html"
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
+
+    elif first_line.startswith(
+        b"GET /api/flight-recorder HTTP/"
+    ):
+        try:
+            os.stat(FLIGHT_RECORDER_PATH)
+            file_path = FLIGHT_RECORDER_PATH
+            status = "200 OK"
+            content_type = "text/plain; charset=utf-8"
+        except OSError:
+            body = "Flight recorder snapshot not found"
+            status = "404 Not Found"
+            content_type = "text/plain"
 
     elif first_line.startswith(b"GET /api/clock "):
         body = json.dumps(clock_status())
@@ -413,8 +436,14 @@ def _build_response(first_line, request=None):
 
     if file_path is not None:
         file_size = os.stat(file_path)[6]
+        download_name = None
+
+        if file_path == FLIGHT_RECORDER_PATH:
+            download_name = "flight_recorder.txt"
+
         header = _http_header(
-            status, content_type, file_size
+            status, content_type, file_size,
+            download_name
         )
         return header, file_path, len(header) + file_size
 
