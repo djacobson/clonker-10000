@@ -273,18 +273,43 @@ def _build_response(first_line, request=None):
         status = "200 OK"
         content_type = "text/html; charset=utf-8"
 
-    elif first_line.startswith(
-        b"GET /api/flight-recorder HTTP/"
+    elif (
+        first_line.startswith(b"GET /api/flight-recorder ")
+        or first_line.startswith(b"GET /api/flight-recorder?")
     ):
-        try:
-            os.stat(FLIGHT_RECORDER_PATH)
-            file_path = FLIGHT_RECORDER_PATH
-            status = "200 OK"
-            content_type = "text/plain; charset=utf-8"
-        except OSError:
-            body = "Flight recorder snapshot not found"
-            status = "404 Not Found"
+        path = first_line.split(b" ", 2)[1]
+        prefix = b"/api/flight-recorder?backup="
+
+        if path == b"/api/flight-recorder":
+            backup = 0
+        elif path.startswith(prefix):
+            value = path[len(prefix):]
+            if value in (b"1", b"2", b"3"):
+                backup = int(value)
+            else:
+                backup = -1
+        else:
+            backup = -1
+
+        if backup < 0:
+            body = "Invalid flight recorder backup parameter"
+            status = "400 Bad Request"
             content_type = "text/plain"
+        else:
+            snapshot_path = FLIGHT_RECORDER_PATH
+
+            if backup:
+                snapshot_path += ".{}".format(backup)
+
+            try:
+                os.stat(snapshot_path)
+                file_path = snapshot_path
+                status = "200 OK"
+                content_type = "text/plain; charset=utf-8"
+            except OSError:
+                body = "Flight recorder snapshot not found"
+                status = "404 Not Found"
+                content_type = "text/plain"
 
     elif first_line.startswith(b"GET /api/clock "):
         body = json.dumps(clock_status())
@@ -438,8 +463,11 @@ def _build_response(first_line, request=None):
         file_size = os.stat(file_path)[6]
         download_name = None
 
-        if file_path == FLIGHT_RECORDER_PATH:
-            download_name = "flight_recorder.txt"
+        if file_path.startswith(FLIGHT_RECORDER_PATH):
+            download_name = (
+                "flight_recorder.txt"
+                + file_path[len(FLIGHT_RECORDER_PATH):]
+            )
 
         header = _http_header(
             status, content_type, file_size,

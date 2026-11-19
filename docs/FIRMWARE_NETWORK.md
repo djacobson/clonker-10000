@@ -284,6 +284,7 @@ Config's maximum serialized size is 8,192 UTF-8 bytes. HTTP framing and headers 
 | `GET /` | Configuration editor |
 | `GET /remote.html` | Browser Test Remote |
 | `GET /api/config` | Active configuration, revision, writability metadata |
+| `GET /api/flight-recorder[?backup=1\|2\|3]` | Download latest or rotated flight-recorder snapshot |
 | `POST /api/config` | Revision-protected validated save |
 | `GET /api/clock` | Clock source and timestamp |
 | `POST /api/clock?utc=...` | Browser-provided UTC reference |
@@ -1274,6 +1275,41 @@ The writer captures diagnostics and recent log messages, streams them into a hum
 **Current persistence policy:** Snapshots are written only during the secret manual-reboot handshake. There are no periodic snapshots, background writes, or filesystem operations in ordinary button dispatch.
 
 The synchronous write can pause application execution for several hundred milliseconds. Earlier test writes measured approximately 225–484 ms. This is acceptable during deliberate reboot but requires further evaluation before enabling scheduled snapshots.
+
+#### HTTP snapshot retrieval — Chapter 11
+
+In CONFIG mode, the management HTTP server provides read-only
+access to the latest completed flight-recorder snapshot and its
+three rotated backups.
+
+| Request | Snapshot |
+|---|---|
+| `GET /api/flight-recorder` | Latest completed snapshot |
+| `GET /api/flight-recorder?backup=1` | Previous snapshot |
+| `GET /api/flight-recorder?backup=2` | Two snapshots ago |
+| `GET /api/flight-recorder?backup=3` | Three snapshots ago |
+
+Responses use `text/plain` with a download filename matching
+the selected snapshot. The existing cooperative HTTP server
+streams the file in bounded chunks rather than loading it
+entirely into RAM.
+
+Invalid backup parameters return HTTP 400. Missing snapshots
+return HTTP 404.
+
+Retrieval never creates, rotates, clears, or modifies snapshots.
+The endpoint is available only while the CONFIG HTTP listener
+is running. It requires no USB connection or filesystem
+ownership change.
+
+The CONFIG server is intended for a trusted local network.
+These endpoints have no independent authentication and should
+not be exposed to the public internet.
+
+The original single-snapshot endpoint was verified on hardware
+on November 19, 2026: an approximately 8 KB HTTP response
+completed in about 398 ms without reported send errors.
+Backup selection requires separate verification.
 
 **Verified:** Read-only write failure handling, DEVICE-mode writes, four-generation rotation, diagnostic-provider capture, and manual-reboot persistence.
 

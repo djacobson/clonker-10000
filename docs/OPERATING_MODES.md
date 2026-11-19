@@ -262,15 +262,48 @@ The handshake also triggers a best-effort flight-recorder snapshot before reboot
 
 In SERVICE mode, the snapshot write fails safely because the filesystem is read-only to the Pico. The reboot still proceeds.
 
-Snapshots are currently written only for this deliberate reboot handshake, not periodically. To retrieve a snapshot, use the CircuitPython REPL:
+Snapshots are written only during the deliberate secret-reboot
+handshake, not periodically.
+
+#### Retrieving snapshots over Wi-Fi
+
+With the Clonker connected to Wi-Fi, flip the physical CONFIG
+switch ON and open the following endpoint in a browser:
+
+`http://<clonker-ip>:9090/api/flight-recorder`
+
+This downloads the latest completed snapshot.
+
+To retrieve older snapshots, append the optional parameter:
+
+- `?backup=1` — previous snapshot
+- `?backup=2` — two snapshots ago
+- `?backup=3` — three snapshots ago
+
+Downloads are read-only. They do not create new snapshots or
+change the existing backup rotation.
+
+An unavailable snapshot returns HTTP 404. An invalid backup
+parameter returns HTTP 400.
+
+The HTTP server is available only in CONFIG mode and is
+intended for trusted local-network use.
+
+#### Alternative retrieval methods
+
+The CircuitPython REPL can still read the snapshot directly:
 
 ```python
 print(open("/clonker/flight_recorder.txt").read())
 ```
 
-Alternatively, fully power off, select SERVICE with GP17, and power on again to inspect the file from the USB-mounted CIRCUITPY drive.
+Alternatively, fully power off, select SERVICE with GP17,
+and power on again to inspect the file from the USB-mounted
+CIRCUITPY drive.
 
-Avoid performing another secret reboot before collecting evidence, because another successful snapshot will rotate the previous one into `.1`.
+Avoid performing another secret reboot before collecting
+evidence, because each successful snapshot rotates the
+previous generations.
 
 Both secret handshakes require the physical CONFIG switch;
 simulated CONFIG mode and software overrides do not qualify.
