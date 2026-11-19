@@ -148,6 +148,8 @@ NAV_BUTTONS = (
     "DOWN",
     "LEFT",
     "RIGHT",
+    "SKIP_BACK",
+    "SKIP_FORWARD",
 )
 
 # Short presses use one keypress command.
