@@ -524,7 +524,7 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 
 These are working firmware and physical-control capabilities, not just plans on a drawing board.
 
-### The Monster Meets Physics 🔋
+### The Clonker Meets Physics 🔋
 
 Building a ridiculously overengineered remote control has led us into some surprisingly serious engineering territory.
 
