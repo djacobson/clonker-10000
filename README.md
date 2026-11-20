@@ -534,6 +534,12 @@ Apple has entire engineering teams working to squeeze every possible minute from
 
 We discovered that reducing the Pico's current consumption doesn't necessarily maximize usable battery runtime. The DFRobot power module has its own efficiency characteristics and possible minimum-load behavior. A sleeping microcontroller might actually be a less cooperative customer for its power supply than an awake one.
 
+Our experiments with sound uncovered another inconvenient law of physics: making a satisfying noise requires moving enough air to convince an actual human eardrum that something happened. That generally takes speaker size, electrical power, and amplification—none of which come free in a battery-powered device. The Clonker, regrettably, does not run on a car battery.
+
+Perhaps that’s why most remote controls limit their acoustic ambitions to an occasional “Help! I’m lost in the couch cushions!” chirp.
+
+Of course, nobody is going to lose the Clonker in the couch cushions.
+
 **Optimizing individual components doesn't necessarily optimize the whole system.**
 
 And sometimes the best engineering decision is recognizing that a device which runs reliably for days, responds instantly, and charges conveniently might already be good enough.
