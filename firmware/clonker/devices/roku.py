@@ -252,11 +252,13 @@ def close():
 # Explicit physical-button holds.
 # Independent of the encoder-driven volume hold.
 BUTTON_MAX_HOLD_NS = 30_000_000_000     # 30 seconds
+BUTTON_RELEASE_RETRY_NS = 500_000_000  # 500 ms
 
 _button_endpoint = None
 _button_key = None
 _button_started = 0
 _button_release_pending = False
+_button_next_release_attempt = 0
 
 
 def button_held_key():
@@ -267,11 +269,13 @@ def button_held_key():
 def _reset_button():
     global _button_endpoint, _button_key, _button_started
     global _button_release_pending
+    global _button_next_release_attempt
 
     _button_endpoint = None
     _button_key = None
     _button_started = 0
     _button_release_pending = False
+    _button_next_release_attempt = 0
 
 
 def _send_button(endpoint, operation, key):
@@ -318,12 +322,13 @@ def button_down(endpoint, key):
 
 
 def button_up(endpoint=None, key=None):
-    """Release the active physical button once.
+    """Release a physical button, retaining state on failure.
 
-    Optional endpoint/key arguments verify that the release
-    belongs to the original press.
+    Retry attempts are paced to avoid hammering the Roku.
+    A successful keyup clears the retained hold state.
     """
     global _button_release_pending
+    global _button_next_release_attempt
 
     if _button_key is None:
         return False
@@ -334,21 +339,39 @@ def button_up(endpoint=None, key=None):
     if key is not None and key != _button_key:
         raise ValueError("Roku button key mismatch")
 
+    now = time.monotonic_ns()
+
+    if (
+        _button_release_pending
+        and now < _button_next_release_attempt
+    ):
+        return False
+
     _button_release_pending = True
+    _button_next_release_attempt = (
+        now + BUTTON_RELEASE_RETRY_NS
+    )
+
+    # Retain the original endpoint and key if I/O fails.
     _send_button(_button_endpoint, "keyup", _button_key)
+
     _reset_button()
     return True
 
 
 def button_poll():
-    """Attempt one safety release if a button stays held too long."""
-    if _button_key is None or _button_release_pending:
+    """Retry pending releases or enforce the maximum hold time."""
+    if _button_key is None:
         return False
 
-    if (
-        time.monotonic_ns() - _button_started
-        >= BUTTON_MAX_HOLD_NS
-    ):
+    now = time.monotonic_ns()
+
+    if _button_release_pending:
+        if now < _button_next_release_attempt:
+            return False
+        return button_up()
+
+    if now - _button_started >= BUTTON_MAX_HOLD_NS:
         return button_up()
 
     return False
