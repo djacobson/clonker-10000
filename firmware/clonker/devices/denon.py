@@ -77,6 +77,52 @@ _socket = None
 _host = None
 _next_send_time = 0
 
+# Chapter 11 -- persistent TCP transport diagnostics.
+# Counters live in RAM and are never written per command.
+_transport_stats = {
+    "connects": 0,
+    "reuses": 0,
+    "connect_failures": 0,
+    "send_successes": 0,
+    "send_failures": 0,
+    "rx_failures": 0,
+    "rx_bytes": 0,
+    "closes": 0,
+    "last_connect_ms": None,
+    "last_send_ms": None,
+    "last_error": None,
+}
+
+_connected_at_ns = 0
+_last_send_ns = 0
+
+
+def transport_snapshot():
+    """Collect Denon diagnostics without network or filesystem I/O."""
+    now = time.monotonic_ns()
+
+    return {
+        "connection_active": _socket is not None,
+        "connected_host": _host,
+        "connection_age_ms": (
+            round((now - _connected_at_ns) / 1_000_000, 1)
+            if _socket is not None and _connected_at_ns
+            else None
+        ),
+        "last_send_age_ms": (
+            round((now - _last_send_ns) / 1_000_000, 1)
+            if _last_send_ns else None
+        ),
+        "pacing_remaining_ms": max(
+            0,
+            round((_next_send_time - now) / 1_000_000, 1)
+        ),
+        "socket_timeout_ms": int(SOCKET_TIMEOUT * 1000),
+        "minimum_command_interval_ms":
+            MIN_COMMAND_INTERVAL_NS // 1_000_000,
+        "requests": dict(_transport_stats),
+    }
+
 
 def _record(name, elapsed_ns):
     """Record timing only when Denon PERF is enabled."""
@@ -118,14 +164,17 @@ def _host_from_endpoint(endpoint):
 def close():
     """Close the active connection and reset adapter state."""
     global _socket, _host, _next_send_time
+    global _connected_at_ns
 
     sock = _socket
 
     _socket = None
     _host = None
     _next_send_time = 0
+    _connected_at_ns = 0
 
     if sock is not None:
+        _transport_stats["closes"] += 1
         try:
             sock.close()
         except OSError:
@@ -149,12 +198,8 @@ def connected_host():
 
 
 def connect(endpoint):
-    """Connect to the configured Denon receiver.
-
-    Reuse an existing connection to the same receiver.
-    A changed receiver causes the old connection to close.
-    """
-    global _socket, _host
+    """Connect or reuse the persistent receiver TCP connection."""
+    global _socket, _host, _connected_at_ns
 
     host = _host_from_endpoint(endpoint)
 
@@ -163,12 +208,13 @@ def connect(endpoint):
         raise OSError("Wi-Fi is not connected")
 
     if _socket is not None and _host == host:
+        _transport_stats["reuses"] += 1
         return
 
     close()
 
     sock = None
-    started = time.monotonic_ns() if DENON_PERF_ENABLED else 0
+    started = time.monotonic_ns()
 
     try:
         pool = _socket_pool()
@@ -178,19 +224,30 @@ def connect(endpoint):
 
         _socket = sock
         _host = host
+        _connected_at_ns = time.monotonic_ns()
 
-        if DENON_PERF_ENABLED:
-            _record(
-                "denon.connect",
-                time.monotonic_ns() - started,
-            )
+        _transport_stats["connects"] += 1
+        _transport_stats["last_connect_ms"] = round(
+            (_connected_at_ns - started) / 1_000_000, 1
+        )
+        _transport_stats["last_error"] = None
 
-    except Exception:
-        if DENON_PERF_ENABLED:
-            _record(
-                "denon.failure.connect",
-                time.monotonic_ns() - started,
+        _record(
+            "denon.connect",
+            _connected_at_ns - started,
+        )
+
+    except Exception as error:
+        _transport_stats["connect_failures"] += 1
+        _transport_stats["last_error"] = (
+            "connect: {}: {}".format(
+                type(error).__name__, error
             )
+        )
+        _record(
+            "denon.failure.connect",
+            time.monotonic_ns() - started,
+        )
 
         if sock is not None:
             try:
@@ -201,15 +258,8 @@ def connect(endpoint):
 
 
 def send_volume(endpoint, command):
-    """Send one volume command when pacing permits.
-
-    Returns False if the command must wait.
-    Returns True after the socket write completes.
-
-    A successful write does not confirm AVR execution.
-    No automatic retries are attempted.
-    """
-    global _next_send_time
+    """Send a paced volume command without automatic retries."""
+    global _next_send_time, _last_send_ns
 
     if command not in ("MVUP", "MVDOWN"):
         raise ValueError("Unsupported Denon volume command")
@@ -217,67 +267,72 @@ def send_volume(endpoint, command):
     if not ready():
         return False
 
-    started = time.monotonic_ns() if DENON_PERF_ENABLED else 0
+    started = time.monotonic_ns()
     stage = "connect"
+    send_started = 0
 
     try:
         connect(endpoint)
 
         stage = "send"
-        send_started = (
-            time.monotonic_ns() if DENON_PERF_ENABLED else 0
-        )
+        send_started = time.monotonic_ns()
 
         data = (command + "\r").encode("ascii")
         _socket.sendall(data)
 
-        # Consume pending AVR status messages while retaining
-        # the persistent TCP connection.
+        # Preserve the existing receive-buffer drain.
+        # poll_rx() retains its own failure handling.
         poll_rx()
 
-        if DENON_PERF_ENABLED:
-            _record(
-                "denon.send",
-                time.monotonic_ns() - send_started,
-            )
+        now = time.monotonic_ns()
+
+        _transport_stats["send_successes"] += 1
+        _transport_stats["last_send_ms"] = round(
+            (now - send_started) / 1_000_000, 1
+        )
+        _transport_stats["last_error"] = None
+        _last_send_ns = now
+
+        _record("denon.send", now - send_started)
 
         _next_send_time = (
-            time.monotonic_ns() + MIN_COMMAND_INTERVAL_NS
+            now + MIN_COMMAND_INTERVAL_NS
         )
 
-        if DENON_PERF_ENABLED:
-            _record(
-                "denon.total",
-                time.monotonic_ns() - started,
-            )
+        _record(
+            "denon.total",
+            time.monotonic_ns() - started,
+        )
 
         return True
 
-    except Exception:
-        if DENON_PERF_ENABLED:
-            now = time.monotonic_ns()
+    except Exception as error:
+        now = time.monotonic_ns()
 
-            if stage == "send":
-                _record(
-                    "denon.failure.send",
-                    now - send_started,
-                )
-
+        if stage == "send":
+            _transport_stats["send_failures"] += 1
             _record(
-                "denon.failure.total",
-                now - started,
+                "denon.failure.send",
+                now - send_started,
             )
+
+        _transport_stats["last_error"] = (
+            "{}: {}: {}".format(
+                stage, type(error).__name__, error
+            )
+        )
+
+        _record(
+            "denon.failure.total",
+            now - started,
+        )
 
         close()
         raise
 
 
 def poll_rx():
-    """Drain available Denon TCP messages without blocking.
-
-    Called by the cooperative scheduler and after sends.
-    Incoming status messages are discarded for now.
-    """
+    """Drain pending AVR status without blocking."""
     if _socket is None:
         return 0
 
@@ -299,9 +354,16 @@ def poll_rx():
 
             received += count
 
+        _transport_stats["rx_bytes"] += received
         return received
 
-    except Exception:
+    except Exception as error:
+        _transport_stats["rx_failures"] += 1
+        _transport_stats["last_error"] = (
+            "receive: {}: {}".format(
+                type(error).__name__, error
+            )
+        )
         close()
         raise
 
@@ -309,6 +371,12 @@ def poll_rx():
         if _socket is not None:
             try:
                 _socket.settimeout(SOCKET_TIMEOUT)
-            except OSError:
+            except OSError as error:
+                _transport_stats["rx_failures"] += 1
+                _transport_stats["last_error"] = (
+                    "restore timeout: {}: {}".format(
+                        type(error).__name__, error
+                    )
+                )
                 close()
                 raise

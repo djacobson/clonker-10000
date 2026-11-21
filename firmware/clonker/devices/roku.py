@@ -230,9 +230,8 @@ def volume(endpoint, direction):
 
 
 def poll():
-    """Maintain encoder and physical-button holds."""
+    """Maintain holds and retire expired idle HTTP sockets."""
     volume_result = False
-    button_result = False
 
     if _direction is not None:
         now = time.monotonic_ns()
@@ -243,6 +242,11 @@ def poll():
             volume_result = release()
 
     button_result = button_poll()
+
+    # Cooperative cleanup: no network request, no waiting.
+    # All persistent sends are synchronous, so this cannot
+    # interrupt an in-progress HTTP transaction.
+    persistent_poll()
 
     return volume_result or button_result
 
@@ -439,6 +443,7 @@ _transport_stats = {
     "reused": 0,
     "last_ms": None,
     "last_error": None,
+    "idle_closes": 0,
 }
 
 
@@ -503,6 +508,29 @@ def persistent_close():
             sock.close()
         except OSError:
             pass
+
+
+def persistent_poll():
+    """Close a persistent socket after its reuse window expires.
+
+    Called cooperatively by the normal adapter scheduler.
+    Does not perform network I/O or open a connection.
+    """
+    if _persist_socket is None:
+        return False
+
+    now = time.monotonic_ns()
+
+    if (
+        not wifi.radio.connected
+        or now - _persist_last_ns > PERSIST_REUSE_NS
+        or now < _persist_last_ns
+    ):
+        persistent_close()
+        _transport_stats["idle_closes"] += 1
+        return True
+
+    return False
 
 
 def _persistent_prepare_socket(sock, deadline):

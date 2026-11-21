@@ -347,6 +347,9 @@ def main():
     flight_recorder.register_provider(
         "roku_transport", device_adapters.roku.transport_snapshot
     )
+    flight_recorder.register_provider(
+        "denon_transport", device_adapters.denon.transport_snapshot
+    )
 
     try:
         while True:
