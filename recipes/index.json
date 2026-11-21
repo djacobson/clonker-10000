@@ -1,0 +1,28 @@
+{
+  "index_version": 1,
+  "recipes": [
+    {
+      "id": "david-roku-denon-starter",
+      "title": "David's Roku + Denon Setup",
+      "category": "TWO-ROOM EXAMPLE",
+      "summary": "A complete two-room Roku and Denon configuration, based on the repository's existing example.",
+      "description": [
+        "Room 1, Den Test, uses a Roku for navigation and playback, with a Denon receiver handling volume and mute. It includes Movie, Music, and Vinyl custom actions that invoke Denon Quick Select presets.",
+        "Room 2, Sunroom, uses Roku for navigation and playback and Denon for volume and mute in this snapshot. This is NOT yet the user's current Roku-centric Sunroom configuration; it is a prototype copied from the repository example.",
+        "Device IP addresses are included and will be replaced as part of any future full-recipe import. Review every endpoint and action before saving."
+      ],
+      "rooms": [
+        "Room 1 — Den Test: Roku navigation, Denon volume/mute, three custom actions",
+        "Room 2 — Sunroom: Roku navigation, Denon volume/mute, two custom actions"
+      ],
+      "custom_actions": [
+        "Den Test: Movie → Roku Home, then Denon Quick Select 1",
+        "Den Test: Music → Roku Home, then Denon Quick Select 2",
+        "Den Test: Vinyl → Roku Home, then Denon Quick Select 3",
+        "Sunroom: Movie → Roku Home, then Denon Quick Select 1",
+        "Sunroom: Music → Roku Home, then Denon Quick Select 2"
+      ],
+      "file": "david-roku-denon-starter.json"
+    }
+  ]
+}

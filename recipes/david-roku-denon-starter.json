@@ -1,0 +1,263 @@
+{
+  "version": 4,
+  "rooms": {
+    "room-1": {
+      "name": "Den Test",
+      "devices": {
+        "device-1": "",
+        "device-2": "192.168.50.44:8080",
+        "device-3": "192.168.50.43:8060"
+      },
+      "actions": {
+        "back": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Back"
+        },
+        "home": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Home"
+        },
+        "select": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Select"
+        },
+        "nav-up": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Up"
+        },
+        "nav-down": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Down"
+        },
+        "nav-left": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Left"
+        },
+        "nav-right": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Right"
+        },
+        "skip-forward": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Fwd"
+        },
+        "skip-back": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/InstantReplay"
+        },
+        "play-pause": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Play"
+        },
+        "volume-up": {
+          "target": "device-2",
+          "method": "GET",
+          "path": "/goform/formiPhoneAppDirect.xml?MVUP"
+        },
+        "volume-down": {
+          "target": "device-2",
+          "method": "GET",
+          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN"
+        },
+        "mute-toggle": {
+          "target": "device-2",
+          "method": "GET",
+          "on_path": "/goform/formiPhoneAppDirect.xml?MUON",
+          "off_path": "/goform/formiPhoneAppDirect.xml?MUOFF"
+        },
+        "power-toggle": {
+          "target": "device-3",
+          "method": "POST",
+          "on_path": "/keypress/Home",
+          "off_path": "/keypress/PowerOff"
+        }
+      },
+      "custom_actions": [
+        {
+          "id": "custom-action-1",
+          "name": "Movie",
+          "steps": [
+            {
+              "target": "device-3",
+              "method": "POST",
+              "path": "/keypress/Home",
+              "wait_after_ms": 3000
+            },
+            {
+              "target": "device-2",
+              "method": "GET",
+              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1",
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-2",
+          "name": "Music",
+          "steps": [
+            {
+              "target": "device-3",
+              "method": "POST",
+              "path": "/keypress/Home",
+              "wait_after_ms": 3000
+            },
+            {
+              "target": "device-2",
+              "method": "GET",
+              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK2",
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-3",
+          "name": "Vinyl",
+          "steps": [
+            {
+              "target": "device-3",
+              "method": "POST",
+              "path": "/keypress/Home",
+              "wait_after_ms": 3000
+            },
+            {
+              "target": "device-2",
+              "method": "GET",
+              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK3",
+              "wait_after_ms": 0
+            }
+          ]
+        }
+      ]
+    },
+    "room-2": {
+      "name": "Sunroom",
+      "devices": {
+        "device-1": "",
+        "device-2": "192.168.50.40:8080",
+        "device-3": "192.168.50.28:8060"
+      },
+      "actions": {
+        "back": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Back"
+        },
+        "home": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Home"
+        },
+        "select": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Select"
+        },
+        "nav-up": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Up"
+        },
+        "nav-down": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Down"
+        },
+        "nav-left": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Left"
+        },
+        "nav-right": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Right"
+        },
+        "skip-forward": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Fwd"
+        },
+        "skip-back": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/InstantReplay"
+        },
+        "play-pause": {
+          "target": "device-3",
+          "method": "POST",
+          "path": "/keypress/Play"
+        },
+        "volume-up": {
+          "target": "device-2",
+          "method": "GET",
+          "path": "/goform/formiPhoneAppDirect.xml?MVUP"
+        },
+        "volume-down": {
+          "target": "device-2",
+          "method": "GET",
+          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN"
+        },
+        "mute-toggle": {
+          "target": "device-2",
+          "method": "GET",
+          "on_path": "/goform/formiPhoneAppDirect.xml?MUON",
+          "off_path": "/goform/formiPhoneAppDirect.xml?MUOFF"
+        },
+        "power-toggle": {
+          "target": "device-3",
+          "method": "POST",
+          "on_path": "/keypress/Home",
+          "off_path": "/keypress/PowerOff"
+        }
+      },
+      "custom_actions": [
+        {
+          "id": "custom-action-1",
+          "name": "Movie",
+          "steps": [
+            {
+              "target": "device-3",
+              "method": "POST",
+              "path": "/keypress/Home",
+              "wait_after_ms": 3000
+            },
+            {
+              "target": "device-2",
+              "method": "GET",
+              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1",
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-2",
+          "name": "Music",
+          "steps": [
+            {
+              "target": "device-3",
+              "method": "POST",
+              "path": "/keypress/Home",
+              "wait_after_ms": 3000
+            },
+            {
+              "target": "device-2",
+              "method": "GET",
+              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK2",
+              "wait_after_ms": 0
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

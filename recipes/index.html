@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>THE CLONKER 10000 — Recipes</title>
+<style>
+:root{color-scheme:dark;--bg:#10151b;--panel:#1b242d;--edge:#354451;--ink:#f0f4f7;--muted:#b4c1ca;--accent:#f4bd5b}*{box-sizing:border-box}body{font:16px/1.55 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);margin:0}main{max-width:780px;margin:auto;padding:28px 18px 60px}h1{font-size:clamp(1.6rem,5vw,2.4rem);margin:0}h2{font-size:1.3rem}p{color:var(--muted)}.tag{color:var(--accent);font-weight:700;letter-spacing:.06em;font-size:.8rem}.panel{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:18px;margin-top:18px}select,button,a.action{font:inherit;border-radius:8px;padding:10px 12px}select{width:100%;background:#10151b;color:var(--ink);border:1px solid #637787}button,a.action{background:var(--accent);color:#171a1d;border:0;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}ul{padding-left:22px}li{margin:5px 0}code{overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;background:#0d1217;border:1px solid var(--edge);padding:12px;border-radius:8px;font-size:.8rem}details{margin-top:18px}small{color:var(--muted)}.error{color:#ffb2a4}a{color:#ffd28a}
+</style>
+</head>
+<body><main>
+<div class="tag">LESS SLEEK. MORE CLONK.</div>
+<h1>THE CLONKER 10000</h1><p>Recipe Library · Browse complete configuration examples before loading them into your Clonker.</p>
+<section class="panel"><label for="choice"><strong>Choose a recipe</strong></label><p><small>Recipes are curated by the project maintainer. Selecting one does not change your Clonker.</small></p><select id="choice" disabled><option>Loading recipes…</option></select><p id="status" role="status"></p></section>
+<section class="panel" id="detail" hidden><div class="tag" id="category"></div><h2 id="title"></h2><p id="summary"></p><div id="description"></div><h3>Rooms</h3><ul id="rooms"></ul><h3>Custom actions</h3><ul id="actions"></ul><div class="actions"><button id="preview">Preview configuration JSON</button><a class="action" id="download" download>Download JSON</a></div><details id="jsonDetails"><summary>Configuration JSON preview</summary><pre id="json"></pre></details><p><small>Prototype only. No direct installation, validation against the Pico, or automatic IP substitution.</small></p></section>
+<p><small>GitHub-hosted recipe library · Schema v4 · Static HTML + JSON</small></p>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+let recipes=[];
+function node(tag,text){const el=document.createElement(tag);el.textContent=text;return el;}
+function showRecipe(r){$('detail').hidden=false;$('category').textContent=r.category||'CONFIGURATION';$('title').textContent=r.title;$('summary').textContent=r.summary;$('description').replaceChildren(...(r.description||[]).map(s=>node('p',s)));$('rooms').replaceChildren(...(r.rooms||[]).map(s=>node('li',s)));$('actions').replaceChildren(...(r.custom_actions||[]).map(s=>node('li',s)));$('jsonDetails').open=false;$('json').textContent='Choose Preview configuration JSON to load this file.';const url=new URL(r.file,location.href);$('download').href=url.href;$('preview').onclick=async()=>{try{const resp=await fetch(url,{cache:'no-store'});if(!resp.ok)throw Error('HTTP '+resp.status);const data=await resp.json();$('json').textContent=JSON.stringify(data,null,2);$('jsonDetails').open=true;}catch(e){$('json').textContent='Unable to load recipe: '+e.message;$('jsonDetails').open=true;}};}
+(async()=>{try{const res=await fetch('index.json',{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();if(data.index_version!==1||!Array.isArray(data.recipes))throw Error('Unsupported recipe index');recipes=data.recipes;$('choice').replaceChildren(...recipes.map((r,i)=>{const o=node('option',r.title);o.value=String(i);return o;}));$('choice').disabled=!recipes.length;$('choice').onchange=()=>showRecipe(recipes[Number($('choice').value)]);$('status').textContent=recipes.length?recipes.length+' recipe available':'No recipes yet';if(recipes.length)showRecipe(recipes[0]);}catch(e){$('choice').replaceChildren(node('option','Unable to load recipes'));$('status').className='error';$('status').textContent='Recipe index unavailable: '+e.message+' (serve via HTTP; do not open file:// directly).';}})();
+</script>
+</body></html>
