@@ -412,6 +412,7 @@ def execute_hold(endpoint, method, path, event):
 
 PERSIST_REUSE_NS = 1_000_000_000  # 1 second
 PERSIST_TIMEOUT = 0.5
+PERSIST_TOTAL_TIMEOUT_NS = 1_500_000_000  # 1.5 seconds
 PERSIST_MAX_HEADERS = 4096
 
 _persist_pool = None
@@ -437,13 +438,26 @@ def persistent_close():
             pass
 
 
-def _persistent_response(sock):
-    """Consume an entire, bounded HTTP response."""
+def _persistent_prepare_socket(sock, deadline):
+    """Bound each socket operation by the remaining deadline."""
+    remaining_ns = deadline - time.monotonic_ns()
+
+    if remaining_ns <= 0:
+        raise OSError("Roku persistent HTTP deadline exceeded")
+
+    remaining_s = remaining_ns / 1_000_000_000
+    sock.settimeout(min(PERSIST_TIMEOUT, remaining_s))
+
+
+def _persistent_response(sock, deadline):
+    """Consume an entire HTTP response within a total deadline."""
     raw = bytearray()
     chunk = bytearray(256)
 
     while b"\r\n\r\n" not in raw:
+        _persistent_prepare_socket(sock, deadline)
         count = sock.recv_into(chunk)
+
         if count <= 0:
             raise OSError("Roku closed before HTTP headers")
 
@@ -483,6 +497,7 @@ def _persistent_response(sock):
     remaining = length - len(body)
 
     while remaining:
+        _persistent_prepare_socket(sock, deadline)
         count = sock.recv_into(
             chunk, min(len(chunk), remaining)
         )
@@ -530,6 +545,7 @@ def persistent_send(endpoint, method, path):
         persistent_close()
 
     start = time.monotonic_ns()
+    deadline = start + PERSIST_TOTAL_TIMEOUT_NS
 
     try:
         if _persist_socket is None:
@@ -541,7 +557,7 @@ def persistent_send(endpoint, method, path):
                 _persist_pool.SOCK_STREAM,
             )
             _persist_socket = sock
-            sock.settimeout(PERSIST_TIMEOUT)
+            _persistent_prepare_socket(sock, deadline)
             sock.connect((host, port))
             _persist_endpoint = endpoint
 
@@ -555,13 +571,16 @@ def persistent_send(endpoint, method, path):
 
         offset = 0
         while offset < len(request):
+            _persistent_prepare_socket(
+                _persist_socket, deadline
+            )
             count = _persist_socket.send(request[offset:])
             if count <= 0:
                 raise OSError("Roku socket send failed")
             offset += count
 
         status, server_close = _persistent_response(
-            _persist_socket
+            _persist_socket, deadline
         )
 
         elapsed_ms = round(
