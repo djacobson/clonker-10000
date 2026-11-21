@@ -432,6 +432,61 @@ _persist_socket = None
 _persist_endpoint = None
 _persist_last_ns = 0
 
+_transport_stats = {
+    "successes": 0,
+    "failures": 0,
+    "new": 0,
+    "reused": 0,
+    "last_ms": None,
+    "last_error": None,
+}
+
+
+def transport_snapshot():
+    """Return Roku transport and hold diagnostics.
+
+    Called by the flight recorder only when collecting
+    a snapshot. Performs no networking or filesystem I/O.
+    """
+    now = time.monotonic_ns()
+
+    held_age_ms = None
+    retry_due_ms = None
+
+    if _button_key is not None:
+        held_age_ms = round(
+            (now - _button_started) / 1_000_000, 1
+        )
+
+        if _button_release_pending:
+            retry_due_ms = max(
+                0,
+                round(
+                    (_button_next_release_attempt - now)
+                    / 1_000_000, 1
+                )
+            )
+
+    connection_age_ms = None
+    if _persist_socket is not None:
+        connection_age_ms = round(
+            (now - _persist_last_ns) / 1_000_000, 1
+        )
+
+    return {
+        "hold_transport": HOLD_TRANSPORT,
+        "reuse_window_ms": PERSIST_REUSE_NS // 1_000_000,
+        "total_timeout_ms":
+            PERSIST_TOTAL_TIMEOUT_NS // 1_000_000,
+        "requests": dict(_transport_stats),
+        "connection_active": _persist_socket is not None,
+        "connection_age_ms": connection_age_ms,
+        "held_key": _button_key,
+        "release_pending": _button_release_pending,
+        "held_age_ms": held_age_ms,
+        "retry_due_ms": retry_due_ms,
+    }
+
 
 def persistent_close():
     """Discard the persistent Roku HTTP connection."""
@@ -604,12 +659,23 @@ def persistent_send(endpoint, method, path):
         else:
             _persist_last_ns = time.monotonic_ns()
 
+        _transport_stats["successes"] += 1
+        _transport_stats[
+            "reused" if reuse else "new"
+        ] += 1
+        _transport_stats["last_ms"] = elapsed_ms
+        _transport_stats["last_error"] = None
+
         return {
             "status": status,
             "reused": reuse,
             "total_ms": elapsed_ms,
         }
 
-    except Exception:
+    except Exception as error:
+        _transport_stats["failures"] += 1
+        _transport_stats["last_error"] = "{}: {}".format(
+            type(error).__name__, error
+        )
         persistent_close()
         raise

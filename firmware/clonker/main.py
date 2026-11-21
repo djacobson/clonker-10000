@@ -331,7 +331,7 @@ def main():
     memory_monitor.initialize()
 
     # Flight recorder diagnostic providers.
-    # These are evaluated only when a snapshot is requested.
+    # Evaluated only when a snapshot is requested.
     flight_recorder.register_provider(
         "performance", perf.snapshot_all
     )
@@ -343,6 +343,9 @@ def main():
     )
     flight_recorder.register_provider(
         "physical", physical.snapshot
+    )
+    flight_recorder.register_provider(
+        "roku_transport", device_adapters.roku.transport_snapshot
     )
 
     try:
