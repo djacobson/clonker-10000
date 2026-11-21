@@ -1124,7 +1124,7 @@ The transport does not provide full response-body parsing, TLS, authentication, 
 
 Generic HTTP handles:
 
-- Ordinary Roku navigation and ECP keypresses.
+- Other Roku ECP commands without specialized adapter selection.
 - Roku mute.
 - Denon HTTP power and mute commands.
 - Custom-action steps.
