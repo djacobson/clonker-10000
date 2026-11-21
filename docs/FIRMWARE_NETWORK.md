@@ -1948,10 +1948,35 @@ connection overhead of opening a new socket for each volume command.
 No Denon status parser or equipment-state synchronization is
 implemented. Incoming status is intentionally discarded for now.
 
-### Roku persistent HTTP — November 18, 2026
+#### Transport diagnostics — Chapter 11
+
+The Denon adapter maintains lightweight, RAM-only transport
+statistics, available through `transport_snapshot()`.
+
+The snapshot includes:
+
+- Connection state, connected host, and connection age.
+- Connection creation, reuse, and closure counts.
+- Successful and failed sends.
+- Connection and receive failures.
+- Received byte counts and recent transport timing.
+- Last recorded transport error.
+
+These diagnostics help distinguish command failures from
+connection-management problems and incoming status traffic.
+
+Snapshots perform no network or filesystem I/O. They are
+captured by the flight recorder for later inspection.
+
+The connection remains open while healthy. Periodic receive
+draining continues to prevent unread status data from
+accumulating in socket buffers.
+
+### Roku persistent HTTP — November 18–20, 2026
 
 The Roku adapter supports short-lived HTTP/1.1 connection reuse
-for ordinary Roku ECP commands.
+for selected Roku ECP commands, including physical navigation
+taps and held-button keydown/keyup operations.
 
 The shared Dumb Queue™ still owns command ordering and execution.
 Protocol-specific connection management remains in
@@ -1974,6 +1999,10 @@ and explicit response parsing.
 The one-second threshold is a conservative client-side policy,
 not a guaranteed Roku server timeout.
 
+`roku.poll()` also performs cooperative idle-socket cleanup.
+Expired connections are closed without waiting for another
+command. This avoids retaining an unused socket indefinitely.
+
 #### Physical navigation
 
 Six physical buttons support tap/hold classification:
@@ -1984,11 +2013,30 @@ Six physical buttons support tap/hold classification:
 The physical coordinator uses a 250 ms threshold.
 
 A short tap sends an ordinary `/keypress/` command through the
-shared action queue. Eligible commands can use persistent HTTP.
+shared action queue.
 
 A sustained press uses Roku `/keydown/` and `/keyup/` operations.
-These retain their existing held-button safety behavior and do
-not depend on the persistent HTTP optimization.
+Both paths can use persistent HTTP, but transport selection
+does not change the held-button state machine.
+
+Held-button safeguards remain independent:
+
+- Keydown/keyup sequencing and release-state tracking.
+- Paced keyup retries after uncertain release failures.
+- Maximum-hold protection.
+- Prevention of new keydowns while release is unresolved.
+
+#### Transport diagnostics — Chapter 11
+
+`transport_snapshot()` exposes lightweight, RAM-only statistics
+including new connections, reused connections, successful and
+failed requests, idle closures, and the most recent error.
+
+The snapshot also reports connection state and reuse-window
+information. It performs no network or filesystem I/O.
+
+Flight-recorder snapshots capture these diagnostics for
+post-test analysis.
 
 #### Verified performance
 
