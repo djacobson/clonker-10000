@@ -1298,8 +1298,25 @@ Diagnostic providers are registered during application startup and evaluated onl
 
 - `performance` — accumulated PERF statistics.
 - `memory` — heap and memory-monitor statistics.
+- `run_exit_memory` — heap checkpoint captured immediately before a RUN → CONFIG transition.
 - `queue` — pending action queue state.
 - `physical` — button events and dispatch counters.
+
+**RUN → CONFIG memory checkpoint — Chapter 11:**
+
+Before CONFIG services start, the memory monitor records uptime,
+free heap, and allocated heap without forcing garbage collection.
+The latest checkpoint is retained in RAM and included in the next
+flight-recorder snapshot as `run_exit_memory`.
+
+This distinguishes memory measured during normal RUN operation
+from memory measured later during CONFIG mode and snapshot capture.
+Differences may reflect garbage collection and temporary allocations,
+not necessarily memory leaks.
+
+**Verified:** Flight Recorder #7 captured the RUN-exit checkpoint
+at 39 seconds (214,656 bytes free) and the regular memory snapshot
+at 46 seconds (250,960 bytes free).
 
 A completed secret manual-reboot handshake requests a synchronous, streaming snapshot before `microcontroller.reset()`.
 
