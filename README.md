@@ -440,7 +440,7 @@ Device adapters handle the equipment-specific details.
 
 - **Denon volume:** Discrete commands over persistent TCP, with command pacing.
 - **Roku volume:** Stateful ECP keydown/keyup over persistent HTTP, turning encoder detents into temporary held keys.
-- **Roku navigation and skip:** Persistent HTTP for ordinary taps; separate held-button behavior for sustained physical presses.
+- **Roku navigation and skip:** Persistent HTTP for immediate taps and sustained physical keydown/keyup, with paced release recovery and flight-recorder transport diagnostics.
 - **Other commands:** Generic HTTP, including configurable Custom Action steps.
 
 That means the same physical volume knob can operate two very different volume interfaces without knowing anything about either protocol.

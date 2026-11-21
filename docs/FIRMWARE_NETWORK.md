@@ -246,7 +246,9 @@ The generic HTTP transport reuses its SocketPool object but does not reuse indiv
 
 The Denon adapter maintains its own persistent TCP connection and command pacing.
 
-The Roku adapter maintains logical held-key state and a separate reusable persistent HTTP connection. Volume and navigation/skip taps currently use persistent HTTP; physical-button holds and other controls use generic HTTP.
+The Roku adapter maintains logical held-key state and a separate reusable persistent HTTP connection. Volume, navigation/skip taps, and physical-button keydown/keyup use persistent HTTP. Other actions follow their configured transport policy.
+
+Persistent requests use a 500 ms per-operation socket timeout and a 1.5-second total request deadline. Connections are eligible for reuse for one second after a successful response. Physical-button keyup failures retain their held-key state and are retried at paced 500 ms intervals. Uncertain navigation taps and keydowns are not automatically replayed.
 
 ---
 
@@ -575,7 +577,7 @@ The parent router recognizes supported fundamental command signatures and delega
 | `denon-tcp` | Recognized Denon fundamental volume commands | Persistent TCP port 23 |
 | `roku-volume-hold` | Recognized Roku fundamental volume commands | ECP keydown/keyup over persistent HTTP |
 | `roku-button-tap` | Recognized Roku navigation/skip taps | ECP keypress over persistent HTTP |
-| `roku-button-hold` | Supported physical navigation/skip press/release events | ECP keydown/keyup over generic HTTP |
+| `roku-button-hold` | Supported physical navigation/skip press/release events | ECP keydown/keyup over persistent HTTP |
 | `generic-http` | Other configured commands | Bounded HTTP GET/POST |
 
 Specialized adapter selection is restricted to recognized fundamental actions. Custom-action steps continue using generic HTTP, even when their command paths resemble specialized fundamental commands.
@@ -1045,6 +1047,49 @@ The tests established:
 - Practical held-button behavior.
 
 The tests do not establish guaranteed release after every possible network outage or application interruption.
+
+### 10.8 Chapter 11 — Persistent transport refinement and diagnostics
+
+Chapter 11 strengthened Roku physical-button release recovery and moved physical keydown/keyup operations from generic HTTP to the existing persistent HTTP transport.
+
+**Reliability improvements:**
+
+- Failed physical keyup operations retain the original endpoint and key for subsequent release attempts.
+- Release recovery retries are paced at approximately 500 ms.
+- Persistent HTTP requests use a 500 ms per-operation socket timeout and a 1.5-second total request deadline.
+- Failed persistent requests discard the connection.
+- Ordinary navigation taps and keydowns are not automatically replayed because delivery may be ambiguous.
+- Press-first navigation, debounce timing, and the 250 ms hold threshold remain unchanged.
+
+**Stage 2B live verification:**
+
+- Rapid DOWN taps completed successfully.
+- Short and long DOWN holds behaved as expected.
+- DOWN-to-UP reversal completed successfully.
+- Recovery and responsiveness testing showed continued operation.
+- Representative persistent keydown operations completed in approximately 12–22 ms, compared with the earlier generic HTTP baseline of approximately 115–120 ms.
+- Keyup operations generally remained around 115–123 ms during the observed tests.
+- No transport failures were visible in the final Stage 2B screenshots.
+
+These measurements are representative observations, not guaranteed timing limits.
+
+**Flight-recorder transport diagnostics:**
+
+The `roku_transport` provider captures:
+
+- Successful and failed persistent HTTP requests.
+- Successful requests using new versus reused connections.
+- Duration of the last successful request.
+- Last transport error.
+- Current persistent connection state and age.
+- Active physical held key.
+- Pending release state, held-key age, and retry timing.
+
+Counters are maintained in RAM and reset on restart. Detailed diagnostic snapshots are collected only when requested.
+
+No additional network requests, background tasks, or routine filesystem writes are introduced.
+
+These diagnostics provide additional evidence for investigating future Roku connection failures and release-recovery behavior without requiring continuous verbose logging.
 
 ---
 
