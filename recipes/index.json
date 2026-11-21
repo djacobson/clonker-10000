@@ -4,17 +4,17 @@
     {
       "id": "david-roku-denon-starter",
       "title": "David's Roku + Denon Setup",
-      "category": "TWO-ROOM EXAMPLE",
-      "summary": "A complete two-room Roku and Denon configuration, based on the repository's existing example.",
+      "category": "TWO ACTIVE ROOMS",
+      "summary": "David's complete Clonker configuration: Denon-centric Den and Roku-centric Sunroom, with an unused third room.",
       "description": [
         "Room 1, Den, uses a Roku for navigation and playback, with a Denon receiver handling volume and mute. It includes Denon custom actions Movie, Music, and Vinyl that invoke Denon Quick Select presets.",
         "Room 2, Sunroom, uses Roku for navigation and playback, also Roku for volume and mute controlling Denon AVR via HDMI CEC (Note: Roku vol for testing, which also applies to Roku smart TVs), includes additional Denon audio custom actions.",
         "Device IP addresses are included and will be replaced as part of any future full-recipe import. Review every endpoint and action before saving."
       ],
       "rooms": [
-        "Room 1 -- Den: Roku navigation, Denon volume/mute, three custom actions",
-        "Room 2 -- Sunroom: Roku navigation, Denon volume/mute, two custom actions",
-        "Room 3 -- Not configured in this recipe; available for future expansion"
+        "Room 1 -- Den: Roku navigation, Denon volume/mute, four custom actions",
+        "Room 2 -- Sunroom: Roku navigation, Roku volume/mute, three custom actions",
+        "Room 3 -- Present but unconfigured; available for future expansion"
       ],
       "custom_actions": [
         "Den: Movie → Roku Home, then Denon Quick Select 1",
@@ -22,7 +22,7 @@
         "Den: Vinyl → Roku Home, then Denon Quick Select 3",
         "Den: Audio Cycle → Denon Audio Modes each select steps through menu",
         "Sunroom: Movie → Roku Home, then Denon Quick Select 1",
-        "Sunroom: Music → Roku Home, then Denon Quick Select 2"
+        "Sunroom: Music → Roku Home, then Denon Quick Select 2",
         "Sunroom: Audio Cycle → Denon Audio Modes each select steps through menu"
       ],
       "file": "david-roku-denon-starter.json"
