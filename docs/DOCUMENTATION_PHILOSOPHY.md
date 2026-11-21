@@ -117,6 +117,27 @@ Development history should preserve the experiments, alternatives, failures, and
 
 Both are valuable. They simply serve different purposes.
 
+## Repository Organization
+
+The repository is organized around the purpose of its contents, not simply the technology used to create them.
+
+| Directory | Responsibility |
+|---|---|
+| `firmware/` | CircuitPython application code, supporting modules, assets, and tests intended to run on the Pico. |
+| `docs/` | Technical documentation, architecture, development guidance, and project history. |
+| `images/` | Images and other visual assets used in project documentation. |
+| `recipes/` | Curated, complete Clonker configuration examples and their browser interface, maintained independently of deployed firmware. |
+
+The guiding distinction is simple:
+
+**If something isn't intended to run on the Pico, it generally doesn't belong under `firmware/`.**
+
+This includes web-hosted tools, configuration recipe libraries, and other supporting resources that may interact with the Clonker but aren't part of its deployed application.
+
+Not every file under `firmware/` must be installed simultaneously. Standalone hardware tests and experiments belong there because they target the Pico, even when they aren't part of the production application.
+
+Keep repository organization intuitive, avoid unnecessary nesting, and give each directory a clear responsibility.
+
 ## Document Responsibilities
 
 Each document should have a clear purpose and an
@@ -165,7 +186,6 @@ Before adding material to a document, ask:
 > Is this the authoritative home for this information,
 > or am I putting it here simply because this is
 > the document I'm currently editing?
-```
 
 ## A Practical Test for Every Document
 
