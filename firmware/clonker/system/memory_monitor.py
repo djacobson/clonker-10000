@@ -36,6 +36,34 @@ _next_gc_at = None
 _baseline_free = None
 _lowest_free = None
 
+# Most recent RUN -> CONFIG transition.
+# Fixed-size RAM-only checkpoint; no GC or filesystem I/O.
+_run_exit_checkpoint = None
+
+
+def capture_run_exit():
+    """Capture heap state before CONFIG services start."""
+    global _run_exit_checkpoint
+
+    _run_exit_checkpoint = (
+        clock.uptime_ns() // 1_000_000_000,
+        gc.mem_free(),
+        gc.mem_alloc(),
+    )
+
+
+def run_exit_snapshot():
+    """Return the most recent RUN -> CONFIG checkpoint."""
+    if _run_exit_checkpoint is None:
+        return None
+
+    uptime_s, free, allocated = _run_exit_checkpoint
+    return {
+        "uptime_s": uptime_s,
+        "free": free,
+        "allocated": allocated,
+    }
+
 
 def free_bytes():
     """Return currently available heap memory."""
@@ -114,7 +142,7 @@ def snapshot():
 def initialize():
     """Initialize independent monitoring schedules."""
     global _next_memory_at, _next_gc_at
-    global _baseline_free, _lowest_free
+    global _baseline_free, _lowest_free, _run_exit_checkpoint
 
     now = time.monotonic_ns()
 
@@ -122,6 +150,7 @@ def initialize():
     _next_gc_at = now + GC_INTERVAL_NS
     _baseline_free = None
     _lowest_free = None
+    _run_exit_checkpoint = None
 
     if MEMORY_MONITOR_ENABLED:
         _sample()

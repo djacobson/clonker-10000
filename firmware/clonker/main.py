@@ -339,6 +339,9 @@ def main():
         "memory", memory_monitor.snapshot
     )
     flight_recorder.register_provider(
+        "run_exit_memory", memory_monitor.run_exit_snapshot
+    )
+    flight_recorder.register_provider(
         "queue", actions.status
     )
     flight_recorder.register_provider(
@@ -426,6 +429,12 @@ def main():
             # CONFIG/RUN is an application mode, not an HTTP command.
             config_mode = switches.config_enabled()
             config_source = switches.config_source()
+
+            # Preserve RUN-mode memory before starting CONFIG
+            # services. Do not capture initial startup as a
+            # transition, and do not force garbage collection.
+            if config_mode and last_announced_mode is False:
+                memory_monitor.capture_run_exit()
 
             # Either CONFIG switch direction counts as activity
             # and can wake a sleeping Clonker.
