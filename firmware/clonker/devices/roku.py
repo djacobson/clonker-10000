@@ -40,12 +40,21 @@ BUTTON_COMMANDS = {
     "/keypress/Fwd": "Fwd",
 }
 
-
 # Roku HTTP transport policy.
 #
 # Select transport independently of control behavior.
-# Navigation/skip taps and volume currently use persistent HTTP.
-# Physical-button holds and other controls use generic HTTP.
+# Navigation/skip taps, volume, and physical-button holds
+# currently use persistent HTTP.
+#
+# Physical keydown/keyup retain their existing state tracking,
+# paced release retry, and maximum-hold safeguards.
+#
+# Persistent requests have a 500 ms per-operation timeout
+# and a 1.5-second total deadline.
+#
+# Failed commands are never automatically replayed.
+# A failed physical keyup may be retried by the separate,
+# paced release-recovery mechanism.
 #
 # Supported values: "generic", "persistent".
 
@@ -67,7 +76,7 @@ TRANSPORT_POLICY = {
 }
 
 # Physical holds are separate from ordinary taps.
-HOLD_TRANSPORT = "generic"
+HOLD_TRANSPORT = "persistent"
 
 
 def transport_for(action_id, hold=False):
@@ -286,7 +295,10 @@ def _send_button(endpoint, operation, key):
     path = "/{}/{}".format(operation, key)
 
     try:
-        return http_transport.send(endpoint, "POST", path)
+        return send(
+            endpoint, "POST", path,
+            "physical-button", hold=True
+        )
     except (OSError, ValueError) as error:
         raise OSError(
             "ROKU {} -> {} failed: {}".format(
