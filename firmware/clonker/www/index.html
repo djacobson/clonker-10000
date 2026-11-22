@@ -237,6 +237,31 @@
             align-self: flex-start;
             margin-top: auto;
         }
+
+        /* Recipe Library controls */
+
+        .recipe-tools {
+            border: 1px solid #59616d;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0 22px;
+        }
+
+        .recipe-tools h3 {
+            margin-top: 0;
+            color: #e6b85c;
+        }
+
+        .recipe-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .recipe-tools .note {
+            line-height: 1.5;
+        }
     </style>
 </head>
 
@@ -311,6 +336,44 @@
             or IPv4:port. An action with no path or
             no target device address does nothing.
         </p>
+
+        <!-- Recipe Library: browse and import -->
+
+        <div class="recipe-tools">
+            <h3>Configuration Recipes</h3>
+
+            <p class="note">
+                Browse complete configuration examples,
+                or import a downloaded JSON recipe into
+                this editor.
+            </p>
+
+            <div class="recipe-buttons">
+                <a
+                    class="button-link"
+                    href="https://djacobson.github.io/clonker-10000/"
+                    target="_blank"
+                    rel="noopener noreferrer">
+                    Browse Recipes
+                </a>
+
+                <button type="button" id="import-recipe">
+                    Import JSON...
+                </button>
+
+                <input
+                    type="file"
+                    id="recipe-file"
+                    accept=".json,application/json"
+                    hidden>
+            </div>
+
+            <p class="note" id="recipe-status"
+               role="status" aria-live="polite">
+                Import replaces the editor contents only.
+                Review before saving.
+            </p>
+        </div>
 
         <div id="rooms-container">
             Loading room configuration...
@@ -1265,6 +1328,141 @@
                 !configRevision || !configWritable;
         }
     }
+
+
+    // Import a downloaded configuration recipe.
+    //
+    // Only browser-side editor state is changed.
+    // The Pico's revision and writable status remain intact.
+    // No POST is performed until Save Configuration.
+
+    async function importRecipeFile(file) {
+        const status =
+            document.getElementById("recipe-status");
+
+        if (!file) {
+            return;
+        }
+
+        if (configRevision === null) {
+            status.textContent =
+                "Wait until the Pico configuration has loaded.";
+            return;
+        }
+
+        try {
+            const recipe = JSON.parse(await file.text());
+
+            if (recipe.version !== CONFIG_VERSION ||
+                    !recipe.rooms ||
+                    typeof recipe.rooms !== "object" ||
+                    Array.isArray(recipe.rooms)) {
+                throw new Error(
+                    "Unsupported configuration format or version."
+                );
+            }
+
+            const roomIds = Object.keys(recipe.rooms);
+
+            if (roomIds.length < 1 ||
+                    roomIds.some(id => !ROOM_IDS.includes(id))) {
+                throw new Error("Invalid room configuration.");
+            }
+
+            for (const roomId of roomIds) {
+                const room = recipe.rooms[roomId];
+
+                if (!room ||
+                        typeof room.name !== "string" ||
+                        !room.devices ||
+                        !room.actions ||
+                        !Array.isArray(room.custom_actions)) {
+                    throw new Error(
+                        "Incomplete configuration for " + roomId
+                    );
+                }
+
+                for (const deviceId of DEVICE_IDS) {
+                    if (typeof room.devices[deviceId] !== "string") {
+                        throw new Error(
+                            "Missing device address in " + roomId
+                        );
+                    }
+                }
+
+                for (const actionId of ACTION_IDS) {
+                    if (!room.actions[actionId]) {
+                        throw new Error(
+                            "Missing action " + actionId +
+                            " in " + roomId
+                        );
+                    }
+                }
+
+                validateCustomActions(
+                    room.custom_actions,
+                    room.name
+                );
+            }
+
+            // Confirm before replacing unsaved editor contents.
+
+            if (!confirm(
+                "Replace the current editor contents with " +
+                file.name + "?\n\n" +
+                "Nothing will be saved to the Pico yet."
+            )) {
+                status.textContent = "Import canceled.";
+                return;
+            }
+
+            // Preserve the Pico's current revision.
+            // Never use revision metadata from the recipe.
+
+            const importedActions = {};
+
+            for (const roomId of roomIds) {
+                importedActions[roomId] =
+                    JSON.parse(JSON.stringify(
+                        recipe.rooms[roomId].custom_actions
+                    ));
+            }
+
+            loadedCustomActions = importedActions;
+            editedCustomActions = {};
+
+            renderDeviceConfig(recipe);
+
+            status.textContent =
+                "Loaded " + file.name +
+                " into the editor. Review and save when ready.";
+
+        } catch (error) {
+            console.error("Recipe import failed:", error);
+
+            status.textContent =
+                "Import failed: " + error.message;
+        }
+    }
+
+
+    // Open the native file picker and import the selection.
+
+    document.getElementById("import-recipe")
+        .addEventListener("click", () => {
+            document.getElementById("recipe-file").click();
+        });
+
+    document.getElementById("recipe-file")
+        .addEventListener("change", async event => {
+            const input = event.target;
+            const file = input.files[0];
+
+            await importRecipeFile(file);
+
+            // Permit selecting the same file again.
+            input.value = "";
+        });
 
 
     // Read the Pico's system clock.
