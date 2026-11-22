@@ -403,8 +403,13 @@
     const MAX_CUSTOM_ACTION_ID_LENGTH = 40;
     const MAX_CUSTOM_ACTION_NAME_LENGTH = 60;
 
-    // Clonker Config v4 configuration constants.
-    const MAX_CONFIG_ATTEMPTS = 5;
+    // Clonker Config configuration constants.
+ 
+    // Browser-side recovery for stalled configuration GETs.
+    // Does not change Pico socket or persistence behavior.
+    const MAX_CONFIG_ATTEMPTS = 3;
+    const CONFIG_GET_TIMEOUT_MS = 6000;
+    const CONFIG_RETRY_DELAY_MS = 1500;
 
     const ROOM_IDS = [
         "room-1",
@@ -443,7 +448,6 @@
         "power-toggle"
     ];
 
-    let configAttempts = 0;
     let configRevision = null;
     let configWritable = false;
 
@@ -981,93 +985,152 @@
 
     // Load configuration from the Pico.
     //
-    // GET /api/config returns the active JSON configuration.
-    // plus the current revision and filesystem status.
+    // A GET may occasionally stall while the Pico is sending
+    // its response. Bound the complete fetch, including JSON
+    // body reception, and retry read-only GETs sequentially.
     //
-    // Retry briefly during initial page loading.
+    // Never retry a configuration POST here.
 
     async function loadDeviceConfig() {
-        configAttempts++;
-
         const container =
             document.getElementById("rooms-container");
 
-        try {
-            const response = await fetch("/api/config", {
-                cache: "no-store"
-            });
+        const saveButton =
+            document.getElementById("save-config");
 
-            if (!response.ok) {
-                throw new Error("HTTP " + response.status);
-            }
+        const saveStatus =
+            document.getElementById("save-status");
 
-            const config = await response.json();
+        for (let attempt = 1;
+                attempt <= MAX_CONFIG_ATTEMPTS;
+                attempt++) {
 
-            if (config.version !== CONFIG_VERSION) {
-                throw new Error(
-                    "Expected JSON configuration version " + CONFIG_VERSION
-                );
-            }
+            const controller = new AbortController();
 
-            loadedCustomActions = {};
-            editedCustomActions = {};
-
-            for (const roomId of ROOM_IDS) {
-                const room = config.rooms[roomId];
-
-                if (room) {
-                    loadedCustomActions[roomId] =
-                        JSON.parse(JSON.stringify(room.custom_actions));
-                }
-            }
-
-            configRevision = config.revision;
-            configWritable =
-                config.filesystem_writable === true;
-
-            renderDeviceConfig(config);
-
-            const saveButton =
-                document.getElementById("save-config");
-
-            saveButton.disabled = !configWritable;
-
-            const saveStatus =
-                document.getElementById("save-status");
-
-            saveStatus.textContent = configWritable
-                ? "Boot mode: DEVICE -- filesystem writable. Configuration saving available."
-                : "Boot mode: SERVICE (USB) -- filesystem read-only. Configuration saving unavailable.";
-
-            configAttempts = 0;
-
-            return true;
-
-        } catch (error) {
-            console.warn(
-                "Configuration load failed:",
-                error
+            const timeout = setTimeout(
+                () => controller.abort(),
+                CONFIG_GET_TIMEOUT_MS
             );
 
-            configRevision = null;
-            configWritable = false;
+            try {
+                console.info(
+                    "CONFIG GET attempt " + attempt +
+                    "/" + MAX_CONFIG_ATTEMPTS
+                );
 
-            document.getElementById("save-config").disabled =
-                true;
+                const response = await fetch("/api/config", {
+                    cache: "no-store",
+                    signal: controller.signal
+                });
 
-            if (configAttempts < MAX_CONFIG_ATTEMPTS) {
-                container.textContent =
-                    "Loading room configuration...";
+                if (!response.ok) {
+                    throw new Error(
+                        "HTTP " + response.status
+                    );
+                }
 
-                setTimeout(loadDeviceConfig, 1500);
+                // Timeout remains active while receiving
+                // and decoding the complete response body.
+                const config = await response.json();
 
-            } else {
-                container.textContent =
-                    "Unable to load configuration. Refresh the page to retry.";
+                if (config.version !== CONFIG_VERSION) {
+                    throw new Error(
+                        "Expected JSON configuration version " +
+                        CONFIG_VERSION
+                    );
+                }
+
+                // Stop the watchdog after successful reception.
+                clearTimeout(timeout);
+
+                loadedCustomActions = {};
+                editedCustomActions = {};
+
+                for (const roomId of ROOM_IDS) {
+                    const room = config.rooms[roomId];
+
+                    if (room) {
+                        loadedCustomActions[roomId] =
+                            JSON.parse(JSON.stringify(
+                                room.custom_actions
+                            ));
+                    }
+                }
+
+                configRevision = config.revision;
+                configWritable =
+                    config.filesystem_writable === true;
+
+                renderDeviceConfig(config);
+
+                saveButton.disabled = !configWritable;
+
+                saveStatus.textContent = configWritable
+                    ? "Boot mode: DEVICE -- filesystem writable. Configuration saving available."
+                    : "Boot mode: SERVICE (USB) -- filesystem read-only. Configuration saving unavailable.";
+
+                if (attempt > 1) {
+                    console.info(
+                        "CONFIG GET recovered on attempt " +
+                        attempt
+                    );
+                }
+
+                return true;
+
+            } catch (error) {
+                const timedOut =
+                    error.name === "AbortError";
+
+                console.warn(
+                    "CONFIG GET attempt " + attempt +
+                    "/" + MAX_CONFIG_ATTEMPTS +
+                    " failed: " +
+                    (timedOut
+                        ? "timeout after " +
+                          CONFIG_GET_TIMEOUT_MS + "ms"
+                        : error.message)
+                );
+
+                // Preserve the existing editor until a
+                // valid replacement has been received.
+                // Disable saving while revision status
+                // is uncertain.
+                configRevision = null;
+                configWritable = false;
+                saveButton.disabled = true;
+
+                if (attempt < MAX_CONFIG_ATTEMPTS) {
+                    saveStatus.textContent =
+                        "Configuration refresh delayed -- retrying (" +
+                        attempt + "/" +
+                        MAX_CONFIG_ATTEMPTS + ")...";
+
+                    await new Promise(resolve =>
+                        setTimeout(
+                            resolve,
+                            CONFIG_RETRY_DELAY_MS
+                        )
+                    );
+
+                } else {
+                    if (!container.children.length) {
+                        container.textContent =
+                            "Unable to load configuration. Refresh the page to retry.";
+                    }
+
+                    saveStatus.textContent =
+                        "Unable to refresh configuration after " +
+                        MAX_CONFIG_ATTEMPTS +
+                        " attempts. Reload the page to verify.";
+                }
+
+            } finally {
+                clearTimeout(timeout);
             }
-
-            return false;
         }
+
+        return false;
     }
 
 
