@@ -451,6 +451,9 @@
     let configRevision = null;
     let configWritable = false;
 
+    // Prevent older configuration GETs from replacing newer results.
+    let configLoadGeneration = 0;
+
     // Preserve custom actions until their editor is implemented.
     // Keep a separate copy of the last loaded configuration.
     let loadedCustomActions = {};
@@ -985,13 +988,15 @@
 
     // Load configuration from the Pico.
     //
-    // A GET may occasionally stall while the Pico is sending
-    // its response. Bound the complete fetch, including JSON
-    // body reception, and retry read-only GETs sequentially.
+    // Each GET has an independent deadline covering both
+    // fetch() and complete JSON reception.
     //
-    // Never retry a configuration POST here.
+    // A timed-out GET is abandoned and aborted. Only GETs
+    // are retried; configuration POSTs are never retried.
 
     async function loadDeviceConfig() {
+        const generation = ++configLoadGeneration;
+
         const container =
             document.getElementById("rooms-container");
 
@@ -1001,23 +1006,25 @@
         const saveStatus =
             document.getElementById("save-status");
 
+        // A fresh load invalidates the previous revision
+        // until a complete response has been received.
+        configRevision = null;
+        configWritable = false;
+        saveButton.disabled = true;
+
         for (let attempt = 1;
                 attempt <= MAX_CONFIG_ATTEMPTS;
                 attempt++) {
 
+            if (generation !== configLoadGeneration) {
+                return false;
+            }
+
             const controller = new AbortController();
+            let timeoutId;
 
-            const timeout = setTimeout(
-                () => controller.abort(),
-                CONFIG_GET_TIMEOUT_MS
-            );
-
-            try {
-                console.info(
-                    "CONFIG GET attempt " + attempt +
-                    "/" + MAX_CONFIG_ATTEMPTS
-                );
-
+            // Fetch and parse without modifying editor state.
+            const request = async () => {
                 const response = await fetch("/api/config", {
                     cache: "no-store",
                     signal: controller.signal
@@ -1029,9 +1036,38 @@
                     );
                 }
 
-                // Timeout remains active while receiving
-                // and decoding the complete response body.
-                const config = await response.json();
+                return await response.json();
+            };
+
+            // The deadline rejects independently of whether
+            // Safari promptly settles the aborted fetch.
+            const deadline = new Promise((resolve, reject) => {
+                timeoutId = setTimeout(() => {
+                    controller.abort();
+
+                    const error = new Error(
+                        "GET timeout after " +
+                        CONFIG_GET_TIMEOUT_MS + "ms"
+                    );
+                    error.name = "TimeoutError";
+                    reject(error);
+                }, CONFIG_GET_TIMEOUT_MS);
+            });
+
+            try {
+                console.info(
+                    "CONFIG GET attempt " + attempt +
+                    "/" + MAX_CONFIG_ATTEMPTS
+                );
+
+                const config = await Promise.race([
+                    request(),
+                    deadline
+                ]);
+
+                if (generation !== configLoadGeneration) {
+                    return false;
+                }
 
                 if (config.version !== CONFIG_VERSION) {
                     throw new Error(
@@ -1040,22 +1076,22 @@
                     );
                 }
 
-                // Stop the watchdog after successful reception.
-                clearTimeout(timeout);
-
-                loadedCustomActions = {};
-                editedCustomActions = {};
+                // Prepare the new state before changing the UI.
+                const newCustomActions = {};
 
                 for (const roomId of ROOM_IDS) {
                     const room = config.rooms[roomId];
 
                     if (room) {
-                        loadedCustomActions[roomId] =
+                        newCustomActions[roomId] =
                             JSON.parse(JSON.stringify(
                                 room.custom_actions
                             ));
                     }
                 }
+
+                loadedCustomActions = newCustomActions;
+                editedCustomActions = {};
 
                 configRevision = config.revision;
                 configWritable =
@@ -1079,23 +1115,16 @@
                 return true;
 
             } catch (error) {
-                const timedOut =
-                    error.name === "AbortError";
+                if (generation !== configLoadGeneration) {
+                    return false;
+                }
 
                 console.warn(
                     "CONFIG GET attempt " + attempt +
                     "/" + MAX_CONFIG_ATTEMPTS +
-                    " failed: " +
-                    (timedOut
-                        ? "timeout after " +
-                          CONFIG_GET_TIMEOUT_MS + "ms"
-                        : error.message)
+                    " failed: " + error.message
                 );
 
-                // Preserve the existing editor until a
-                // valid replacement has been received.
-                // Disable saving while revision status
-                // is uncertain.
                 configRevision = null;
                 configWritable = false;
                 saveButton.disabled = true;
@@ -1114,7 +1143,10 @@
                     );
 
                 } else {
-                    if (!container.children.length) {
+                    // Always replace the initial loading message
+                    // when all attempts have failed.
+                    if (container.textContent.includes(
+                            "Loading room configuration")) {
                         container.textContent =
                             "Unable to load configuration. Refresh the page to retry.";
                     }
@@ -1126,7 +1158,8 @@
                 }
 
             } finally {
-                clearTimeout(timeout);
+                clearTimeout(timeoutId);
+                controller.abort();
             }
         }
 
