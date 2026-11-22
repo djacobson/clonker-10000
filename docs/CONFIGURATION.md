@@ -267,6 +267,22 @@ Current inbound implementation limits (see `firmware/clonker/net/web.py` for cha
 
 The editor exposes room names, built-in device endpoints, fourteen fundamental mappings, toggle ON/OFF paths, ordered custom actions and steps, revision-aware saves, and clock tools. It does not provide arbitrary new room IDs, additional built-in action IDs, nested macros, or custom-device destinations. Browser action tests use the same dispatcher as physical controls.
 
+### Configuration Recipes
+
+The repository's top-level [`recipes/`](../recipes/) directory contains maintainer-curated, complete configuration examples. The GitHub-hosted recipe browser provides descriptions, previews, and JSON downloads.
+
+The embedded configuration editor provides **Browse Recipes** and **Import JSON** controls. Import replaces the browser editor's contents, including device IP addresses, but does not immediately save anything to the Pico. The user reviews, edits, validates, and explicitly saves the imported configuration.
+
+The recipe library is not copied to the Pico and requires no Config v4 schema change.
+
+### Configuration refresh recovery
+
+Configuration GET requests use a browser-side 6-second timeout, with up to three attempts separated by 1.5 seconds. If refreshing fails, the editor reports the failure instead of waiting indefinitely. The browser does not automatically repeat a configuration POST.
+
+A successful POST does not guarantee that the subsequent GET will succeed. When refresh fails after a save, reload the page and verify the persisted configuration before making additional changes.
+
+See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for the unresolved CircuitPython socket-send investigation.
+
 ## 10. Action execution and transport boundary
 
 Configuration describes **what** command is associated with an action. The shared dispatcher and Dumb Queue™ decide **when** to execute; adapters and transports decide **how** to deliver. Keep these concerns separate.

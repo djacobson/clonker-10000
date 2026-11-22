@@ -4109,6 +4109,16 @@ will return promptly.
 
 **Less sleek. More CLONK.**
 
+### November 21–22, 2026 — Recipes and the Returning Gremlin
+
+Chapter 11 introduced a GitHub-hosted Configuration Recipe Library. Its first example contains the maintainer's complete Roku/Denon configuration. The embedded editor gained recipe browsing and local JSON import, with explicit review and save rather than automatic installation.
+
+The intermittent CONFIG HTTP stall subsequently reappeared during battery-only operation. Flight Recorder evidence showed repeated approximately ten-second socket-send stalls while transmitting configuration GET responses after a successful save.
+
+A browser-side configuration GET watchdog and bounded retry mechanism were implemented. A forced 100 ms timeout verified failure handling; the production setting was restored to 6 seconds. The watchdog improves browser failure reporting but does not resolve the underlying socket stall.
+
+The issue remains open, with CircuitPython 10.3.1 socket behavior a leading hypothesis rather than a confirmed root cause. Further investigation is deferred pending a suitable stable CircuitPython update.
+
 ### November 17, 2026 — The Monster Refuses to Sleep
 
 The fully assembled Clonker completed its first extended

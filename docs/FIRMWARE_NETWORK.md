@@ -1628,6 +1628,16 @@ A standalone reproducer, `firmware/tests/socket_send_stall.py`, exercised POST/G
 
 **Status: unresolved, currently intermittent/not reproducing.** Repeated subsequent configuration saves succeeded, including battery-only operation. Do not mistake the disappearance of symptoms for a proven fix. If it returns, start with the timed `_client.send(chunk)` call and the existing standalone test rather than reopening the entire scheduler or persistence investigation.
 
+#### November 22 — Reproduction and browser recovery
+
+Chapter 11 reproduced the CONFIG HTTP stall during battery-only operation, with no USB or charging cable attached. Flight Recorder diagnostics showed repeated partial configuration GET responses followed by approximately 10,005 ms spent inside a single socket `send()` call. The failure occurred after a successful configuration save.
+
+The browser editor now uses a 6-second configuration GET watchdog, up to three attempts, and a 1.5-second delay between attempts. It reports failure rather than remaining indefinitely in a loading state. A deliberately shortened 100 ms timeout verified the retry exhaustion and failure UI; the normal 6-second timeout was restored afterward.
+
+The watchdog does not interrupt a blocked Pico socket operation and did not recover the observed production failure. Configuration POST is not automatically repeated. The underlying issue remains unresolved and is suspected, but not confirmed, to involve CircuitPython 10.3.1 socket behavior.
+
+Battery-only operation appears correlated with more frequent reproduction, but a power-related cause has not been established. Reevaluate using the existing diagnostics when a suitable stable CircuitPython release becomes available.
+
 #### OLED confirmation of successful configuration persistence
 
 Chapter 10 added an independent OLED acknowledgment for
@@ -2184,7 +2194,7 @@ Do not introduce speculative protocol modules or a second action execution path 
 - [Hardware Design](HARDWARE_DESIGN.md) — components, GPIO, mechanical integration.
 - [Development & Deployment](DEVELOPMENT.md) — iPad-first workflow and tests.
 - [Development History](DEVELOPMENT_HISTORY.md) — chronological experiments and evidence.
-- [`samples/device_config_roku_denon_sample.json`](../samples/device_config_roku_denon_sample.json) — readable Config v4 example.
+- [Configuration Recipes](../recipes/) — curated, complete Config v4 examples and the GitHub-hosted recipe browser; not deployed to the Pico.
 
 ---
 
