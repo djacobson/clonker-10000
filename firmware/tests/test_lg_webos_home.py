@@ -24,11 +24,11 @@ MANIFEST = {
         "created": "20140509", "appId": "com.lge.test", "vendorId": "com.lge",
         "localizedAppNames": {"": "Clonker webOS Test"},
         "localizedVendorNames": {"": "Clonker"},
-        "permissions": ["LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA",
+        "permissions": ["LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA", "CONTROL_INPUT_TV",
                         "CONTROL_POWER", "READ_RUNNING_APPS", "READ_INPUT_DEVICE_LIST"],
         "serial": "2f930e2d2cfe083771f68e4fe7bb07",
     },
-    "permissions": ["LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA",
+    "permissions": ["LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA", "CONTROL_INPUT_TV",
                     "CONTROL_POWER", "READ_RUNNING_APPS", "READ_INPUT_DEVICE_LIST"],
 }
 
