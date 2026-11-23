@@ -110,8 +110,8 @@ def connection_lab(control, pending):
     print("=== LG WebSocket idle test ===")
     print("No keep-alive traffic; read-only getVolume.")
 
-    seconds = input("Idle seconds (5, 10, 20): ").strip()
-    if seconds not in ("5", "10", "20"):
+    seconds = input("Idle seconds (5, 10, 20, 25, 30): ").strip()
+    if seconds not in ("5", "10", "20", "25", "30"):
         print("Test cancelled.")
         return
 
