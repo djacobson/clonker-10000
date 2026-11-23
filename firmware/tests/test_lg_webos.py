@@ -58,7 +58,9 @@ def run():
         while b"\r\n\r\n" not in response and len(response) < 4096:
             if time.monotonic() >= deadline:
                 raise RuntimeError("Timed out waiting for HTTP response headers")
-            chunk = sock.recv(512)
+            buffer = bytearray(512)
+            count = sock.recv_into(buffer)
+            chunk = buffer[:count]
             if not chunk:
                 break
             response.extend(chunk)
