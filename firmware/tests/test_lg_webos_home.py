@@ -19,17 +19,20 @@ CLIENT_KEY = "PASTE_YOUR_CLIENT_KEY_HERE"
 TIMEOUT = 5
 
 MANIFEST = {
-    "manifestVersion": 1, "appVersion": "1.0",
-    "signed": {
-        "created": "20140509", "appId": "com.lge.test", "vendorId": "com.lge",
-        "localizedAppNames": {"": "Clonker webOS Test"},
-        "localizedVendorNames": {"": "Clonker"},
-        "permissions": ["LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA", "CONTROL_INPUT_TV",
-                        "CONTROL_POWER", "READ_RUNNING_APPS", "READ_INPUT_DEVICE_LIST"],
-        "serial": "2f930e2d2cfe083771f68e4fe7bb07",
-    },
-    "permissions": ["LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA", "CONTROL_INPUT_TV",
-                    "CONTROL_POWER", "READ_RUNNING_APPS", "READ_INPUT_DEVICE_LIST"],
+    "manifestVersion": 1,
+    "appVersion": "1.0",
+    "appId": "com.clonker.webos.test",
+    "appName": "Clonker webOS Test",
+    "permissions": [
+        "LAUNCH",
+        "CONTROL_AUDIO",
+        "CONTROL_INPUT_TV",
+        "CONTROL_INPUT_TEXT",
+        "CONTROL_MOUSE_AND_KEYBOARD",
+        "CONTROL_POWER",
+        "READ_RUNNING_APPS",
+        "READ_INPUT_DEVICE_LIST",
+    ],
 }
 
 
