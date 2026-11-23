@@ -51,8 +51,7 @@ def pop_frame(buffer):
         mask = buffer[pos - 4:pos]
         for i in range(length):
             payload[i] ^= mask[i % 4]
-    del buffer[:end]
-    return first & 15, bytes(payload)
+    return first & 15, bytes(payload), end
 
 
 def poll_rx(sock, buffer, stats):
@@ -111,7 +110,8 @@ def run_rx_test():
                 frame = pop_frame(pending)
                 if frame is None:
                     break
-                opcode, payload = frame
+                opcode, payload, consumed = frame
+                pending = pending[consumed:]
                 if opcode == 8:
                     raise OSError('LG sent WebSocket CLOSE')
                 if opcode == 9:
