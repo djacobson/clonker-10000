@@ -7,6 +7,7 @@ Run: exec(open('/tests/test_lg_webos_lab.py').read())
 No production Clonker changes. Never prints the client key.
 """
 import json
+import time
 import socketpool
 import wifi
 
@@ -36,8 +37,14 @@ def registered_socket(pool):
         raise
 
 
+_request_number = 0
+
+
 def request(sock, pending, uri, payload=None):
-    message = {'id': 'lab-request', 'type': 'request', 'uri': uri}
+    global _request_number
+    _request_number += 1
+    message = {'id': 'lab-request-{}'.format(_request_number),
+               'type': 'request', 'uri': uri}
     if payload is not None:
         message['payload'] = payload
     print('Request:', uri)
@@ -68,6 +75,36 @@ def pointer_socket(pool, control, pending):
     return pointer
 
 
+def volume_lab(control, pending):
+    print('Volume commands: U=up D=down G=get M=mute X=unmute')
+    print('                R=repeat up 5 times F=repeat down 5 times Q=quit')
+    print('NOTE: TV uses external ARC; check whether Denon actually changes.')
+    while True:
+        key = input('Volume command: ').strip().upper()
+        if key in ('Q', 'QUIT', ''):
+            break
+        if key == 'G':
+            request(control, pending, 'ssap://audio/getVolume')
+        elif key == 'U':
+            request(control, pending, 'ssap://audio/volumeUp')
+        elif key == 'D':
+            request(control, pending, 'ssap://audio/volumeDown')
+        elif key == 'M':
+            request(control, pending, 'ssap://audio/setMute', {'mute': True})
+        elif key == 'X':
+            request(control, pending, 'ssap://audio/setMute', {'mute': False})
+        elif key in ('R', 'F'):
+            uri = 'ssap://audio/volumeUp' if key == 'R' else 'ssap://audio/volumeDown'
+            print('Sending 5 volume steps at ~200 ms intervals...')
+            for i in range(5):
+                request(control, pending, uri)
+                if i < 4:
+                    time.sleep(0.2)
+            print('Repeat test complete; check TV/Denon.')
+        else:
+            print('Unknown command')
+
+
 def run():
     print('=== Clonker LG webOS laboratory ===')
     print('TV:', TV_IP, 'port', TV_PORT)
@@ -85,7 +122,8 @@ def run():
         print('1 = Home dashboard (launcher API)')
         print('2 = Read audio status (no change)')
         print('3 = Test pointer access and navigation')
-        choice = input('Choose 1, 2, or 3: ').strip()
+        print('4 = Volume / mute laboratory')
+        choice = input('Choose 1, 2, 3, or 4: ').strip()
         if choice == '1':
             request(control, pending, 'ssap://system.launcher/launch',
                     {'id': 'com.webos.app.home'})
@@ -93,7 +131,7 @@ def run():
         elif choice == '2':
             request(control, pending, 'ssap://audio/getVolume')
         elif choice == '3':
-            print('Requesting pointer-input socket (previously returned 401)...')
+            print('Requesting pointer-input socket...')
             pointer = pointer_socket(pool, control, pending)
             print('Commands: UP DOWN LEFT RIGHT ENTER BACK HOME; Q to quit')
             while True:
@@ -105,12 +143,14 @@ def run():
                     continue
                 send_frame(pointer, 1, ('type:button\nname:{}\n\n'.format(key)).encode('ascii'))
                 print('Sent', key, '- check TV')
+        elif choice == '4':
+            volume_lab(control, pending)
         else:
             print('No test selected')
     except Exception as exc:
         print('TEST RESULT:', type(exc).__name__, str(exc))
         if '401' in str(exc):
-            print('Pointer service still denies access. Launcher/audio tests remain valid.')
+            print('TV denied access to the requested service.')
     finally:
         for sock in (pointer, control):
             if sock is not None:
