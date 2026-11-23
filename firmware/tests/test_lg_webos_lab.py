@@ -105,6 +105,64 @@ def volume_lab(control, pending):
             print('Unknown command')
 
 
+def connection_lab(control, pending):
+    """Test reuse of the authenticated control WebSocket."""
+    print("=== LG WebSocket connection lifecycle ===")
+    print("Read-only test: audio/getVolume")
+    print("No keep-alive traffic during idle periods.")
+
+    # First establish that the connection is working.
+    print("Baseline request...")
+    start = time.monotonic_ns()
+    request(control, pending, "ssap://audio/getVolume")
+    elapsed = (time.monotonic_ns() - start) / 1_000_000
+    print("Baseline response: {:.1f} ms".format(elapsed))
+
+    for idle_seconds in (30, 120, 300):
+        answer = input(
+            "Idle {} seconds, then reuse socket? (Y/N): "
+            .format(idle_seconds)
+        ).strip().upper()
+
+        if answer != "Y":
+            print("Stopping lifecycle test.")
+            return
+
+        print("Idle begins:", idle_seconds, "seconds")
+        start_idle = time.monotonic_ns()
+        time.sleep(idle_seconds)
+        actual_idle = (
+            time.monotonic_ns() - start_idle
+        ) / 1_000_000_000
+
+        print("Actual idle: {:.1f} seconds".format(actual_idle))
+        print("Reusing original control WebSocket...")
+
+        start = time.monotonic_ns()
+
+        try:
+            request(control, pending, "ssap://audio/getVolume")
+        except Exception as error:
+            elapsed = (
+                time.monotonic_ns() - start
+            ) / 1_000_000
+
+            print("FAIL: Existing connection unusable")
+            print("Elapsed: {:.1f} ms".format(elapsed))
+            print("Error:", type(error).__name__, str(error))
+            print("No automatic reconnect attempted.")
+            return
+
+        elapsed = (
+            time.monotonic_ns() - start
+        ) / 1_000_000
+
+        print("PASS: Original connection reused")
+        print("Response time: {:.1f} ms".format(elapsed))
+
+    print("Lifecycle test complete.")
+
+
 def run():
     print('=== Clonker LG webOS laboratory ===')
     print('TV:', TV_IP, 'port', TV_PORT)
@@ -123,7 +181,8 @@ def run():
         print('2 = Read audio status (no change)')
         print('3 = Test pointer access and navigation')
         print('4 = Volume / mute laboratory')
-        choice = input('Choose 1, 2, 3, or 4: ').strip()
+        print('5 = Persistent WebSocket lifecycle')
+        choice = input('Choose 1, 2, 3, 4, or 5: ').strip()
         if choice == '1':
             request(control, pending, 'ssap://system.launcher/launch',
                     {'id': 'com.webos.app.home'})
@@ -145,6 +204,8 @@ def run():
                 print('Sent', key, '- check TV')
         elif choice == '4':
             volume_lab(control, pending)
+        elif choice == '5':
+            connection_lab(control, pending)
         else:
             print('No test selected')
     except Exception as exc:
