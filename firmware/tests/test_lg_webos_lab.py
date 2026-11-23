@@ -106,61 +106,39 @@ def volume_lab(control, pending):
 
 
 def connection_lab(control, pending):
-    """Test reuse of the authenticated control WebSocket."""
-    print("=== LG WebSocket connection lifecycle ===")
-    print("Read-only test: audio/getVolume")
-    print("No keep-alive traffic during idle periods.")
+    """Measure passive idle lifetime of the control WebSocket."""
+    print("=== LG WebSocket idle test ===")
+    print("No keep-alive traffic; read-only getVolume.")
 
-    # First establish that the connection is working.
+    seconds = input("Idle seconds (5, 10, 20): ").strip()
+    if seconds not in ("5", "10", "20"):
+        print("Test cancelled.")
+        return
+
+    seconds = int(seconds)
+
     print("Baseline request...")
     start = time.monotonic_ns()
     request(control, pending, "ssap://audio/getVolume")
-    elapsed = (time.monotonic_ns() - start) / 1_000_000
-    print("Baseline response: {:.1f} ms".format(elapsed))
+    print("Baseline: {:.1f} ms".format(
+        (time.monotonic_ns() - start) / 1000000
+    ))
 
-    for idle_seconds in (30, 120, 300):
-        answer = input(
-            "Idle {} seconds, then reuse socket? (Y/N): "
-            .format(idle_seconds)
-        ).strip().upper()
+    print("Sleeping {} seconds...".format(seconds))
+    time.sleep(seconds)
 
-        if answer != "Y":
-            print("Stopping lifecycle test.")
-            return
+    print("Reusing same WebSocket...")
+    start = time.monotonic_ns()
 
-        print("Idle begins:", idle_seconds, "seconds")
-        start_idle = time.monotonic_ns()
-        time.sleep(idle_seconds)
-        actual_idle = (
-            time.monotonic_ns() - start_idle
-        ) / 1_000_000_000
-
-        print("Actual idle: {:.1f} seconds".format(actual_idle))
-        print("Reusing original control WebSocket...")
-
-        start = time.monotonic_ns()
-
-        try:
-            request(control, pending, "ssap://audio/getVolume")
-        except Exception as error:
-            elapsed = (
-                time.monotonic_ns() - start
-            ) / 1_000_000
-
-            print("FAIL: Existing connection unusable")
-            print("Elapsed: {:.1f} ms".format(elapsed))
-            print("Error:", type(error).__name__, str(error))
-            print("No automatic reconnect attempted.")
-            return
-
-        elapsed = (
-            time.monotonic_ns() - start
-        ) / 1_000_000
-
-        print("PASS: Original connection reused")
-        print("Response time: {:.1f} ms".format(elapsed))
-
-    print("Lifecycle test complete.")
+    try:
+        request(control, pending, "ssap://audio/getVolume")
+        print("PASS: Socket reused after {} seconds".format(seconds))
+    except Exception as error:
+        print("FAIL:", type(error).__name__, str(error))
+    finally:
+        print("Request elapsed: {:.1f} ms".format(
+            (time.monotonic_ns() - start) / 1000000
+        ))
 
 
 def run():
