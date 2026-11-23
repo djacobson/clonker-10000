@@ -160,7 +160,8 @@ def run():
         print('3 = Test pointer access and navigation')
         print('4 = Volume / mute laboratory')
         print('5 = Persistent WebSocket lifecycle')
-        choice = input('Choose 1, 2, 3, 4, or 5: ').strip()
+        print('6 = Activity-based WebSocket lifecycle')
+        choice = input('Choose 1, 2, 3, 4, 5, or 6: ').strip()
         if choice == '1':
             request(control, pending, 'ssap://system.launcher/launch',
                     {'id': 'com.webos.app.home'})
@@ -184,6 +185,9 @@ def run():
             volume_lab(control, pending)
         elif choice == '5':
             connection_lab(control, pending)
+        elif choice == '6':
+            activity_lifecycle_lab(pool, control, pending)
+            control = None
         else:
             print('No test selected')
     except Exception as exc:
@@ -198,6 +202,95 @@ def run():
                 except Exception:
                     pass
         print('Sockets closed. Laboratory finished.')
+
+
+def activity_lifecycle_lab(pool, control, pending):
+    """Prototype LG activity-based WebSocket reuse."""
+    idle_timeout_ns = 10_000_000_000
+    last_activity_ns = time.monotonic_ns()
+    connects = 0
+    reuses = 0
+    closes = 0
+
+    print("=== LG activity lifecycle prototype ===")
+    print("Idle timeout: 10 seconds")
+    print("Commands: G=getVolume, U=volumeUp,")
+    print("          D=volumeDown, W=wait 12s, Q=quit")
+    print("W simulates nonblocking scheduler polling.")
+
+    try:
+        while True:
+            key = input("Command: ").strip().upper()
+
+            if key == "Q":
+                break
+
+            if key == "W":
+                print("Simulating 12 seconds of scheduler ticks...")
+                for _ in range(120):
+                    if control is not None:
+                        elapsed = time.monotonic_ns() - last_activity_ns
+                        if elapsed >= idle_timeout_ns:
+                            print("IDLE: closing LG WebSocket")
+                            try:
+                                control.close()
+                            finally:
+                                control = None
+                                pending = None
+                            closes += 1
+                    time.sleep(0.1)
+                continue
+
+            if key not in ("G", "U", "D"):
+                print("Unknown command")
+                continue
+
+            if control is not None:
+                elapsed = time.monotonic_ns() - last_activity_ns
+                if elapsed >= idle_timeout_ns:
+                    print("IDLE: closing expired connection")
+                    control.close()
+                    control = None
+                    pending = None
+                    closes += 1
+
+            started = time.monotonic_ns()
+
+            if control is None:
+                print("CONNECT: opening new WebSocket")
+                control, pending = registered_socket(pool)
+                connects += 1
+            else:
+                print("REUSE: existing WebSocket")
+                reuses += 1
+
+            uri = {
+                "G": "ssap://audio/getVolume",
+                "U": "ssap://audio/volumeUp",
+                "D": "ssap://audio/volumeDown",
+            }[key]
+
+            try:
+                request(control, pending, uri)
+                last_activity_ns = time.monotonic_ns()
+                print("PASS: {:.1f} ms".format(
+                    (last_activity_ns - started) / 1_000_000
+                ))
+            except Exception as error:
+                print("FAIL:", type(error).__name__, str(error))
+                control.close()
+                control = None
+                pending = None
+                closes += 1
+                print("Connection discarded; next command reconnects")
+
+    finally:
+        if control is not None:
+            control.close()
+            closes += 1
+        print("Connections opened:", connects)
+        print("Connections reused:", reuses)
+        print("Connections closed:", closes)
 
 
 run()
