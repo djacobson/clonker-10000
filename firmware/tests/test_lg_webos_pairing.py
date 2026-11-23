@@ -1,11 +1,11 @@
-"""Standalone LG webOS registration test for CircuitPython 10.3.1.
+"""Standalone LG webOS registration / pairing test for CircuitPython 10.3.1.
 
-Copy to /tests/test_lg_webos.py on the Pico and run:
-    exec(open('/tests/test_lg_webos.py').read())
+Copy to /tests/test_lg_webos_pairing_v2.py on Pico and run:
+    exec(open('/tests/test_lg_webos_pairing_v2.py').read())
 
-Does not send remote-control commands or save a client key.
+Requests CONTROL_INPUT_TV in addition to the previous test permissions.
+No remote-control commands are sent; client key is printed but not stored.
 """
-
 import binascii
 import json
 import os
@@ -18,7 +18,10 @@ TV_PORT = 3000
 TIMEOUT_SECONDS = 5
 PAIRING_WAIT_SECONDS = 45
 
-# Limited permissions for an experimental remote-control client.
+PERMISSIONS = [
+    "LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA", "CONTROL_INPUT_TV",
+    "CONTROL_POWER", "READ_RUNNING_APPS", "READ_INPUT_DEVICE_LIST",
+]
 MANIFEST = {
     "manifestVersion": 1,
     "appVersion": "1.0",
@@ -28,16 +31,10 @@ MANIFEST = {
         "vendorId": "com.lge",
         "localizedAppNames": {"": "Clonker webOS Test"},
         "localizedVendorNames": {"": "Clonker"},
-        "permissions": [
-            "LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA",
-            "CONTROL_POWER", "READ_RUNNING_APPS", "READ_INPUT_DEVICE_LIST",
-        ],
+        "permissions": PERMISSIONS,
         "serial": "2f930e2d2cfe083771f68e4fe7bb07",
     },
-    "permissions": [
-        "LAUNCH", "CONTROL_AUDIO", "CONTROL_INPUT_MEDIA",
-        "CONTROL_POWER", "READ_RUNNING_APPS", "READ_INPUT_DEVICE_LIST",
-    ],
+    "permissions": PERMISSIONS,
 }
 
 
@@ -66,7 +63,6 @@ def read_exact(sock, n, pending):
 
 
 def send_frame(sock, opcode, payload=b""):
-    # RFC 6455: every client-to-server frame must be masked.
     size = len(payload)
     frame = bytearray([0x80 | opcode])
     if size < 126:
@@ -103,7 +99,7 @@ def receive_frame(sock, pending):
 
 
 def run():
-    print("=== LG webOS registration / pairing test ===")
+    print("=== LG webOS pairing v2: CONTROL_INPUT_TV ===")
     print("Wi-Fi connected:", wifi.radio.connected)
     print("Pico IP:", wifi.radio.ipv4_address)
     print("TV:", TV_IP, "port", TV_PORT)
@@ -147,11 +143,15 @@ def run():
 
         pending = bytearray(leftover)
         registration = {
-            "id": "clonker-register-1",
+            "id": "clonker-register-v2",
             "type": "register",
-            "payload": {"forcePairing": False, "pairingType": "PROMPT", "manifest": MANIFEST},
+            "payload": {
+                "forcePairing": True,
+                "pairingType": "PROMPT",
+                "manifest": MANIFEST,
+            },
         }
-        print("Sending masked registration request...")
+        print("Requesting registration with CONTROL_INPUT_TV...")
         send_frame(sock, 1, json.dumps(registration).encode("utf-8"))
         print("Watch the TV for a pairing approval prompt.")
 
@@ -161,11 +161,10 @@ def run():
             try:
                 opcode, data = receive_frame(sock, pending)
             except OSError as exc:
-                # A socket timeout is expected while the TV waits for approval.
                 if "timed out" in str(exc).lower() or getattr(exc, "errno", None) in (110, 116):
                     continue
                 raise
-            if opcode == 9:  # server ping
+            if opcode == 9:
                 send_frame(sock, 10, data)
                 continue
             if opcode == 8:
@@ -180,7 +179,7 @@ def run():
                 client_key = message.get("payload", {}).get("client-key")
                 print("PASS: TV registration accepted")
                 print("CLIENT KEY (save privately):", client_key)
-                print("No TV buttons were sent; key not stored on Pico")
+                print("No TV buttons sent; key not stored on Pico")
                 break
             if message.get("type") == "error":
                 print("TV registration error:", message.get("error", message))
