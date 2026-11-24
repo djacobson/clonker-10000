@@ -2159,7 +2159,48 @@ Validated writes and backups reduce risk but cannot guarantee recovery from ever
 
 ### Future protocols
 
-Apple TV discovery, pairing, authenticated sessions, and commands are not implemented.
+#### LG webOS — experimental adapter
+
+Chapter 11 laboratory experiments established the feasibility
+of controlling LG webOS televisions directly from CircuitPython
+using two WebSocket connections:
+
+- A registered SSAP control socket for request/response commands.
+- A separate pointer input socket for navigation and button commands.
+
+Successful experiments covered pairing, reusable client keys,
+audio control, application launching, navigation, persistent
+connections, inactivity-based cleanup, nonblocking reception,
+and multiple outstanding SSAP requests.
+
+The laboratory scripts are retained in
+[`firmware/tests/`](../firmware/tests/) as `test_lg_webos_*.py`.
+
+The experimental design is consolidated in
+[`lg_webos.py`](../firmware/clonker/devices/lg_webos.py),
+including pairing helpers, transport management, response
+correlation, temporary development credentials, and diagnostics.
+
+This adapter is intentionally not connected to production
+device routing. Its combined implementation still requires
+hardware verification.
+
+The planned configuration redesign directly supports future
+integration of this adapter through explicit device typing,
+protocol-independent configuration, and device-specific
+configuration attributes.
+
+The draft adapter should be reviewed when designing the new
+configuration schema and adapter interfaces.
+
+Existing Roku, Denon, and generic HTTP behavior must be
+regression-tested under the redesigned configuration before
+LG webOS production integration begins.
+
+#### Apple TV
+
+Apple TV discovery, pairing, authenticated sessions, and
+commands are not implemented.
 
 ### Further investigations
 
