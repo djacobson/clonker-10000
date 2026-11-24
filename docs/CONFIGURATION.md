@@ -17,6 +17,25 @@ The source repository holds maintained firmware and an example configuration; th
 
 Other responsibilities: [Architecture](ARCHITECTURE.md) covers boundaries; [Firmware, Network & Clock](FIRMWARE_NETWORK.md) covers execution, queue, adapters, and timing; [Operating Modes](OPERATING_MODES.md) covers filesystem ownership; [Hardware Design](HARDWARE_DESIGN.md) covers wiring; [Development & Deployment](DEVELOPMENT.md) covers procedure; [Development History](DEVELOPMENT_HISTORY.md) preserves dated evidence.
 
+### Planned configuration redesign — Chapter 12
+
+The proposed Config v5 architecture is documented in
+[Configuration Redesign](CONFIGURATION_REDESIGN.md).
+
+The redesign introduces explicitly typed devices,
+a more compact configuration editor, automatic Custom
+Action ID generation, and an extensible foundation
+for device-specific attributes and future pairing.
+
+It directly supports the eventual integration of the
+experimental LG webOS adapter while preserving existing
+Roku, Denon, and generic HTTP functionality.
+
+The redesign remains a proposal. This document continues
+to describe the currently implemented Config v4 schema
+until the replacement architecture has been implemented
+and regression-tested.
+
 ### Design commitments
 
 - A fixed, small vocabulary of fundamental actions; editable room-specific command mappings.
