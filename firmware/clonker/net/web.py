@@ -40,7 +40,9 @@ HTTP_DIAGNOSTICS = False
 # Maximum configuration plus HTTP headers and revision metadata.
 MAX_REQUEST_BYTES = device_config.MAX_CONFIG_BYTES + 2048
 MAX_HEADER_BYTES = 2048
+# Inbound HTTP server transport tuning.
 IO_CHUNK_BYTES = 128
+WEB_SEND_CHUNK_BYTES = 512
 
 # Abandon silent browser connections quickly.
 IDLE_CLIENT_TIMEOUT_NS = 200_000_000    # 200 ms
@@ -501,7 +503,7 @@ def _advance_file():
     global _response, _sent
 
     try:
-        data = _file.read(IO_CHUNK_BYTES)
+        data = _file.read(WEB_SEND_CHUNK_BYTES)
     except OSError as error:
         logger.warning("HTTP file read error: {}".format(error))
         _close_client("file_read_error")
@@ -676,7 +678,7 @@ def poll():
 
     # Send the current response buffer incrementally.
     chunk = memoryview(_response)[
-        _sent:_sent + IO_CHUNK_BYTES
+        _sent:_sent + WEB_SEND_CHUNK_BYTES
     ]
 
     web_diag.send_attempt()
