@@ -32,9 +32,9 @@ And perhaps a case that opens with actual lunchbox latches.
   <sub>
     <b>⚙️ CURRENT COMPATIBILITY — EXTREME BETA</b><br>
     <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython 10.3.1<br>
-    <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (future possibility)<br>
+    <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (planned)<br>
     <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
-    <b>Televisions:</b> Direct LG, Samsung, TCL, and other TV control under consideration<br>
+    <b>Televisions:</b> LG webOS (experimental adapter) · Samsung, TCL, and others (future possibilities)<br>
     <b>Configuration:</b> Browser editor · Config v4 · Custom actions<br>
     <b>Physical controls:</b> Room selector · Power · Volume/Mute · Navigation · Playback
   </sub>
@@ -229,7 +229,7 @@ Custom actions are already operational through the browser Test Remote.
 
 They use the same command queue as ordinary actions, so an unrelated eligible command can execute while a custom action is waiting.
 
-The second rotary encoder is intended to make selecting and running these actions possible without opening the browser.
+The second rotary encoder selects and executes room-specific custom actions directly, with OLED feedback. No browser required.
 
 ### Device Compatibility Roadmap
 
@@ -238,11 +238,17 @@ Current tested equipment includes:
 - **Denon AV receivers**, using HTTP commands and persistent TCP for recognized volume actions.
 - **Roku streaming devices**, using ECP commands, including held-key behavior.
 
-**Apple TV support is an explicit future objective.**
+**LG webOS is the next experimental protocol.**
 
-Its discovery, pairing, authentication, and control requirements will be investigated when that development phase begins.
+Standalone CircuitPython experiments have successfully demonstrated TV pairing, reusable client keys, navigation, audio control, application launching, and persistent WebSocket connections.
 
-Other network-controllable TVs, receivers, and streaming devices may be considered later.
+A [draft LG webOS adapter](firmware/clonker/devices/lg_webos.py) consolidates these experiments but is not yet integrated into the running Clonker.
+
+The next configuration redesign directly supports its future integration.
+
+**Apple TV and Amazon Fire TV remain future compatibility objectives.**
+
+Other network-controllable televisions, receivers, and streaming devices may be considered later.
 
 The goal is simple:
 
@@ -481,6 +487,10 @@ The configuration system is designed to avoid silently sending commands to anoth
 
 See [Configuration & Recovery](docs/CONFIGURATION.md).
 
+The proposed Config v5 redesign will introduce explicit device types, a compact device configuration table, automatic Custom Action IDs, and support for future device-specific attributes and pairing.
+
+See [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) for the planned architecture.
+
 ### Management Interface
 
 The Pico hosts its management interface on port `9090` while CONFIG mode is enabled.
@@ -499,7 +509,7 @@ See [Operating Modes](docs/OPERATING_MODES.md).
 
 ## Where the Monster Stands
 
-**November 7, 2026 — Chapter 7 physical-controls milestone.**
+**November 24, 2026 — Chapter 11 milestone.**
 
 The Clonker 10000 is still in extreme beta.
 
@@ -555,20 +565,26 @@ Of course, that won't stop us from wanting to know *why* it works.
 - Characterize practical battery runtime, charging behavior, and DFRobot power-management efficiency.
 - Continue reliability and failure-recovery testing, including the intermittent CONFIG HTTP send stall.
 - Investigate hardware deep sleep when supported.
-- Expand compatibility, including Apple TV.
+- Redesign the configuration architecture for explicitly typed devices.
+- Integrate the experimental LG webOS adapter and device pairing.
+- Expand future compatibility, including Apple TV and Amazon Fire TV.
 - Explore additional OLED feedback where it provides real value.
 
 ### What's Next?
 
-The physical controls are assembled and operational, including both Bourns encoders and the OLED.
+The physical controls are assembled and operational. The rechargeable power system has demonstrated more than 29 hours of continuous awake-mode operation.
 
-The Custom Action encoder selects and executes room-specific actions, with OLED inversion acknowledging execution. The display also provides two-line room identification, volume-direction feedback, and mute feedback without continuous screen rendering.
+Chapter 11 ventured into new territory: direct control of LG webOS televisions using WebSockets, authenticated connections, and reusable client keys.
 
-The rechargeable power system is installed, including two 18650 cells, the DFRobot power module, and an external USB-C charging connection. Battery-powered sleep/wake and extended overnight operation have been demonstrated.
+The laboratory experiments were successful, and an experimental LG webOS adapter now exists. It remains disconnected from the running application.
 
-Chapter 10 is exploring the less glamorous—but fascinating—questions of power-system efficiency, long-term reliability, and an occasional CONFIG HTTP gremlin.
+Before integrating it, Chapter 12 will revisit the Clonker's configuration architecture, introducing explicitly typed devices, a more compact browser editor, and the foundation for future device pairing.
 
-Or perhaps we should finally make it look slightly less like a bench experiment inside a very nice enclosure.
+See the [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) proposal.
+
+**The Monster Gets Organized.**
+
+Of course, we still haven't entirely evicted the CONFIG HTTP gremlin.
 
 **The software talks to the equipment.**
 
@@ -589,6 +605,7 @@ The project is documented as it develops, including architectural decisions, imp
 | [Architecture](docs/ARCHITECTURE.md) | System design, component responsibilities, and boundaries |
 | [Hardware Design](docs/HARDWARE_DESIGN.md) | Components, GPIO, wiring, and physical design |
 | [Configuration](docs/CONFIGURATION.md) | Config v4 schema, validation, and recovery |
+| [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) | Proposed Config v5 architecture, typed devices, and future pairing |
 | [Hardware Parts List](docs/HARDWARE_PARTS_LIST.md) | Actual components, part numbers, and verified mounting/drill sizes |
 | [Firmware & Network](docs/FIRMWARE_NETWORK.md) | Networking, adapters, scheduler, and diagnostics |
 | [Operating Modes](docs/OPERATING_MODES.md) | SERVICE/DEVICE and CONFIG/RUN |
