@@ -104,16 +104,212 @@ def _ip(value, location):
     return value
 
 
-def resolve_endpoint(room, device_id):
-    """Resolve a built-in destination from a validated room.
-
-    Future custom destinations will extend this single helper
-    without changing command-step target identifiers.
-    """
+def resolve_device(room, device_id):
+    """Return a read-only reference to a validated device record."""
     if device_id in DEVICE_IDS:
         return room["devices"][device_id]
 
     raise ValueError("Unknown device destination: " + str(device_id))
+
+
+def resolve_endpoint(room, device_id):
+    """Resolve the endpoint of a validated device."""
+    return resolve_device(room, device_id)["endpoint"]
+
+
+def command_is_blank(command):
+    """Check an already-validated command without revalidation."""
+    kind = command["kind"]
+
+    if kind == device_types.HTTP:
+        return command["path"] == ""
+
+    if kind == device_types.SSAP:
+        return command["uri"] == ""
+
+    if kind == device_types.POINTER:
+        return command["button"] == ""
+
+    raise ValueError("Unknown command kind")
+
+
+def _device(value, location):
+    """Validate and normalize a typed device record."""
+    if not isinstance(value, dict):
+        raise ValueError("Invalid device: " + location)
+
+    type_id = value.get("type")
+
+    if not isinstance(type_id, str):
+        raise ValueError("Invalid device type: " + location)
+
+    definition = device_types.get(type_id)
+
+    if definition is None:
+        raise ValueError("Unknown device type: " + location)
+
+    # LG configuration is supported before runtime integration.
+    # Other unimplemented device types remain unavailable.
+    if not definition["enabled"] and type_id != "lg-webos":
+        raise ValueError("Unavailable device type: " + location)
+
+    expected = ("type", "endpoint") + definition["attributes"]
+    _keys(value, expected, location)
+
+    validated = {
+        "type": type_id,
+        "endpoint": _ip(value["endpoint"], location),
+    }
+
+    if "client_key" in definition["attributes"]:
+        client_key = value["client_key"]
+
+        if (not isinstance(client_key, str) or
+                len(client_key) > 512):
+            raise ValueError("Invalid client key: " + location)
+
+        validated["client_key"] = client_key
+
+    return validated
+
+
+def _target(value, location):
+    """Validate a built-in destination identifier."""
+    if not isinstance(value, str) or value not in DEVICE_IDS:
+        raise ValueError("Invalid target: " + location)
+
+    return value
+
+
+def _json_copy(value):
+    """Copy JSON-compatible data with deterministic object ordering."""
+    if isinstance(value, dict):
+        for key in value:
+            if not isinstance(key, str):
+                raise ValueError("Invalid JSON object key")
+
+        return {
+            key: _json_copy(value[key])
+            for key in sorted(value)
+        }
+
+    if isinstance(value, list):
+        return [_json_copy(item) for item in value]
+
+    if value is None or type(value) in (str, bool, int):
+        return value
+
+    if type(value) is float:
+        # Reject NaN and positive/negative infinity.
+        if value - value != 0:
+            raise ValueError("Invalid JSON number")
+        return value
+
+    raise ValueError("Invalid JSON value")
+
+
+def _command(value, device, location, allow_blank=False):
+    """Validate a command against its configured device type."""
+    if not isinstance(value, dict):
+        raise ValueError("Invalid command: " + location)
+
+    kind = value.get("kind")
+
+    if not isinstance(kind, str):
+        raise ValueError("Invalid command kind: " + location)
+
+    if not device_types.supports_command(device["type"], kind):
+        raise ValueError(
+            "Command kind incompatible with device: " + location
+        )
+
+    if kind == device_types.HTTP:
+        _keys(value, ("kind", "method", "path"), location)
+
+        method = value["method"]
+        path = value["path"]
+
+        if method not in ("GET", "POST"):
+            raise ValueError("Invalid HTTP method: " + location)
+
+        if (not isinstance(path, str) or
+                len(path) > MAX_PATH_LENGTH):
+            raise ValueError("Invalid HTTP path: " + location)
+
+        if path and not path.startswith("/"):
+            raise ValueError("Invalid HTTP path: " + location)
+
+        validated = {
+            "kind": kind,
+            "method": method,
+            "path": path,
+        }
+
+    elif kind == device_types.SSAP:
+        expected = ("kind", "uri")
+
+        if "payload" in value:
+            expected += ("payload",)
+
+        _keys(value, expected, location)
+
+        uri = value["uri"]
+
+        if (not isinstance(uri, str) or
+                len(uri) > MAX_PATH_LENGTH):
+            raise ValueError("Invalid SSAP URI: " + location)
+
+        if uri and (
+                not uri.startswith("ssap://") or
+                len(uri) <= len("ssap://") or
+                any(ch.isspace() for ch in uri)):
+            raise ValueError("Invalid SSAP URI: " + location)
+
+        validated = {
+            "kind": kind,
+            "uri": uri,
+        }
+
+        if "payload" in value:
+            payload = value["payload"]
+
+            if not isinstance(payload, dict):
+                raise ValueError("Invalid SSAP payload: " + location)
+
+            if not uri:
+                raise ValueError(
+                    "Blank SSAP command cannot have payload: "
+                    + location
+                )
+
+            validated["payload"] = _json_copy(payload)
+
+    elif kind == device_types.POINTER:
+        _keys(value, ("kind", "button"), location)
+
+        button = value["button"]
+
+        if (not isinstance(button, str) or
+                len(button) > 64):
+            raise ValueError("Invalid pointer button: " + location)
+
+        allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+
+        if any(ch not in allowed for ch in button):
+            raise ValueError("Invalid pointer button: " + location)
+
+        validated = {
+            "kind": kind,
+            "button": button,
+        }
+
+    else:
+        raise ValueError("Unsupported command kind: " + location)
+
+    if not allow_blank and command_is_blank(validated):
+        raise ValueError("Blank command: " + location)
+
+    return validated
 
 
 def _custom_action_id(value, location):
@@ -131,8 +327,8 @@ def _custom_action_id(value, location):
     return value
 
 
-def _custom_actions(value, room_id):
-    """Validate and normalize ordered custom HTTP actions."""
+def _custom_actions(value, room_id, devices):
+    """Validate and normalize ordered protocol-aware Custom Actions."""
     if not isinstance(value, list):
         raise ValueError("Invalid custom actions: " + room_id)
 
@@ -174,40 +370,33 @@ def _custom_actions(value, room_id):
 
             _keys(
                 step,
-                ("target", "method", "path", "wait_after_ms"),
+                ("target", "command", "wait_after_ms"),
                 step_where
             )
 
-            target = step["target"]
-            method = step["method"]
-            path = step["path"]
+            target = _target(step["target"], step_where)
+
+            command = _command(
+                step["command"],
+                devices[target],
+                step_where + ".command"
+            )
+
             wait_ms = step["wait_after_ms"]
-
-            # Custom destinations will be added to this resolution
-            # model later. Only built-in destinations exist today.
-            if not isinstance(target, str) or target not in DEVICE_IDS:
-                raise ValueError("Invalid custom target: " + step_where)
-
-            if method not in ("GET", "POST"):
-                raise ValueError("Invalid custom method: " + step_where)
-
-            if (not isinstance(path, str) or
-                    not path or
-                    len(path) > MAX_PATH_LENGTH or
-                    not path.startswith("/")):
-                raise ValueError("Invalid custom path: " + step_where)
 
             if (type(wait_ms) is not int or
                     not 0 <= wait_ms <= MAX_WAIT_AFTER_MS):
                 raise ValueError("Invalid custom wait: " + step_where)
 
             if step_index == len(steps) - 1 and wait_ms != 0:
-                raise ValueError("Final custom step must have zero wait: " + step_where)
+                raise ValueError(
+                    "Final custom step must have zero wait: "
+                    + step_where
+                )
 
             validated_steps.append({
                 "target": target,
-                "method": method,
-                "path": path,
+                "command": command,
                 "wait_after_ms": wait_ms,
             })
 
@@ -221,9 +410,11 @@ def _custom_actions(value, room_id):
 
 
 def validate_config(config):
-    """Return a validated, ordered copy; blank endpoints/paths are valid."""
+    """Return a validated, ordered Config v5 copy."""
     _keys(config, ("version", "rooms"), "root")
-    if type(config["version"]) is not int or config["version"] != CONFIG_VERSION:
+
+    if (type(config["version"]) is not int or
+            config["version"] != CONFIG_VERSION):
         raise ValueError("Unsupported configuration version")
 
     configured_rooms = config["rooms"]
@@ -240,81 +431,78 @@ def validate_config(config):
 
     rooms = {}
 
-    # Preserve the established room-ID ordering while allowing
-    # unused rooms to be absent from the configuration.
+    # Preserve stable room IDs and canonical room ordering.
     for room_id in ROOM_IDS:
         if room_id not in configured_rooms:
             continue
 
         room = configured_rooms[room_id]
 
-        _keys(room, ("name", "devices", "actions", "custom_actions"), room_id)
+        _keys(
+            room,
+            ("name", "devices", "actions", "custom_actions"),
+            room_id
+        )
+
         name = room["name"]
-        if (not isinstance(name, str) or not name.strip() or
+
+        if (not isinstance(name, str) or
+                not name.strip() or
                 len(name) > MAX_ROOM_NAME_LENGTH):
             raise ValueError("Invalid room name: " + room_id)
 
-        # Missing device addresses are valid; physical actions will no-op.
         _keys(room["devices"], DEVICE_IDS, room_id + ".devices")
-        devices = {}
-        for device_id in DEVICE_IDS:
-            devices[device_id] = _ip(room["devices"][device_id], room_id + "." + device_id)
 
-        # Fundamental action IDs always exist, even when unconfigured.
+        devices = {}
+
+        for device_id in DEVICE_IDS:
+            devices[device_id] = _device(
+                room["devices"][device_id],
+                room_id + "." + device_id
+            )
+
         _keys(room["actions"], ACTION_IDS, room_id + ".actions")
+
         actions = {}
+
         for action_id in ACTION_IDS:
             action = room["actions"][action_id]
             where = room_id + "." + action_id
 
-            # Toggle actions have separate ON and OFF paths.
-            # All other fundamental actions retain one path.
-            is_toggle = action_id in ("power-toggle", "mute-toggle")
+            is_toggle = action_id in (
+                "power-toggle",
+                "mute-toggle"
+            )
 
             if is_toggle:
-                expected_fields = (
-                    "target", "method", "on_path", "off_path"
-                )
+                fields = ("target", "on_command", "off_command")
+                command_fields = ("on_command", "off_command")
             else:
-                expected_fields = ("target", "method", "path")
+                fields = ("target", "command")
+                command_fields = ("command",)
 
-            _keys(action, expected_fields, where)
+            _keys(action, fields, where)
 
-            if (not isinstance(action["target"], str) or
-                    action["target"] not in DEVICE_IDS):
-                raise ValueError("Invalid target: " + where)
-
-            if (not isinstance(action["method"], str) or
-                    action["method"] not in ("GET", "POST")):
-                raise ValueError("Invalid method: " + where)
+            target = _target(action["target"], where)
 
             validated_action = {
-                "target": action["target"],
-                "method": action["method"],
+                "target": target,
             }
 
-            if is_toggle:
-                for field in ("on_path", "off_path"):
-                    path = action[field]
-                    if (not isinstance(path, str) or
-                            len(path) > MAX_PATH_LENGTH):
-                        raise ValueError(
-                            "Invalid " + field + ": " + where
-                        )
-                    validated_action[field] = path
-            else:
-                path = action["path"]
-                if (not isinstance(path, str) or
-                        len(path) > MAX_PATH_LENGTH):
-                    raise ValueError("Invalid path: " + where)
-                validated_action["path"] = path
+            for field in command_fields:
+                validated_action[field] = _command(
+                    action[field],
+                    devices[target],
+                    where + "." + field,
+                    allow_blank=True
+                )
 
             actions[action_id] = validated_action
 
-        # User-defined actions are validated independently of
-        # fundamental actions and preserve their declared order.
         custom_actions = _custom_actions(
-            room["custom_actions"], room_id
+            room["custom_actions"],
+            room_id,
+            devices
         )
 
         rooms[room_id] = {
@@ -324,7 +512,10 @@ def validate_config(config):
             "custom_actions": custom_actions,
         }
 
-    return {"version": CONFIG_VERSION, "rooms": rooms}
+    return {
+        "version": CONFIG_VERSION,
+        "rooms": rooms,
+    }
 
 
 def to_json(config):
@@ -367,7 +558,6 @@ def load(path=None):
     for candidate in (path, path + ".bak", path + ".bak.old"):
         try:
             loaded = _load_existing(candidate)
-            device_adapters.rebuild(loaded)
             _current = loaded
             _current_path = path
             return loaded
@@ -551,22 +741,17 @@ def save(config, expected_revision, path=None):
     persisted_at = time.monotonic_ns()
 
     # Publish only after successful persistence.
-    device_adapters.rebuild(validated)
-    rebuilt_at = time.monotonic_ns()
-
     _current = validated
 
     logger.info(
         "CONFIG PERF: validation={:.1f}ms, "
         "disk_check={:.1f}ms, "
         "persistence={:.1f}ms, "
-        "adapter_rebuild={:.1f}ms, "
         "total={:.1f}ms".format(
             (validated_at - started) / 1_000_000,
             (checked_at - validated_at) / 1_000_000,
             (persisted_at - checked_at) / 1_000_000,
-            (rebuilt_at - persisted_at) / 1_000_000,
-            (rebuilt_at - started) / 1_000_000,
+            (persisted_at - started) / 1_000_000,
         )
     )
 
