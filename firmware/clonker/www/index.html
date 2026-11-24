@@ -1,892 +1,921 @@
 <!DOCTYPE html>
 <html lang="en">
- <head>
-  <meta charset="utf-8"/>
-  <meta content="width=device-width, initial-scale=1" name="viewport"/>
-  <title>
-   The Clonker 10000
-  </title>
-  <style>
-   body {
-    font: 15px Arial,sans-serif;
-    background: #20242a;
-    color: #f0f0f0;
-    margin: 0;
-    padding: 24px;
-}
+    <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1" name="viewport"/>
+        <title>
+            The Clonker 10000
+        </title>
+<style>
+        body {
+            font: 15px Arial,sans-serif;
+            background: #20242a;
+            color: #f0f0f0;
+            margin: 0;
+            padding: 24px;
+        }
 
-main {
-    max-width: 760px;
-    margin: auto;
-}
+        main {
+            max-width: 760px;
+            margin: auto;
+        }
 
-h1,h3,summary {
-    color: #e6b85c;
-}
+        h1, h3, summary {
+            color: #e6b85c;
+        }
 
-h1 {
-    font-size: 28px;
-}
+        h1 {
+            font-size: 28px;
+        }
 
-.panel {
-    background: #30363e;
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 18px;
-}
+        .panel {
+            background: #30363e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+        }
 
-.utilities {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
-}
+        .utilities {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
 
-.utilities .panel {
-    display: flex;
-    flex-direction: column;
-}
+        .utilities .panel {
+            display: flex;
+            flex-direction: column;
+        }
 
-.utilities h2 {
-    margin-top: 0;
-}
+        .utilities h2 {
+            margin-top: 0;
+        }
 
-.utilities button,.utilities a {
-    align-self: flex-start;
-    margin-top: auto;
-}
+        .utilities button, .utilities a {
+            align-self: flex-start;
+            margin-top: auto;
+        }
 
-button,.button-link {
-    display: inline-block;
-    background: #e6b85c;
-    color: #20242a;
-    border: 0;
-    border-radius: 6px;
-    padding: 10px 14px;
-    font: inherit;
-    cursor: pointer;
-    text-decoration: none;
-}
+        button, .button-link {
+            display: inline-block;
+            background: #e6b85c;
+            color: #20242a;
+            border: 0;
+            border-radius: 6px;
+            padding: 10px 14px;
+            font: inherit;
+            cursor: pointer;
+            text-decoration: none;
+        }
 
-button:disabled {
-    opacity: .5;
-    cursor: default;
-}
+        button:disabled {
+            opacity: .5;
+            cursor: default;
+        }
 
-input,select,textarea {
-    box-sizing: border-box;
-    width: 100%;
-    background: #20242a;
-    color: #f0f0f0;
-    border: 1px solid #666;
-    border-radius: 6px;
-    padding: 9px;
-    font: inherit;
-}
+        input, select, textarea {
+            box-sizing: border-box;
+            width: 100%;
+            background: #20242a;
+            color: #f0f0f0;
+            border: 1px solid #666;
+            border-radius: 6px;
+            padding: 9px;
+            font: inherit;
+        }
 
-textarea {
-    min-height: 65px;
-    resize: vertical;
-}
+        textarea {
+            min-height: 65px;
+            resize: vertical;
+        }
 
-label {
-    display: block;
-    font-size: 12px;
-    color: #ccc;
-    margin: 8px 0;
-}
+        label {
+            display: block;
+            font-size: 12px;
+            color: #ccc;
+            margin: 8px 0;
+        }
 
-label input,label select,label textarea {
-    margin-top: 5px;
-}
+        label input, label select, label textarea {
+            margin-top: 5px;
+        }
 
-input[readonly] {
-    color: #aaa;
-}
+        input[readonly] {
+            color: #aaa;
+        }
 
-.row {
-    display: flex;
-    gap: 10px;
-    align-items: end;
-    flex-wrap: wrap;
-}
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
 
-.row>label {
-    flex: 1;
-    min-width: 120px;
-}
+        .row > label {
+            flex: 1;
+            min-width: 120px;
+        }
 
-.row>button {
-    margin-bottom: 8px;
-}
+        .row > button {
+            margin-bottom: 8px;
+        }
 
-/* Compact HTTP command fields */
-.http-row > label:first-child {
-    flex: 0 1 100px;
-    min-width: 90px;
-}
+        /* Compact HTTP command fields */
+        .http-row  >  label:first-child {
+            flex: 0 1 100px;
+            min-width: 90px;
+        }
 
-.http-row > label:last-child {
-    flex: 1;
-    min-width: 180px;
-}
+        .http-row  >  label:last-child {
+            flex: 1;
+            min-width: 180px;
+        }
 
-/* Stable custom action identity is informational */
-.action-id {
-    font-size: 11px;
-    color: #999;
-}
+        /* Stable custom action identity is informational */
+        .action-id {
+            font-size: 11px;
+            color: #999;
+        }
 
-.action-id input {
-    font-family: monospace;
-    font-size: 11px;
-    padding: 5px 8px;
-    color: #999;
-    background: transparent;
-    border-color: #414850;
-}
+        .action-id input {
+            font-family: monospace;
+            font-size: 11px;
+            padding: 5px 8px;
+            color: #999;
+            background: transparent;
+            border-color: #414850;
+        }
 
-.device,.action {
-    background: #252a30;
-    border-radius: 6px;
-    padding: 12px;
-    margin: 8px 0;
-}
+        .device, .action {
+            background: #252a30;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+        }
 
-.room {
-    border-top: 1px solid #555;
-    margin-top: 20px;
-    padding-top: 12px;
-}
+        .room {
+            border-top: 1px solid #555;
+            margin-top: 20px;
+            padding-top: 12px;
+        }
 
-details {
-    margin: 14px 0;
-}
+        details {
+            margin: 14px 0;
+        }
 
-summary {
-    cursor: pointer;
-    font-weight: bold;
-}
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+        }
 
-.note {
-    font-size: 13px;
-    color: #bbb;
-    line-height: 1.5;
-}
+        .note {
+            font-size: 13px;
+            color: #bbb;
+            line-height: 1.5;
+        }
 
-.warning {
-    color: #ffb58a;
-    font-size: 13px;
-}
+        .warning {
+            color: #ffb58a;
+            font-size: 13px;
+        }
 
-.attribution {
-    text-align: center;
-    font-size: 11px;
-    color: #999;
-    margin-bottom: 18px;
-}
+        .attribution {
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 18px;
+        }
 
-.attribution a {
-    color: inherit;
-}
+        .attribution a {
+            color: inherit;
+        }
 
-.recipe {
-    border: 1px solid #59616d;
-    border-radius: 8px;
-    padding: 16px;
-    margin: 16px 0;
-}
+        .recipe {
+            border: 1px solid #59616d;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
 
-.tools {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 10px 0;
-}
+        .tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
 
-.secondary {
-    background: #48515d;
-    color: #fff;
-}
+        .secondary {
+            background: #48515d;
+            color: #fff;
+        }
 
-.value {
-    font-family: monospace;
-}
+        .value {
+            font-family: monospace;
+        }
 
-fieldset {
-    border: 0;
-    padding: 0;
-    margin: 0;
-    min-width: 0;
-}
+        fieldset {
+            border: 0;
+            padding: 0;
+            margin: 0;
+            min-width: 0;
+        }
 
-fieldset:disabled {
-    opacity: .8;
-}
+        fieldset:disabled {
+            opacity: .8;
+        }
 
-@media (max-width:600px) {
-    body {
-        padding: 12px;
-    }
-    .utilities {
-        grid-template-columns: 1fr;
-    }
-    .panel {
-        padding: 14px;
-    }
-}
-  </style>
- </head>
- <body>
-  <main>
-   <h1>
-    THE CLONKER 10000
-   </h1>
-   <div class="attribution">
-    Designed by David Jacobson ·
-    <a href="https://github.com/djacobson/clonker-10000" rel="noopener noreferrer" target="_blank">
-     GitHub
-    </a>
-   </div>
-   <div class="utilities">
-    <section class="panel">
-     <h2>
-      System Clock
-     </h2>
-     <p>
-      Clock source:
-      <span class="value" id="clock-source">
-       Not connected
-      </span>
-     </p>
-     <p>
-      Current time:
-      <span class="value" id="clock-time">
-       Not available
-      </span>
-     </p>
-     <button id="sync-clock">
-      Synchronize with Browser
-     </button>
-    </section>
-    <section class="panel">
-     <h2>
-      Test Remote
-     </h2>
-     <p class="note">
-      Send configured actions to your home theater equipment. Commands are queued for execution.
-     </p>
-     <a class="button-link" href="/remote.html">
-      Open Test Remote
-     </a>
-    </section>
-   </div>
-   <section class="panel">
-    <h2>
-     Device Configuration
-    </h2>
-    <p class="note">
-     Clonker Config v5. Blank endpoints and fundamental commands are valid no-ops. Endpoints may be IPv4 or IPv4:port. Device slots are labels only; commands follow their selected target and device type.
-    </p>
-    <fieldset disabled="" id="editor">
-     <div class="recipe">
-      <h3>
-       Configuration Recipes
-      </h3>
-      <div class="tools">
-       <a class="button-link" href="https://djacobson.github.io/clonker-10000/" rel="noopener noreferrer" target="_blank">
-        Browse Recipes
-       </a>
-       <button id="import-recipe">
-        Import JSON...
-       </button>
-       <input accept=".json,application/json" hidden="" id="recipe-file" type="file"/>
-      </div>
-      <p class="note" id="recipe-status">
-       Import replaces editor contents only. Review before saving.
-      </p>
-     </div>
-     <div id="rooms-container">
-      Loading room configuration...
-     </div>
-     <div class="tools" id="room-tools">
-     </div>
-    </fieldset>
-    <button disabled="" id="save-config">
-     Save Configuration
-    </button>
-    <p aria-live="polite" id="save-status" role="status">
-     Checking filesystem status...
-    </p>
-   </section>
-  </main>
-  <script>
-   'use strict';
+        @media (max-width:600px) {
+            body {
+                padding: 12px;
+            }
+            .utilities {
+                grid-template-columns: 1fr;
+            }
+            .panel {
+                padding: 14px;
+            }
+        }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>
+                THE CLONKER 10000
+            </h1>
+            <div class="attribution">
+                Designed by David Jacobson ·
+                <a href="https://github.com/djacobson/clonker-10000" rel="noopener noreferrer" target="_blank">
+                    GitHub
+                </a>
+            </div>
+            <div class="utilities">
+                <section class="panel">
+                    <h2>
+                        System Clock
+                    </h2>
+                    <p>
+                        Clock source:
+                        <span class="value" id="clock-source">
+                            Not connected
+                        </span>
+                    </p>
+                    <p>
+                        Current time:
+                        <span class="value" id="clock-time">
+                            Not available
+                        </span>
+                    </p>
+                    <button id="sync-clock">
+                        Synchronize with Browser
+                    </button>
+                </section>
+                <section class="panel">
+                    <h2>
+                        Test Remote
+                    </h2>
+                    <p class="note">
+                        Send configured actions to your home theater equipment. Commands are queued for execution.
+                    </p>
+                    <a class="button-link" href="/remote.html">
+                        Open Test Remote
+                    </a>
+                </section>
+            </div>
+            <section class="panel">
+                <h2>
+                    Device Configuration
+                </h2>
+                <p class="note">
+                    Clonker Config v5. Blank endpoints and fundamental commands are valid no-ops. Endpoints may be IPv4 or IPv4:port. Device slots are labels only; commands follow their selected target and device type.
+                </p>
+                <fieldset disabled="" id="editor">
+                    <div class="recipe">
+                        <h3>
+                            Configuration Recipes
+                        </h3>
+                        <div class="tools">
+                            <a class="button-link" href="https://djacobson.github.io/clonker-10000/" rel="noopener noreferrer" target="_blank">
+                                Browse Recipes
+                            </a>
+                            <button id="import-recipe">
+                                Import JSON...
+                            </button>
+                            <input accept=".json,application/json" hidden="" id="recipe-file" type="file"/>
+                        </div>
+                        <p class="note" id="recipe-status">
+                            Import replaces editor contents only. Review before saving.
+                        </p>
+                    </div>
+                    <div id="rooms-container">
+                        Loading room configuration...
+                    </div>
+                    <div class="tools" id="room-tools">
+                    </div>
+                </fieldset>
+                <button disabled="" id="save-config">
+                    Save Configuration
+                </button>
+                <p aria-live="polite" id="save-status" role="status">
+                    Checking filesystem status...
+                </p>
+            </section>
+        </main>
+<script>
+        'use strict';
+        const CONFIG_VERSION = 5;
+        const MAX_CONFIG_BYTES = 16384;
 
-const CONFIG_VERSION = 5, MAX_CONFIG_BYTES = 16384, MAX_CONFIG_ATTEMPTS = 3, CONFIG_GET_TIMEOUT_MS = 6000, CONFIG_RETRY_DELAY_MS = 1500;
 
-const ROOM_IDS = ['room-1', 'room-2', 'room-3'], DEVICE_IDS = ['device-1', 'device-2', 'device-3'];
+        // Retry configuration reads, never configuration writes.
+        const MAX_CONFIG_ATTEMPTS = 3;
+        const CONFIG_GET_TIMEOUT_MS = 6000;
+        const CONFIG_RETRY_DELAY_MS = 1500;
+        const ROOM_IDS = ['room-1', 'room-2', 'room-3'];
+        const DEVICE_IDS = ['device-1', 'device-2', 'device-3'];
+        const DEVICE_LABELS = { 'device-1': 'TV', 'device-2': 'AVR', 'device-3': 'Streaming' };
+        const ACTION_IDS = ['volume-up', 'volume-down', 'mute-toggle', 'nav-up', 'nav-down', 'nav-left',
+            'nav-right', 'select', 'back', 'home', 'play-pause', 'skip-back', 'skip-forward', 'power-toggle'];
+        const KIND_LABELS = { http: 'HTTP', ssap: 'SSAP', pointer: 'Pointer' };
+        const $ = id => document.getElementById(id);
 
-const DEVICE_LABELS = { 'device-1': 'TV', 'device-2': 'AVR', 'device-3': 'Streaming' };
+        // Editor model and response-only metadata are kept separately.
+        let model = null;
+        let types = null;
+        let revision = null;
+        let writable = false;
+        let busy = false;
+        let generation = 0;
+        let issuedIds = new Set();
+        const clone = x => JSON.parse(JSON.stringify(x));
+        const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
+        const toggle = id => id === 'mute-toggle' || id === 'power-toggle';
+        const selectable = id => types[id] && (types[id].enabled || id === 'lg-webos');
+        const blank = (kind = 'http', method = 'GET') => kind === 'ssap' ? { kind, uri: '' } :
+            kind === 'pointer' ? { kind, button: '' } : { kind: 'http', method, path: '' };
 
-const ACTION_IDS = ['volume-up', 'volume-down', 'mute-toggle', 'nav-up', 'nav-down', 'nav-left', 'nav-right', 'select', 'back', 'home', 'play-pause', 'skip-back', 'skip-forward', 'power-toggle'];
+        // DOM construction helpers
 
-const KIND_LABELS = { http: 'HTTP', ssap: 'SSAP', pointer: 'Pointer' };
+        function el(tag, parent, content, cls) {
+            const n = document.createElement(tag);
+            if (content !== undefined)
+                n.textContent = content;
+            if (cls)
+                n.className = cls;
+            if (parent)
+                parent.appendChild(n);
+            return n;
+        }
 
-const $ = id => document.getElementById(id);
+        function button(parent, label, fn, disabled = false, secondary = false) {
+            const n = el('button', parent, label, secondary ? 'secondary' : '');
+            n.type = 'button';
+            n.disabled = disabled;
+            n.addEventListener('click', fn);
+            return n;
+        }
 
-let model = null, types = null, revision = null, writable = false, busy = false, generation = 0;
+        function field(parent, label, value, change, opts = {}) {
+            const l = el('label', parent, label);
+            let n;
+            if (opts.choices) {
+                n = el('select', l);
+                for (const c of opts.choices) {
+                    const o = el('option', n, c.label);
+                    o.value = c.value;
+                    o.disabled = !!c.disabled;
+                }
+            }
+            else {
+                n = el(opts.multiline ? 'textarea' : 'input', l);
+                if (!opts.multiline)
+                    n.type = opts.type || 'text';
+                if (opts.max !== undefined)
+                    n.maxLength = opts.max;
+                if (opts.type === 'number') {
+                    n.min = 0;
+                    n.max = 60000;
+                    n.step = 1;
+                }
+            }
+            n.value = value ?? '';
+            n.readOnly = !!opts.readonly;
+            n.disabled = !!opts.disabled;
+            if (change)
+                n.addEventListener(opts.choices ? 'change' : 'input', () => change(n.value));
+            return n;
+        }
 
-let issuedIds = new Set();
+        function details(parent, title) {
+            const d = el('details', parent);
+            el('summary', d, title);
+            return d;
+        }
 
-const clone = x => JSON.parse(JSON.stringify(x));
+        // Protocol-aware command and target editors
 
-const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
+        function targetChoices(room) {
+            return DEVICE_IDS.map(id => ({ value: id, label: DEVICE_LABELS[id] + ' · ' +
+                types[room.devices[id].type].label }));
+        }
 
-const toggle = id => id === 'mute-toggle' || id === 'power-toggle';
+        function commandEditor(parent, room, owner, key, label, includeTarget = false) {
+            const box = el('div', parent);
+            function draw() {
+                box.replaceChildren();
+                const c = owner[key];
+                const supported = types[room.devices[owner.target].type].command_kinds;
+                const choices = [...new Set([...supported, c.kind])].map(k => ({
+                    value: k,
+                    label: (KIND_LABELS[k] || k) + (supported.includes(k) ? '' : ' (incompatible)')
+                }));
+                const header = el('div', box, undefined, 'row');
+                if (includeTarget) {
+                    field(header, 'Target', owner.target, v => {
+                        owner.target = v;
+                        draw();
+                    }, { choices: targetChoices(room) });
+                }
+                field(header, label + ' protocol', c.kind, k => {
+                    if (k === c.kind)
+                        return;
+                    if (!confirm('Replace this command with a blank ' + KIND_LABELS[k] + ' command?')) {
+                        draw();
+                        return;
+                    }
+                    owner[key] = blank(k);
+                    draw();
+                }, { choices });
+                if (!supported.includes(c.kind)) {
+                    el('p', box, 'Command is incompatible with the selected device. ' +
+                        'Choose a supported protocol before saving.', 'warning');
+                }
+                if (c.kind === 'http') {
+                    const row = el('div', box, undefined, 'row http-row');
+                    field(row, 'Method', c.method, v => c.method = v, {
+                        choices: ['GET', 'POST'].map(value => ({ value, label: value }))
+                    });
+                    field(row, 'Path', c.path, v => c.path = v, { max: 512 });
+                }
+                else if (c.kind === 'ssap') {
+                    field(box, 'SSAP URI', c.uri, v => c.uri = v, { max: 512 });
+                    field(box, 'Optional JSON payload (object)', c._payloadText ??
+                        (Object.prototype.hasOwnProperty.call(c, 'payload') ? JSON.stringify(c.payload) : ''),
+                        v => c._payloadText = v, { multiline: true });
+                }
+                else if (c.kind === 'pointer') {
+                    field(box, 'Pointer button', c.button, v => c.button = v, { max: 64 });
+                }
+            }
+            draw();
+        }
 
-const selectable = id => types[id] && (types[id].enabled || id === 'lg-webos');
-
-const blank = (kind = 'http', method = 'GET') => kind === 'ssap' ? { kind, uri: '' } : kind === 'pointer' ? { kind, button: '' } : { kind: 'http', method, path: '' };
-
-// DOM construction helpers
-function el(tag, parent, content, cls) { const n = document.createElement(tag); if (content !== undefined)
-    n.textContent = content; if (cls)
-    n.className = cls; if (parent)
-    parent.appendChild(n); return n; }
-
-function button(parent, label, fn, disabled = false, secondary = false) { const n = el('button', parent, label, secondary ? 'secondary' : ''); n.type = 'button'; n.disabled = disabled; n.addEventListener('click', fn); return n; }
-
-function field(parent, label, value, change, opts = {}) { const l = el('label', parent, label); let n; if (opts.choices) {
-    n = el('select', l);
-    for (const c of opts.choices) {
-        const o = el('option', n, c.label);
-        o.value = c.value;
-        o.disabled = !!c.disabled;
-    }
-}
-else {
-    n = el(opts.multiline ? 'textarea' : 'input', l);
-    if (!opts.multiline)
-        n.type = opts.type || 'text';
-    if (opts.max !== undefined)
-        n.maxLength = opts.max;
-    if (opts.type === 'number') {
-        n.min = 0;
-        n.max = 60000;
-        n.step = 1;
-    }
-} n.value = value ?? ''; n.readOnly = !!opts.readonly; n.disabled = !!opts.disabled; if (change)
-    n.addEventListener(opts.choices ? 'change' : 'input', () => change(n.value)); return n; }
-
-function details(parent, title) { const d = el('details', parent); el('summary', d, title); return d; }
-
-// Protocol-aware command and target editors
-function targetChoices(room) { return DEVICE_IDS.map(id => ({ value: id, label: DEVICE_LABELS[id] + ' · ' + types[room.devices[id].type].label })); }
-
-function commandEditor(parent, room, owner, key, label,
-                       includeTarget = false) {
-    const box = el('div', parent);
-
-    function draw() {
-        box.replaceChildren();
-
-        const c = owner[key];
-        const supported =
-            types[room.devices[owner.target].type].command_kinds;
-
-        const choices = [...new Set([...supported, c.kind])]
-            .map(k => ({
-                value: k,
-                label: (KIND_LABELS[k] || k) +
-                    (supported.includes(k) ? '' : ' (incompatible)')
-            }));
-
-        const header = el('div', box, undefined, 'row');
-
-        if (includeTarget) {
-            field(header, 'Target', owner.target, v => {
-                owner.target = v;
+        function actionEditor(parent, room, a, id) {
+            const box = el('div', parent, undefined, 'action');
+            el('strong', box, id);
+            if (!toggle(id)) {
+                commandEditor(box, room, a, 'command', 'Command', true);
+                return;
+            }
+            field(box, 'Target', a.target, v => {
+                a.target = v;
                 draw();
             }, { choices: targetChoices(room) });
-        }
-
-        field(header, label + ' protocol', c.kind, k => {
-            if (k === c.kind)
-                return;
-
-            if (!confirm(
-                'Replace this command with a blank ' +
-                KIND_LABELS[k] + ' command?'
-            )) {
-                draw();
-                return;
+            const commands = el('div', box);
+            function draw() {
+                commands.replaceChildren();
+                commandEditor(commands, room, a, 'on_command', 'ON');
+                commandEditor(commands, room, a, 'off_command', 'OFF');
             }
-
-            owner[key] = blank(k);
             draw();
-        }, { choices });
-
-        if (!supported.includes(c.kind)) {
-            el(
-                'p', box,
-                'Command is incompatible with the selected device. ' +
-                'Choose a supported protocol before saving.',
-                'warning'
-            );
         }
 
-        if (c.kind === 'http') {
-            const row = el('div', box, undefined, 'row http-row');
+        // Stable custom action identity and step editing
 
-            field(row, 'Method', c.method, v => c.method = v, {
-                choices: ['GET', 'POST'].map(value => ({
-                    value,
-                    label: value
-                }))
-            });
-
-            field(row, 'Path', c.path,
-                v => c.path = v, { max: 512 });
+        function newId() {
+            let id;
+            do {
+                id = 'ca-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+            } while (issuedIds.has(id));
+            issuedIds.add(id);
+            return id;
         }
-        else if (c.kind === 'ssap') {
-            field(box, 'SSAP URI', c.uri,
-                v => c.uri = v, { max: 512 });
 
-            field(
-                box,
-                'Optional JSON payload (object)',
-                c._payloadText ??
-                    (Object.prototype.hasOwnProperty.call(c, 'payload')
-                        ? JSON.stringify(c.payload)
-                        : ''),
-                v => c._payloadText = v,
-                { multiline: true }
-            );
+        function newStep(room) {
+            const target = DEVICE_IDS[0];
+            return { target, command: blank(types[room.devices[target].type].command_kinds[0]), wait_after_ms:
+                0 };
         }
-        else if (c.kind === 'pointer') {
-            field(box, 'Pointer button', c.button,
-                v => c.button = v, { max: 64 });
+
+        function customEditor(parent, room) {
+            function actionTitle(a) {
+                const count = a.steps.length;
+                return a.name + ' (' + count + (count === 1 ? ' step)' : ' steps)');
+            }
+            const d = details(parent, 'Custom Actions');
+            const list = el('div', d);
+            function draw(open = null) {
+                list.replaceChildren();
+                d.firstChild.textContent = 'Custom Actions (' + room.custom_actions.length + ')';
+                for (const a of room.custom_actions) {
+                    const ad = details(list, actionTitle(a));
+                    ad.className = 'action';
+                    ad.open = a === open;
+                    const idField = field(ad, 'Action ID (read-only)', a.id, null, { readonly: true });
+                    idField.parentElement.classList.add('action-id');
+                    field(ad, 'Display Name', a.name, v => {
+                        a.name = v;
+                        ad.firstChild.textContent = actionTitle(a);
+                    }, { max: 60 });
+                    a.steps.forEach((s, i) => {
+                        const b = el('div', ad, undefined, 'device');
+                        el('strong', b, 'Step ' + (i + 1));
+                        commandEditor(b, room, s, 'command', 'Command', true);
+                        field(b, 'Wait after (ms)', s.wait_after_ms, v => s.wait_after_ms = v === '' ? null :
+                            Number(v), { type: 'number', disabled: i === a.steps.length - 1 });
+                        const tools = el('div', b, undefined, 'tools');
+                        function move(j) {
+                            [a.steps[i], a.steps[j]] = [a.steps[j], a.steps[i]];
+                            a.steps[a.steps.length - 1].wait_after_ms = 0;
+                            draw(a);
+                        }
+                        button(tools, 'Move up', () => move(i - 1), i === 0, true);
+                        button(tools, 'Move down', () => move(i + 1), i === a.steps.length - 1, true);
+                        button(tools, 'Remove step', () => {
+                            a.steps.splice(i, 1);
+                            a.steps[a.steps.length - 1].wait_after_ms = 0;
+                            draw(a);
+                        }, a.steps.length === 1, true);
+                    });
+                    const tools = el('div', ad, undefined, 'tools');
+                    button(tools, 'Add step', () => {
+                        a.steps.push(newStep(room));
+                        draw(a);
+                    }, a.steps.length >= 16);
+                    button(tools, 'Remove action', () => {
+                        if (confirm('Remove ' + a.name + '?')) {
+                            room.custom_actions.splice(room.custom_actions.indexOf(a), 1);
+                            draw();
+                        }
+                    }, false, true);
+                }
+                button(list, 'Add Custom Action', () => {
+                    const a = { id: newId(), name: 'New Action', steps: [newStep(room)] };
+                    room.custom_actions.push(a);
+                    draw(a);
+                }, room.custom_actions.length >= 16);
+            }
+            draw();
         }
-    }
 
-    draw();
-}
+        // Room creation and rendering
 
-function actionEditor(parent, room, a, id) {
-    const box = el('div', parent, undefined, 'action');
-    el('strong', box, id);
+        function newRoom(id) {
+            const room = { name: 'Room ' + id.slice(-1), devices: {}, actions: {}, custom_actions: [] };
+            for (const d of DEVICE_IDS)
+                room.devices[d] = { type: 'generic-http', endpoint: '' };
+            for (const a of ACTION_IDS) {
+                const vol = a.startsWith('volume-') || a === 'mute-toggle', target = vol ? 'device-2' :
+                    'device-3', method = vol ? 'GET' : 'POST';
+                room.actions[a] = toggle(a) ? { target, on_command: blank('http', method), off_command:
+                    blank('http', method) } : { target, command: blank('http', method) };
+            }
+            return room;
+        }
 
-    if (!toggle(id)) {
-        commandEditor(box, room, a, 'command', 'Command', true);
-        return;
-    }
-
-    field(box, 'Target', a.target, v => {
-        a.target = v;
-        draw();
-    }, { choices: targetChoices(room) });
-
-    const commands = el('div', box);
-
-    function draw() {
-        commands.replaceChildren();
-        commandEditor(commands, room, a, 'on_command', 'ON');
-        commandEditor(commands, room, a, 'off_command', 'OFF');
-    }
-
-    draw();
-}
-
-// Stable custom action identity and step editing
-function newId() { let id; do {
-    id = 'ca-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-} while (issuedIds.has(id)); issuedIds.add(id); return id; }
-
-function newStep(room) { const target = DEVICE_IDS[0]; return { target, command: blank(types[room.devices[target].type].command_kinds[0]), wait_after_ms: 0 }; }
-
-function customEditor(parent, room) {
-    const d = details(parent, 'Custom Actions');
-    const list = el('div', d);
-
-    function actionTitle(a) {
-        const count = a.steps.length;
-        return a.name + ' (' + count +
-            (count === 1 ? ' step)' : ' steps)');
-    }
-
-    function draw(open = null) {
-        list.replaceChildren();
-
-        d.firstChild.textContent =
-            'Custom Actions (' + room.custom_actions.length + ')';
-
-        for (const a of room.custom_actions) {
-            const ad = details(list, actionTitle(a));
-            ad.className = 'action';
-            ad.open = a === open;
-
-            const idField = field(
-                ad, 'Action ID (read-only)',
-                a.id, null, { readonly: true }
-            );
-
-            idField.parentElement.classList.add('action-id');
-
-            field(ad, 'Display Name', a.name, v => {
-                a.name = v;
-                ad.firstChild.textContent = actionTitle(a);
-            }, { max: 60 });
-
-            a.steps.forEach((s, i) => {
-                const b = el('div', ad, undefined, 'device');
-                el('strong', b, 'Step ' + (i + 1));
-
-                commandEditor(b, room, s, 'command', 'Command', true);
-
-                field(
-                    b, 'Wait after (ms)', s.wait_after_ms,
-                    v => s.wait_after_ms =
-                        v === '' ? null : Number(v),
-                    {
-                        type: 'number',
-                        disabled: i === a.steps.length - 1
+        function render() {
+            const container = $('rooms-container');
+            container.replaceChildren();
+            for (const id of ROOM_IDS) {
+                const room = model.rooms[id];
+                if (!room)
+                    continue;
+                const section = el('section', container, undefined, 'room');
+                const heading = el('h3', section, id.toUpperCase() + ' -- ' + room.name);
+                field(section, 'Room Name', room.name, v => {
+                    room.name = v;
+                    heading.textContent = id.toUpperCase() + ' -- ' + v;
+                }, { max: 40 });
+                for (const did of DEVICE_IDS) {
+                    const dev = room.devices[did], b = el('div', section, undefined, 'device');
+                    el('strong', b, DEVICE_LABELS[did] + ' (' + did + ')');
+                    const row = el('div', b, undefined, 'row');
+                    field(row, 'Device type', dev.type, v => {
+                        if (v === dev.type)
+                            return;
+                        if (!confirm('Change device type? Existing commands will be retained and may require editing.')) {
+                            render();
+                            return;
+                        }
+                        const replacement = { type: v, endpoint: dev.endpoint };
+                        if (types[v].attributes.includes('client_key'))
+                            replacement.client_key = dev.client_key || '';
+                        room.devices[did] = replacement;
+                        render();
+                    }, {
+                        choices: Object.keys(types)
+                            .sort((a, b) => Number(selectable(b)) - Number(selectable(a)) ||
+                                types[a].label.localeCompare(types[b].label))
+                            .map(value => ({ value, label: types[value].label + (!types[value].enabled ?
+                                (selectable(value) ? ' (configuration only)' : ' (future)') : ''), disabled:
+                                !selectable(value) }))
+                    });
+                    field(row, 'Endpoint (default port ' + (types[dev.type].default_port ?? '--') + ')',
+                        dev.endpoint, v => dev.endpoint = v);
+                    const meta = types[dev.type];
+                    if (meta.attributes.includes('client_key') || meta.pairing) {
+                        const pairingRow = el('div', b, undefined, 'row');
+                        if (meta.attributes.includes('client_key'))
+                            field(pairingRow, 'Client key', dev.client_key, v => dev.client_key = v);
+                        if (meta.pairing) {
+                            button(pairingRow, 'Pair', () => {
+                            }, true);
+                            el('p', b, 'Pairing and runtime integration are not available yet.', 'note');
+                        }
                     }
-                );
-
-                const tools = el('div', b, undefined, 'tools');
-
-                function move(j) {
-                    [a.steps[i], a.steps[j]] =
-                        [a.steps[j], a.steps[i]];
-
-                    a.steps[a.steps.length - 1].wait_after_ms = 0;
-                    draw(a);
                 }
+                const fundamental = details(section, 'Fundamental actions (14)');
+                for (const a of ACTION_IDS)
+                    actionEditor(fundamental, room, room.actions[a], a);
+                customEditor(section, room);
+                button(section, 'Remove room', () => {
+                    if (confirm('Remove ' + room.name + ' and all its actions?')) {
+                        delete model.rooms[id];
+                        render();
+                    }
+                }, Object.keys(model.rooms).length === 1, true);
+            }
+            const tools = $('room-tools');
+            tools.replaceChildren();
+            for (const id of ROOM_IDS.filter(id => !model.rooms[id]))
+                button(tools, 'Add Room ' + id.slice(-1), () => {
+                    model.rooms[id] = newRoom(id);
+                    render();
+                });
+        }
 
-                button(
-                    tools, 'Move up',
-                    () => move(i - 1),
-                    i === 0, true
-                );
+        // Client-side validation; firmware remains authoritative
 
-                button(
-                    tools, 'Move down',
-                    () => move(i + 1),
-                    i === a.steps.length - 1, true
-                );
+        function requireThat(ok, msg) {
+            if (!ok)
+                throw new Error(msg);
+        }
 
-                button(tools, 'Remove step', () => {
-                    a.steps.splice(i, 1);
-                    a.steps[a.steps.length - 1].wait_after_ms = 0;
-                    draw(a);
-                }, a.steps.length === 1, true);
-            });
-
-            const tools = el('div', ad, undefined, 'tools');
-
-            button(tools, 'Add step', () => {
-                a.steps.push(newStep(room));
-                draw(a);
-            }, a.steps.length >= 16);
-
-            button(tools, 'Remove action', () => {
-                if (confirm('Remove ' + a.name + '?')) {
-                    room.custom_actions.splice(
-                        room.custom_actions.indexOf(a), 1
-                    );
-                    draw();
+        function validate(source) {
+            const c = clone(source);
+            requireThat(c.version === 5 && object(c.rooms), 'Expected Config v5 rooms.');
+            const ids = Object.keys(c.rooms);
+            requireThat(ids.length >= 1 && ids.every(id => ROOM_IDS.includes(id)), 'Invalid room IDs.');
+            for (const id of ids) {
+                const r = c.rooms[id];
+                requireThat(object(r) && typeof r.name === 'string' && r.name.trim() && r.name.length <= 40, id +
+                    ': invalid room name');
+                requireThat(object(r.devices) && object(r.actions) && Array.isArray(r.custom_actions), id +
+                    ': incomplete room');
+                for (const d of DEVICE_IDS) {
+                    const v = r.devices[d];
+                    requireThat(object(v) && selectable(v.type) && typeof v.endpoint === 'string', id +
+                        ': invalid device ' + d);
+                    v.endpoint = v.endpoint.trim();
+                    if (v.endpoint) {
+                        const parts = v.endpoint.split(':');
+                        requireThat(parts.length <= 2 && /^\d{1,3}(\.\d{1,3}){3}$/.test(parts[0]) &&
+                            parts[0].split('.').every(x => Number(x) <= 255) && (parts.length === 1 ||
+                            (/^\d+$/.test(parts[1]) && Number(parts[1]) >= 1 && Number(parts[1]) <= 65535)), id +
+                            ': invalid endpoint ' + d);
+                    }
+                    if (types[v.type].attributes.includes('client_key'))
+                        requireThat(typeof v.client_key === 'string' && v.client_key.length <= 512, id +
+                            ': invalid client key');
                 }
-            }, false, true);
-        }
-
-        button(list, 'Add Custom Action', () => {
-            const a = {
-                id: newId(),
-                name: 'New Action',
-                steps: [newStep(room)]
-            };
-
-            room.custom_actions.push(a);
-            draw(a);
-        }, room.custom_actions.length >= 16);
-    }
-
-    draw();
-}
-
-// Room creation and rendering
-function newRoom(id) { const room = { name: 'Room ' + id.slice(-1), devices: {}, actions: {}, custom_actions: [] }; for (const d of DEVICE_IDS)
-    room.devices[d] = { type: 'generic-http', endpoint: '' }; for (const a of ACTION_IDS) {
-    const vol = a.startsWith('volume-') || a === 'mute-toggle', target = vol ? 'device-2' : 'device-3', method = vol ? 'GET' : 'POST';
-    room.actions[a] = toggle(a) ? { target, on_command: blank('http', method), off_command: blank('http', method) } : { target, command: blank('http', method) };
-} return room; }
-
-function render() { const container = $('rooms-container'); container.replaceChildren(); for (const id of ROOM_IDS) {
-    const room = model.rooms[id];
-    if (!room)
-        continue;
-    const section = el('section', container, undefined, 'room');
-    const heading = el('h3', section, id.toUpperCase() + ' -- ' + room.name);
-    field(section, 'Room Name', room.name, v => { room.name = v; heading.textContent = id.toUpperCase() + ' -- ' + v; }, { max: 40 });
-    for (const did of DEVICE_IDS) {
-        const dev = room.devices[did], b = el('div', section, undefined, 'device');
-        el('strong', b, DEVICE_LABELS[did] + ' (' + did + ')');
-        const row = el('div', b, undefined, 'row');
-        field(row, 'Device type', dev.type, v => {
-            if (v === dev.type)
-                return;
-
-            if (!confirm('Change device type? Existing commands will be retained and may require editing.')) {
-                render();
-                return;
+                function check(a, k, where, allowBlank) {
+                    requireThat(object(a) && DEVICE_IDS.includes(a.target), where + ': invalid target');
+                    const x = a[k];
+                    requireThat(object(x) && types[r.devices[a.target].type].command_kinds.includes(x.kind),
+                        where + ': incompatible command');
+                    let value;
+                    if (x.kind === 'http') {
+                        value = x.path;
+                        requireThat(['GET', 'POST'].includes(x.method) && typeof value === 'string' &&
+                            value.length <= 512 && (!value || value.startsWith('/')), where +
+                            ': invalid HTTP command');
+                    }
+                    else if (x.kind === 'ssap') {
+                        value = x.uri;
+                        requireThat(typeof value === 'string' && value.length <= 512 && (!value ||
+                            /^ssap:\/\/\S+$/.test(value)), where + ': invalid SSAP URI');
+                        if (Object.prototype.hasOwnProperty.call(x, '_payloadText')) {
+                            const raw = x._payloadText.trim();
+                            delete x._payloadText;
+                            if (raw) {
+                                try {
+                                    x.payload = JSON.parse(raw);
+                                }
+                                catch (e) {
+                                    throw new Error(where + ': invalid JSON payload');
+                                }
+                            }
+                            else
+                                delete x.payload;
+                        }
+                        if (Object.prototype.hasOwnProperty.call(x, 'payload'))
+                            requireThat(value && object(x.payload), where +
+                                ': payload requires URI and JSON object');
+                    }
+                    else {
+                        value = x.button;
+                        requireThat(typeof value === 'string' && /^[A-Z0-9_-]{0,64}$/.test(value), where +
+                            ': invalid pointer button');
+                    }
+                    requireThat(allowBlank || value, where + ': command cannot be blank');
+                }
+                for (const a of ACTION_IDS) {
+                    for (const k of toggle(a) ? ['on_command', 'off_command'] : ['command'])
+                        check(r.actions[a], k, id + ' / ' + a + ' / ' + k, true);
+                }
+                requireThat(r.custom_actions.length <= 16, id + ': too many custom actions');
+                const seen = new Set();
+                for (const a of r.custom_actions) {
+                    requireThat(object(a) && typeof a.id === 'string' &&
+                        /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(a.id) && !seen.has(a.id), id +
+                        ': invalid or duplicate action ID');
+                    seen.add(a.id);
+                    requireThat(typeof a.name === 'string' && a.name.trim() && a.name.length <= 60, id +
+                        ': invalid custom name');
+                    requireThat(Array.isArray(a.steps) && a.steps.length >= 1 && a.steps.length <= 16, id +
+                        ': invalid step count');
+                    a.steps.forEach((s, i) => {
+                        const w = id + ' / ' + a.name + ' / step ' + (i + 1);
+                        check(s, 'command', w, false);
+                        requireThat(Number.isInteger(s.wait_after_ms) && s.wait_after_ms >= 0 &&
+                            s.wait_after_ms <= 60000 && (i !== a.steps.length - 1 || s.wait_after_ms === 0), w +
+                            ': invalid wait');
+                    });
+                }
             }
-
-            const replacement = {
-                type: v,
-                endpoint: dev.endpoint
-            };
-
-            if (types[v].attributes.includes('client_key'))
-                replacement.client_key = dev.client_key || '';
-
-            room.devices[did] = replacement;
-            render();
-        }, {
-            choices: Object.keys(types)
-                .sort((a, b) =>
-                    Number(selectable(b)) - Number(selectable(a)) ||
-                    types[a].label.localeCompare(types[b].label)
-                )
-                .map(value => ({
-                    value,
-                    label: types[value].label +
-                        (!types[value].enabled
-                            ? (selectable(value)
-                                ? ' (configuration only)'
-                                : ' (future)')
-                            : ''),
-                    disabled: !selectable(value)
-                }))
-        });
-
-        field(
-            row,
-            'Endpoint (default port ' +
-                (types[dev.type].default_port ?? '--') + ')',
-            dev.endpoint,
-            v => dev.endpoint = v
-        );
-
-        const meta = types[dev.type];
-
-        if (meta.attributes.includes('client_key') || meta.pairing) {
-            const pairingRow = el('div', b, undefined, 'row');
-
-            if (meta.attributes.includes('client_key'))
-                field(
-                    pairingRow,
-                    'Client key',
-                    dev.client_key,
-                    v => dev.client_key = v
-                );
-
-            if (meta.pairing) {
-                button(pairingRow, 'Pair', () => {}, true);
-                el(
-                    'p',
-                    b,
-                    'Pairing and runtime integration are not available yet.',
-                    'note'
-                );
-            }
+            requireThat(new TextEncoder().encode(JSON.stringify(c)).length <= MAX_CONFIG_BYTES,
+                'Configuration exceeds 16384 bytes');
+            return c;
         }
-    }
-    const fundamental = details(section, 'Fundamental actions (14)');
-    for (const a of ACTION_IDS)
-        actionEditor(fundamental, room, room.actions[a], a);
-    customEditor(section, room);
-    button(section, 'Remove room', () => { if (confirm('Remove ' + room.name + ' and all its actions?')) {
-        delete model.rooms[id];
-        render();
-    } }, Object.keys(model.rooms).length === 1, true);
-} const tools = $('room-tools'); tools.replaceChildren(); for (const id of ROOM_IDS.filter(id => !model.rooms[id]))
-    button(tools, 'Add Room ' + id.slice(-1), () => { model.rooms[id] = newRoom(id); render(); }); }
 
-// Client-side validation; firmware remains authoritative
-function requireThat(ok, msg) { if (!ok)
-    throw new Error(msg); }
+        // Configuration loading and revision-protected persistence
 
-function validate(source) { const c = clone(source); requireThat(c.version === 5 && object(c.rooms), 'Expected Config v5 rooms.'); const ids = Object.keys(c.rooms); requireThat(ids.length >= 1 && ids.every(id => ROOM_IDS.includes(id)), 'Invalid room IDs.'); for (const id of ids) {
-    const r = c.rooms[id];
-    requireThat(object(r) && typeof r.name === 'string' && r.name.trim() && r.name.length <= 40, id + ': invalid room name');
-    requireThat(object(r.devices) && object(r.actions) && Array.isArray(r.custom_actions), id + ': incomplete room');
-    for (const d of DEVICE_IDS) {
-        const v = r.devices[d];
-        requireThat(object(v) && selectable(v.type) && typeof v.endpoint === 'string', id + ': invalid device ' + d);
-        v.endpoint = v.endpoint.trim();
-        if (v.endpoint) {
-            const parts = v.endpoint.split(':');
-            requireThat(parts.length <= 2 && /^\d{1,3}(\.\d{1,3}){3}$/.test(parts[0]) && parts[0].split('.').every(x => Number(x) <= 255) && (parts.length === 1 || (/^\d+$/.test(parts[1]) && Number(parts[1]) >= 1 && Number(parts[1]) <= 65535)), id + ': invalid endpoint ' + d);
+        function rememberIds() {
+            for (const r of Object.values(model.rooms))
+                for (const a of r.custom_actions)
+                    issuedIds.add(a.id);
         }
-        if (types[v.type].attributes.includes('client_key'))
-            requireThat(typeof v.client_key === 'string' && v.client_key.length <= 512, id + ': invalid client key');
-    }
-    function check(a, k, where, allowBlank) { requireThat(object(a) && DEVICE_IDS.includes(a.target), where + ': invalid target'); const x = a[k]; requireThat(object(x) && types[r.devices[a.target].type].command_kinds.includes(x.kind), where + ': incompatible command'); let value; if (x.kind === 'http') {
-        value = x.path;
-        requireThat(['GET', 'POST'].includes(x.method) && typeof value === 'string' && value.length <= 512 && (!value || value.startsWith('/')), where + ': invalid HTTP command');
-    }
-    else if (x.kind === 'ssap') {
-        value = x.uri;
-        requireThat(typeof value === 'string' && value.length <= 512 && (!value || /^ssap:\/\/\S+$/.test(value)), where + ': invalid SSAP URI');
-        if (Object.prototype.hasOwnProperty.call(x, '_payloadText')) {
-            const raw = x._payloadText.trim();
-            delete x._payloadText;
-            if (raw) {
+
+        function controls() {
+            $('editor').disabled = busy || !model || !revision;
+            $('save-config').disabled = busy || !revision || !writable;
+        }
+
+        async function load() {
+            const g = ++generation;
+            revision = null;
+            writable = false;
+            controls();
+            for (let i = 1; i <= MAX_CONFIG_ATTEMPTS; i++) {
+                const controller = new AbortController();
+                let timer;
                 try {
-                    x.payload = JSON.parse(raw);
+                    const request = async () => {
+                        const r = await fetch('/api/config', { cache: 'no-store', signal: controller.signal });
+                        if (!r.ok)
+                            throw new Error('HTTP ' + r.status);
+                        return r.json();
+                    };
+                    const deadline = new Promise((_, reject) => {
+                        timer = setTimeout(() => {
+                            controller.abort();
+                            reject(new Error('GET timeout'));
+                        }, CONFIG_GET_TIMEOUT_MS);
+                    });
+                    const c = await Promise.race([request(), deadline]);
+                    if (g !== generation)
+                        return false;
+                    requireThat(c.version === 5 && object(c.device_types) && typeof c.revision === 'string',
+                        'Expected Config v5 and device registry');
+                    types = c.device_types;
+                    model = validate({ version: c.version, rooms: c.rooms });
+                    rememberIds();
+                    render();
+                    revision = c.revision;
+                    writable = c.filesystem_writable === true;
+                    $('save-status').textContent = writable ? 'Boot mode: DEVICE -- filesystem writable.' :
+                        'Boot mode: SERVICE (USB) -- filesystem read-only. Saving unavailable.';
+                    controls();
+                    return true;
                 }
                 catch (e) {
-                    throw new Error(where + ': invalid JSON payload');
+                    if (g !== generation)
+                        return false;
+                    console.warn('CONFIG GET attempt ' + i, e);
+                    $('save-status').textContent = i < MAX_CONFIG_ATTEMPTS ?
+                        'Configuration refresh delayed -- retrying (' + i + '/3)...' :
+                        'Unable to refresh configuration. Reload the page to verify.';
                 }
+                finally {
+                    clearTimeout(timer);
+                    controller.abort();
+                }
+                if (i < MAX_CONFIG_ATTEMPTS)
+                    await new Promise(r => setTimeout(r, CONFIG_RETRY_DELAY_MS));
             }
-            else
-                delete x.payload;
+            return false;
         }
-        if (Object.prototype.hasOwnProperty.call(x, 'payload'))
-            requireThat(value && object(x.payload), where + ': payload requires URI and JSON object');
-    }
-    else {
-        value = x.button;
-        requireThat(typeof value === 'string' && /^[A-Z0-9_-]{0,64}$/.test(value), where + ': invalid pointer button');
-    } requireThat(allowBlank || value, where + ': command cannot be blank'); }
-    for (const a of ACTION_IDS) {
-        for (const k of toggle(a) ? ['on_command', 'off_command'] : ['command'])
-            check(r.actions[a], k, id + ' / ' + a + ' / ' + k, true);
-    }
-    requireThat(r.custom_actions.length <= 16, id + ': too many custom actions');
-    const seen = new Set();
-    for (const a of r.custom_actions) {
-        requireThat(object(a) && typeof a.id === 'string' && /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(a.id) && !seen.has(a.id), id + ': invalid or duplicate action ID');
-        seen.add(a.id);
-        requireThat(typeof a.name === 'string' && a.name.trim() && a.name.length <= 60, id + ': invalid custom name');
-        requireThat(Array.isArray(a.steps) && a.steps.length >= 1 && a.steps.length <= 16, id + ': invalid step count');
-        a.steps.forEach((s, i) => { const w = id + ' / ' + a.name + ' / step ' + (i + 1); check(s, 'command', w, false); requireThat(Number.isInteger(s.wait_after_ms) && s.wait_after_ms >= 0 && s.wait_after_ms <= 60000 && (i !== a.steps.length - 1 || s.wait_after_ms === 0), w + ': invalid wait'); });
-    }
-} requireThat(new TextEncoder().encode(JSON.stringify(c)).length <= MAX_CONFIG_BYTES, 'Configuration exceeds 16384 bytes'); return c; }
 
-// Configuration loading and revision-protected persistence
-function rememberIds() { for (const r of Object.values(model.rooms))
-    for (const a of r.custom_actions)
-        issuedIds.add(a.id); }
+        async function save() {
+            if (busy || !revision || !writable)
+                return;
+            busy = true;
+            controls();
+            $('save-status').textContent = 'Saving configuration...';
+            let submitted = false;
+            try {
+                const c = validate(model);
+                c.revision = revision;
+                submitted = true;
+                const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type':
+                    'application/json' }, body: JSON.stringify(c), cache: 'no-store' });
+                const result = await r.json();
+                if (!r.ok) {
+                    submitted = false;
+                    throw new Error(result.error || 'HTTP ' + r.status);
+                }
+                const refreshed = await load();
+                $('save-status').textContent = refreshed ? (result.saved ? 'Configuration saved successfully.' :
+                    'No changes to save.') : 'Save accepted, but refresh failed. Reload the page to verify.';
+            }
+            catch (e) {
+                $('save-status').textContent = (submitted ? 'Save outcome uncertain. Reload to verify: ' :
+                    'Save failed: ') + e.message;
+                if (submitted)
+                    revision = null;
+            }
+            finally {
+                busy = false;
+                controls();
+            }
+        }
 
-function controls() { $('editor').disabled = busy || !model || !revision; $('save-config').disabled = busy || !revision || !writable; }
+        $('import-recipe').onclick = () => $('recipe-file').click();
 
-async function load() { const g = ++generation; revision = null; writable = false; controls(); for (let i = 1; i <= MAX_CONFIG_ATTEMPTS; i++) {
-    const controller = new AbortController();
-    let timer;
-    try {
-        const request = async () => { const r = await fetch('/api/config', { cache: 'no-store', signal: controller.signal }); if (!r.ok)
-            throw new Error('HTTP ' + r.status); return r.json(); };
-        const deadline = new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('GET timeout')); }, CONFIG_GET_TIMEOUT_MS); });
-        const c = await Promise.race([request(), deadline]);
-        if (g !== generation)
-            return false;
-        requireThat(c.version === 5 && object(c.device_types) && typeof c.revision === 'string', 'Expected Config v5 and device registry');
-        types = c.device_types;
-        model = validate({ version: c.version, rooms: c.rooms });
-        rememberIds();
-        render();
-        revision = c.revision;
-        writable = c.filesystem_writable === true;
-        $('save-status').textContent = writable ? 'Boot mode: DEVICE -- filesystem writable.' : 'Boot mode: SERVICE (USB) -- filesystem read-only. Saving unavailable.';
-        controls();
-        return true;
-    }
-    catch (e) {
-        if (g !== generation)
-            return false;
-        console.warn('CONFIG GET attempt ' + i, e);
-        $('save-status').textContent = i < MAX_CONFIG_ATTEMPTS ? 'Configuration refresh delayed -- retrying (' + i + '/3)...' : 'Unable to refresh configuration. Reload the page to verify.';
-    }
-    finally {
-        clearTimeout(timer);
-        controller.abort();
-    }
-    if (i < MAX_CONFIG_ATTEMPTS)
-        await new Promise(r => setTimeout(r, CONFIG_RETRY_DELAY_MS));
-} return false; }
+        $('recipe-file').onchange = async (e) => {
+            const f = e.target.files[0];
+            e.target.value = '';
+            if (!f || busy || !revision)
+                return;
+            try {
+                const c = validate(JSON.parse(await f.text()));
+                if (!confirm('Replace editor contents with ' + f.name + '? Nothing will be saved yet.'))
+                    return;
+                model = c;
+                rememberIds();
+                render();
+                $('recipe-status').textContent = 'Loaded ' + f.name + '. Review before saving.';
+            }
+            catch (err) {
+                $('recipe-status').textContent = 'Import failed: ' + err.message;
+            }
+        };
 
-async function save() { if (busy || !revision || !writable)
-    return; busy = true; controls(); $('save-status').textContent = 'Saving configuration...'; let submitted = false; try {
-    const c = validate(model);
-    c.revision = revision;
-    submitted = true;
-    const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c), cache: 'no-store' });
-    const result = await r.json();
-    if (!r.ok) {
-        submitted = false;
-        throw new Error(result.error || 'HTTP ' + r.status);
-    }
-    const refreshed = await load();
-    $('save-status').textContent = refreshed ? (result.saved ? 'Configuration saved successfully.' : 'No changes to save.') : 'Save accepted, but refresh failed. Reload the page to verify.';
-}
-catch (e) {
-    $('save-status').textContent = (submitted ? 'Save outcome uncertain. Reload to verify: ' : 'Save failed: ') + e.message;
-    if (submitted)
-        revision = null;
-}
-finally {
-    busy = false;
-    controls();
-} }
+        // System clock controls
 
-$('import-recipe').onclick = () => $('recipe-file').click();
+        async function updateClock() {
+            try {
+                const r = await fetch('/api/clock', { cache: 'no-store' });
+                if (!r.ok)
+                    throw new Error('HTTP ' + r.status);
+                const c = await r.json();
+                $('clock-source').textContent = c.source;
+                $('clock-time').textContent = c.timestamp;
+            }
+            catch (e) {
+                $('clock-source').textContent = 'Connection error';
+            }
+        }
 
-$('recipe-file').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f || busy || !revision)
-    return; try {
-    const c = validate(JSON.parse(await f.text()));
-    if (!confirm('Replace editor contents with ' + f.name + '? Nothing will be saved yet.'))
-        return;
-    model = c;
-    rememberIds();
-    render();
-    $('recipe-status').textContent = 'Loaded ' + f.name + '. Review before saving.';
-}
-catch (err) {
-    $('recipe-status').textContent = 'Import failed: ' + err.message;
-} };
+        $('sync-clock').onclick = async () => {
+            const b = $('sync-clock');
+            b.disabled = true;
+            try {
+                const r = await fetch('/api/clock?utc=' + Math.floor(Date.now() / 1000), { method: 'POST', cache:
+                    'no-store' });
+                if (!r.ok)
+                    throw new Error('HTTP ' + r.status);
+                await updateClock();
+            }
+            catch (e) {
+                alert('Clock synchronization failed: ' + e.message);
+            }
+            finally {
+                b.disabled = false;
+            }
+        };
 
-// System clock controls
-async function updateClock() { try {
-    const r = await fetch('/api/clock', { cache: 'no-store' });
-    if (!r.ok)
-        throw new Error('HTTP ' + r.status);
-    const c = await r.json();
-    $('clock-source').textContent = c.source;
-    $('clock-time').textContent = c.timestamp;
-}
-catch (e) {
-    $('clock-source').textContent = 'Connection error';
-} }
-
-$('sync-clock').onclick = async () => { const b = $('sync-clock'); b.disabled = true; try {
-    const r = await fetch('/api/clock?utc=' + Math.floor(Date.now() / 1000), { method: 'POST', cache: 'no-store' });
-    if (!r.ok)
-        throw new Error('HTTP ' + r.status);
-    await updateClock();
-}
-catch (e) {
-    alert('Clock synchronization failed: ' + e.message);
-}
-finally {
-    b.disabled = false;
-} };
-
-$('save-config').onclick = save;
-
-updateClock();
-
-load();
-  </script>
- </body>
+        $('save-config').onclick = save;
+        updateClock();
+        load();
+        </script>
+    </body>
 </html>
