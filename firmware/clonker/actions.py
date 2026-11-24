@@ -30,8 +30,8 @@ Power and mute use independent, volatile ON/OFF command histories.
 import time
 
 from clonker.system import logger
-from clonker import device_adapters
-from clonker import device_config_v2 as device_config
+from clonker.devices import device_adapters
+from clonker import device_config
 from clonker.display import oled
 
 
@@ -67,28 +67,35 @@ def dispatch(room_id, action_id, delay_seconds=0):
         logger.warning("DUMB QUEUE: Full; action rejected")
         raise ValueError("Action queue full")
 
-    # Resolve and validate before admitting any task.
+    # Resolve already-validated configuration before
+    # admitting any task.
     if action_id in device_config.ACTION_IDS:
         kind = "fundamental"
+
         room, action = device_config.action_details(
             room_id, action_id
         )
 
-        target = action["target"]
-        endpoint = device_config.resolve_endpoint(
-            room, target
+        device = device_config.resolve_device(
+            room, action["target"]
         )
 
         is_toggle = action_id in (
             "mute-toggle", "power-toggle"
         )
 
-        paths = (
-            (action["on_path"], action["off_path"])
-            if is_toggle else (action["path"],)
+        commands = (
+            (action["on_command"], action["off_command"])
+            if is_toggle else (action["command"],)
         )
 
-        configured = bool(endpoint and any(paths))
+        configured = bool(
+            device["endpoint"]
+            and any(
+                not device_config.command_is_blank(command)
+                for command in commands
+            )
+        )
 
     else:
         kind = "custom"
@@ -146,7 +153,7 @@ def dispatch(room_id, action_id, delay_seconds=0):
 
 def dispatch_hold(
     room_id, action_id, event,
-    destination=None, command=None, adapter=None
+    device=None, command=None, adapter=None
 ):
     """Queue a physical held-button press or release."""
     global _peak_depth
@@ -171,9 +178,7 @@ def dispatch_hold(
         logger.warning("DUMB QUEUE: Full; hold rejected")
         raise ValueError("Action queue full")
 
-    if destination is not None and command is not None:
-        endpoint = destination
-        target, method, path = command
+    if device is not None and command is not None:
         room_name = room_id
     else:
         room, action = device_config.action_details(
@@ -181,24 +186,18 @@ def dispatch_hold(
         )
         room_name = room["name"]
 
-        if destination is None:
-            endpoint = device_config.resolve_endpoint(
+        if device is None:
+            device = device_config.resolve_device(
                 room, action["target"]
             )
-        else:
-            endpoint = destination
 
         if command is None:
-            command = (
-                action["target"],
-                action["method"],
-                action["path"],
-            )
-
-        target, method, path = command
+            command = action["command"]
 
     if adapter is None:
-        adapter = device_adapters.lookup_hold(room_id, action_id)
+        adapter = device_adapters.lookup_hold(
+            room_id, action_id
+        )
 
     if adapter == device_adapters.GENERIC_HTTP:
         raise ValueError(
@@ -207,17 +206,15 @@ def dispatch_hold(
             )
         )
 
-    # Preserve the destination at press/release time.
-    # Later configuration changes must not redirect a keyup.
+    # Preserve the original device and command.
+    # A room change must not redirect a keyup.
     _queue.append({
         "room": room_id,
         "action": action_id,
         "kind": "hold",
         "event": event,
-        "endpoint": endpoint,
-        "target": target,
-        "method": method,
-        "path": path,
+        "device": device,
+        "command": command,
         "adapter": adapter,
         "due": 0,
         "enqueued_at": time.monotonic_ns(),
@@ -276,34 +273,31 @@ def poll():
             if step_index >= len(steps):
                 raise ValueError("Custom step no longer exists")
 
-            command = steps[step_index]
+            step = steps[step_index]
+            command = step["command"]
 
-            target = command["target"]
-            method = command["method"]
-            path = command["path"]
-
-            endpoint = device_config.resolve_endpoint(
-                room, target
+            device = device_config.resolve_device(
+                room, step["target"]
             )
 
             # Unlike fundamental actions, a missing custom
             # destination is an execution failure.
-            if not endpoint:
+            if not device["endpoint"]:
                 raise ValueError(
                     "Custom destination is unconfigured"
                 )
 
-            # Custom actions always use generic HTTP.
-            adapter = device_adapters.GENERIC_HTTP
+            # Resolve through the declared device type.
+            # Custom commands retain single-command semantics.
+            adapter = device_adapters.resolve(
+                device, "custom", action_id, command
+            )
 
         elif kind == "hold":
             room_name = room_id
-            target = task["target"]
-            endpoint = task["endpoint"]
-            method = task["method"]
-            path = task["path"]
+            device = task["device"]
+            command = task["command"]
             event = task["event"]
-
             adapter = task["adapter"]
 
         else:
@@ -311,11 +305,8 @@ def poll():
                 room_id, action_id
             )
 
-            target = action["target"]
-            method = action["method"]
-
-            endpoint = device_config.resolve_endpoint(
-                room, target
+            device = device_config.resolve_device(
+                room, action["target"]
             )
 
             # Toggle direction tracking.
@@ -324,15 +315,19 @@ def poll():
                 toggle_direction = _toggle_next.get(
                     toggle_key, "on"
                 )
-                path = action[
-                    "on_path" if toggle_direction == "on"
-                    else "off_path"
+
+                command = action[
+                    "on_command" if toggle_direction == "on"
+                    else "off_command"
                 ]
             else:
-                path = action["path"]
+                command = action["command"]
 
             # Fundamental actions retain blank-command no-ops.
-            if not endpoint or not path:
+            if (
+                not device["endpoint"]
+                or device_config.command_is_blank(command)
+            ):
                 _queue.pop(selected)
 
                 message = "NO-OP: {} / {} (unconfigured)".format(
@@ -357,23 +352,22 @@ def poll():
             room_name = room["name"]
 
         logger.info(
-            "EXECUTING: {} / {} -> {} {} {} [{}]".format(
+            "EXECUTING: {} / {} -> {} {} [{}]".format(
                 room_name,
                 action_id,
-                target,
-                method,
-                path,
+                device["type"],
+                command["kind"],
                 adapter,
             )
         )
 
         if kind == "hold":
             result = device_adapters.execute_hold(
-                adapter, endpoint, method, path, event
+                adapter, device, command, event
             )
         else:
             result = device_adapters.execute(
-                adapter, endpoint, method, path,
+                adapter, device, command,
                 action_id=action_id
             )
 
@@ -426,7 +420,7 @@ def poll():
             if next_index < len(steps):
 
                 # Start the wait AFTER the command completes.
-                wait_ms = command["wait_after_ms"]
+                wait_ms = step["wait_after_ms"]
                 task["step"] = next_index
                 task["due"] = (
                     0 if wait_ms == 0
@@ -443,7 +437,7 @@ def poll():
                         room["name"],
                         action_id,
                         next_index + 1,
-                        command["wait_after_ms"],
+                        wait_ms,
                     )
                 )
 
