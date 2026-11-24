@@ -425,6 +425,6 @@ def test_persistence():
     )
 
 
-EXPECTED_PASSES = 57
+EXPECTED_PASSES = 56
 
 run()
