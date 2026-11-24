@@ -119,6 +119,32 @@ input[readonly] {
     margin-bottom: 8px;
 }
 
+/* Compact HTTP command fields */
+.http-row > label:first-child {
+    flex: 0 1 100px;
+    min-width: 90px;
+}
+
+.http-row > label:last-child {
+    flex: 1;
+    min-width: 180px;
+}
+
+/* Stable custom action identity is informational */
+.action-id {
+    font-size: 11px;
+    color: #999;
+}
+
+.action-id input {
+    font-family: monospace;
+    font-size: 11px;
+    padding: 5px 8px;
+    color: #999;
+    background: transparent;
+    border-color: #414850;
+}
+
 .device,.action {
     background: #252a30;
     border-radius: 6px;
@@ -357,26 +383,119 @@ function details(parent, title) { const d = el('details', parent); el('summary',
 // Protocol-aware command and target editors
 function targetChoices(room) { return DEVICE_IDS.map(id => ({ value: id, label: DEVICE_LABELS[id] + ' · ' + types[room.devices[id].type].label })); }
 
-function commandEditor(parent, room, owner, key, label) { const box = el('div', parent); function draw() { box.replaceChildren(); const c = owner[key], supported = types[room.devices[owner.target].type].command_kinds; const choices = [...new Set([...supported, c.kind])].map(k => ({ value: k, label: (KIND_LABELS[k] || k) + (supported.includes(k) ? '' : ' (incompatible)') })); field(box, label + ' protocol', c.kind, k => { if (k === c.kind)
-    return; if (!confirm('Replace this command with a blank ' + KIND_LABELS[k] + ' command?')) {
-    draw();
-    return;
-} owner[key] = blank(k); draw(); }, { choices }); if (!supported.includes(c.kind))
-    el('p', box, 'Command is incompatible with the selected device. Choose a supported protocol before saving.', 'warning'); if (c.kind === 'http') {
-    const row = el('div', box, undefined, 'row');
-    field(row, 'Method', c.method, v => c.method = v, { choices: ['GET', 'POST'].map(value => ({ value, label: value })) });
-    field(row, 'Path', c.path, v => c.path = v, { max: 512 });
-}
-else if (c.kind === 'ssap') {
-    field(box, 'SSAP URI', c.uri, v => c.uri = v, { max: 512 });
-    field(box, 'Optional JSON payload (object)', c._payloadText ?? (Object.prototype.hasOwnProperty.call(c, 'payload') ? JSON.stringify(c.payload) : ''), v => c._payloadText = v, { multiline: true });
-}
-else if (c.kind === 'pointer') {
-    field(box, 'Pointer button', c.button, v => c.button = v, { max: 64 });
-} } draw(); }
+function commandEditor(parent, room, owner, key, label,
+                       includeTarget = false) {
+    const box = el('div', parent);
 
-function actionEditor(parent, room, a, id) { const box = el('div', parent, undefined, 'action'); el('strong', box, id); const commands = el('div', box); function draw() { commands.replaceChildren(); for (const k of toggle(id) ? ['on_command', 'off_command'] : ['command'])
-    commandEditor(commands, room, a, k, k === 'on_command' ? 'ON' : k === 'off_command' ? 'OFF' : 'Command'); } const target = field(box, 'Target', a.target, v => { a.target = v; draw(); }, { choices: targetChoices(room) }); box.insertBefore(target.parentElement, commands); draw(); }
+    function draw() {
+        box.replaceChildren();
+
+        const c = owner[key];
+        const supported =
+            types[room.devices[owner.target].type].command_kinds;
+
+        const choices = [...new Set([...supported, c.kind])]
+            .map(k => ({
+                value: k,
+                label: (KIND_LABELS[k] || k) +
+                    (supported.includes(k) ? '' : ' (incompatible)')
+            }));
+
+        const header = el('div', box, undefined, 'row');
+
+        if (includeTarget) {
+            field(header, 'Target', owner.target, v => {
+                owner.target = v;
+                draw();
+            }, { choices: targetChoices(room) });
+        }
+
+        field(header, label + ' protocol', c.kind, k => {
+            if (k === c.kind)
+                return;
+
+            if (!confirm(
+                'Replace this command with a blank ' +
+                KIND_LABELS[k] + ' command?'
+            )) {
+                draw();
+                return;
+            }
+
+            owner[key] = blank(k);
+            draw();
+        }, { choices });
+
+        if (!supported.includes(c.kind)) {
+            el(
+                'p', box,
+                'Command is incompatible with the selected device. ' +
+                'Choose a supported protocol before saving.',
+                'warning'
+            );
+        }
+
+        if (c.kind === 'http') {
+            const row = el('div', box, undefined, 'row http-row');
+
+            field(row, 'Method', c.method, v => c.method = v, {
+                choices: ['GET', 'POST'].map(value => ({
+                    value,
+                    label: value
+                }))
+            });
+
+            field(row, 'Path', c.path,
+                v => c.path = v, { max: 512 });
+        }
+        else if (c.kind === 'ssap') {
+            field(box, 'SSAP URI', c.uri,
+                v => c.uri = v, { max: 512 });
+
+            field(
+                box,
+                'Optional JSON payload (object)',
+                c._payloadText ??
+                    (Object.prototype.hasOwnProperty.call(c, 'payload')
+                        ? JSON.stringify(c.payload)
+                        : ''),
+                v => c._payloadText = v,
+                { multiline: true }
+            );
+        }
+        else if (c.kind === 'pointer') {
+            field(box, 'Pointer button', c.button,
+                v => c.button = v, { max: 64 });
+        }
+    }
+
+    draw();
+}
+
+function actionEditor(parent, room, a, id) {
+    const box = el('div', parent, undefined, 'action');
+    el('strong', box, id);
+
+    if (!toggle(id)) {
+        commandEditor(box, room, a, 'command', 'Command', true);
+        return;
+    }
+
+    field(box, 'Target', a.target, v => {
+        a.target = v;
+        draw();
+    }, { choices: targetChoices(room) });
+
+    const commands = el('div', box);
+
+    function draw() {
+        commands.replaceChildren();
+        commandEditor(commands, room, a, 'on_command', 'ON');
+        commandEditor(commands, room, a, 'off_command', 'OFF');
+    }
+
+    draw();
+}
 
 // Stable custom action identity and step editing
 function newId() { let id; do {
@@ -385,20 +504,115 @@ function newId() { let id; do {
 
 function newStep(room) { const target = DEVICE_IDS[0]; return { target, command: blank(types[room.devices[target].type].command_kinds[0]), wait_after_ms: 0 }; }
 
-function customEditor(parent, room) { const d = details(parent, 'Custom Actions'); const list = el('div', d); function draw(open = null) { list.replaceChildren(); d.firstChild.textContent = 'Custom Actions (' + room.custom_actions.length + ')'; for (const a of room.custom_actions) {
-    const ad = details(list, a.name + ' (' + a.steps.length + ' steps)');
-    ad.className = 'action';
-    ad.open = a === open;
-    field(ad, 'Action ID (read-only)', a.id, null, { readonly: true });
-    field(ad, 'Display Name', a.name, v => { a.name = v; ad.firstChild.textContent = v + ' (' + a.steps.length + ' steps)'; }, { max: 60 });
-    a.steps.forEach((s, i) => { const b = el('div', ad, undefined, 'device'); el('strong', b, 'Step ' + (i + 1)); const cmd = el('div', b); function redraw() { cmd.replaceChildren(); commandEditor(cmd, room, s, 'command', 'Command'); } const t = field(b, 'Target', s.target, v => { s.target = v; redraw(); }, { choices: targetChoices(room) }); b.insertBefore(t.parentElement, cmd); redraw(); field(b, 'Wait after (ms)', s.wait_after_ms, v => s.wait_after_ms = v === '' ? null : Number(v), { type: 'number', disabled: i === a.steps.length - 1 }); const tools = el('div', b, undefined, 'tools'); function move(j) { [a.steps[i], a.steps[j]] = [a.steps[j], a.steps[i]]; a.steps[a.steps.length - 1].wait_after_ms = 0; draw(a); } button(tools, 'Move up', () => move(i - 1), i === 0, true); button(tools, 'Move down', () => move(i + 1), i === a.steps.length - 1, true); button(tools, 'Remove step', () => { a.steps.splice(i, 1); a.steps[a.steps.length - 1].wait_after_ms = 0; draw(a); }, a.steps.length === 1, true); });
-    const tools = el('div', ad, undefined, 'tools');
-    button(tools, 'Add step', () => { a.steps.push(newStep(room)); draw(a); }, a.steps.length >= 16);
-    button(tools, 'Remove action', () => { if (confirm('Remove ' + a.name + '?')) {
-        room.custom_actions.splice(room.custom_actions.indexOf(a), 1);
-        draw();
-    } }, false, true);
-} button(list, 'Add Custom Action', () => { const a = { id: newId(), name: 'New Action', steps: [newStep(room)] }; room.custom_actions.push(a); draw(a); }, room.custom_actions.length >= 16); } draw(); }
+function customEditor(parent, room) {
+    const d = details(parent, 'Custom Actions');
+    const list = el('div', d);
+
+    function actionTitle(a) {
+        const count = a.steps.length;
+        return a.name + ' (' + count +
+            (count === 1 ? ' step)' : ' steps)');
+    }
+
+    function draw(open = null) {
+        list.replaceChildren();
+
+        d.firstChild.textContent =
+            'Custom Actions (' + room.custom_actions.length + ')';
+
+        for (const a of room.custom_actions) {
+            const ad = details(list, actionTitle(a));
+            ad.className = 'action';
+            ad.open = a === open;
+
+            const idField = field(
+                ad, 'Action ID (read-only)',
+                a.id, null, { readonly: true }
+            );
+
+            idField.parentElement.classList.add('action-id');
+
+            field(ad, 'Display Name', a.name, v => {
+                a.name = v;
+                ad.firstChild.textContent = actionTitle(a);
+            }, { max: 60 });
+
+            a.steps.forEach((s, i) => {
+                const b = el('div', ad, undefined, 'device');
+                el('strong', b, 'Step ' + (i + 1));
+
+                commandEditor(b, room, s, 'command', 'Command', true);
+
+                field(
+                    b, 'Wait after (ms)', s.wait_after_ms,
+                    v => s.wait_after_ms =
+                        v === '' ? null : Number(v),
+                    {
+                        type: 'number',
+                        disabled: i === a.steps.length - 1
+                    }
+                );
+
+                const tools = el('div', b, undefined, 'tools');
+
+                function move(j) {
+                    [a.steps[i], a.steps[j]] =
+                        [a.steps[j], a.steps[i]];
+
+                    a.steps[a.steps.length - 1].wait_after_ms = 0;
+                    draw(a);
+                }
+
+                button(
+                    tools, 'Move up',
+                    () => move(i - 1),
+                    i === 0, true
+                );
+
+                button(
+                    tools, 'Move down',
+                    () => move(i + 1),
+                    i === a.steps.length - 1, true
+                );
+
+                button(tools, 'Remove step', () => {
+                    a.steps.splice(i, 1);
+                    a.steps[a.steps.length - 1].wait_after_ms = 0;
+                    draw(a);
+                }, a.steps.length === 1, true);
+            });
+
+            const tools = el('div', ad, undefined, 'tools');
+
+            button(tools, 'Add step', () => {
+                a.steps.push(newStep(room));
+                draw(a);
+            }, a.steps.length >= 16);
+
+            button(tools, 'Remove action', () => {
+                if (confirm('Remove ' + a.name + '?')) {
+                    room.custom_actions.splice(
+                        room.custom_actions.indexOf(a), 1
+                    );
+                    draw();
+                }
+            }, false, true);
+        }
+
+        button(list, 'Add Custom Action', () => {
+            const a = {
+                id: newId(),
+                name: 'New Action',
+                steps: [newStep(room)]
+            };
+
+            room.custom_actions.push(a);
+            draw(a);
+        }, room.custom_actions.length >= 16);
+    }
+
+    draw();
+}
 
 // Room creation and rendering
 function newRoom(id) { const room = { name: 'Room ' + id.slice(-1), devices: {}, actions: {}, custom_actions: [] }; for (const d of DEVICE_IDS)
@@ -418,18 +632,73 @@ function render() { const container = $('rooms-container'); container.replaceChi
         const dev = room.devices[did], b = el('div', section, undefined, 'device');
         el('strong', b, DEVICE_LABELS[did] + ' (' + did + ')');
         const row = el('div', b, undefined, 'row');
-        field(row, 'Device type', dev.type, v => { if (v === dev.type)
-            return; if (!confirm('Change device type? Existing commands will be retained and may require editing.')) {
+        field(row, 'Device type', dev.type, v => {
+            if (v === dev.type)
+                return;
+
+            if (!confirm('Change device type? Existing commands will be retained and may require editing.')) {
+                render();
+                return;
+            }
+
+            const replacement = {
+                type: v,
+                endpoint: dev.endpoint
+            };
+
+            if (types[v].attributes.includes('client_key'))
+                replacement.client_key = dev.client_key || '';
+
+            room.devices[did] = replacement;
             render();
-            return;
-        } const replacement = { type: v, endpoint: dev.endpoint }; if (types[v].attributes.includes('client_key'))
-            replacement.client_key = dev.client_key || ''; room.devices[did] = replacement; render(); }, { choices: Object.keys(types).map(value => ({ value, label: types[value].label + (!types[value].enabled ? (value === 'lg-webos' ? ' (configuration only)' : ' (future)') : ''), disabled: !selectable(value) })) });
-        field(row, 'Endpoint (default port ' + (types[dev.type].default_port ?? '--') + ')', dev.endpoint, v => dev.endpoint = v);
-        if (types[dev.type].attributes.includes('client_key'))
-            field(b, 'Client key', dev.client_key, v => dev.client_key = v);
-        if (types[dev.type].pairing) {
-            button(b, 'Pair', () => { }, true);
-            el('p', b, 'Pairing and runtime integration are not available yet.', 'note');
+        }, {
+            choices: Object.keys(types)
+                .sort((a, b) =>
+                    Number(selectable(b)) - Number(selectable(a)) ||
+                    types[a].label.localeCompare(types[b].label)
+                )
+                .map(value => ({
+                    value,
+                    label: types[value].label +
+                        (!types[value].enabled
+                            ? (selectable(value)
+                                ? ' (configuration only)'
+                                : ' (future)')
+                            : ''),
+                    disabled: !selectable(value)
+                }))
+        });
+
+        field(
+            row,
+            'Endpoint (default port ' +
+                (types[dev.type].default_port ?? '--') + ')',
+            dev.endpoint,
+            v => dev.endpoint = v
+        );
+
+        const meta = types[dev.type];
+
+        if (meta.attributes.includes('client_key') || meta.pairing) {
+            const pairingRow = el('div', b, undefined, 'row');
+
+            if (meta.attributes.includes('client_key'))
+                field(
+                    pairingRow,
+                    'Client key',
+                    dev.client_key,
+                    v => dev.client_key = v
+                );
+
+            if (meta.pairing) {
+                button(pairingRow, 'Pair', () => {}, true);
+                el(
+                    'p',
+                    b,
+                    'Pairing and runtime integration are not available yet.',
+                    'note'
+                );
+            }
         }
     }
     const fundamental = details(section, 'Fundamental actions (14)');
