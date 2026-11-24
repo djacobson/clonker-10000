@@ -14,6 +14,7 @@ Connect, upgrade, registration and transmission remain bounded blocking I/O.
 Normal response processing is cooperative. Pointer acquisition is currently
 bounded blocking too; consider a cooperative setup state machine later.
 No internal command queue, automatic replay, pairing UI or filesystem writes.
+Draft v2 adds isolated cooperative pairing helpers and local development keys.
 A successful send is NOT proof of execution. Poll failures must eventually
 reach the shared action failure handler; integration is deliberately deferred.
 """
@@ -34,7 +35,7 @@ MAX_FRAMES = 8
 MAX_BUFFER = 8192
 READ_SIZE = 256
 
-# Preserve the tested application identity. Pairing is external for now.
+# Runtime registration manifest from the successful navigation lab.
 MANIFEST = {
     'manifestVersion': 1, 'appVersion': '1.0',
     'appId': 'com.clonker.webos.test', 'appName': 'Clonker webOS Test',
@@ -42,6 +43,27 @@ MANIFEST = {
                     'CONTROL_INPUT_TEXT', 'CONTROL_MOUSE_AND_KEYBOARD',
                     'CONTROL_POWER', 'READ_RUNNING_APPS', 'READ_INPUT_DEVICE_LIST'],
 }
+# Pairing lab used a DIFFERENT manifest. Preserve both tested forms rather
+# than assuming they are interchangeable. Unification requires TV testing.
+_PAIR_PERMISSIONS = ['LAUNCH', 'CONTROL_AUDIO', 'CONTROL_INPUT_MEDIA',
+                     'CONTROL_INPUT_TV', 'CONTROL_POWER', 'READ_RUNNING_APPS',
+                     'READ_INPUT_DEVICE_LIST']
+PAIR_MANIFEST = {
+    'manifestVersion': 1, 'appVersion': '1.0',
+    'signed': {'created': '20140509', 'appId': 'com.lge.test',
+               'vendorId': 'com.lge',
+               'localizedAppNames': {'': 'Clonker webOS Test'},
+               'localizedVendorNames': {'': 'Clonker'},
+               'permissions': _PAIR_PERMISSIONS,
+               'serial': '2f930e2d2cfe083771f68e4fe7bb07'},
+    'permissions': _PAIR_PERMISSIONS,
+}
+PAIR_WAIT_NS = 45_000_000_000
+# LOCAL Pico copy only. Never commit actual keys.
+DEV_CLIENT_KEYS = {
+    # '192.168.50.47:3000': 'PASTE_CLIENT_KEY_HERE',
+}
+
 # Proposed adapter-local command vocabulary, NOT a config schema decision.
 SSAP_COMMANDS = {
     'volume-up': ('ssap://audio/volumeUp', None),
@@ -249,6 +271,16 @@ def _request_message(uri, payload=None):
     return message
 
 
+def _registration_message(client_key=None, pairing=False):
+    payload = {'forcePairing': pairing, 'pairingType': 'PROMPT',
+               'manifest': PAIR_MANIFEST if pairing else MANIFEST}
+    if not pairing:
+        if not client_key:
+            raise ValueError('LG pairing key required')
+        payload['client-key'] = client_key
+    return {'id': _id(), 'type': 'register', 'payload': payload}
+
+
 def _connect_control(host, port, client_key):
     global _control
     if _control is not None:
@@ -258,10 +290,7 @@ def _connect_control(host, port, client_key):
     deadline = started + SETUP_NS
     conn = _open(host, port, '/', deadline)
     try:
-        rid = _id()
-        _json_send(conn, {'id': rid, 'type': 'register', 'payload': {
-            'forcePairing': False, 'pairingType': 'PROMPT',
-            'client-key': client_key, 'manifest': MANIFEST}}, deadline)
+        _json_send(conn, _registration_message(client_key), deadline)
         while True:
             msg = conn.next_json(deadline)
             if msg.get('type') == 'error':
@@ -348,8 +377,31 @@ def _expire():
         _stats['idle_closes'] += 1
 
 
+def _parse_endpoint(endpoint):
+    host, colon, port_text = endpoint.partition(':')
+    octets = host.split('.')
+    if len(octets) != 4 or any(not x.isdigit() or int(x) > 255 for x in octets):
+        raise ValueError('LG endpoint requires IPv4')
+    port = int(port_text) if colon else 3000
+    if not 1 <= port <= 65535:
+        raise ValueError('Invalid LG port')
+    return host, port
+
+
+def _resolve_key(endpoint, client_key):
+    if client_key is None:
+        client_key = DEV_CLIENT_KEYS.get(endpoint)
+    if not isinstance(client_key, str) or not client_key:
+        raise ValueError("LG pairing key required")
+    return client_key
+
+
 def ready(endpoint, command):
     """No I/O. False means leave the original command in the Dumb Queue."""
+    if _pair_conn is not None:
+        return False
+    host, port = _parse_endpoint(endpoint)
+    endpoint = '{}:{}'.format(host, port)
     if _pending and endpoint != _endpoint:
         return False
     if command in BUTTON_COMMANDS and _pointer is None and _pending:
@@ -357,7 +409,7 @@ def ready(endpoint, command):
     return len(_pending) < MAX_PENDING
 
 
-def execute(endpoint, command, client_key):
+def execute(endpoint, command, client_key=None):
     """Draft interface; endpoint is IPv4:port or IPv4 (default 3000).
 
     Client key supplied externally; never persisted or printed here.
@@ -366,15 +418,11 @@ def execute(endpoint, command, client_key):
     global _endpoint
     if command not in SSAP_COMMANDS and command not in BUTTON_COMMANDS:
         raise ValueError('Unsupported LG command')
-    if not client_key:
-        raise ValueError('LG pairing key required')
-    host, colon, port_text = endpoint.partition(':')
-    octets = host.split('.')
-    if len(octets) != 4 or any(not x.isdigit() or int(x) > 255 for x in octets):
-        raise ValueError('LG endpoint requires IPv4')
-    port = int(port_text) if colon else 3000
-    if not 1 <= port <= 65535:
-        raise ValueError('Invalid LG port')
+    host, port = _parse_endpoint(endpoint)
+    endpoint = '{}:{}'.format(host, port)
+    client_key = _resolve_key(endpoint, client_key)
+    if _pair_conn is not None:
+        return {'accepted': False, 'detail': 'LG pairing active'}
     try:
         if not wifi.radio.connected:
             raise OSError('Wi-Fi disconnected')
@@ -484,10 +532,165 @@ def transport_snapshot():
             'pending_limit': MAX_PENDING, 'pending_count': len(_pending),
             'oldest_pending_ms': max([round((now - x[1]) / 1_000_000, 1)
                                       for x in _pending.values()] or [0]),
-            'requests': dict(_stats)}
+            'requests': dict(_stats), 'pairing': pair_status(),
+            'pairing_counts': dict(_pair_stats)}
+
+# Pairing is explicitly driven by the future configuration layer, not poll().
+# A temporary session never enters the runtime request dictionary.
+_pair_conn = None
+_pair_deadline = 0
+_pair_state = 'idle'
+_pair_endpoint = None
+_pair_key = None
+_pair_error = None
+_pair_stats = dict.fromkeys(('started', 'approved', 'failed', 'cancelled', 'timed_out'), 0)
+
+
+def _pair_finish(state, error=None):
+    global _pair_conn, _pair_state, _pair_error, _pair_deadline
+    conn = _pair_conn
+    _pair_conn = None
+    _pair_deadline = 0
+    _pair_state = state
+    _pair_error = error
+    if conn is not None:
+        try:
+            conn.sock.close()
+        except OSError:
+            pass
+    if state in _pair_stats:
+        _pair_stats[state] += 1
+
+
+def pair_status():
+    """Safe status for UI/diagnostics; never contains the client key."""
+    return {'state': _pair_state, 'endpoint': _pair_endpoint,
+            'error': _pair_error, 'key_available': _pair_key is not None,
+            'remaining_ms': max(0, (_pair_deadline - _now()) // 1_000_000)
+                            if _pair_conn is not None else 0}
+
+
+def pair_begin(endpoint):
+    """Bounded setup; user approval is handled by subsequent pair_poll calls."""
+    global _pair_conn, _pair_deadline, _pair_state, _pair_endpoint, _pair_key, _pair_error
+    if _pair_conn is not None or _pending:
+        raise RuntimeError('LG adapter busy')
+    host, port = _parse_endpoint(endpoint)
+    close()
+    _pair_key = None
+    _pair_endpoint = '{}:{}'.format(host, port)
+    _pair_error = None
+    _pair_state = 'connecting'
+    _pair_stats['started'] += 1
+    try:
+        if not wifi.radio.connected:
+            raise OSError('Wi-Fi disconnected')
+        deadline = _now() + SETUP_NS
+        _pair_conn = _open(host, port, '/', deadline)
+        _json_send(_pair_conn, _registration_message(pairing=True), deadline)
+        _pair_deadline = _now() + PAIR_WAIT_NS
+        _pair_state = 'waiting'
+    except Exception as error:
+        _pair_finish('failed', type(error).__name__)
+    return pair_status()
+
+
+def pair_poll():
+    """Bounded RX; no sleep or blocking wait for human approval."""
+    global _pair_key
+    conn = _pair_conn
+    if conn is None:
+        return pair_status()
+    if _now() >= _pair_deadline:
+        _pair_finish('timed_out')
+        return pair_status()
+    try:
+        conn.sock.settimeout(0)
+        try:
+            for _ in range(MAX_READS):
+                try:
+                    conn.read()
+                except OSError as error:
+                    if getattr(error, 'errno', None) in (11, 35):
+                        break
+                    raise
+        finally:
+            conn.sock.settimeout(OP_TIMEOUT)
+        for _ in range(MAX_FRAMES):
+            frame = conn.take()
+            if frame is None:
+                break
+            opcode, payload = frame
+            conn.handle_protocol(opcode, payload, min(_pair_deadline, _now() + int(OP_TIMEOUT * 1e9)))
+            if opcode != 1:
+                continue
+            msg = json.loads(payload.decode('utf-8'))
+            if msg.get('type') == 'error':
+                _pair_finish('failed', 'LG rejected pairing')
+                break
+            if msg.get('type') == 'registered':
+                key = msg.get('payload', {}).get('client-key')
+                if not isinstance(key, str) or not key:
+                    raise ValueError('LG returned no client key')
+                _pair_key = key
+                _pair_finish('approved')
+                break
+    except Exception as error:
+        _pair_finish('failed', type(error).__name__)
+    return pair_status()
+
+
+def pair_take_client_key():
+    """Explicit one-time credential handoff to trusted configuration code."""
+    global _pair_key
+    key = _pair_key
+    _pair_key = None
+    return key
+
+
+def pair_cancel():
+    global _pair_key
+    _pair_key = None
+    if _pair_conn is not None:
+        _pair_finish('cancelled')
+    return pair_status()
+
+
+def verify_client_key(endpoint, client_key=None):
+    """Bounded synchronous registration on a temporary socket, no forced pairing.
+
+    LG may still prompt if a key is invalid; no human approval wait here.
+    Does not verify every permission or execute a TV command.
+    """
+    if _pair_conn is not None or _pending:
+        raise RuntimeError('LG adapter busy')
+    host, port = _parse_endpoint(endpoint)
+    key = _resolve_key('{}:{}'.format(host, port), client_key)
+    conn = None
+    try:
+        deadline = _now() + SETUP_NS
+        conn = _open(host, port, '/', deadline)
+        _json_send(conn, _registration_message(key), deadline)
+        while True:
+            msg = conn.next_json(deadline)
+            if msg.get('type') == 'registered':
+                return True
+            if msg.get('type') == 'error':
+                return False
+    except (OSError, ValueError):
+        return False
+    finally:
+        if conn is not None:
+            try:
+                conn.sock.close()
+            except OSError:
+                pass
+
 
 # Integration TODOs (intentionally no changes outside this module):
-# - Decide configuration schema, endpoint normalization, key lookup and pairing UI.
+# - Decide configuration schema, permanent key storage and pairing UI.
+# - Test cooperative pairing, credential handoff and both manifests on Pico.
+# - Future shutdown/config transitions must call pair_cancel() as appropriate.
 # - Decide generic adapter contract for ready/execute/poll and delayed failures.
 # - Add perf.register/record instrumentation following Denon conventions.
 # - Test pointer lifetime, ping/pong, partial frames, burst writes, error paths,
