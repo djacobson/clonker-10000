@@ -3,9 +3,9 @@
 **Proposed:** November 24, 2026  
 **Origin:** Chapter 11  
 **Target:** Chapter 12  
-**Status:** Design proposal — not implemented  
+**Status:** Design agreed — implementation pending  
 **Current schema:** Config v4  
-**Proposed schema:** Config v5  
+**Target schema:** Config v5  
 
 > Configure the device. Configure the intent.
 > Let the adapter speak the protocol.
@@ -28,13 +28,15 @@ including persistent WebSockets, authenticated registration,
 pairing, structured command payloads, and asynchronous
 response processing.
 
-Rather than incrementally extending the existing HTTP-oriented
-configuration model, Chapter 12 will establish a more
-explicit and extensible device configuration architecture.
+Chapter 12 will establish a more explicit and extensible
+device configuration architecture without sacrificing the
+flexibility and simplicity of the original Clonker.
 
-The redesign should preserve the flexibility and simplicity
-of the existing Clonker while removing assumptions that
-all devices communicate through ordinary HTTP requests.
+LG webOS is the first significant motivation for this
+redesign. Future Apple TV, Fire TV, and other device
+adapters may benefit from the same architectural foundation.
+
+Keep It Simple.
 
 ## 2. Relationship to the LG webOS adapter
 
@@ -45,8 +47,8 @@ The standalone experimental adapter:
 is an intentional architectural reference for this redesign,
 not abandoned experimental code.
 
-It consolidates the successful Chapter 11 laboratory
-experiments, including:
+It consolidates successful Chapter 11 laboratory experiments,
+including:
 
 - WebSocket transport and connection lifecycle.
 - SSAP registration and request/response correlation.
@@ -56,42 +58,43 @@ experiments, including:
 - Temporary development credentials.
 - Transport and pairing diagnostics.
 
+The associated laboratory scripts are located in:
+
+`firmware/tests/test_lg_webos_*.py`
+
 The adapter remains intentionally disconnected from
 production device routing.
 
-Review this adapter and the associated laboratory scripts
-before finalizing the new configuration schema, device
-registry, command representation, and adapter interfaces.
+**LG runtime integration is deferred, but its configuration
+requirements are not.**
 
-The laboratory scripts are located in
-`firmware/tests/test_lg_webos_*.py`.
+Implement the LG device record, credential representation,
+SSAP and pointer command formats, and associated editor
+infrastructure during the configuration refactor.
 
-The configuration redesign is undertaken in direct support
-of future LG webOS integration.
-
-**LG integration is deferred, but its requirements are not.**
-
-The immediate objective is to establish and regression-test
+The immediate operational objective is to regression-test
 the redesigned configuration using existing supported devices
 before connecting the LG adapter to the running application.
 
-Future Apple TV support may benefit from the same
-architectural foundation, but its specific protocol
-requirements remain to be investigated.
+The final LG execution and asynchronous completion semantics
+will be established through subsequent integration testing.
 
 ## 3. Design objectives
 
 - Explicitly identify the type of each configured device.
 - Separate device identity, role, type, endpoint, and commands.
 - Select adapters by configured device type.
-- Preserve editable fundamental and custom action commands.
+- Preserve editable fundamental and Custom Action commands.
+- Support HTTP, SSAP, and pointer command representations.
 - Accommodate device-specific configuration attributes.
-- Provide a compact, extensible configuration editor.
+- Provide a compact, protocol-aware configuration editor.
+- Support adding and removing rooms through the editor.
 - Automatically generate stable Custom Action IDs.
+- Provide conditional pairing and credential controls.
 - Preserve existing configuration persistence safeguards.
 - Avoid unnecessary legacy schema compatibility.
 - Preserve existing operational behavior through regression testing.
-- Prepare for pairing without implementing its UI prematurely.
+- Avoid speculative abstractions for future protocols.
 
 ## 4. Architectural invariants
 
@@ -100,7 +103,7 @@ The redesign must preserve the following principles:
 - There remains one shared Dumb Queue™.
 - Browser and physical controls use the same execution path.
 - Fundamental actions retain their established identities.
-- Custom actions retain their ordered step semantics.
+- Custom Actions retain their ordered step semantics.
 - Device adapters own protocol-specific behavior.
 - The configuration layer owns configuration data and persistence.
 - Display names are not internal identifiers.
@@ -110,6 +113,8 @@ The redesign must preserve the following principles:
 - No automatic command replay after transport failure.
 - Configuration validity does not imply equipment reachability
   or successful command execution.
+- Full configuration validation must not be repeated in
+  latency-sensitive execution paths.
 
 Do not introduce another action queue or an independent
 execution path for a new protocol.
@@ -132,11 +137,8 @@ These identifiers are independent of the device type.
 
 For example, TV is a role, while LG webOS is a device type.
 
-Do not infer the device type from its role, endpoint port,
+Do not infer device type from its role, endpoint port,
 command syntax, or display label.
-
-Retain the existing stable room identifiers and support for
-one to three configured rooms.
 
 Future custom destinations remain outside the immediate
 redesign scope.
@@ -146,7 +148,7 @@ redesign scope.
 Replace the existing endpoint-string representation with
 structured device records.
 
-Conceptual Config v5 device fragment:
+Example Config v5 device fragment:
 
 ```json
 {
@@ -167,20 +169,20 @@ Conceptual Config v5 device fragment:
 }
 ```
 
-This is an illustrative fragment, not a complete deployable
-configuration.
+Retain existing IPv4 and optional port syntax unless a
+specific protocol requires an extension.
 
-The final field names and exact validation rules should
-be established after inspecting the current implementation.
+An unused device may be represented by a generic HTTP
+device with a blank endpoint.
 
-Existing IPv4 and optional port syntax should remain
-supported unless a specific protocol requires an extension.
+A separate `none` device type is unnecessary.
 
 ### 5.3 Device-specific attributes
 
-Device types may require additional configuration attributes.
+Store device-specific configuration attributes directly
+within the applicable device record.
 
-A future LG webOS device could resemble:
+Example LG webOS device:
 
 ```json
 {
@@ -191,79 +193,476 @@ A future LG webOS device could resemble:
 ```
 
 The client key belongs to the configured device, not to
-individual fundamental commands or custom action steps.
+individual commands.
 
-Avoid adding unrelated authentication fields to every device.
+Avoid introducing a nested settings object unless future
+requirements establish a genuine need for one.
+
+Do not add unrelated authentication attributes to ordinary
+Roku, Denon, or generic HTTP device records.
 
 Device-specific attributes should be validated according
 to the declared device type.
 
-Whether these attributes reside directly in the device
-record or in a nested settings object remains an open
-schema design decision.
+### 5.4 Adapter-owned attributes
 
-## 6. Device-type registry
+Do not expose internal protocol machinery as user
+configuration merely because a new protocol requires it.
 
-Consider a small centralized registry of supported device types.
+Examples of adapter-owned responsibilities include:
 
-Proposed internal identifiers:
+- WebSocket connection paths and headers.
+- Registration manifests.
+- Protocol request identifiers.
+- Connection and response timeouts.
+- Persistent connection management.
+- Authentication procedures.
+- Receive buffers and outstanding response metadata.
 
-| Type ID | Display label | Status |
+The configuration describes the device and the commands
+to execute. The adapter implements the protocol.
+
+## 6. Room configuration
+
+Retain the existing stable room identifiers:
+
+- `room-1`
+- `room-2`
+- `room-3`
+
+Support one to three configured rooms.
+
+Only configured rooms should be represented in the
+stored configuration.
+
+Unused rooms do not require empty placeholder structures.
+
+Removing a room must not renumber the remaining rooms.
+
+### 6.1 Dynamic room editing
+
+The configuration editor shall provide controls for adding
+and removing rooms.
+
+For an unconfigured room, display a compact Add Room
+control instead of a complete empty configuration section.
+
+Adding a room creates its default configuration structure
+in the browser, including:
+
+- Room name.
+- Three built-in device records.
+- Fourteen fundamental action definitions.
+- An empty Custom Actions array.
+
+Removing a room removes its entire configuration structure,
+subject to user confirmation.
+
+At least one configured room must remain.
+
+Room additions and removals become persistent only after
+a successful configuration save.
+
+No additional firmware API endpoints or schema attributes
+are required solely for this capability.
+
+### 6.2 Benefits
+
+Omitting unused rooms reduces:
+
+- Stored configuration size.
+- Runtime configuration memory consumption.
+- Parsing and validation work.
+- Configuration transfer and backup sizes.
+- Unnecessary browser rendering.
+
+It also makes focused configuration recipes practical,
+including single-room experimental configurations.
+
+## 7. Device-type registry
+
+Establish a small centralized registry of device types.
+
+| Type ID | Display label | Initial runtime status |
 |---|---|---|
 | `generic-http` | Generic HTTP | Operational |
 | `denon` | Denon AVR | Operational |
 | `roku` | Roku ECP | Operational |
-| `lg-webos` | LG webOS | Experimental |
+| `lg-webos` | LG webOS | Integration pending |
 | `apple-tv` | Apple TV | Planned |
 | `fire-tv` | Amazon Fire TV | Planned |
 
-Internal identifiers must remain independent of user-facing
-labels.
+Internal identifiers must remain independent of
+user-facing labels.
 
-The registry may describe:
+The registry should provide the information needed for:
 
-- Device type identifier.
-- User-facing display label.
-- Associated adapter.
-- Default endpoint port, where appropriate.
-- Supported command representation.
-- Additional configuration attributes.
+- Device type identification.
+- User-facing display labels.
+- Adapter selection.
+- Supported command kinds.
+- Device-specific attributes.
+- Default endpoint ports, where applicable.
 - Pairing capability.
 - Implementation availability.
 
 Avoid duplicating device-type knowledge independently
 throughout the firmware and browser editor.
 
-The exact registry implementation and browser exposure
-mechanism require further design.
+The registry should remain lightweight and avoid
+unnecessary dependencies on transport implementations.
+
+The exact registry structure and browser exposure
+mechanism are implementation details.
+
+### 7.1 Device-type availability
 
 Experimental and planned device types may appear in
 the configuration editor's device-type selector.
 
-Types that are not yet operational must be displayed
-as disabled (greyed-out), non-selectable options.
+Types not yet operational must appear disabled
+(greyed-out) in the normal editor.
 
-Their presence communicates intended future support
-without implying that their adapters are operational.
+Implement the LG configuration representation and
+associated editor infrastructure during the refactor.
 
-Device-type availability should be driven by the
-central registry rather than independently hard-coded
-into the browser editor.
+Enable normal LG device selection and execution at the
+appropriate LG integration checkpoint.
+
+Availability must be driven by the central registry
+rather than independently hard-coded in the browser.
 
 Device-type validation should reuse the central registry
-and remain deliberately simple. Avoid introducing additional
-validation machinery solely to defend against manually
-modified configuration files containing unavailable device
-types.
+and remain deliberately simple.
 
-## 7. Configuration editor redesign
+Do not introduce excessive validation machinery solely
+to defend against manually modified configuration files.
 
-### 7.1 Compact device table
+## 8. Command configuration
+
+### 8.1 Common command objects
+
+Fundamental actions and Custom Action steps shall use
+a common nested command representation.
+
+Every command object shall contain an explicit `kind`
+attribute.
+
+Supported initial command kinds:
+
+| Kind | Purpose | Command attributes |
+|---|---|---|
+| `http` | HTTP-oriented device commands | `method`, `path` |
+| `ssap` | LG webOS SSAP requests | `uri`, optional `payload` |
+| `pointer` | LG webOS pointer input | `button` |
+
+The explicit command kind simplifies validation, editor
+rendering, and adapter interpretation.
+
+Do not infer command kinds from the presence or absence
+of other attributes.
+
+Only include attributes applicable to the command kind.
+
+### 8.2 HTTP commands
+
+Example Roku Home action:
+
+```json
+{
+  "target": "device-3",
+  "command": {
+    "kind": "http",
+    "method": "POST",
+    "path": "/keypress/Home"
+  }
+}
+```
+
+Preserve editable GET and POST methods and command paths.
+
+The HTTP command representation describes the configured
+command, not necessarily its ultimate transport.
+
+For example, the Denon adapter may recognize an eligible
+volume command and execute it through its specialized
+persistent TCP connection.
+
+### 8.3 LG SSAP commands
+
+Example LG volume command:
+
+```json
+{
+  "target": "device-1",
+  "command": {
+    "kind": "ssap",
+    "uri": "ssap://audio/volumeUp"
+  }
+}
+```
+
+Example command containing a structured payload:
+
+```json
+{
+  "target": "device-1",
+  "command": {
+    "kind": "ssap",
+    "uri": "ssap://system.launcher/launch",
+    "payload": {
+      "id": "com.webos.app.home"
+    }
+  }
+}
+```
+
+The payload is an optional JSON object, not a string
+containing encoded JSON.
+
+The editor may present it as editable JSON text, but
+must parse and validate it before saving.
+
+Preserve the user's ability to experiment with arbitrary
+SSAP URIs and applicable payloads.
+
+Do not require a hard-coded library of every supported
+LG command.
+
+### 8.4 LG pointer commands
+
+Example LG Home button command:
+
+```json
+{
+  "target": "device-1",
+  "command": {
+    "kind": "pointer",
+    "button": "HOME"
+  }
+}
+```
+
+Pointer input is distinct from SSAP request execution.
+
+The LG adapter owns pointer connection acquisition,
+message formatting, and transmission.
+
+### 8.5 Toggle commands
+
+Toggle actions shall contain independent ON and OFF
+command objects.
+
+Example LG mute toggle:
+
+```json
+{
+  "target": "device-1",
+  "on_command": {
+    "kind": "ssap",
+    "uri": "ssap://audio/setMute",
+    "payload": {
+      "mute": true
+    }
+  },
+  "off_command": {
+    "kind": "ssap",
+    "uri": "ssap://audio/setMute",
+    "payload": {
+      "mute": false
+    }
+  }
+}
+```
+
+This representation also permits independent HTTP methods
+and paths without introducing special toggle-specific
+protocol attributes.
+
+Preserve the existing toggle history behavior for
+operational devices.
+
+### 8.6 Protocol request identifiers
+
+An LG SSAP request transmitted by the adapter may resemble:
+
+```json
+{
+  "id": "clonker-42",
+  "type": "request",
+  "uri": "ssap://audio/volumeUp"
+}
+```
+
+The outer request ID is generated by the adapter for
+response correlation.
+
+It is not a user-editable configuration attribute.
+
+An identifier inside a command payload may represent
+application-specific data and legitimately be configurable.
+
+Keep these meanings separate.
+
+### 8.7 Blank commands
+
+Preserve intentionally blank fundamental commands.
+
+The exact empty representation for each command kind
+must be defined consistently in the validator and editor.
+
+An empty fundamental command is not a transport request.
+
+Custom Action steps continue to require actual commands.
+
+## 9. Custom Actions
+
+### 9.1 Original design philosophy
+
+Custom Actions were inspired by the flexibility of
+iOS Shortcuts.
+
+They intentionally allowed arbitrary HTTP GET and POST
+commands rather than limiting the user to the predefined
+fundamental action library.
+
+Preserve that philosophy.
+
+The introduction of LG webOS provides a genuine reason
+to extend Custom Actions beyond generic HTTP.
+
+### 9.2 Protocol-aware Custom Action steps
+
+Custom Action steps shall use the same command objects
+as fundamental actions.
+
+Example mixed-protocol Custom Action:
+
+```json
+{
+  "name": "Movie Mode",
+  "id": "custom-action-1",
+  "steps": [
+    {
+      "target": "device-1",
+      "command": {
+        "kind": "pointer",
+        "button": "HOME"
+      },
+      "wait_after_ms": 1000
+    },
+    {
+      "target": "device-3",
+      "command": {
+        "kind": "http",
+        "method": "POST",
+        "path": "/keypress/Home"
+      },
+      "wait_after_ms": 3000
+    },
+    {
+      "target": "device-2",
+      "command": {
+        "kind": "http",
+        "method": "GET",
+        "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1"
+      },
+      "wait_after_ms": 0
+    }
+  ]
+}
+```
+
+This is an illustrative configuration fragment, not a
+verified equipment automation recipe.
+
+The target identifies the configured device.
+
+The device type determines the applicable adapter and
+supported command kinds.
+
+Do not duplicate device type within each command step.
+
+### 9.3 Execution semantics
+
+Custom Actions shall execute through the appropriate
+configured device adapters.
+
+Preserve single-command semantics.
+
+A Custom Action step must not implicitly initiate
+physical button holds or repeat sequences.
+
+Preserve existing Roku and Denon Custom Action behavior
+during the initial regression phase.
+
+Any changes to specialized transport optimization for
+Custom Actions must be deliberate and tested.
+
+### 9.4 Step delays
+
+Preserve the existing completion-based delay semantics.
+
+The current dispatcher begins `wait_after_ms` after
+successful command transmission and returns the next
+step to the Dumb Queue.
+
+Other eligible commands may execute during the wait.
+
+Do not change this established behavior speculatively.
+
+The exact definition of successful completion for
+asynchronous LG SSAP requests will be determined during
+LG adapter integration.
+
+## 10. Custom Action IDs
+
+### 10.1 Automatic generation
+
+Remove ordinary user editing of Custom Action IDs.
+
+Generate an ID automatically when creating a Custom Action.
+
+Display the ID in smaller, read-only text for diagnostic
+and development purposes.
+
+### 10.2 Identity rules
+
+- Preserve the ID when renaming or editing an action.
+- Preserve the ID when reordering actions.
+- Generate a new ID when duplicating an action, if supported.
+- Never derive identity solely from the display name.
+- Never renumber existing actions merely because one is deleted.
+- Validate imported IDs and reject invalid duplicates.
+- Do not silently rewrite existing valid IDs.
+
+Prefer generating new IDs that are unique throughout
+the configuration.
+
+Retain compatibility with existing valid room-scoped IDs.
+
+The exact generation mechanism remains an implementation
+detail and should avoid unnecessary dependencies.
+
+### 10.3 Distinct identifier classes
+
+| Identifier | Purpose |
+|---|---|
+| Room ID | Stable configured room |
+| Device ID | Stable configured destination |
+| Device type ID | Adapter and capability selection |
+| Fundamental Action ID | Application-defined action |
+| Custom Action ID | Stable user-defined action |
+| Protocol request ID | Transient network correlation |
+
+These identifiers have different scopes and lifetimes.
+
+## 11. Configuration editor redesign
+
+### 11.1 Compact device table
 
 Replace the existing device address fields with a compact,
-vertically organized table within each room configuration.
-
-Conceptual layout:
+vertically organized table within each configured room.
 
 | Role | Device type | IP address : port |
 |---|---|---|
@@ -273,86 +672,96 @@ Conceptual layout:
 
 The room name remains independently editable.
 
-Each row contains:
+Device type selection may provide sensible default ports
+for empty endpoints.
 
-- A recognizable device role label.
-- A supported device-type selector.
-- An editable endpoint.
+Never silently overwrite existing user-entered endpoints
+or commands.
 
-Device type selection may eventually provide sensible
-default ports, but must not silently overwrite existing
-user-entered endpoints or commands.
-
-### 7.2 Conditional device-specific controls
+### 11.2 Conditional device-specific controls
 
 When a selected device type requires pairing, display
-a pairing button alongside an editable client-key field
-associated with that device row.
+a pairing button alongside an editable client-key field.
 
 Both controls should be available together, allowing
-the user to either initiate pairing or manually enter
-an existing client key.
+the user to initiate pairing or manually enter an
+existing client key.
 
-Pairing-capable device rows should provide:
+Provide infrastructure for:
 
-- An editable client-key field.
-- A pairing button.
+- Editable client-key entry.
+- Pairing initiation.
 - Pairing progress and result indication.
-- An indication of credential availability.
+- Credential availability indication.
 
 These controls should appear conditionally according
 to the selected device type's declared capabilities.
 
-Other device-specific configuration attributes may
-be accommodated using the same approach.
+Keep the layout compact for ordinary HTTP-oriented devices.
 
-The layout should remain compact for ordinary Roku,
-Denon, and generic HTTP configurations.
+Implement the conditional editor infrastructure during
+the configuration refactor.
 
-Actual pairing functionality remains deferred until
-the redesigned configuration architecture is operational
-and regression-tested.
+Actual pairing operations remain deferred until the
+existing-equipment regression checkpoint is complete.
 
-### 7.3 Preserve existing editor capabilities
+### 11.3 Protocol-aware command editing
+
+The selected destination's device type determines
+the available command kinds and editor fields.
+
+HTTP command editor:
+
+- Method selector: GET or POST.
+- Editable path.
+
+SSAP command editor:
+
+- Editable SSAP URI.
+- Optional editable JSON payload.
+
+Pointer command editor:
+
+- Editable pointer button name.
+
+Apply the same command editing principles to fundamental
+actions, toggle commands, and Custom Action steps.
+
+Custom Action steps additionally retain their existing
+delay controls.
+
+Changing a device type or command destination must not
+silently discard or rewrite existing commands.
+
+Identify incompatible commands clearly and allow the
+user to resolve them.
+
+### 11.4 Preserve existing editor capabilities
 
 Retain:
 
-- Room configuration.
+- Room name editing.
 - Fundamental action editing.
 - Toggle ON/OFF command editing.
-- Custom action creation and editing.
-- Ordered custom action steps and delays.
+- Custom Action creation and editing.
+- Ordered Custom Action steps and delays.
 - Revision-aware saves.
 - Configuration import and recipe browsing.
 - Test Remote functionality.
 - Existing save confirmation and error handling.
 
-Changing a device type must not silently discard or rewrite
-the user's existing commands.
+Add dynamic room creation and removal as described
+in Section 6.
 
-Incompatible commands should be identified clearly.
+## 12. Explicit adapter selection
 
-## 8. Explicit adapter selection
-
-### 8.1 Current approach
-
-The current application uses configured endpoints,
-HTTP methods, and command paths.
-
-Specialized adapter selection relies partly on recognizing
-Roku and Denon command signatures.
-
-This was practical for the original HTTP-oriented design.
-
-### 8.2 Proposed approach
+### 12.1 Execution flow
 
 The configured target identifies a device record.
 
 The device record explicitly identifies the device type.
 
 The device type determines the adapter.
-
-Conceptual execution flow:
 
 ```text
 Physical controls / Test Remote
@@ -373,137 +782,50 @@ Physical controls / Test Remote
 ```
 
 The dispatcher and adapter coordination layer should not
-need to infer a device's identity from its command syntax.
+need to infer device identity from command syntax.
 
-### 8.3 Protocol-specific transport decisions
+### 12.2 Protocol-specific transport decisions
 
 Explicit adapter selection does not eliminate all
 command-specific recognition.
 
 It changes where that recognition belongs.
 
-The Denon adapter may still recognize volume commands
-that use its specialized persistent TCP connection.
+The Denon adapter may recognize volume commands eligible
+for its specialized persistent TCP connection.
 
-The Roku adapter may still recognize commands eligible
-for persistent HTTP, native held-button behavior, or
-other specialized execution policies.
+The Roku adapter may recognize commands eligible for
+persistent HTTP, native held-button behavior, or other
+specialized execution policies.
 
-LG webOS may distinguish SSAP requests from pointer
-input commands.
+LG webOS distinguishes SSAP requests from pointer input.
 
-These are internal adapter decisions, not device-type
+These are adapter execution decisions, not device-type
 discovery mechanisms.
 
 Preserve the useful protocol-specific diagnostics and
 transport behavior established in earlier chapters.
 
-### 8.4 Adapter cache and lifecycle
+### 12.3 Adapter cache and lifecycle
 
-Review the existing adapter cache, configuration accessors,
-readiness checks, execution delegation, cancellation,
-polling, and connection cleanup.
+Review and update the existing adapter cache,
+configuration accessors, readiness checks, execution
+delegation, cancellation, polling, and connection cleanup.
 
 Changed configurations must not leave stale device-type
 associations, endpoint associations, or authenticated
 sessions active.
 
-Preserve the existing changed-save and unchanged-save
+Credential changes may require session retirement even
+when the endpoint remains unchanged.
+
+Preserve existing changed-save and unchanged-save
 semantics.
 
 Do not reintroduce repeated full configuration validation
 into latency-sensitive execution paths.
 
-## 9. Command configuration
-
-### 9.1 Preserve user-editable commands
-
-Editable commands are a deliberate Clonker capability.
-
-Users should remain able to configure the commands associated
-with fundamental actions and custom action steps.
-
-Explicit device typing must not turn the Clonker into a
-fixed, hard-coded command library.
-
-The first implementation phase should preserve the existing
-HTTP method/path representation and behavior where practical.
-
-However, the new schema must be reviewed against the
-requirements of the draft LG webOS adapter before it
-is finalized.
-
-### 9.2 Future command representations
-
-Different protocols may require different command data.
-
-Examples:
-
-| Protocol | Command | Additional data |
-|---|---|---|
-| Roku ECP | `/keypress/Home` | POST |
-| Denon HTTP | `/goform/formiPhoneAppDirect.xml?MVUP` | GET |
-| LG SSAP | `ssap://audio/volumeUp` | None |
-| LG SSAP | `ssap://audio/setMute` | JSON payload |
-| LG Pointer | `HOME` | None |
-
-These examples illustrate protocol requirements, not
-a finalized Config v5 command schema.
-
-A future LG SSAP command may contain a configurable URI
-and optional structured payload.
-
-Pointer input commands may require a distinct command
-kind or another unambiguous representation.
-
-Do not assume every future command can be expressed as
-an HTTP method and slash-prefixed path.
-
-Review both fundamental actions and custom action steps
-when establishing the command model.
-
-Toggle actions must also accommodate distinct ON and OFF
-command arguments where required.
-
-### 9.3 Protocol request identifiers
-
-An LG SSAP request can resemble:
-
-```json
-{
-  "id": "clonker-42",
-  "type": "request",
-  "uri": "ssap://audio/volumeUp"
-}
-```
-
-The request ID is generated by the adapter for response
-correlation.
-
-It is not a user-editable configuration attribute.
-
-Some commands contain an additional identifier within
-their payload:
-
-```json
-{
-  "id": "clonker-43",
-  "type": "request",
-  "uri": "ssap://system.launcher/launch",
-  "payload": {
-    "id": "com.webos.app.home"
-  }
-}
-```
-
-The payload ID identifies the application to launch.
-
-Unlike the outer request ID, it is command-specific data
-and may legitimately be configurable.
-
-Keep these meanings separate.
-
-### 9.4 Asynchronous completion
+## 13. Deferred LG execution questions
 
 The LG laboratory experiments demonstrated multiple
 outstanding read-only SSAP requests with response
@@ -520,90 +842,52 @@ Future integration must distinguish:
 - Protocol acknowledgment.
 - Actual equipment behavior.
 
-Review asynchronous failure propagation, response deadlines,
-toggle advancement, custom action step completion, and
-queue cancellation before enabling LG execution.
+The following questions are intentionally deferred until
+the configuration refactor and existing-equipment
+regression testing are complete:
 
-Do not change existing completion semantics speculatively.
+- Whether SSAP Custom Action steps wait for acknowledgment
+  before advancing.
+- Ordering of state-changing SSAP requests.
+- Ordering across SSAP and pointer connections.
+- Asynchronous failure propagation.
+- Response deadlines and timeout handling.
+- Toggle advancement after asynchronous responses.
+- Custom Action completion and delay timing for SSAP.
+- Queue cancellation following delayed protocol failures.
+- Exact unavailable-device execution semantics.
 
-## 10. Custom Action IDs
+Resolve these questions through actual equipment testing
+rather than speculative queue redesign.
 
-### 10.1 Remove user editing
+The Config v5 schema does not depend on their resolution.
 
-Custom Action IDs were originally exposed as editable
-configuration fields.
+Do not introduce user-configurable acknowledgment policies,
+response timeout attributes, or additional queues without
+an established requirement.
 
-This flexibility is unnecessary for ordinary users and
-creates avoidable opportunities for duplicate or unstable
-identifiers.
-
-The redesigned editor should generate these IDs automatically.
-
-Display the ID in smaller, read-only text for diagnostic
-and development purposes.
-
-### 10.2 Identity rules
-
-- Generate an ID when creating a custom action.
-- Preserve the ID when renaming or editing an action.
-- Preserve the ID when reordering actions.
-- Generate a new ID when duplicating an action, if supported.
-- Never derive identity solely from the display name.
-- Never renumber existing actions merely because one is deleted.
-- Validate imported IDs and reject invalid duplicates.
-- Do not silently rewrite existing valid IDs.
-
-Config v4 currently requires uniqueness within each room.
-
-The proposed redesign should consider configuration-wide
-uniqueness for newly generated IDs.
-
-Whether to enforce configuration-wide uniqueness for all
-imported actions should be decided after reviewing current
-consumers and existing configuration data.
-
-The generation mechanism must work within CircuitPython
-and browser resource constraints.
-
-Avoid unnecessary complexity or external dependencies.
-
-### 10.3 Distinct identifier classes
-
-Keep the following concepts separate:
-
-| Identifier | Purpose |
-|---|---|
-| Room ID | Stable configured room |
-| Device ID | Stable configured destination |
-| Device type ID | Adapter and capability selection |
-| Fundamental Action ID | Application-defined action |
-| Custom Action ID | Stable user-defined action |
-| Protocol request ID | Transient network correlation |
-
-These identifiers have different scopes and lifetimes.
-
-## 11. Future pairing architecture
+## 14. Pairing architecture
 
 Pairing is a device protocol operation.
 
-The configuration interface orchestrates the user interaction
+The configuration interface orchestrates user interaction
 and persists the resulting credentials.
 
 The draft LG adapter already contains experimental pairing
 helpers and client-key verification functionality.
 
 Review and reuse those helpers rather than implementing
-LG-specific WebSocket registration inside the browser
+LG-specific WebSocket registration inside browser
 management or configuration modules.
 
 Conceptual pairing flow:
 
-1. User selects a configured device requiring pairing.
+1. User selects a device requiring pairing.
 2. Configuration UI requests a pairing operation.
 3. The appropriate adapter initiates pairing.
 4. The user approves the request on the equipment.
 5. The adapter cooperatively processes the result.
-6. The resulting credential is returned to the configuration layer.
+6. The resulting credential is returned to the editor.
 7. The user reviews and saves the updated configuration.
 
 The approval wait must not block the main cooperative
@@ -615,13 +899,13 @@ must be handled explicitly.
 Pairing success and configuration persistence are separate
 operations.
 
-Do not assume successful pairing means that the resulting
+Do not assume successful pairing means the resulting
 credential has already been saved.
 
-The exact management API and pairing state model remain
-future design work.
+The operational pairing API and state model remain
+deferred until LG integration.
 
-### 11.1 Configuration validity versus device readiness
+### 14.1 Configuration validity versus device readiness
 
 A valid configuration may contain:
 
@@ -630,22 +914,22 @@ A valid configuration may contain:
 - A device awaiting pairing.
 - A missing or placeholder credential.
 
-Such a configuration should remain importable and savable.
+Such configurations should remain importable and savable,
+subject to the applicable device-type availability rules.
 
-A device requiring authentication should not be considered
-ready for execution until the necessary credential is
-available.
+A device requiring authentication is not ready for
+execution until its necessary credential is available.
 
 An unready device must not prevent unrelated configured
 devices from operating normally.
 
-Define the exact unavailable-device and custom-action
-failure semantics before enabling authenticated adapters.
-
-### 11.2 Credential handling
+### 14.2 Credential handling
 
 Actual client keys and authentication tokens must not be
 committed to the public repository or published in recipes.
+
+The maintainer may retain credentials privately and paste
+them into the configuration editor as needed.
 
 Do not include credentials in ordinary diagnostic snapshots,
 Flight Recorder output, or error messages.
@@ -665,12 +949,84 @@ deployment beyond the existing trusted environment.
 Temporary development credentials in the LG draft are
 a laboratory convenience, not the permanent design.
 
-## 12. Schema versioning and replacement
+## 15. Configuration size and resource considerations
+
+### 15.1 Representative size measurements
+
+During Chapter 12 design, the existing repository recipe:
+
+`recipes/david-roku-denon-starter.json`
+
+was converted in memory to the proposed Config v5
+representation.
+
+The experiment included typed device records, nested
+command objects, explicit command kinds, and independent
+toggle command objects.
+
+No repository files were modified.
+
+Measured minified JSON sizes:
+
+| Configuration | Size |
+|---|---:|
+| Original Config v4, three rooms | 5,098 bytes |
+| Proposed Config v5, three rooms | 7,022 bytes |
+| Proposed Config v5, two configured rooms | 5,508 bytes |
+| Proposed Config v5, Sunroom only | 2,610 bytes |
+
+The complete three-room configuration increased by
+1,924 bytes, approximately 37.7 percent.
+
+The unused third room accounted for approximately
+1.5 KB of the proposed Config v5 representation.
+
+These measurements use the repository HTTP recipe,
+not the latest live configuration, and do not include
+LG credentials or SSAP payloads.
+
+### 15.2 Avoid unnecessary JSON bloat
+
+Prefer clear attribute names and consistent command
+representations over abbreviated keys or clever compression.
+
+Continue storing canonical minified JSON on the Pico.
+
+Use readable, indented JSON for published recipes.
+
+Omit unused rooms rather than retaining complete empty
+room structures.
+
+Include protocol-specific attributes only where applicable.
+
+Do not store adapter-owned protocol machinery in
+configuration records.
+
+### 15.3 Proposed size limits
+
+| Limit | Current | Proposed |
+|---|---:|---:|
+| Stored configuration | 8,192 bytes | 16,384 bytes |
+| Incoming management HTTP request | 10,240 bytes | 18,432 bytes |
+
+The proposed limits are provisional until verified through
+Pico memory and configuration persistence testing.
+
+Review actual request buffering, JSON parsing, validation,
+canonical serialization, and save-time memory consumption.
+
+Do not assume serialized JSON size directly represents
+the runtime memory cost of its parsed object structure.
+
+Retain existing room, Custom Action, step count, and
+delay limits unless testing establishes a need to
+change them.
+
+## 16. Schema versioning and replacement
 
 The current active schema is Config v4.
 
-The proposed redesign should increment the schema version
-to Config v5 when the incompatible changes are implemented.
+The incompatible redesign shall introduce Config v5.
 
 There is no requirement to support legacy configuration
 versions or automatic schema migration.
@@ -697,21 +1053,7 @@ Preserve existing validation, canonical serialization,
 revision checking, verified writes, backup rotation,
 and recovery principles.
 
-Review storage and HTTP request limits against the new
-configuration size.
-
-Current documented limits include:
-
-- 8192 bytes for stored configuration.
-- 10240 bytes for incoming management HTTP requests.
-
-Measure representative configurations before changing
-these limits.
-
-Avoid arbitrary increases that could create unnecessary
-memory pressure on the Pico.
-
-## 13. Recipe Configuration and Credential Sanitization
+## 17. Configuration Recipe Library
 
 The Configuration Recipe Library distributes complete
 replacement configuration JSON files.
@@ -720,14 +1062,14 @@ It should remain a simple publication and download
 mechanism rather than becoming a protocol-aware
 configuration service.
 
-Verify that the existing recipe website does not depend
-on the old schema before assuming that replacing the
-downloadable JSON is sufficient.
-
-Update the downloadable recipe and any associated schema
+Update downloadable recipes and associated schema
 version descriptions when Config v5 is introduced.
 
-### 13.1 Publication workflow
+Review the recipe website, catalog, documentation,
+and embedded configuration import functionality for
+schema dependencies.
+
+### 17.1 Publication workflow
 
 The maintainer may provide an exported, working,
 minified configuration JSON for recipe preparation.
@@ -736,8 +1078,8 @@ The publication preparation process should:
 
 1. Parse the working JSON.
 2. Produce a readable, indented representation.
-3. Preserve device types, commands, action IDs, custom
-   action ordering, and step delays.
+3. Preserve device types, commands, action IDs, Custom
+   Action ordering, and step delays.
 4. Replace sensitive credentials with descriptive placeholders.
 5. Review other potentially sensitive values.
 6. Validate the resulting JSON syntax and target schema.
@@ -762,7 +1104,7 @@ recipe examples or replaced when requested.
 The published recipe must not modify the maintainer's
 working configuration.
 
-### 13.2 Recipe import
+### 17.2 Recipe import
 
 The user should be able to import a recipe, review it,
 edit device addresses and credentials, and explicitly save.
@@ -774,13 +1116,34 @@ they were real authentication keys.
 Pretty-printed recipe files may be larger than their
 compact stored representation.
 
-Review import size limits and canonicalization behavior
-as part of the redesign.
+Review import size limits and canonicalization behavior.
 
-## 14. Application impact inventory
+### 17.3 Recipes as development tools
 
-Before implementation, inspect the current repository and
-identify every consumer of the configuration schema.
+The existing recipe import mechanism also provides a
+convenient way to switch between development configurations.
+
+Maintain separate recipes for:
+
+- Existing-equipment Config v5 regression testing.
+- Subsequent LG webOS integration and experimentation.
+
+The LG experimental recipe may replace Sunroom Denon
+command mappings with LG commands and omit unrelated rooms.
+
+The maintainer can restore the baseline configuration
+by reimporting its recipe.
+
+Switching between recipes also provides a useful test
+of adapter cache invalidation and connection cleanup.
+
+Do not introduce a separate development mode or
+configuration profile manager solely for this purpose.
+
+## 18. Application impact inventory
+
+Inspect the current repository rather than relying solely
+on historical documentation or conversation summaries.
 
 Areas requiring review include:
 
@@ -788,13 +1151,14 @@ Areas requiring review include:
 - Configuration accessors and active RAM state.
 - Revision calculation and persistence.
 - Startup loading and recovery.
+- Device-type registry.
 - Adapter cache construction.
 - Device adapter selection and execution.
 - Action dispatcher and Dumb Queue integration.
 - Fundamental action and toggle handling.
-- Custom action admission and sequencing.
+- Custom Action admission and sequencing.
 - Physical control coordination.
-- OLED feedback and custom action selection.
+- OLED feedback and Custom Action selection.
 - Configuration editor HTML and JavaScript.
 - Management HTTP API.
 - Test Remote page.
@@ -803,20 +1167,27 @@ Areas requiring review include:
 - Diagnostic and Flight Recorder behavior.
 - Existing standalone tests and regression procedures.
 
-Start with the authoritative configuration implementation:
+The current authoritative configuration implementation is:
 
 `firmware/clonker/device_config_v2.py`
 
 Its historical filename does not indicate the current
 schema version.
 
-Inspect the current code rather than relying solely
-on historical documentation or conversation summaries.
-
 The standalone LG draft must be included in this review
 even though it is not yet a production configuration consumer.
 
-## 15. Proposed implementation sequence
+Existing firmware laboratory and regression scripts are
+located in:
+
+`firmware/tests/`
+
+These scripts are deployed to `/tests/` on the Pico.
+
+Reuse relevant existing tests rather than unnecessarily
+recreating previous experimental work.
+
+## 19. Implementation sequence
 
 ### Phase 1 — Inventory and design
 
@@ -827,39 +1198,58 @@ validation rules, UI dependencies, and test coverage.
 
 Review the LG draft and laboratory findings.
 
-Finalize the Config v5 device and command representations
-before undertaking cascading changes.
+Establish the Config v5 schema and document agreed
+architectural decisions before cascading changes.
 
 ### Phase 2 — Configuration engine
 
-Implement typed device records, validation, accessors,
-and canonical serialization.
+Implement:
 
-Establish the device-type registry and Custom Action
-ID policy.
+- Typed device records.
+- Centralized device-type registry.
+- Common command objects.
+- HTTP, SSAP, and pointer command validation.
+- Independent toggle command objects.
+- Device-specific credential attributes.
+- Configuration accessors and canonical serialization.
+- Custom Action identity policy.
+
+Preserve existing persistence and recovery safeguards.
 
 Prepare complete replacement configurations.
 
-### Phase 3 — Adapter coordination
+Test configuration behavior independently where practical.
+
+### Phase 3 — Adapter coordination and consumers
 
 Refactor adapter selection to use declared device types.
 
-Preserve existing Roku, Denon, and generic HTTP
-transport behavior.
+Update dispatcher, physical control, startup, diagnostic,
+and other configuration consumers.
 
-Review cache rebuilding and connection cleanup.
+Preserve existing Roku, Denon, and generic HTTP behavior.
+
+Route Custom Actions through their applicable adapters
+while preserving single-command semantics.
+
+Review cache rebuilding, cancellation, and connection cleanup.
+
+Do not enable production LG execution yet.
 
 ### Phase 4 — Configuration editor
 
-Implement the compact device table and type selectors.
+Implement:
 
-Remove Custom Action ID editing and implement automatic
-ID generation.
+- Compact device table and device-type selectors.
+- Dynamic room addition and removal.
+- Protocol-aware fundamental and Custom Action editors.
+- Independent toggle command editing.
+- Automatic Custom Action ID generation.
+- Conditional client-key and pairing controls.
 
-Preserve existing command editing, import, save, and
-Test Remote functionality.
+Preserve import, save, revision, and Test Remote behavior.
 
-Pairing controls remain deferred.
+Functional LG pairing remains deferred.
 
 ### Phase 5 — Controlled deployment
 
@@ -868,35 +1258,62 @@ Deploy a compatible firmware/configuration pair.
 Verify startup, configuration loading, room selection,
 and basic execution before broader testing.
 
-### Phase 6 — Regression testing
+Retain an external rollback configuration and compatible
+firmware.
 
-Complete the regression checklist below using the
-existing supported devices.
+### Phase 6 — Existing-equipment regression testing
+
+Complete the regression checklist using existing
+Roku, Denon, and generic HTTP configurations.
 
 Investigate and correct regressions before introducing
 LG runtime execution.
 
-### Phase 7 — Documentation checkpoint
+Verify configuration size limits and memory behavior.
 
-Update the authoritative configuration and architecture
+### Phase 7 — Documentation and recipe checkpoint
+
+Update authoritative configuration and architecture
 documentation to describe the implemented design.
 
 Update recipe files, examples, and development procedures.
 
-Consolidate this proposal into the permanent documentation
-or retain it clearly as historical design material.
+Establish a known-good Config v5 baseline recipe.
 
-The implementation sequence may be adjusted after
-dependency inspection.
+### Phase 8 — LG integration and experimentation
 
-## 16. Regression checklist
+Prepare a focused LG experimental configuration recipe.
+
+Connect the LG adapter to production device routing.
+
+Implement and test operational pairing.
+
+Test individual SSAP and pointer commands.
+
+Experiment with mixed-protocol Custom Actions.
+
+Resolve asynchronous completion, ordering, timeout,
+and failure propagation questions using actual equipment.
+
+Restore the baseline recipe and verify existing operation
+and proper LG session retirement.
+
+The detailed implementation sequence may be adjusted
+after dependency inspection.
+
+## 20. Regression checklist
 
 ### Configuration and persistence
 
 - [ ] Load a valid Config v5 configuration.
 - [ ] Reject malformed and unsupported-schema configurations.
-- [ ] Validate all supported device types and endpoints.
+- [ ] Validate supported device types and endpoints.
+- [ ] Validate HTTP, SSAP, and pointer command structures.
+- [ ] Validate independent ON/OFF command objects.
+- [ ] Validate applicable device-specific attributes.
 - [ ] Preserve intentionally blank destinations and commands.
+- [ ] Verify configurations containing one, two, and three rooms.
+- [ ] Reject configurations containing no rooms.
 - [ ] Verify canonical serialization and revision stability.
 - [ ] Verify changed and unchanged save behavior.
 - [ ] Reject stale browser revisions.
@@ -908,15 +1325,27 @@ dependency inspection.
 
 ### Configuration editor
 
-- [ ] Display and edit all configured room names.
+- [ ] Display and edit configured room names.
+- [ ] Add a previously unconfigured room.
+- [ ] Remove a configured room with confirmation.
+- [ ] Preserve remaining room IDs after removal.
+- [ ] Prevent removal of the last configured room.
 - [ ] Display and edit device types and endpoints.
+- [ ] Display unavailable device types as disabled.
 - [ ] Preserve existing fundamental command mappings.
 - [ ] Preserve toggle ON/OFF mappings.
-- [ ] Create custom actions with automatically generated IDs.
+- [ ] Display applicable protocol-specific command fields.
+- [ ] Validate editable JSON payloads.
+- [ ] Identify incompatible commands after device-type changes.
+- [ ] Verify conditional credential and pairing controls.
+- [ ] Create Custom Actions with automatically generated IDs.
 - [ ] Preserve IDs during editing and reordering.
 - [ ] Reject duplicate or malformed imported IDs.
-- [ ] Preserve custom action step ordering and delays.
+- [ ] Preserve Custom Action step ordering and delays.
 - [ ] Verify Test Remote room and action selection.
+
+LG-specific editor components may be tested independently
+before normal LG device selection is enabled.
 
 ### Runtime execution
 
@@ -931,8 +1360,10 @@ dependency inspection.
 - [ ] Verify physical navigation and playback controls.
 - [ ] Verify power and mute toggle histories.
 - [ ] Verify physical room selection.
-- [ ] Verify custom action encoder selection and execution.
-- [ ] Verify custom action delays and queue sequencing.
+- [ ] Verify Custom Action encoder selection and execution.
+- [ ] Verify Custom Action adapter routing.
+- [ ] Verify Custom Action single-command semantics.
+- [ ] Verify Custom Action delays and queue sequencing.
 - [ ] Verify cancellation after execution failure.
 - [ ] Verify blank-command and unconfigured-room behavior.
 - [ ] Verify configuration changes invalidate stale runtime state.
@@ -944,6 +1375,9 @@ dependency inspection.
 - [ ] Verify OLED responsiveness.
 - [ ] Verify adapter diagnostic snapshots.
 - [ ] Verify Flight Recorder operation.
+- [ ] Measure configuration loading and validation memory usage.
+- [ ] Measure configuration save-time memory usage.
+- [ ] Verify proposed configuration and HTTP request size limits.
 - [ ] Verify memory behavior across repeated saves and actions.
 - [ ] Verify CONFIG and RUN operating-mode transitions.
 - [ ] Verify connection cleanup during configuration changes.
@@ -954,44 +1388,69 @@ socket-send stall remains a separate known investigation.
 Do not claim that the configuration redesign resolves
 that issue without specific supporting evidence.
 
-## 17. Explicitly deferred work
+### Subsequent LG integration
 
-The initial configuration redesign does not include:
+- [ ] Verify manual client-key entry.
+- [ ] Verify pairing initiation, approval, rejection, and cancellation.
+- [ ] Verify credential persistence and placeholder handling.
+- [ ] Verify SSAP commands without payloads.
+- [ ] Verify SSAP commands with structured payloads.
+- [ ] Verify pointer commands.
+- [ ] Verify mixed-protocol Custom Actions.
+- [ ] Investigate asynchronous completion and command ordering.
+- [ ] Verify timeout and failure propagation.
+- [ ] Verify toggle and Custom Action completion semantics.
+- [ ] Verify session retirement after endpoint or credential changes.
+- [ ] Restore the baseline recipe and verify normal operation.
+- [ ] Verify credentials are excluded from ordinary diagnostics.
+
+## 21. Remaining implementation decisions
+
+The principal configuration architecture decisions
+have been established.
+
+Remaining implementation details include:
+
+- Exact registry structure and browser exposure mechanism.
+- Configuration module naming and import updates.
+- Exact blank-command representation for each command kind.
+- Default room and device initialization details.
+- Custom Action ID generation mechanism.
+- Final configuration and HTTP request size limits.
+- Adapter cache invalidation and cleanup implementation.
+- Credential presentation and diagnostic sanitization.
+
+These details should be resolved during implementation
+without unnecessarily expanding the architecture.
+
+The LG asynchronous execution questions are explicitly
+deferred as described in Section 13.
+
+They are not blockers to the configuration refactor.
+
+## 22. Explicitly deferred work
+
+The initial configuration refactor does not include:
 
 - Production LG webOS command routing.
-- Production LG pairing UI or management API.
+- Functional LG pairing operations and management API.
 - Final LG asynchronous execution integration.
 - Apple TV protocol implementation.
+- Fire TV protocol implementation.
 - Arbitrary user-defined device destinations.
 - A replacement action queue.
 - Automatic legacy schema migration.
 - A protocol-aware recipe website.
+- A separate configuration profile manager.
 
-The architecture must accommodate foreseeable LG
-requirements without implementing speculative functionality.
+Implement foreseeable LG configuration requirements now.
 
-## 18. Open design questions
+Implement and test LG protocol execution afterward.
 
-Resolve these during the Chapter 12 source inventory:
+Do not implement speculative functionality for future
+device types without an established requirement.
 
-- Exact Config v5 device record structure.
-- Location and representation of device-specific attributes.
-- Registry ownership and browser exposure.
-- Device-type availability and blank-device representation.
-- Default port behavior.
-- Command representation for non-HTTP protocols.
-- Toggle command argument representation.
-- Custom Action ID generation and uniqueness scope.
-- Configuration and HTTP request size limits.
-- Adapter cache invalidation and session cleanup.
-- Device readiness and unavailable-command semantics.
-- Future credential persistence and management security.
-- Asynchronous response and custom action completion semantics.
-
-These are design questions, not authorization to expand
-the immediate implementation scope.
-
-## 19. Sources of truth
+## 23. Sources of truth
 
 Until the redesign is implemented, the current working
 configuration architecture remains documented in:
@@ -1006,10 +1465,11 @@ Experimental LG protocol knowledge resides primarily in:
 - [LG webOS draft adapter](../firmware/clonker/devices/lg_webos.py)
 - [Firmware laboratory tests](../firmware/tests/)
 
-This proposal records the intended direction and agreed
-design objectives for Chapter 12.
+This document records the agreed architectural direction
+and implementation plan for Chapter 12.
 
-It does not supersede the existing implemented schema.
+It does not supersede the existing implemented schema
+until the redesign has been completed and regression-tested.
 
 ---
 
