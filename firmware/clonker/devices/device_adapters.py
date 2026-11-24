@@ -117,15 +117,16 @@ def resolve(device, kind, action_id, command):
     return GENERIC_HTTP
 
 
-def rebuild(config):
-    """Build and publish a specialized transport cache.
-
-    Construct the replacement map before publishing it.
+def prepare_cache(config):
+    """Prepare a specialized transport cache without publishing.
 
     Configuration-only device types are permitted in the
     schema but are not assigned operational transports.
 
-    Returns the number of specialized transport selections.
+    Performs no network operations and does not modify
+    the active adapter cache.
+
+    Returns the prepared adapter map.
     """
 
     new_map = {}
@@ -159,10 +160,38 @@ def rebuild(config):
                     ("hold", room_id, action_id)
                 ] = ROKU_BUTTON_HOLD
 
+    return new_map
+
+
+def publish_cache(new_map):
+    """Publish a previously prepared adapter cache."""
     global _adapter_map
     _adapter_map = new_map
 
     return len(new_map)
+
+
+def rebuild(config):
+    """Prepare and publish the specialized adapter cache."""
+    return publish_cache(prepare_cache(config))
+
+
+def activate(new_map):
+    """Retire existing sessions and publish a prepared cache.
+
+    Session cleanup is best-effort. A cleanup failure must
+    not prevent activation of an already-persisted config.
+    """
+    try:
+        close()
+    except Exception as error:
+        print(
+            "ADAPTER: Session retirement warning: {}".format(
+                repr(error)
+            )
+        )
+
+    return publish_cache(new_map)
 
 
 def lookup(room_id, action_id):

@@ -22,6 +22,7 @@ import os
 import time
 from clonker.system import logger
 from clonker.devices import device_types
+from clonker.devices import device_adapters
 
 # Clonker Config v5 (JSON): optional rooms, typed device
 # records, protocol-aware commands, fourteen fundamental
@@ -558,6 +559,10 @@ def load(path=None):
     for candidate in (path, path + ".bak", path + ".bak.old"):
         try:
             loaded = _load_existing(candidate)
+            prepared_cache = device_adapters.prepare_cache(loaded)
+
+            device_adapters.activate(prepared_cache)
+
             _current = loaded
             _current_path = path
             return loaded
@@ -734,24 +739,33 @@ def save(config, expected_revision, path=None):
     if serialized == to_json(_current):
         return False
 
+    # Prepare the replacement cache before modifying disk.
+    prepared_cache = device_adapters.prepare_cache(validated)
+
     checked_at = time.monotonic_ns()
 
     # Existing verified persistence and backup rotation.
     _replace_with_backup(path, serialized)
     persisted_at = time.monotonic_ns()
 
-    # Publish only after successful persistence.
+    # Retire old adapter sessions and publish the prepared
+    # cache only after successful persistence.
+    device_adapters.activate(prepared_cache)
     _current = validated
+
+    activated_at = time.monotonic_ns()
 
     logger.info(
         "CONFIG PERF: validation={:.1f}ms, "
-        "disk_check={:.1f}ms, "
+        "disk_check+cache={:.1f}ms, "
         "persistence={:.1f}ms, "
+        "activation={:.1f}ms, "
         "total={:.1f}ms".format(
             (validated_at - started) / 1_000_000,
             (checked_at - validated_at) / 1_000_000,
             (persisted_at - checked_at) / 1_000_000,
-            (persisted_at - started) / 1_000_000,
+            (activated_at - persisted_at) / 1_000_000,
+            (activated_at - started) / 1_000_000,
         )
     )
 
