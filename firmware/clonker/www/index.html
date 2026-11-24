@@ -1,1667 +1,623 @@
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1">
-
-    <title>The Clonker 10000</title>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #20242a;
-            color: #f0f0f0;
-            margin: 0;
-            padding: 24px;
-        }
-
-        main {
-            max-width: 760px;
-            margin: 0 auto;
-        }
-
-        h1,
-        .room h3 {
-            color: #e6b85c;
-        }
-
-        .panel {
-            background: #30363e;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 18px;
-        }
-
-        button {
-            background: #e6b85c;
-            color: #20242a;
-            border: none;
-            border-radius: 6px;
-            padding: 12px 18px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: default;
-        }
-
-        #save-config {
-            margin-top: 20px;
-        }
-
-        .value {
-            font-family: monospace;
-        }
-
-        .attribution {
-            font-size: 10px;
-            color: #888;
-            margin-top: 4px;
-            margin-bottom: 16px;
-            text-align: center;
-        }
-
-        .attribution a {
-            color: inherit;
-            text-decoration: underline;
-        }
-
-        .device-panel {
-            margin-top: 16px;
-        }
-
-        .room {
-            border-top: 1px solid #555;
-            padding-top: 12px;
-            margin-top: 20px;
-        }
-
-        .room label {
-            display: block;
-            margin-top: 12px;
-            margin-bottom: 6px;
-        }
-
-        .room input,
-        .room select {
-            box-sizing: border-box;
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #666;
-            border-radius: 6px;
-            background: #20242a;
-            color: #f0f0f0;
-            font-size: 15px;
-        }
-
-        .device-fields {
-            display: grid;
-            grid-template-columns:
-                repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-        }
-
-        .device-fields label {
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-        }
-
-        .device-fields input {
-            margin-top: auto;
-        }
-
-        .action-editor {
-            margin: 8px 0;
-            padding: 12px;
-            background: #252a30;
-            border-radius: 6px;
-        }
-
-        /* Breathing room for custom-action controls. */
-        .custom-action-editor button {
-            margin: 8px 10px 4px 0;
-        }
- 
-        .action-editor strong {
-            display: block;
-            margin-bottom: 8px;
-        }
-
-        .action-fields {
-            display: grid;
-            grid-template-columns:
-                minmax(90px, 1fr)
-                minmax(85px, 1fr)
-                minmax(160px, 3fr);
-            gap: 10px;
-        }
-
-        .action-fields label {
-            margin: 0;
-            font-size: 12px;
-            color: #bbb;
-        }
-
-        .action-fields input,
-        .action-fields select {
-            margin-top: 5px;
-        }
-
-        details {
-            margin-top: 16px;
-        }
-
-        summary {
-            cursor: pointer;
-            color: #e6b85c;
-            font-weight: bold;
-        }
-
-        .note {
-            font-size: 13px;
-            color: #bbb;
-        }
-
-        /* Narrow screens: place the action path
-           below the target and method controls. */
-        @media (max-width: 520px) {
-            .action-fields {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .action-path {
-                grid-column: 1 / -1;
-            }
-        }
-
-        .toggle-fields .action-path {
-            grid-column: 1 / -1;
-        }
-
-        /* Clock and Test Remote: matching side-by-side panels. */
-
-        .utility-panels {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px;
-            margin-bottom: 18px;
-        }
-
-        .utility-panels .panel {
-            margin-bottom: 0;
-        }
-
-        .utility-panels h2 {
-            margin-top: 0;
-        }
-
-        /* Give the remote link the same appearance as
-           the Synchronize with Browser button. */
-
-        .button-link {
-            display: inline-block;
-            background: #e6b85c;
-            color: #20242a;
-            border: none;
-            border-radius: 6px;
-            padding: 12px 18px;
-            font-size: 16px;
-            font-family: Arial, sans-serif;
-            text-decoration: none;
-            cursor: pointer;
-            box-sizing: border-box;
-        }
-
-        /* Stack panels when the screen is narrow. */
-
-        @media (max-width: 600px) {
-            .utility-panels {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Align utility panel buttons along the bottom. */
-
-        .utility-panels .panel {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .utility-panels .panel > button,
-        .utility-panels .panel > .button-link {
-            align-self: flex-start;
-            margin-top: auto;
-        }
-
-        /* Recipe Library controls */
-
-        .recipe-tools {
-            border: 1px solid #59616d;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0 22px;
-        }
-
-        .recipe-tools h3 {
-            margin-top: 0;
-            color: #e6b85c;
-        }
-
-        .recipe-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .recipe-tools .note {
-            line-height: 1.5;
-        }
-    </style>
-</head>
-
-<body>
-<main>
-    <h1>THE CLONKER 10000</h1>
-
-    <div class="attribution">
-        Designed by David Jacobson ·
-        <a href="https://github.com/djacobson/clonker-10000"
-           target="_blank" rel="noopener noreferrer">
-            GitHub
-        </a>
-    </div>
-
-
-    <!-- Clock and Test Remote utility panels -->
-
-    <div class="utility-panels">
-
-        <!-- System Clock: left panel -->
-
-        <section class="panel">
-            <h2>System Clock</h2>
-
-            <p>
-                Clock source:
-                <span class="value" id="clock-source">
-                    Not connected
-                </span>
-            </p>
-
-            <p>
-                Current time:
-                <span class="value" id="clock-time">
-                    Not available
-                </span>
-            </p>
-
-            <button id="sync-clock">
-                Synchronize with Browser
-            </button>
-        </section>
-
-
-        <!-- Test Remote: right panel -->
-
-        <section class="panel">
-            <h2>Test Remote</h2>
-
-            <p class="note">
-                Send configured actions to your home theater equipment.
-                Commands are queued for execution.
-            </p>
-
-            <a href="/remote.html" class="button-link">
-                Open Test Remote
-            </a>
-        </section>
-
-    </div>
-
-
-    <!-- JSON Device Configuration -->
-
-    <section class="panel device-panel">
-        <h2>Device Configuration</h2>
-
-        <p class="note">
-            Blank device addresses and action paths
-            are valid. Device addresses may be IPv4
-            or IPv4:port. An action with no path or
-            no target device address does nothing.
-        </p>
-
-        <!-- Recipe Library: browse and import -->
-
-        <div class="recipe-tools">
-            <h3>Configuration Recipes</h3>
-
-            <p class="note">
-                Browse complete configuration examples,
-                or import a downloaded JSON recipe into
-                this editor.
-            </p>
-
-            <div class="recipe-buttons">
-                <a
-                    class="button-link"
-                    href="https://djacobson.github.io/clonker-10000/"
-                    target="_blank"
-                    rel="noopener noreferrer">
-                    Browse Recipes
-                </a>
-
-                <button type="button" id="import-recipe">
-                    Import JSON...
-                </button>
-
-                <input
-                    type="file"
-                    id="recipe-file"
-                    accept=".json,application/json"
-                    hidden>
-            </div>
-
-            <p class="note" id="recipe-status"
-               role="status" aria-live="polite">
-                Import replaces the editor contents only.
-                Review before saving.
-            </p>
-        </div>
-
-        <div id="rooms-container">
-            Loading room configuration...
-        </div>
-
-        <button id="save-config" disabled>
-            Save Configuration
-        </button>
-
-        <p id="save-status">
-            Checking filesystem status...
-        </p>
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>
+   The Clonker 10000
+  </title>
+  <style>
+   body {
+    font: 15px Arial,sans-serif;
+    background: #20242a;
+    color: #f0f0f0;
+    margin: 0;
+    padding: 24px;
+}
+
+main {
+    max-width: 760px;
+    margin: auto;
+}
+
+h1,h3,summary {
+    color: #e6b85c;
+}
+
+h1 {
+    font-size: 28px;
+}
+
+.panel {
+    background: #30363e;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+}
+
+.utilities {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.utilities .panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.utilities h2 {
+    margin-top: 0;
+}
+
+.utilities button,.utilities a {
+    align-self: flex-start;
+    margin-top: auto;
+}
+
+button,.button-link {
+    display: inline-block;
+    background: #e6b85c;
+    color: #20242a;
+    border: 0;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+input,select,textarea {
+    box-sizing: border-box;
+    width: 100%;
+    background: #20242a;
+    color: #f0f0f0;
+    border: 1px solid #666;
+    border-radius: 6px;
+    padding: 9px;
+    font: inherit;
+}
+
+textarea {
+    min-height: 65px;
+    resize: vertical;
+}
+
+label {
+    display: block;
+    font-size: 12px;
+    color: #ccc;
+    margin: 8px 0;
+}
+
+label input,label select,label textarea {
+    margin-top: 5px;
+}
+
+input[readonly] {
+    color: #aaa;
+}
+
+.row {
+    display: flex;
+    gap: 10px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.row>label {
+    flex: 1;
+    min-width: 120px;
+}
+
+.row>button {
+    margin-bottom: 8px;
+}
+
+.device,.action {
+    background: #252a30;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.room {
+    border-top: 1px solid #555;
+    margin-top: 20px;
+    padding-top: 12px;
+}
+
+details {
+    margin: 14px 0;
+}
+
+summary {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.note {
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.5;
+}
+
+.warning {
+    color: #ffb58a;
+    font-size: 13px;
+}
+
+.attribution {
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 18px;
+}
+
+.attribution a {
+    color: inherit;
+}
+
+.recipe {
+    border: 1px solid #59616d;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.secondary {
+    background: #48515d;
+    color: #fff;
+}
+
+.value {
+    font-family: monospace;
+}
+
+fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+}
+
+fieldset:disabled {
+    opacity: .8;
+}
+
+@media (max-width:600px) {
+    body {
+        padding: 12px;
+    }
+    .utilities {
+        grid-template-columns: 1fr;
+    }
+    .panel {
+        padding: 14px;
+    }
+}
+  </style>
+ </head>
+ <body>
+  <main>
+   <h1>
+    THE CLONKER 10000
+   </h1>
+   <div class="attribution">
+    Designed by David Jacobson ·
+    <a href="https://github.com/djacobson/clonker-10000" rel="noopener noreferrer" target="_blank">
+     GitHub
+    </a>
+   </div>
+   <div class="utilities">
+    <section class="panel">
+     <h2>
+      System Clock
+     </h2>
+     <p>
+      Clock source:
+      <span class="value" id="clock-source">
+       Not connected
+      </span>
+     </p>
+     <p>
+      Current time:
+      <span class="value" id="clock-time">
+       Not available
+      </span>
+     </p>
+     <button id="sync-clock">
+      Synchronize with Browser
+     </button>
     </section>
+    <section class="panel">
+     <h2>
+      Test Remote
+     </h2>
+     <p class="note">
+      Send configured actions to your home theater equipment. Commands are queued for execution.
+     </p>
+     <a class="button-link" href="/remote.html">
+      Open Test Remote
+     </a>
+    </section>
+   </div>
+   <section class="panel">
+    <h2>
+     Device Configuration
+    </h2>
+    <p class="note">
+     Clonker Config v5. Blank endpoints and fundamental commands are valid no-ops. Endpoints may be IPv4 or IPv4:port. Device slots are labels only; commands follow their selected target and device type.
+    </p>
+    <fieldset disabled="" id="editor">
+     <div class="recipe">
+      <h3>
+       Configuration Recipes
+      </h3>
+      <div class="tools">
+       <a class="button-link" href="https://djacobson.github.io/clonker-10000/" rel="noopener noreferrer" target="_blank">
+        Browse Recipes
+       </a>
+       <button id="import-recipe">
+        Import JSON...
+       </button>
+       <input accept=".json,application/json" hidden="" id="recipe-file" type="file"/>
+      </div>
+      <p class="note" id="recipe-status">
+       Import replaces editor contents only. Review before saving.
+      </p>
+     </div>
+     <div id="rooms-container">
+      Loading room configuration...
+     </div>
+     <div class="tools" id="room-tools">
+     </div>
+    </fieldset>
+    <button disabled="" id="save-config">
+     Save Configuration
+    </button>
+    <p aria-live="polite" id="save-status" role="status">
+     Checking filesystem status...
+    </p>
+   </section>
+  </main>
+  <script>
+   'use strict';
 
-</main>
+const CONFIG_VERSION = 5, MAX_CONFIG_BYTES = 16384, MAX_CONFIG_ATTEMPTS = 3, CONFIG_GET_TIMEOUT_MS = 6000, CONFIG_RETRY_DELAY_MS = 1500;
 
+const ROOM_IDS = ['room-1', 'room-2', 'room-3'], DEVICE_IDS = ['device-1', 'device-2', 'device-3'];
 
-<script>
-    // Configuration schema version.
-    // Must match CONFIG_VERSION in device_config_v2.py.
-    const CONFIG_VERSION = 4;
+const DEVICE_LABELS = { 'device-1': 'TV', 'device-2': 'AVR', 'device-3': 'Streaming' };
 
-    // Must match MAX_CONFIG_BYTES in device_config_v2.py.
-    const MAX_CONFIG_BYTES = 8192;
- 
-    // Must match custom-action limits in device_config_v2.py.
-    const MAX_CUSTOM_ACTION_ID_LENGTH = 40;
-    const MAX_CUSTOM_ACTION_NAME_LENGTH = 60;
+const ACTION_IDS = ['volume-up', 'volume-down', 'mute-toggle', 'nav-up', 'nav-down', 'nav-left', 'nav-right', 'select', 'back', 'home', 'play-pause', 'skip-back', 'skip-forward', 'power-toggle'];
 
-    // Clonker Config configuration constants.
- 
-    // Browser-side recovery for stalled configuration GETs.
-    // Does not change Pico socket or persistence behavior.
-    const MAX_CONFIG_ATTEMPTS = 3;
-    const CONFIG_GET_TIMEOUT_MS = 6000;
-    const CONFIG_RETRY_DELAY_MS = 1500;
+const KIND_LABELS = { http: 'HTTP', ssap: 'SSAP', pointer: 'Pointer' };
 
-    const ROOM_IDS = [
-        "room-1",
-        "room-2",
-        "room-3"
-    ];
+const $ = id => document.getElementById(id);
 
-    const DEVICE_IDS = [
-        "device-1",
-        "device-2",
-        "device-3"
-    ];
+let model = null, types = null, revision = null, writable = false, busy = false, generation = 0;
 
-    // Fixed labels for the three built-in device slots.
-    // Device IDs are generic; these labels are UI-only.
-    const DEVICE_LABELS = {
-        "device-1": "TV",
-        "device-2": "AVR",
-        "device-3": "Streaming"
-    };
+let issuedIds = new Set();
 
-    const ACTION_IDS = [
-        "volume-up",
-        "volume-down",
-        "mute-toggle",
-        "nav-up",
-        "nav-down",
-        "nav-left",
-        "nav-right",
-        "select",
-        "back",
-        "home",
-        "play-pause",
-        "skip-back",
-        "skip-forward",
-        "power-toggle"
-    ];
+const clone = x => JSON.parse(JSON.stringify(x));
 
-    let configRevision = null;
-    let configWritable = false;
+const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 
-    // Prevent older configuration GETs from replacing newer results.
-    let configLoadGeneration = 0;
+const toggle = id => id === 'mute-toggle' || id === 'power-toggle';
 
-    // Preserve custom actions until their editor is implemented.
-    // Keep a separate copy of the last loaded configuration.
-    let loadedCustomActions = {};
-    // Live custom-action edits, maintained by the browser editor.
-    let editedCustomActions = {};
- 
+const selectable = id => types[id] && (types[id].enabled || id === 'lg-webos');
 
-    // Create a labeled text field or dropdown.
-    //
-    // The data-field attribute identifies the
-    // configuration property represented by the control.
+const blank = (kind = 'http', method = 'GET') => kind === 'ssap' ? { kind, uri: '' } : kind === 'pointer' ? { kind, button: '' } : { kind: 'http', method, path: '' };
 
-    function createField(parent, labelText, value,
-                     fieldName, choices = null,
-                     choiceLabels = null) {
+// DOM construction helpers
+function el(tag, parent, content, cls) { const n = document.createElement(tag); if (content !== undefined)
+    n.textContent = content; if (cls)
+    n.className = cls; if (parent)
+    parent.appendChild(n); return n; }
 
-        const label = document.createElement("label");
-        label.textContent = labelText;
+function button(parent, label, fn, disabled = false, secondary = false) { const n = el('button', parent, label, secondary ? 'secondary' : ''); n.type = 'button'; n.disabled = disabled; n.addEventListener('click', fn); return n; }
 
-        let control;
-
-        if (choices) {
-            control = document.createElement("select");
-
-            for (const choice of choices) {
-                const option = document.createElement("option");
-
-                option.value = choice;
-                option.textContent = choiceLabels
-                    ? choiceLabels[choice]
-                    : choice.toUpperCase();
-
-                control.appendChild(option);
-            }
-
-        } else {
-            control = document.createElement("input");
-            control.type = "text";
-        }
-
-        control.value = value;
-        control.dataset.field = fieldName;
-
-        label.appendChild(control);
-        parent.appendChild(label);
-
-        return control;
+function field(parent, label, value, change, opts = {}) { const l = el('label', parent, label); let n; if (opts.choices) {
+    n = el('select', l);
+    for (const c of opts.choices) {
+        const o = el('option', n, c.label);
+        o.value = c.value;
+        o.disabled = !!c.disabled;
     }
-
-
-    // Render configured rooms in their established ID order.
-    //
-    // The schema permits one to three rooms. Unconfigured
-    // room slots are omitted from the editor.
-    //
-    // Each configured room contains its name, three built-in
-    // device addresses, and fourteen fundamental actions.
-
-    function renderDeviceConfig(config) {
-        const container =
-            document.getElementById("rooms-container");
-
-        container.replaceChildren();
-
-        for (const roomId of ROOM_IDS) {
-            const room = config.rooms[roomId];
-
-            if (!room) {
-                continue;
-            }
-
-            const section = document.createElement("section"); 
-            section.className = "room";
-            section.dataset.roomId = roomId;
-
-            const heading = document.createElement("h3");
-            heading.textContent =
-                roomId.toUpperCase() + " -- " + room.name;
-
-            section.appendChild(heading);
-
-
-            // Room name.
-
-            createField(
-                section,
-                "Room Name",
-                room.name,
-                "name"
-            );
-
-
-            // Optional device addresses.
-
-            const deviceFields = document.createElement("div");
-            deviceFields.className = "device-fields";
-
-            for (const deviceId of DEVICE_IDS) {
-                const control = createField(
-                    deviceFields,
-                    DEVICE_LABELS[deviceId] + " Address",
-                    room.devices[deviceId],
-                    deviceId
-                );
-
-                control.dataset.device = deviceId;
-            }
-
-            section.appendChild(deviceFields);
-
-
-            // Fundamental HTTP actions.
-            //
-            // The expandable section keeps the main
-            // configuration page manageable.
-            //
-            // Blank paths are intentional no-ops.
-
-            const details = document.createElement("details");
-
-            const summary = document.createElement("summary");
-            summary.textContent = "Fundamental actions (14)";
-
-            details.appendChild(summary);
-
-            for (const actionId of ACTION_IDS) {
-                const action = room.actions[actionId];
-
-                const editor = document.createElement("div");
-                editor.className = "action-editor";
-                editor.dataset.actionId = actionId;
-
-                const actionName = document.createElement("strong");
-                actionName.textContent = actionId;
-
-                editor.appendChild(actionName);
-
-                const fields = document.createElement("div");
-                fields.className = "action-fields";
-
-
-                // Target device.
-
-                createField(
-                    fields,
-                    "Target",
-                    action.target,
-                    "target",
-                    DEVICE_IDS,
-                    DEVICE_LABELS
-                );
-
-
-                // HTTP method.
-
-                createField(
-                    fields,
-                    "Method",
-                    action.method,
-                    "method",
-                    ["GET", "POST"]
-                );
-
-
-
-                // HTTP paths.
-                //
-                // Power and mute toggles have separate
-                // ON and OFF paths. Ordinary actions
-                // retain a single path.
-
-                const isToggle =
-                    actionId === "power-toggle" ||
-                    actionId === "mute-toggle";
-
-                if (isToggle) {
-                    fields.classList.add("toggle-fields");
-                }
- 
-                const pathFields = isToggle
-                    ? [
-                        ["ON Path (blank = no-op)", "on_path"],
-                        ["OFF Path (blank = no-op)", "off_path"]
-                    ]
-                    : [
-                        ["Path (blank = no-op)", "path"]
-                    ];
-
-                for (const [label, fieldName] of pathFields) {
-                    const pathControl = createField(
-                        fields,
-                        label,
-                        action[fieldName],
-                        fieldName
-                    );
-
-                    pathControl.parentElement.className =
-                        "action-path";
-                }
-
-
-                editor.appendChild(fields);
-                details.appendChild(editor);
-            }
-
-            section.appendChild(details);
-
-
-            // Custom actions.
-            //
-            // Phase 3C.3b.1: browser-only custom-action editor.
-            // Configuration saving will be connected in 3C.3b.2.
-            //
-            // Actions retain their array order. No reordering UI.
-
-            const customActions = room.custom_actions || [];
-            // Track actions loaded from Pico independently
-            // of their editable IDs.
-            const savedActions = new WeakSet(customActions); 
-            editedCustomActions[roomId] = customActions;
-
-            const customDetails = document.createElement("details");
-
-            const customSummary = document.createElement("summary");
-            customDetails.appendChild(customSummary);
-
-            const actionList = document.createElement("div");
-            customDetails.appendChild(actionList);
-
-
-            // Rebuild the custom-action display after changes.
-
-            function refreshCustomActions(openAction = null) {
-                actionList.replaceChildren();
-
-                customSummary.textContent =
-                    "Custom Actions (" + customActions.length + ")";
-
-                for (const action of customActions) {
-                    const actionDetails = document.createElement("details");
-                    actionDetails.className = "custom-action-editor action-editor";
-                    actionDetails.open = action === openAction;
-
-                    const actionSummary = document.createElement("summary");
-                    actionDetails.appendChild(actionSummary);
-
-                    function updateTitle() {
-                        actionSummary.textContent =
-                            (action.name || action.id) +
-                            " (" + action.steps.length + " steps)";
-                    }
-
-                    updateTitle();
-
-
-                    // Existing saved IDs cannot be edited.
-                    //
-                    // New actions may change their suggested IDs
-                    // until the configuration is successfully saved.
-
-                    const saved = savedActions.has(action);
-
-                    const idField = createField(
-                        actionDetails,
-                        "Action ID",
-                        action.id,
-                        "id"
-                    );
-
-                    idField.readOnly = saved;
-
-                    idField.addEventListener("input", () => {
-                        action.id = idField.value.trim();
-                        updateTitle();
-                    });
-
-
-                    // Editable display name.
-
-                    const nameField = createField(
-                        actionDetails,
-                        "Display Name",
-                        action.name,
-                        "name"
-                    );
-
-                    nameField.addEventListener("input", () => {
-                        action.name = nameField.value;
-                        updateTitle();
-                    });
-
-
-                    // Phase 3C.3b.1: editable command steps.
-                    //
-                    // Step names are intentionally omitted.
-                    // Array order determines execution order.
-
-                    const stepsContainer = document.createElement("div");
-                    actionDetails.appendChild(stepsContainer);
-
-                    function renderSteps(openStepIndex = -1) {
-                        stepsContainer.replaceChildren();
-
-                        action.steps.forEach((step, index) => {
-                            const stepDetails =
-                                document.createElement("details");
-                            stepDetails.open = index === openStepIndex; 
-
-                            const stepSummary =
-                                document.createElement("summary");
-
-                            stepDetails.appendChild(stepSummary);
-
-                            function updateStepTitle() {
-                                const deviceName =
-                                    DEVICE_LABELS[step.target] ||
-                                    step.target;
-
-                                stepSummary.textContent =
-                                    (index + 1) + ". " +
-                                    deviceName + " · " +
-                                    step.method + " · " +
-                                    step.path;
-                            }
-
-                            updateStepTitle();
-
-                            const targetField = createField(
-                                stepDetails,
-                                "Target",
-                                step.target,
-                                "target",
-                                DEVICE_IDS,
-                                DEVICE_LABELS
-                            );
-
-                            targetField.addEventListener("change", () => {
-                                step.target = targetField.value;
-                                updateStepTitle();
-                            });
-
-                            const methodField = createField(
-                                stepDetails,
-                                "Method",
-                                step.method,
-                                "method",
-                                ["GET", "POST"]
-                            );
-
-                            methodField.addEventListener("change", () => {
-                                step.method = methodField.value;
-                                updateStepTitle();
-                            });
-
-                            const pathField = createField(
-                                stepDetails,
-                                "Command Path",
-                                step.path,
-                                "path"
-                            );
-
-                            pathField.addEventListener("input", () => {
-                                step.path = pathField.value;
-                                updateStepTitle();
-                            });
-
-                            const waitField = createField(
-                                stepDetails,
-                                "Wait After (ms)",
-                                step.wait_after_ms,
-                                "wait_after_ms"
-                            );
-
-                            waitField.type = "number";
-                            waitField.min = "0";
-                            waitField.max = "60000";
-                            waitField.step = "1";
-
-                            // The final step must not have a wait.
-                            waitField.disabled =
-                                index === action.steps.length - 1;
-
-                            waitField.addEventListener("input", () => {
-                                step.wait_after_ms =
-                                    Number(waitField.value);
-                            });
-
-                            const deleteStepButton =
-                                document.createElement("button");
-
-                            deleteStepButton.type = "button";
-                            deleteStepButton.textContent = "− Delete Step";
-
-                            deleteStepButton.disabled =
-                                action.steps.length <= 1;
-
-                            deleteStepButton.addEventListener(
-                                "click", () => {
-                                    if (action.steps.length <= 1) {
-                                        return;
-                                    }
-
-                                    action.steps.splice(index, 1);
-
-                                    // A new final step cannot retain a wait.
-                                    action.steps[
-                                        action.steps.length - 1
-                                    ].wait_after_ms = 0;
-
-                                    renderSteps();
-                                    updateTitle();
-                                }
-                            );
-
-                            stepDetails.appendChild(deleteStepButton);
-                            stepsContainer.appendChild(stepDetails);
-                        });
-
-                        addStepButton.disabled =
-                            action.steps.length >= 16;
-                    }
-
-                    const addStepButton = document.createElement("button");
-                    addStepButton.type = "button";
-                    addStepButton.textContent = "+ Add Step";
-
-                    addStepButton.addEventListener("click", () => {
-                        if (action.steps.length >= 16) {
-                            return;
-                        }
-
-                        action.steps.push({
-                            target: "device-3",
-                            method: "POST",
-                            path: "",
-                            wait_after_ms: 0
-                        });
-
-                        renderSteps(action.steps.length - 1);
-                        updateTitle();
-                    });
-
-                    actionDetails.appendChild(addStepButton);
-                    renderSteps();
-
-
-                    // Delete the entire custom action.
-
-                    const deleteButton = document.createElement("button");
-                    deleteButton.type = "button";
-                    deleteButton.textContent = "− Delete Action";
-
-                    deleteButton.addEventListener("click", () => {
-                        if (!confirm("Delete this custom action?")) {
-                            return;
-                        }
-
-                        customActions.splice(
-                            customActions.indexOf(action),
-                            1
-                        );
-
-                        refreshCustomActions();
-                    });
-
-                    actionDetails.appendChild(deleteButton);
-                    actionList.appendChild(actionDetails);
-                }
-
-
-                // Empty-state message.
-
-                if (customActions.length === 0) {
-                    const emptyMessage = document.createElement("p");
-                    emptyMessage.textContent =
-                        "No custom actions configured.";
-
-                    actionList.appendChild(emptyMessage);
-                }
-
-                addButton.disabled = customActions.length >= 16;
-            }
-
-            // Add a custom action with a suggested unique ID.
-            // Start with one editable command step.
-
-            const addButton = document.createElement("button");
-            addButton.type = "button";
-            addButton.textContent = "+ Add Action";
-
-            addButton.addEventListener("click", () => {
-                if (customActions.length >= 16) {
-                    return;
-                }
-
-                const existingIds = new Set(
-                    customActions.map(action => action.id)
-                );
-
-                let n = 1;
-
-                while (existingIds.has("custom-action-" + n)) {
-                    n++;
-                }
-
-                customActions.push({
-                    id: "custom-action-" + n,
-                    name: "New Custom Action",
-                    steps: [{
-                        target: "device-3",
-                        method: "POST",
-                        path: "",
-                        wait_after_ms: 0
-                    }]
-                });
-                refreshCustomActions(
-                    customActions[customActions.length - 1]
-                );
-                customDetails.open = true;
-
-            });
-
-            customDetails.appendChild(addButton);
-            refreshCustomActions();
-
-            section.appendChild(customDetails);
-            container.appendChild(section);
-
-        }
+}
+else {
+    n = el(opts.multiline ? 'textarea' : 'input', l);
+    if (!opts.multiline)
+        n.type = opts.type || 'text';
+    if (opts.max !== undefined)
+        n.maxLength = opts.max;
+    if (opts.type === 'number') {
+        n.min = 0;
+        n.max = 60000;
+        n.step = 1;
     }
-
-
-    // Load configuration from the Pico.
-    //
-    // Each GET has an independent deadline covering both
-    // fetch() and complete JSON reception.
-    //
-    // A timed-out GET is abandoned and aborted. Only GETs
-    // are retried; configuration POSTs are never retried.
-
-    async function loadDeviceConfig() {
-        const generation = ++configLoadGeneration;
-
-        const container =
-            document.getElementById("rooms-container");
-
-        const saveButton =
-            document.getElementById("save-config");
-
-        const saveStatus =
-            document.getElementById("save-status");
-
-        // A fresh load invalidates the previous revision
-        // until a complete response has been received.
-        configRevision = null;
-        configWritable = false;
-        saveButton.disabled = true;
-
-        for (let attempt = 1;
-                attempt <= MAX_CONFIG_ATTEMPTS;
-                attempt++) {
-
-            if (generation !== configLoadGeneration) {
-                return false;
-            }
-
-            const controller = new AbortController();
-            let timeoutId;
-
-            // Fetch and parse without modifying editor state.
-            const request = async () => {
-                const response = await fetch("/api/config", {
-                    cache: "no-store",
-                    signal: controller.signal
-                });
-
-                if (!response.ok) {
-                    throw new Error(
-                        "HTTP " + response.status
-                    );
-                }
-
-                return await response.json();
-            };
-
-            // The deadline rejects independently of whether
-            // Safari promptly settles the aborted fetch.
-            const deadline = new Promise((resolve, reject) => {
-                timeoutId = setTimeout(() => {
-                    controller.abort();
-
-                    const error = new Error(
-                        "GET timeout after " +
-                        CONFIG_GET_TIMEOUT_MS + "ms"
-                    );
-                    error.name = "TimeoutError";
-                    reject(error);
-                }, CONFIG_GET_TIMEOUT_MS);
-            });
-
-            try {
-                console.info(
-                    "CONFIG GET attempt " + attempt +
-                    "/" + MAX_CONFIG_ATTEMPTS
-                );
-
-                const config = await Promise.race([
-                    request(),
-                    deadline
-                ]);
-
-                if (generation !== configLoadGeneration) {
-                    return false;
-                }
-
-                if (config.version !== CONFIG_VERSION) {
-                    throw new Error(
-                        "Expected JSON configuration version " +
-                        CONFIG_VERSION
-                    );
-                }
-
-                // Prepare the new state before changing the UI.
-                const newCustomActions = {};
-
-                for (const roomId of ROOM_IDS) {
-                    const room = config.rooms[roomId];
-
-                    if (room) {
-                        newCustomActions[roomId] =
-                            JSON.parse(JSON.stringify(
-                                room.custom_actions
-                            ));
-                    }
-                }
-
-                loadedCustomActions = newCustomActions;
-                editedCustomActions = {};
-
-                configRevision = config.revision;
-                configWritable =
-                    config.filesystem_writable === true;
-
-                renderDeviceConfig(config);
-
-                saveButton.disabled = !configWritable;
-
-                saveStatus.textContent = configWritable
-                    ? "Boot mode: DEVICE -- filesystem writable. Configuration saving available."
-                    : "Boot mode: SERVICE (USB) -- filesystem read-only. Configuration saving unavailable.";
-
-                if (attempt > 1) {
-                    console.info(
-                        "CONFIG GET recovered on attempt " +
-                        attempt
-                    );
-                }
-
-                return true;
-
-            } catch (error) {
-                if (generation !== configLoadGeneration) {
-                    return false;
-                }
-
-                console.warn(
-                    "CONFIG GET attempt " + attempt +
-                    "/" + MAX_CONFIG_ATTEMPTS +
-                    " failed: " + error.message
-                );
-
-                configRevision = null;
-                configWritable = false;
-                saveButton.disabled = true;
-
-                if (attempt < MAX_CONFIG_ATTEMPTS) {
-                    saveStatus.textContent =
-                        "Configuration refresh delayed -- retrying (" +
-                        attempt + "/" +
-                        MAX_CONFIG_ATTEMPTS + ")...";
-
-                    await new Promise(resolve =>
-                        setTimeout(
-                            resolve,
-                            CONFIG_RETRY_DELAY_MS
-                        )
-                    );
-
-                } else {
-                    // Always replace the initial loading message
-                    // when all attempts have failed.
-                    if (container.textContent.includes(
-                            "Loading room configuration")) {
-                        container.textContent =
-                            "Unable to load configuration. Refresh the page to retry.";
-                    }
-
-                    saveStatus.textContent =
-                        "Unable to refresh configuration after " +
-                        MAX_CONFIG_ATTEMPTS +
-                        " attempts. Reload the page to verify.";
-                }
-
-            } finally {
-                clearTimeout(timeoutId);
-                controller.abort();
-            }
-        }
-
-        return false;
-    }
-
-
-    // Validate custom actions before submitting configuration.
-    //
-    // The firmware remains the final authority.
-    // This provides useful errors without writing to flash.
-
-    function validateCustomActions(actions, roomName) {
-        if (actions.length > 16) {
-            throw new Error(roomName + ": too many custom actions.");
-        }
-
-        const ids = new Set();
-
-        for (const action of actions) {
-            const id = action.id;
-
-            if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ||
-                    id.length > MAX_CUSTOM_ACTION_ID_LENGTH) {
-                throw new Error(
-                    roomName + ": invalid custom action ID: " + id
-                );
-            }
-
-            if (ids.has(id)) {
-                throw new Error(
-                    roomName + ": duplicate custom action ID: " + id
-                );
-            }
-
-            ids.add(id);
-
-            if (!action.name.trim() ||
-                    action.name.length > MAX_CUSTOM_ACTION_NAME_LENGTH) {
-                throw new Error(
-                    roomName + ": invalid name for " + id
-                );
-            }
-
-            if (action.steps.length < 1 || action.steps.length > 16) {
-                throw new Error(
-                    roomName + ": invalid step count for " + id
-                );
-            }
-
-            action.steps.forEach((step, index) => {
-                const where =
-                    roomName + " / " + id + " / step " + (index + 1);
-
-                if (!DEVICE_IDS.includes(step.target)) {
-                    throw new Error(where + ": invalid target.");
-                }
-
-                if (!["GET", "POST"].includes(step.method)) {
-                    throw new Error(where + ": invalid HTTP method.");
-                }
-
-                if (!step.path.startsWith("/")) {
-                    throw new Error(
-                        where + ": command path must begin with /."
-                    );
-                }
-
-                if (!Number.isInteger(step.wait_after_ms) ||
-                        step.wait_after_ms < 0 ||
-                        step.wait_after_ms > 60000) {
-                    throw new Error(
-                        where + ": wait must be 0–60000 ms."
-                    );
-                }
-
-                if (index === action.steps.length - 1 &&
-                        step.wait_after_ms !== 0) {
-                    throw new Error(
-                        where + ": final step must have zero wait."
-                    );
-                }
-            });
-        }
-    }
-
-
-    // Collect fundamental actions from HTML controls and
-    // custom actions from the live browser-side model.
-    // Validate custom actions before submitting.
-
-    function collectDeviceConfig() {
-        const rooms = {};
-
-        document.querySelectorAll(".room").forEach(section => {
-            const roomId = section.dataset.roomId;
-
-            const room = {
-                name: "",
-                devices: {},
-                actions: {},
-                custom_actions: JSON.parse(JSON.stringify(
-                    loadedCustomActions[roomId] || []
-                ))
-            };
-
-            // Room name.
-
-            room.name = section.querySelector(
-                '[data-field="name"]'
-            ).value.trim();
-
-
-            // Device addresses (IPv4 or IPv4:port).
-
-            for (const deviceId of DEVICE_IDS) {
-                room.devices[deviceId] = section.querySelector(
-                    '[data-device="' + deviceId + '"]'
-                ).value.trim();
-            }
-
-
-            // Fundamental actions.
-
-            section.querySelectorAll(".action-editor[data-action-id]")
-                .forEach(editor => {
-
-                    const action = {};
-
-
-                    // Toggle actions have two paths;
-                    // ordinary actions have one.
-
-                    const actionId = editor.dataset.actionId;
-
-                    const isToggle =
-                        actionId === "power-toggle" ||
-                        actionId === "mute-toggle";
-
-                    const fieldNames = isToggle
-                        ? [
-                            "target", "method",
-                            "on_path", "off_path"
-                        ]
-                        : [
-                            "target", "method", "path"
-                        ];
-
-                    for (const fieldName of fieldNames) {
-                        action[fieldName] = editor.querySelector(
-                            '[data-field="' + fieldName + '"]'
-                        ).value;
-                    }
-
-                    room.actions[editor.dataset.actionId] =
-                        action;
-                });
-
-            rooms[roomId] = room;
-
-
-            // Custom actions.
-            //
-            // Read the browser-side model, including edited steps.
-            // Validate before allowing the configuration to save.
-
-            room.custom_actions = JSON.parse(JSON.stringify(
-                editedCustomActions[roomId] || []
-            ));
-
-            validateCustomActions(room.custom_actions, room.name);
-
-        });
-
-        return {
-            version: CONFIG_VERSION,
-            rooms: rooms
-        };
-
-    }
-
-
-    // Save configuration to Pico flash.
-    //
-    // POST /api/config includes the revision obtained
-    // during loading, allowing the firmware to reject
-    // stale edits.
-    //
-    // After saving, reload from the Pico so the page
-    // reflects the actual active configuration.
-
-    async function saveDeviceConfig() {
-        const button =
-            document.getElementById("save-config");
-
-        const status =
-            document.getElementById("save-status");
-
-        if (!configRevision || !configWritable) {
-            status.textContent =
-                "Configuration saving is unavailable.";
+} n.value = value ?? ''; n.readOnly = !!opts.readonly; n.disabled = !!opts.disabled; if (change)
+    n.addEventListener(opts.choices ? 'change' : 'input', () => change(n.value)); return n; }
+
+function details(parent, title) { const d = el('details', parent); el('summary', d, title); return d; }
+
+// Protocol-aware command and target editors
+function targetChoices(room) { return DEVICE_IDS.map(id => ({ value: id, label: DEVICE_LABELS[id] + ' · ' + types[room.devices[id].type].label })); }
+
+function commandEditor(parent, room, owner, key, label) { const box = el('div', parent); function draw() { box.replaceChildren(); const c = owner[key], supported = types[room.devices[owner.target].type].command_kinds; const choices = [...new Set([...supported, c.kind])].map(k => ({ value: k, label: (KIND_LABELS[k] || k) + (supported.includes(k) ? '' : ' (incompatible)') })); field(box, label + ' protocol', c.kind, k => { if (k === c.kind)
+    return; if (!confirm('Replace this command with a blank ' + KIND_LABELS[k] + ' command?')) {
+    draw();
+    return;
+} owner[key] = blank(k); draw(); }, { choices }); if (!supported.includes(c.kind))
+    el('p', box, 'Command is incompatible with the selected device. Choose a supported protocol before saving.', 'warning'); if (c.kind === 'http') {
+    const row = el('div', box, undefined, 'row');
+    field(row, 'Method', c.method, v => c.method = v, { choices: ['GET', 'POST'].map(value => ({ value, label: value })) });
+    field(row, 'Path', c.path, v => c.path = v, { max: 512 });
+}
+else if (c.kind === 'ssap') {
+    field(box, 'SSAP URI', c.uri, v => c.uri = v, { max: 512 });
+    field(box, 'Optional JSON payload (object)', c._payloadText ?? (Object.prototype.hasOwnProperty.call(c, 'payload') ? JSON.stringify(c.payload) : ''), v => c._payloadText = v, { multiline: true });
+}
+else if (c.kind === 'pointer') {
+    field(box, 'Pointer button', c.button, v => c.button = v, { max: 64 });
+} } draw(); }
+
+function actionEditor(parent, room, a, id) { const box = el('div', parent, undefined, 'action'); el('strong', box, id); const commands = el('div', box); function draw() { commands.replaceChildren(); for (const k of toggle(id) ? ['on_command', 'off_command'] : ['command'])
+    commandEditor(commands, room, a, k, k === 'on_command' ? 'ON' : k === 'off_command' ? 'OFF' : 'Command'); } const target = field(box, 'Target', a.target, v => { a.target = v; draw(); }, { choices: targetChoices(room) }); box.insertBefore(target.parentElement, commands); draw(); }
+
+// Stable custom action identity and step editing
+function newId() { let id; do {
+    id = 'ca-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+} while (issuedIds.has(id)); issuedIds.add(id); return id; }
+
+function newStep(room) { const target = DEVICE_IDS[0]; return { target, command: blank(types[room.devices[target].type].command_kinds[0]), wait_after_ms: 0 }; }
+
+function customEditor(parent, room) { const d = details(parent, 'Custom Actions'); const list = el('div', d); function draw(open = null) { list.replaceChildren(); d.firstChild.textContent = 'Custom Actions (' + room.custom_actions.length + ')'; for (const a of room.custom_actions) {
+    const ad = details(list, a.name + ' (' + a.steps.length + ' steps)');
+    ad.className = 'action';
+    ad.open = a === open;
+    field(ad, 'Action ID (read-only)', a.id, null, { readonly: true });
+    field(ad, 'Display Name', a.name, v => { a.name = v; ad.firstChild.textContent = v + ' (' + a.steps.length + ' steps)'; }, { max: 60 });
+    a.steps.forEach((s, i) => { const b = el('div', ad, undefined, 'device'); el('strong', b, 'Step ' + (i + 1)); const cmd = el('div', b); function redraw() { cmd.replaceChildren(); commandEditor(cmd, room, s, 'command', 'Command'); } const t = field(b, 'Target', s.target, v => { s.target = v; redraw(); }, { choices: targetChoices(room) }); b.insertBefore(t.parentElement, cmd); redraw(); field(b, 'Wait after (ms)', s.wait_after_ms, v => s.wait_after_ms = v === '' ? null : Number(v), { type: 'number', disabled: i === a.steps.length - 1 }); const tools = el('div', b, undefined, 'tools'); function move(j) { [a.steps[i], a.steps[j]] = [a.steps[j], a.steps[i]]; a.steps[a.steps.length - 1].wait_after_ms = 0; draw(a); } button(tools, 'Move up', () => move(i - 1), i === 0, true); button(tools, 'Move down', () => move(i + 1), i === a.steps.length - 1, true); button(tools, 'Remove step', () => { a.steps.splice(i, 1); a.steps[a.steps.length - 1].wait_after_ms = 0; draw(a); }, a.steps.length === 1, true); });
+    const tools = el('div', ad, undefined, 'tools');
+    button(tools, 'Add step', () => { a.steps.push(newStep(room)); draw(a); }, a.steps.length >= 16);
+    button(tools, 'Remove action', () => { if (confirm('Remove ' + a.name + '?')) {
+        room.custom_actions.splice(room.custom_actions.indexOf(a), 1);
+        draw();
+    } }, false, true);
+} button(list, 'Add Custom Action', () => { const a = { id: newId(), name: 'New Action', steps: [newStep(room)] }; room.custom_actions.push(a); draw(a); }, room.custom_actions.length >= 16); } draw(); }
+
+// Room creation and rendering
+function newRoom(id) { const room = { name: 'Room ' + id.slice(-1), devices: {}, actions: {}, custom_actions: [] }; for (const d of DEVICE_IDS)
+    room.devices[d] = { type: 'generic-http', endpoint: '' }; for (const a of ACTION_IDS) {
+    const vol = a.startsWith('volume-') || a === 'mute-toggle', target = vol ? 'device-2' : 'device-3', method = vol ? 'GET' : 'POST';
+    room.actions[a] = toggle(a) ? { target, on_command: blank('http', method), off_command: blank('http', method) } : { target, command: blank('http', method) };
+} return room; }
+
+function render() { const container = $('rooms-container'); container.replaceChildren(); for (const id of ROOM_IDS) {
+    const room = model.rooms[id];
+    if (!room)
+        continue;
+    const section = el('section', container, undefined, 'room');
+    const heading = el('h3', section, id.toUpperCase() + ' -- ' + room.name);
+    field(section, 'Room Name', room.name, v => { room.name = v; heading.textContent = id.toUpperCase() + ' -- ' + v; }, { max: 40 });
+    for (const did of DEVICE_IDS) {
+        const dev = room.devices[did], b = el('div', section, undefined, 'device');
+        el('strong', b, DEVICE_LABELS[did] + ' (' + did + ')');
+        const row = el('div', b, undefined, 'row');
+        field(row, 'Device type', dev.type, v => { if (v === dev.type)
+            return; if (!confirm('Change device type? Existing commands will be retained and may require editing.')) {
+            render();
             return;
-        }
-
-        button.disabled = true;
-        status.textContent = "Saving configuration...";
-
-        try {
-            const submitted = collectDeviceConfig();
-
-            submitted.revision = configRevision;
-
-            const payload = JSON.stringify(submitted);
-
-            if (new TextEncoder().encode(payload).length > MAX_CONFIG_BYTES) {
-                throw new Error(
-                    "Configuration exceeds the " +
-                    MAX_CONFIG_BYTES + "-byte limit."
-                );
-            }
-
-            const response = await fetch("/api/config", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: payload,
-                cache: "no-store"
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    result.error || "HTTP " + response.status
-                );
-            }
-
-            const refreshed = await loadDeviceConfig();
-
-            if (!refreshed) {
-                status.textContent =
-                    "Save accepted, but refresh failed. Reload the page to verify.";
-                return;
-            }
-
-            status.textContent = result.saved
-                ? "Configuration saved successfully."
-                : "No changes to save.";
-
-        } catch (error) {
-            console.error(
-                "Configuration save failed:",
-                error
-            );
-
-            status.textContent =
-                "Save failed: " + error.message;
-
-        } finally {
-            button.disabled =
-                !configRevision || !configWritable;
+        } const replacement = { type: v, endpoint: dev.endpoint }; if (types[v].attributes.includes('client_key'))
+            replacement.client_key = dev.client_key || ''; room.devices[did] = replacement; render(); }, { choices: Object.keys(types).map(value => ({ value, label: types[value].label + (!types[value].enabled ? (value === 'lg-webos' ? ' (configuration only)' : ' (future)') : ''), disabled: !selectable(value) })) });
+        field(row, 'Endpoint (default port ' + (types[dev.type].default_port ?? '--') + ')', dev.endpoint, v => dev.endpoint = v);
+        if (types[dev.type].attributes.includes('client_key'))
+            field(b, 'Client key', dev.client_key, v => dev.client_key = v);
+        if (types[dev.type].pairing) {
+            button(b, 'Pair', () => { }, true);
+            el('p', b, 'Pairing and runtime integration are not available yet.', 'note');
         }
     }
+    const fundamental = details(section, 'Fundamental actions (14)');
+    for (const a of ACTION_IDS)
+        actionEditor(fundamental, room, room.actions[a], a);
+    customEditor(section, room);
+    button(section, 'Remove room', () => { if (confirm('Remove ' + room.name + ' and all its actions?')) {
+        delete model.rooms[id];
+        render();
+    } }, Object.keys(model.rooms).length === 1, true);
+} const tools = $('room-tools'); tools.replaceChildren(); for (const id of ROOM_IDS.filter(id => !model.rooms[id]))
+    button(tools, 'Add Room ' + id.slice(-1), () => { model.rooms[id] = newRoom(id); render(); }); }
 
+// Client-side validation; firmware remains authoritative
+function requireThat(ok, msg) { if (!ok)
+    throw new Error(msg); }
 
-    // Import a downloaded configuration recipe.
-    //
-    // Only browser-side editor state is changed.
-    // The Pico's revision and writable status remain intact.
-    // No POST is performed until Save Configuration.
-
-    async function importRecipeFile(file) {
-        const status =
-            document.getElementById("recipe-status");
-
-        if (!file) {
-            return;
+function validate(source) { const c = clone(source); requireThat(c.version === 5 && object(c.rooms), 'Expected Config v5 rooms.'); const ids = Object.keys(c.rooms); requireThat(ids.length >= 1 && ids.every(id => ROOM_IDS.includes(id)), 'Invalid room IDs.'); for (const id of ids) {
+    const r = c.rooms[id];
+    requireThat(object(r) && typeof r.name === 'string' && r.name.trim() && r.name.length <= 40, id + ': invalid room name');
+    requireThat(object(r.devices) && object(r.actions) && Array.isArray(r.custom_actions), id + ': incomplete room');
+    for (const d of DEVICE_IDS) {
+        const v = r.devices[d];
+        requireThat(object(v) && selectable(v.type) && typeof v.endpoint === 'string', id + ': invalid device ' + d);
+        v.endpoint = v.endpoint.trim();
+        if (v.endpoint) {
+            const parts = v.endpoint.split(':');
+            requireThat(parts.length <= 2 && /^\d{1,3}(\.\d{1,3}){3}$/.test(parts[0]) && parts[0].split('.').every(x => Number(x) <= 255) && (parts.length === 1 || (/^\d+$/.test(parts[1]) && Number(parts[1]) >= 1 && Number(parts[1]) <= 65535)), id + ': invalid endpoint ' + d);
         }
-
-        if (configRevision === null) {
-            status.textContent =
-                "Wait until the Pico configuration has loaded.";
-            return;
-        }
-
-        try {
-            const recipe = JSON.parse(await file.text());
-
-            if (recipe.version !== CONFIG_VERSION ||
-                    !recipe.rooms ||
-                    typeof recipe.rooms !== "object" ||
-                    Array.isArray(recipe.rooms)) {
-                throw new Error(
-                    "Unsupported configuration format or version."
-                );
-            }
-
-            const roomIds = Object.keys(recipe.rooms);
-
-            if (roomIds.length < 1 ||
-                    roomIds.some(id => !ROOM_IDS.includes(id))) {
-                throw new Error("Invalid room configuration.");
-            }
-
-            for (const roomId of roomIds) {
-                const room = recipe.rooms[roomId];
-
-                if (!room ||
-                        typeof room.name !== "string" ||
-                        !room.devices ||
-                        !room.actions ||
-                        !Array.isArray(room.custom_actions)) {
-                    throw new Error(
-                        "Incomplete configuration for " + roomId
-                    );
-                }
-
-                for (const deviceId of DEVICE_IDS) {
-                    if (typeof room.devices[deviceId] !== "string") {
-                        throw new Error(
-                            "Missing device address in " + roomId
-                        );
-                    }
-                }
-
-                for (const actionId of ACTION_IDS) {
-                    if (!room.actions[actionId]) {
-                        throw new Error(
-                            "Missing action " + actionId +
-                            " in " + roomId
-                        );
-                    }
-                }
-
-                validateCustomActions(
-                    room.custom_actions,
-                    room.name
-                );
-            }
-
-            // Confirm before replacing unsaved editor contents.
-
-            if (!confirm(
-                "Replace the current editor contents with " +
-                file.name + "?\n\n" +
-                "Nothing will be saved to the Pico yet."
-            )) {
-                status.textContent = "Import canceled.";
-                return;
-            }
-
-            // Preserve the Pico's current revision.
-            // Never use revision metadata from the recipe.
-
-            const importedActions = {};
-
-            for (const roomId of roomIds) {
-                importedActions[roomId] =
-                    JSON.parse(JSON.stringify(
-                        recipe.rooms[roomId].custom_actions
-                    ));
-            }
-
-            loadedCustomActions = importedActions;
-            editedCustomActions = {};
-
-            renderDeviceConfig(recipe);
-
-            status.textContent =
-                "Loaded " + file.name +
-                " into the editor. Review and save when ready.";
-
-        } catch (error) {
-            console.error("Recipe import failed:", error);
-
-            status.textContent =
-                "Import failed: " + error.message;
-        }
+        if (types[v.type].attributes.includes('client_key'))
+            requireThat(typeof v.client_key === 'string' && v.client_key.length <= 512, id + ': invalid client key');
     }
-
-
-    // Open the native file picker and import the selection.
-
-    document.getElementById("import-recipe")
-        .addEventListener("click", () => {
-            document.getElementById("recipe-file").click();
-        });
-
-    document.getElementById("recipe-file")
-        .addEventListener("change", async event => {
-            const input = event.target;
-            const file = input.files[0];
-
-            await importRecipeFile(file);
-
-            // Permit selecting the same file again.
-            input.value = "";
-        });
-
-
-    // Read the Pico's system clock.
-
-    async function updateClock() {
-        try {
-            const response = await fetch("/api/clock", {
-                cache: "no-store"
-            });
-
-            if (!response.ok) {
-                throw new Error("HTTP " + response.status);
-            }
-
-            const clock = await response.json();
-
-            document.getElementById("clock-source")
-                .textContent = clock.source;
-
-            document.getElementById("clock-time")
-                .textContent = clock.timestamp;
-
-        } catch (error) {
-            console.error(
-                "Clock update failed:",
-                error
-            );
-
-            document.getElementById("clock-source")
-                .textContent = "Connection error";
-        }
+    function check(a, k, where, allowBlank) { requireThat(object(a) && DEVICE_IDS.includes(a.target), where + ': invalid target'); const x = a[k]; requireThat(object(x) && types[r.devices[a.target].type].command_kinds.includes(x.kind), where + ': incompatible command'); let value; if (x.kind === 'http') {
+        value = x.path;
+        requireThat(['GET', 'POST'].includes(x.method) && typeof value === 'string' && value.length <= 512 && (!value || value.startsWith('/')), where + ': invalid HTTP command');
     }
-
-
-    // Synchronize the Pico clock from the browser.
-
-    async function synchronizeClock() {
-        const button =
-            document.getElementById("sync-clock");
-
-        button.disabled = true;
-
-        try {
-            const utc = Math.floor(Date.now() / 1000);
-
-            const response = await fetch(
-                "/api/clock?utc=" + utc,
-                {
-                    method: "POST",
-                    cache: "no-store"
+    else if (x.kind === 'ssap') {
+        value = x.uri;
+        requireThat(typeof value === 'string' && value.length <= 512 && (!value || /^ssap:\/\/\S+$/.test(value)), where + ': invalid SSAP URI');
+        if (Object.prototype.hasOwnProperty.call(x, '_payloadText')) {
+            const raw = x._payloadText.trim();
+            delete x._payloadText;
+            if (raw) {
+                try {
+                    x.payload = JSON.parse(raw);
                 }
-            );
-
-            if (!response.ok) {
-                throw new Error(
-                    "HTTP " + response.status
-                );
+                catch (e) {
+                    throw new Error(where + ': invalid JSON payload');
+                }
             }
-
-            await updateClock();
-
-        } catch (error) {
-            console.error(
-                "Clock synchronization failed:",
-                error
-            );
-
-            alert(
-                "Clock synchronization failed: " +
-                error.message
-            );
-
-        } finally {
-            button.disabled = false;
+            else
+                delete x.payload;
         }
+        if (Object.prototype.hasOwnProperty.call(x, 'payload'))
+            requireThat(value && object(x.payload), where + ': payload requires URI and JSON object');
     }
+    else {
+        value = x.button;
+        requireThat(typeof value === 'string' && /^[A-Z0-9_-]{0,64}$/.test(value), where + ': invalid pointer button');
+    } requireThat(allowBlank || value, where + ': command cannot be blank'); }
+    for (const a of ACTION_IDS) {
+        for (const k of toggle(a) ? ['on_command', 'off_command'] : ['command'])
+            check(r.actions[a], k, id + ' / ' + a + ' / ' + k, true);
+    }
+    requireThat(r.custom_actions.length <= 16, id + ': too many custom actions');
+    const seen = new Set();
+    for (const a of r.custom_actions) {
+        requireThat(object(a) && typeof a.id === 'string' && /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(a.id) && !seen.has(a.id), id + ': invalid or duplicate action ID');
+        seen.add(a.id);
+        requireThat(typeof a.name === 'string' && a.name.trim() && a.name.length <= 60, id + ': invalid custom name');
+        requireThat(Array.isArray(a.steps) && a.steps.length >= 1 && a.steps.length <= 16, id + ': invalid step count');
+        a.steps.forEach((s, i) => { const w = id + ' / ' + a.name + ' / step ' + (i + 1); check(s, 'command', w, false); requireThat(Number.isInteger(s.wait_after_ms) && s.wait_after_ms >= 0 && s.wait_after_ms <= 60000 && (i !== a.steps.length - 1 || s.wait_after_ms === 0), w + ': invalid wait'); });
+    }
+} requireThat(new TextEncoder().encode(JSON.stringify(c)).length <= MAX_CONFIG_BYTES, 'Configuration exceeds 16384 bytes'); return c; }
 
+// Configuration loading and revision-protected persistence
+function rememberIds() { for (const r of Object.values(model.rooms))
+    for (const a of r.custom_actions)
+        issuedIds.add(a.id); }
 
-    // Connect buttons to their event handlers.
+function controls() { $('editor').disabled = busy || !model || !revision; $('save-config').disabled = busy || !revision || !writable; }
 
-    document.getElementById("sync-clock")
-        .addEventListener(
-            "click",
-            synchronizeClock
-        );
+async function load() { const g = ++generation; revision = null; writable = false; controls(); for (let i = 1; i <= MAX_CONFIG_ATTEMPTS; i++) {
+    const controller = new AbortController();
+    let timer;
+    try {
+        const request = async () => { const r = await fetch('/api/config', { cache: 'no-store', signal: controller.signal }); if (!r.ok)
+            throw new Error('HTTP ' + r.status); return r.json(); };
+        const deadline = new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('GET timeout')); }, CONFIG_GET_TIMEOUT_MS); });
+        const c = await Promise.race([request(), deadline]);
+        if (g !== generation)
+            return false;
+        requireThat(c.version === 5 && object(c.device_types) && typeof c.revision === 'string', 'Expected Config v5 and device registry');
+        types = c.device_types;
+        model = validate({ version: c.version, rooms: c.rooms });
+        rememberIds();
+        render();
+        revision = c.revision;
+        writable = c.filesystem_writable === true;
+        $('save-status').textContent = writable ? 'Boot mode: DEVICE -- filesystem writable.' : 'Boot mode: SERVICE (USB) -- filesystem read-only. Saving unavailable.';
+        controls();
+        return true;
+    }
+    catch (e) {
+        if (g !== generation)
+            return false;
+        console.warn('CONFIG GET attempt ' + i, e);
+        $('save-status').textContent = i < MAX_CONFIG_ATTEMPTS ? 'Configuration refresh delayed -- retrying (' + i + '/3)...' : 'Unable to refresh configuration. Reload the page to verify.';
+    }
+    finally {
+        clearTimeout(timer);
+        controller.abort();
+    }
+    if (i < MAX_CONFIG_ATTEMPTS)
+        await new Promise(r => setTimeout(r, CONFIG_RETRY_DELAY_MS));
+} return false; }
 
-    document.getElementById("save-config")
-        .addEventListener(
-            "click",
-            saveDeviceConfig
-        );
+async function save() { if (busy || !revision || !writable)
+    return; busy = true; controls(); $('save-status').textContent = 'Saving configuration...'; let submitted = false; try {
+    const c = validate(model);
+    c.revision = revision;
+    submitted = true;
+    const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c), cache: 'no-store' });
+    const result = await r.json();
+    if (!r.ok) {
+        submitted = false;
+        throw new Error(result.error || 'HTTP ' + r.status);
+    }
+    const refreshed = await load();
+    $('save-status').textContent = refreshed ? (result.saved ? 'Configuration saved successfully.' : 'No changes to save.') : 'Save accepted, but refresh failed. Reload the page to verify.';
+}
+catch (e) {
+    $('save-status').textContent = (submitted ? 'Save outcome uncertain. Reload to verify: ' : 'Save failed: ') + e.message;
+    if (submitted)
+        revision = null;
+}
+finally {
+    busy = false;
+    controls();
+} }
 
+$('import-recipe').onclick = () => $('recipe-file').click();
 
-    // Read clock status when the page opens.
+$('recipe-file').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f || busy || !revision)
+    return; try {
+    const c = validate(JSON.parse(await f.text()));
+    if (!confirm('Replace editor contents with ' + f.name + '? Nothing will be saved yet.'))
+        return;
+    model = c;
+    rememberIds();
+    render();
+    $('recipe-status').textContent = 'Loaded ' + f.name + '. Review before saving.';
+}
+catch (err) {
+    $('recipe-status').textContent = 'Import failed: ' + err.message;
+} };
 
-    updateClock();
+// System clock controls
+async function updateClock() { try {
+    const r = await fetch('/api/clock', { cache: 'no-store' });
+    if (!r.ok)
+        throw new Error('HTTP ' + r.status);
+    const c = await r.json();
+    $('clock-source').textContent = c.source;
+    $('clock-time').textContent = c.timestamp;
+}
+catch (e) {
+    $('clock-source').textContent = 'Connection error';
+} }
 
+$('sync-clock').onclick = async () => { const b = $('sync-clock'); b.disabled = true; try {
+    const r = await fetch('/api/clock?utc=' + Math.floor(Date.now() / 1000), { method: 'POST', cache: 'no-store' });
+    if (!r.ok)
+        throw new Error('HTTP ' + r.status);
+    await updateClock();
+}
+catch (e) {
+    alert('Clock synchronization failed: ' + e.message);
+}
+finally {
+    b.disabled = false;
+} };
 
-    // Read device configuration when the page opens.
+$('save-config').onclick = save;
 
-    loadDeviceConfig();
+updateClock();
 
-</script>
-
-</body>
+load();
+  </script>
+ </body>
 </html>
