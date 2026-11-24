@@ -4211,6 +4211,48 @@ the queue at all.
 
 **Less sleek. More CLONK.**
 
+### November 24, 2026 — The Monster Speaks webOS
+
+Chapter 11 expanded device protocol experimentation to
+LG webOS televisions using native WebSocket connections
+from CircuitPython.
+
+Standalone laboratory tests successfully demonstrated:
+
+- TV pairing and reusable client-key registration.
+- SSAP commands for audio control and application launching.
+- Navigation through a separate pointer input WebSocket.
+- Persistent connection reuse with inactivity-based cleanup.
+- Cooperative, nonblocking receive processing.
+- Multiple outstanding SSAP requests with response correlation.
+
+The experimental knowledge was consolidated into a standalone
+draft device adapter:
+
+`firmware/clonker/devices/lg_webos.py`
+
+The draft includes transport lifecycle management, command
+handling, pairing helpers, temporary development credentials,
+and diagnostics. It remains intentionally disconnected from
+production device routing.
+
+Detailed experiments and protocol examples are retained in
+the `firmware/tests/test_lg_webos_*.py` laboratory scripts.
+
+**Status:** Initial protocol feasibility established on real
+hardware. Combined adapter testing and production integration
+remain pending.
+
+The experiments also motivated a broader configuration
+redesign based on explicitly typed devices rather than
+command-pattern-based adapter selection. This will be
+undertaken before integrating LG webOS into the running
+application.
+
+*The Monster is learning another language.*
+
+**Less sleek. More CLONK.**
+
 ---
 
 **THE CLONKER 10000**
