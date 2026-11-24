@@ -26,11 +26,11 @@ from clonker.net import web
 from clonker.net import http_transport
 from clonker.devices import denon
 from clonker import actions
-from clonker import device_adapters
+from clonker.devices import device_adapters
 from clonker.controls import switches
 from clonker.controls import physical
 from clonker.display import oled
-from clonker import device_config_v2 as device_config
+from clonker import device_config
 
 
 # Physical GPIO controls are optional during development.
@@ -258,10 +258,13 @@ def main():
         logger.info("{}: {}".format(room_id, room["name"]))
 
         for device_id in device_config.DEVICE_IDS:
+            device = room["devices"][device_id]
+
             logger.info(
-                "  {} IP: {}".format(
+                "  {} [{}]: {}".format(
                     device_id.upper(),
-                    room["devices"][device_id]
+                    device["type"],
+                    device["endpoint"] or "UNCONFIGURED"
                 )
             )
 

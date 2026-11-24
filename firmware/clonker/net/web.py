@@ -26,8 +26,9 @@ import os
 
 from clonker.system import clock, logger
 from clonker.net import web_diag
-from clonker import device_config_v2 as device_config
+from clonker import device_config
 from clonker import actions
+from clonker.controls import physical
 from clonker.display import oled
 
 WEB_ROOT = "/clonker/www"
@@ -35,8 +36,8 @@ FLIGHT_RECORDER_PATH = "/clonker/flight_recorder.txt"
 PORT = 9090
 HTTP_DIAGNOSTICS = False
 
-# 8192-byte maximum config plus HTTP headers and revision metadata.
-MAX_REQUEST_BYTES = 10240
+# Maximum configuration plus HTTP headers and revision metadata.
+MAX_REQUEST_BYTES = device_config.MAX_CONFIG_BYTES + 2048
 MAX_HEADER_BYTES = 2048
 IO_CHUNK_BYTES = 128
 
@@ -393,16 +394,21 @@ def _build_response(first_line, request=None):
                 )
                 saved_at = time.monotonic_ns()
 
-                # Confirm actual flash persistence independently
-                # of the browser's HTTP response or reload.
                 if changed:
-                    oled.show_text("CONFIG", "SAVED!")
+                    # Discard physical gestures captured under
+                    # the previous configuration.
+                    physical.configuration_changed()
 
-                if changed:
+                    # Discard queued commands and reset toggle
+                    # histories after configuration activation.
                     actions.clear(
                         "Configuration changed",
                         reset_toggles=True
                     )
+
+                    # Confirm successful configuration activation
+                    # independently of the browser response.
+                    oled.show_text("CONFIG", "SAVED!")
                 cleared_at = time.monotonic_ns()
 
                 new_revision = device_config.revision()
