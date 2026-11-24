@@ -30,6 +30,7 @@ from clonker import device_config
 from clonker import actions
 from clonker.controls import physical
 from clonker.display import oled
+from clonker.devices import device_types
 
 WEB_ROOT = "/clonker/www"
 FLIGHT_RECORDER_PATH = "/clonker/flight_recorder.txt"
@@ -316,14 +317,15 @@ def _build_response(first_line, request=None):
         body = json.dumps(clock_status())
         status = "200 OK"
 
-    # Include the active revision and filesystem ownership state.
-    # current() returns a copy, so these response-only fields are not saved.
+    # Include response-only configuration metadata.
+    # current() returns a copy, so these fields are not saved.
     elif first_line.startswith(b"GET /api/config "):
         config = device_config.current()
         config["filesystem_writable"] = (
             not storage.getmount("/").readonly
         )
         config["revision"] = device_config.revision()
+        config["device_types"] = device_types.DEVICE_TYPES
         body = json.dumps(config)
         status = "200 OK"
 
