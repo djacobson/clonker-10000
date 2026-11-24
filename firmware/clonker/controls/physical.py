@@ -18,8 +18,8 @@ from clonker.system import logger
 from clonker.system import sleep_manager
 from clonker.system import flight_recorder
 from clonker import actions
-from clonker import device_config_v2 as device_config
-from clonker import device_adapters
+from clonker import device_config
+from clonker.devices import device_adapters
 from clonker.controls import pins
 from clonker.controls import selectors
 from clonker.controls.buttons import Button
@@ -211,12 +211,31 @@ _volume_encoder = None
 _action_encoder = None
 _action_index = 0
 
-# Physical button name -> room selected when pressed.
+# Physical button name -> captured gesture state.
+# Includes original room, device and command references.
 _hold_rooms = {}
 
 # Releases awaiting space in the Dumb Queue.
 # A new press must not overtake its previous keyup.
 _pending_releases = {}
+
+
+def configuration_changed():
+    """Invalidate physical state after configuration activation.
+
+    Adapter session retirement is owned by the coordinator.
+    Queue cancellation is owned by the dispatcher.
+
+    Discard captured gestures so they cannot resurrect
+    sessions belonging to the previous configuration.
+    """
+    global _action_index
+
+    _hold_rooms.clear()
+    _pending_releases.clear()
+    _action_index = 0
+
+    logger.info("PHYSICAL: Configuration state reset")
 
 
 # Secret reboot handshake.
@@ -465,37 +484,43 @@ def dispatch_hold_button(button_name, action_id, event):
             room, action = device_config.action_details(
                 room_id, action_id
             )
-            endpoint = device_config.resolve_endpoint(
+
+            device = device_config.resolve_device(
                 room, action["target"]
             )
-            command = (
-                action["target"],
-                action["method"],
-                action["path"],
-            )
+            command = action["command"]
+
+            if (
+                not device["endpoint"]
+                or device_config.command_is_blank(command)
+            ):
+                _record_dispatch(action_id, "skipped")
+                return False
+
             adapter = device_adapters.lookup_hold(
                 room_id, action_id
             )
 
-            if not endpoint or not action["path"]:
-                _record_dispatch(action_id, "skipped")
-                return False
-
+            # Devices without native hold support receive
+            # one ordinary action per physical press.
             if adapter == device_adapters.GENERIC_HTTP:
-                raise ValueError("No native hold adapter")
+                actions.dispatch(room_id, action_id)
+                _record_dispatch(action_id, "accepted")
+                return True
 
             pressed_ns = time.monotonic_ns()
 
             if NAV_PRESS_FIRST and button_name in NAV_BUTTONS:
-                # The initial tap is part of the gesture,
-                # even when the press later becomes a hold.
-                # If queue admission fails, do not start a hold.
+                # Preserve the initial navigation tap.
+                # Failed queue admission must not start a hold.
                 actions.dispatch(room_id, action_id)
 
+            # Retain the original validated device and command.
+            # A room change must not redirect a release.
             _hold_rooms[button_name] = (
                 room_id,
                 action_id,
-                endpoint,
+                device,
                 command,
                 adapter,
                 pressed_ns,
@@ -516,7 +541,7 @@ def dispatch_hold_button(button_name, action_id, event):
             return False
 
         (
-            room_id, saved_action_id, endpoint,
+            room_id, saved_action_id, device,
             command, adapter, pressed_ns, holding
         ) = original
 
@@ -524,7 +549,7 @@ def dispatch_hold_button(button_name, action_id, event):
             if holding:
                 actions.dispatch_hold(
                     room_id, saved_action_id, "released",
-                    endpoint, command, adapter
+                    device, command, adapter
                 )
             elif not (
                 NAV_PRESS_FIRST and button_name in NAV_BUTTONS
@@ -540,7 +565,7 @@ def dispatch_hold_button(button_name, action_id, event):
                 # Retain the original destination for retry.
                 _pending_releases[button_name] = (
                     room_id, saved_action_id,
-                    endpoint, command, adapter
+                    device, command, adapter
                 )
 
             _record_dispatch(saved_action_id, "failed")
@@ -555,12 +580,12 @@ def dispatch_hold_button(button_name, action_id, event):
 def retry_pending_releases():
     """Retry held-button releases that could not enter the queue."""
     for button_name, state in tuple(_pending_releases.items()):
-        room_id, action_id, endpoint, command, adapter = state
+        room_id, action_id, device, command, adapter = state
 
         try:
             actions.dispatch_hold(
                 room_id, action_id, "released",
-                endpoint, command, adapter
+                device, command, adapter
             )
         except Exception:
             # Keep the release pending for the next poll.
@@ -576,7 +601,7 @@ def poll_pending_holds():
 
     for button_name, state in tuple(_hold_rooms.items()):
         (
-            room_id, action_id, endpoint,
+            room_id, action_id, device,
             command, adapter, pressed_ns, holding
         ) = state
 
@@ -589,11 +614,11 @@ def poll_pending_holds():
         try:
             actions.dispatch_hold(
                 room_id, action_id, "pressed",
-                endpoint, command, adapter
+                device, command, adapter
             )
 
             _hold_rooms[button_name] = (
-                room_id, action_id, endpoint,
+                room_id, action_id, device,
                 command, adapter, pressed_ns, True
             )
             _record_dispatch(action_id, "accepted")
