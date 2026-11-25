@@ -13,7 +13,7 @@ import socketpool
 import time
 import wifi
 
-TV_IP = "192.168.50.47"
+TV_IP = "192.168.50.20"
 TV_PORT = 3000
 TIMEOUT_SECONDS = 5
 PAIRING_WAIT_SECONDS = 45

@@ -6,7 +6,7 @@
       "devices": {
         "device-1": {
           "type": "lg-webos",
-          "endpoint": "192.168.50.47:3000",
+          "endpoint": "192.168.50.20:3000",
           "client_key": "PASTE_OR_PAIR_CLIENT_KEY_HERE"
         },
         "device-2": {
