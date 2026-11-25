@@ -1,7 +1,7 @@
 # The Clonker 10000
 # clonker/devices/device_adapters.py
 #
-# Chapter 12 -- Typed device adapter coordination
+# Chapter 13 -- Typed device adapter coordination
 #
 # Clonker Designed by David Jacobson
 
@@ -35,6 +35,7 @@ ROKU_BUTTON_TAP = "roku-button-tap"
 
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
+LG_WEBOS = "lg-webos"
 
 # Only specialized transport selections are cached.
 #
@@ -68,7 +69,10 @@ def resolve(device, kind, action_id, command):
             "Unsupported command kind for device: " + type_id
         )
 
-    # SSAP and pointer execution will be integrated later.
+    # LG commands use the WebSocket transport regardless
+    # of fundamental, toggle or Custom Action context.
+    if type_id == "lg-webos":
+        return LG_WEBOS
     if command_kind != device_types.HTTP:
         raise ValueError(
             "Unsupported runtime command kind: " + command_kind
@@ -221,11 +225,14 @@ def snapshot():
     return dict(_adapter_map)
 
 
-def ready(adapter):
+def ready(adapter, device=None, command=None):
     """Can this adapter accept its next queued command?"""
 
     if adapter == DENON_TCP:
         return denon.ready()
+
+    if adapter == LG_WEBOS:
+        return lg_webos.ready(device, command)
 
     return True
 
@@ -272,6 +279,26 @@ def execute(adapter, device, command, action_id=None):
     """
 
     start = time.monotonic_ns()
+
+    if adapter == LG_WEBOS:
+        if (
+            device["type"] != "lg-webos"
+            or not device_types.is_enabled("lg-webos")
+            or not device_types.supports_command(
+                "lg-webos", command["kind"]
+            )
+        ):
+            raise ValueError("Unsupported LG execution")
+
+        result = lg_webos.execute(device, command)
+
+        return {
+            "accepted": result["accepted"],
+            "detail": result["detail"],
+            "total_ms": round(
+                (time.monotonic_ns() - start) / 1_000_000, 1
+            ),
+        }
 
     endpoint, method, path = _http_fields(device, command)
 
@@ -364,12 +391,14 @@ def poll():
     """Advance stateful adapters requiring maintenance.
 
     Roku manages held-button and volume releases.
-    Denon drains incoming TCP status messages to prevent
-    receive-buffer accumulation on its persistent socket.
+    Denon drains incoming TCP status messages.
+    LG processes asynchronous WebSocket responses
+    and retires expired sessions.
     """
 
     roku.poll()
     denon.poll_rx()
+    lg_webos.poll()
 
 
 def cancel_active():
@@ -395,9 +424,12 @@ def cancel_active():
 
 
 def close():
-    """Release adapter resources during shutdown."""
+    """Release adapter resources during shutdown or activation."""
 
     try:
         roku.close()
     finally:
-        denon.close()
+        try:
+            denon.close()
+        finally:
+            lg_webos.close()
