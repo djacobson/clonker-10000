@@ -259,12 +259,9 @@
 
         <label for="room">Room</label>
 
-        <select id="room">
-            <option value="room-1">Den</option>
-            <option value="room-2">Sunroom</option>
-            <option value="room-3">Room 3</option>
+        <select id="room" disabled>
+            <option value="">Loading rooms...</option>
         </select>
-
 
         <!-- Volume and Mute: right-aligned bordered group -->
 
@@ -405,29 +402,51 @@
 
 
 <script>
-    // Test remote: submit only room and fundamental action IDs.
+    // Test remote: submit only room and action IDs.
     // Pico resolves configuration and queues actions for execution.
     // A queued acknowledgment does not guarantee device execution.
 
     const status = document.getElementById("status");
     const room = document.getElementById("room");
+    const customSelect = document.getElementById("custom-action");
+    const runCustom = document.getElementById("run-custom-action");
+
+    const buttons =
+        document.querySelectorAll("button[data-action]");
 
     let busy = false;
+    let configLoaded = false;
+    let customActionsByRoom = {};
+
+
+    function updateControls() {
+        const ready = configLoaded && Boolean(room.value);
+        const available = ready && !busy;
+
+        room.disabled = !configLoaded || busy;
+
+        buttons.forEach(button => {
+            button.disabled = !available;
+        });
+
+        const actions = customActionsByRoom[room.value] || [];
+
+        customSelect.disabled =
+            !available || actions.length === 0;
+
+        runCustom.disabled =
+            !available || !customSelect.value;
+    }
 
 
     async function sendAction(action) {
-        if (busy) {
+        if (busy || !configLoaded || !room.value || !action) {
             return;
         }
 
         busy = true;
+        updateControls();
 
-        const buttons =
-            document.querySelectorAll("button[data-action]");
-
-        buttons.forEach(button => button.disabled = true);
-        updateCustomActions();
- 
         status.textContent =
             "Sending " + room.value + " / " + action + "...";
 
@@ -459,34 +478,22 @@
 
         } finally {
             busy = false;
-
-            buttons.forEach(
-                button => button.disabled = false
-            );
-
-            updateCustomActions();
+            updateControls();
         }
- 
     }
 
 
     // Wire up the 14 fundamental action buttons.
 
-    document.querySelectorAll("button[data-action]")
-        .forEach(button => {
-            button.addEventListener("click", () => {
-                sendAction(button.dataset.action);
-            });
+    buttons.forEach(button => {
+        button.addEventListener("click", () => {
+            sendAction(button.dataset.action);
         });
+    });
 
 
-    // Populate the custom-action selector for the chosen room.
+    // Populate Custom Actions for the selected room.
     // Selection alone never executes an action.
-
-    const customSelect = document.getElementById("custom-action");
-    const runCustom = document.getElementById("run-custom-action");
-
-    let customActionsByRoom = {};
 
     function updateCustomActions() {
         const actions = customActionsByRoom[room.value] || [];
@@ -503,19 +510,27 @@
         if (actions.length === 0) {
             const option = document.createElement("option");
             option.value = "";
-            option.textContent = "No custom actions";
+            option.textContent = configLoaded
+                ? "No custom actions"
+                : "Configuration unavailable";
+
             customSelect.appendChild(option);
         }
 
-        customSelect.disabled = busy || actions.length === 0;
-        runCustom.disabled = busy || actions.length === 0;
+        updateControls();
     }
 
 
-    // Load saved actions, not unsaved configuration edits.
-    // The Pico remains the authority for available actions.
+    // Load saved rooms and Custom Actions in one request.
+    // Room IDs follow physical selector order.
+    // Missing rooms are omitted rather than renumbered.
 
-    async function loadCustomActions() {
+    async function loadConfiguration() {
+        configLoaded = false;
+        updateControls();
+
+        status.textContent = "Loading configuration...";
+
         try {
             const response = await fetch("/api/config", {
                 cache: "no-store"
@@ -526,36 +541,77 @@
             }
 
             const config = await response.json();
-            const loaded = {};
 
-            for (const [roomId, roomConfig] of
-                    Object.entries(config.rooms || {})) {
-                loaded[roomId] = roomConfig.custom_actions || [];
+            if (config.version !== 5 || !config.rooms) {
+                throw new Error("Expected Config v5 rooms");
             }
 
+            const loaded = {};
+            const options = [];
+
+            for (const roomId of [
+                "room-1", "room-2", "room-3"
+            ]) {
+                const roomConfig = config.rooms[roomId];
+
+                if (!roomConfig) {
+                    continue;
+                }
+
+                const option = document.createElement("option");
+                option.value = roomId;
+                option.textContent = roomConfig.name || roomId;
+
+                options.push(option);
+
+                loaded[roomId] =
+                    roomConfig.custom_actions || [];
+            }
+
+            if (options.length === 0) {
+                throw new Error("No configured rooms");
+            }
+
+            room.replaceChildren(...options);
             customActionsByRoom = loaded;
+            configLoaded = true;
+
             updateCustomActions();
 
+            status.textContent = "Ready.";
+
         } catch (error) {
+            configLoaded = false;
             customActionsByRoom = {};
+
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "Rooms unavailable";
+
+            room.replaceChildren(option);
             updateCustomActions();
+
             status.textContent =
-                "Custom actions unavailable: " + error.message;
+                "Configuration unavailable: " +
+                error.message;
         }
     }
 
 
     room.addEventListener("change", updateCustomActions);
 
+    customSelect.addEventListener("change", updateControls);
+
     runCustom.addEventListener("click", () => {
-        if (!customSelect.disabled && customSelect.value) {
+        if (!runCustom.disabled && customSelect.value) {
             sendAction(customSelect.value);
         }
     });
 
-    updateCustomActions();
-    loadCustomActions();
- 
+
+    updateControls();
+    loadConfiguration();
+
 </script>
 
 </body>
