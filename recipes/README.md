@@ -19,12 +19,12 @@ and Custom Actions.
 - `david-roku-denon-starter.json` — a complete Config v5
   recipe based on a working configuration exported
   from the physical Clonker.
-- `david-lg-webos-starter.json` — an experimental,
-  single-room LG webOS Config v5 recipe created
-  for Chapter 13 adapter integration and testing.
-  Includes SSAP commands, pointer commands,
-  a placeholder client key, and temporary
-  integration-test Custom Actions.
+- `david-lg-webos-starter.json` — a hardware-tested,
+  single-room LG webOS Config v5 recipe developed
+  during Chapter 13. Includes native SSAP and pointer
+  commands, Wake-on-LAN power management, Picture Cycle
+  and TV Wake Custom Actions, a placeholder client key,
+  and synthetic MAC addresses.
  
 The catalog's `index_version` is independent of the
 Clonker configuration schema version.
@@ -75,7 +75,7 @@ substituted during import.
 A valid configuration does not necessarily mean
 every device is reachable or operational.
 
-## Credentials and future protocols
+## Credentials and protocol requirements
 
 Never publish live authentication credentials,
 client keys, passwords, or access tokens.
@@ -88,12 +88,29 @@ keys with the explicit placeholder:
 The placeholder is configuration data, not a usable
 authentication credential.
 
-Config v5 supports LG webOS configuration fields,
-SSAP commands, structured payloads, and pointer
-commands.
+For Wake-on-LAN commands, replace actual equipment
+MAC addresses with the synthetic placeholder:
 
-Operational LG execution and pairing remain
-dependent on future firmware integration.
+`02:00:00:00:00:00`
+
+This preserves schema validity without publishing
+the original equipment's MAC address.
+
+Before using Wake-on-LAN, replace every synthetic
+MAC address with the intended device's actual MAC
+address. Review the broadcast address and UDP port
+for the local network.
+
+Config v5 supports operational LG webOS SSAP and
+pointer commands, structured JSON payloads, and
+Wake-on-LAN commands.
+
+Wake-on-LAN is available for fundamental power
+toggles and Custom Action steps across operational
+device types.
+
+LG client keys must currently be supplied manually.
+Integrated pairing remains a future enhancement.
 
 Apple TV and Amazon Fire TV are reserved future
 device types, not currently operational adapters.
@@ -107,7 +124,8 @@ device types, not currently operational adapters.
    identifiers.
 4. Preserve command definitions, payloads, step
    ordering, and delays.
-5. Remove or replace sensitive authentication data.
+5. Remove or replace sensitive authentication data
+   and equipment-specific MAC addresses.
 6. Validate the resulting configuration against
    the active firmware schema.
 7. Add the JSON file under `recipes/`.

@@ -32,23 +32,22 @@
     {
       "id": "david-lg-webos-starter",
       "title": "David's LG webOS Starter",
-      "category": "CONFIG V5 · ONE ROOM · EXPERIMENTAL",
-      "summary": "David's LG G1 OLED configuration, demonstrating native LG webOS SSAP and pointer commands in a single-room setup.",
+      "category": "CONFIG V5 · ONE ROOM · HARDWARE TESTED",
+      "summary": "David's working LG G1 OLED configuration, combining native webOS control with Wake-on-LAN power management.",
       "description": [
-        "This complete Config v5 recipe was created for Chapter 13 of the Clonker project: The Monster Learns Another Language.",
+        "This complete Config v5 recipe was developed and hardware tested during Chapter 13: The Monster Learns Another Language.",
         "Room 1, Sunroom, contains a single configured LG webOS television. Volume and mute use SSAP commands, while navigation, Select, Back, and Home use pointer commands.",
-        "The recipe demonstrates structured JSON payloads, independent mute ON/OFF commands, and Custom Actions combining SSAP and pointer commands.",
-        "Power and media transport controls are intentionally unassigned during initial integration testing.",
-        "A valid LG webOS client key must be supplied manually through the Clonker configuration editor. The published recipe contains only a placeholder credential.",
-        "Operational compatibility is pending Chapter 13 firmware integration and testing. Review the device endpoint and authentication settings before explicitly saving."
+        "Power ON uses Wake-on-LAN, including recovery from extended standby. Power OFF uses LG SSAP.",
+        "Picture Cycle advances the television's picture mode using a timed sequence of pointer commands. TV Wake provides unconditional power-on independently of the remembered power-toggle direction.",
+        "Media transport controls are intentionally unassigned.",
+        "Replace the placeholder client key and both synthetic MAC addresses with your television's actual values. Review the device endpoint and broadcast address before explicitly saving."
       ],
       "rooms": [
-        "Room 1 -- Sunroom: LG G1 OLED, native webOS navigation, volume/mute, three Custom Actions"
+        "Room 1 -- Sunroom: LG G1 OLED, native navigation, volume/mute, power control, two Custom Actions"
       ],
       "custom_actions": [
-        "Sunroom: Get Volume → Request current volume using SSAP",
-        "Sunroom: Launch Home → Launch the LG Home application using SSAP",
-        "Sunroom: Home & Right → Launch LG Home, wait 1.5 seconds, send pointer RIGHT"
+        "Sunroom: Picture Cycle → Advance the LG picture mode using Quick Settings",
+        "Sunroom: TV Wake → Unconditional power-on using Wake-on-LAN"
       ],
       "file": "david-lg-webos-starter.json"
     }
