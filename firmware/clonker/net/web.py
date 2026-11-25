@@ -64,6 +64,8 @@ _last_activity = 0
 # Bounded HTTP processing diagnostics.
 _stage = "IDLE"
 _expected_request_bytes = 0
+_body_start = 0
+_received_request_bytes = 0
 # Reusable receive storage for the single active HTTP client.
 _receive_buffer = bytearray(IO_CHUNK_BYTES)
 _receive_view = memoryview(_receive_buffer)
@@ -171,7 +173,7 @@ def _request_complete(request):
     GET and clock-sync requests need only their headers; configuration POSTs
     additionally require one valid Content-Length and the entire body.
     """
-    global _expected_request_bytes
+    global _expected_request_bytes, _body_start
     # Once validated, reuse the expected request length
     # while receiving the remaining POST body.
     if _expected_request_bytes:
@@ -211,6 +213,7 @@ def _request_complete(request):
     if header_end + 4 + lengths[0] > MAX_REQUEST_BYTES:
         raise ValueError("Configuration request too large")
 
+    _body_start = header_end + 4
     _expected_request_bytes = header_end + 4 + lengths[0]
     return len(request) >= _expected_request_bytes
 
@@ -269,7 +272,7 @@ def _http_header(status, content_type, content_length,
     return (header + "\r\n").encode("utf-8")
 
 
-def _build_response(first_line, request=None):
+def _build_response(first_line):
     """Build response bytes or prepare a static-file stream.
 
     Returns:
@@ -280,7 +283,7 @@ def _build_response(first_line, request=None):
 
     For other routes, initial_bytes contains the complete response.
     """
-    global _stage
+    global _stage, _request
     logger.debug("HTTP request: {}".format(first_line))
     content_type = "application/json"
     file_path = None
@@ -379,33 +382,25 @@ def _build_response(first_line, request=None):
             )
         else:
             try:
-                _stage = "POST_HEADERS"
-                header_end = request.find(b"\r\n\r\n")
-                headers = bytes(
-                    request[:header_end]
-                ).split(b"\r\n")
-
-                length = None
-
-                for header in headers[1:]:
-                    if header.lower().startswith(b"content-length:"):
-                        length = int(
-                            header.split(b":", 1)[1].strip()
-                        )
-                        break
-
-                if length is None or length < 0:
-                    raise ValueError("Missing Content-Length")
-
-                body_start = header_end + 4
                 _stage = "POST_BODY_COPY"
+
                 body_bytes = bytes(
-                    request[body_start:body_start + length]
+                    memoryview(_request)[
+                        _body_start:_expected_request_bytes
+                    ]
                 )
+
+                # Release the accumulated HTTP request before
+                # decoding and validating the configuration.
+                _request = None
+
+                _stage = "POST_BODY_DECODE"
+                body_text = body_bytes.decode("utf-8")
+                del body_bytes
+
                 _stage = "POST_JSON"
-                submitted = json.loads(
-                    body_bytes.decode("utf-8")
-                )
+                submitted = json.loads(body_text)
+                del body_text
 
                 if not isinstance(submitted, dict):
                     raise ValueError(
@@ -556,6 +551,7 @@ def poll():
     global _sent, _sent_total, _response_total
     global _last_activity, _file
     global _stage, _expected_request_bytes
+    global _body_start, _received_request_bytes
 
     if _listener is None:
         return
@@ -580,6 +576,8 @@ def poll():
         # can close the socket even if initialization fails.
         _client = client
         _expected_request_bytes = 0
+        _body_start = 0
+        _received_request_bytes = 0
         _stage = "CLIENT_INITIALIZE"
 
         try:
@@ -653,6 +651,7 @@ def poll():
         _last_activity = now
         _stage = "REQUEST_EXTEND"
         _request.extend(_receive_view[:count])
+        _received_request_bytes = len(_request)
 
         if len(_request) > MAX_REQUEST_BYTES:
             logger.warning("HTTP request exceeded size limit")
@@ -684,7 +683,7 @@ def poll():
         try:
             _stage = "BUILD_RESPONSE"
             response, file_path, total_bytes = _build_response(
-                first_line, _request
+                first_line
             )
 
             if file_path is not None:
@@ -780,7 +779,11 @@ def abort_low_memory():
     global _sent, _sent_total, _response_total, _last_activity
 
     free_before = gc.mem_free()
-    request_bytes = len(_request) if _request is not None else 0
+    request_bytes = (
+        len(_request)
+        if _request is not None
+        else _received_request_bytes
+    )
     expected_bytes = _expected_request_bytes
     sent_bytes = _sent_total
     response_bytes = _response_total
