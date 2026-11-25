@@ -1,7 +1,7 @@
 # The Clonker 10000
 # tests/test_typed_adapters.py
 #
-# Chapter 12 -- Typed adapter selection regression
+# Chapter 13 -- Typed adapter selection regression
 #
 # No network operations or filesystem writes.
 
@@ -24,6 +24,7 @@ TCP = adapters.DENON_TCP
 VOLUME = adapters.ROKU_VOLUME_HOLD
 TAP = adapters.ROKU_BUTTON_TAP
 HOLD = adapters.ROKU_BUTTON_HOLD
+LG = adapters.LG_WEBOS
 
 
 def check(name, condition):
@@ -286,31 +287,57 @@ def test_selection():
                 http("/keypress/Up")) == HTTP
     )
 
-    # Disabled devices and incompatible protocols.
+    # LG typed transport selection.
 
-    reject(
-        "Reject disabled LG SSAP selection",
-        lambda: resolve(
+    check(
+        "LG SSAP selects webOS adapter",
+        resolve(
             "lg-webos", "fundamental", "volume-up",
             ssap("ssap://audio/volumeUp")
-        )
+        ) == LG
     )
 
-    reject(
-        "Reject disabled LG pointer selection",
-        lambda: resolve(
+    check(
+        "LG pointer selects webOS adapter",
+        resolve(
             "lg-webos", "fundamental", "nav-up",
             pointer("UP")
-        )
+        ) == LG
+    )
+
+    check(
+        "LG Custom Action pointer selects webOS adapter",
+        resolve(
+            "lg-webos", "custom", None,
+            pointer("HOME")
+        ) == LG
+    )
+
+    check(
+        "LG Custom Action SSAP selects webOS adapter",
+        resolve(
+            "lg-webos", "custom", None,
+            ssap("ssap://audio/getVolume")
+        ) == LG
+    )
+
+    check(
+        "LG mute toggle selects webOS adapter",
+        resolve(
+            "lg-webos", "fundamental", "mute-toggle",
+            ssap("ssap://audio/setMute")
+        ) == LG
     )
 
     reject(
-        "Reject disabled LG Custom Action",
+        "LG rejects HTTP selection",
         lambda: resolve(
-            "lg-webos", "custom", None,
-            pointer("HOME")
+            "lg-webos", "fundamental", "home",
+            http("/test")
         )
     )
+
+    # Disabled devices and incompatible protocols.
 
     reject(
         "Reject future Apple TV selection",
@@ -438,7 +465,7 @@ def test_cache():
         adapters.lookup_hold("room-2", "nav-up") == HTTP
     )
 
-    # Add a configuration-only LG device.
+    # Add an operational LG device.
     room = config["rooms"]["room-2"]
     room["devices"]["device-1"] = device("lg-webos")
 
@@ -450,13 +477,18 @@ def test_cache():
     config = cfg.validate_config(config)
 
     check(
-        "Disabled LG configuration can rebuild",
-        adapters.rebuild(config) == 0
+        "LG configuration rebuilds specialized cache",
+        adapters.rebuild(config) == 1
     )
 
     check(
-        "Disabled LG receives no specialized cache entry",
-        ("room-2", "nav-up") not in adapters.snapshot()
+        "LG pointer receives specialized cache entry",
+        adapters.lookup("room-2", "nav-up") == LG
+    )
+
+    check(
+        "LG pointer does not receive native hold entry",
+        adapters.lookup_hold("room-2", "nav-up") == HTTP
     )
 
 
@@ -467,21 +499,21 @@ def test_execution_guards():
     lg = device("lg-webos")
 
     reject(
-        "Execution rejects disabled LG SSAP",
+        "HTTP execution rejects LG SSAP",
         lambda: adapters.execute(
             HTTP, lg, ssap("ssap://audio/volumeUp")
         )
     )
 
     reject(
-        "Execution rejects disabled LG pointer",
+        "HTTP execution rejects LG pointer",
         lambda: adapters.execute(
             HTTP, lg, pointer("HOME")
         )
     )
 
     reject(
-        "Held execution rejects disabled LG",
+        "Native hold execution rejects LG pointer",
         lambda: adapters.execute_hold(
             HOLD, lg, pointer("UP"), "down"
         )
@@ -493,6 +525,78 @@ def test_execution_guards():
             HTTP, device("roku"),
             ssap("ssap://audio/volumeUp")
         )
+    )
+
+
+def test_lg_execution():
+    lg = device("lg-webos")
+    lg["endpoint"] = "192.168.1.10:3000"
+    lg["client_key"] = "TEST_KEY"
+
+    command = ssap("ssap://audio/setMute")
+    command["payload"] = {"mute": True}
+
+    calls = []
+    original_execute = adapters.lg_webos.execute
+    original_ready = adapters.lg_webos.ready
+
+    def fake_execute(dev, cmd):
+        calls.append((dev, cmd))
+        return {
+            "accepted": True,
+            "detail": "LG test transmission",
+        }
+
+    def fake_busy(dev, cmd):
+        return False
+
+    try:
+        adapters.lg_webos.execute = fake_execute
+
+        result = adapters.execute(LG, lg, command)
+
+        check("LG SSAP accepted", result["accepted"])
+        check(
+            "LG SSAP preserves device and payload",
+            calls[-1] == (lg, command)
+        )
+        check(
+            "LG execution reports elapsed time",
+            "total_ms" in result
+        )
+
+        command = pointer("HOME")
+        result = adapters.execute(LG, lg, command)
+
+        check("LG pointer accepted", result["accepted"])
+        check(
+            "LG pointer preserves command",
+            calls[-1] == (lg, command)
+        )
+
+        adapters.lg_webos.ready = fake_busy
+
+        check(
+            "LG busy readiness propagated",
+            not adapters.ready(LG, lg, command)
+        )
+
+    finally:
+        adapters.lg_webos.execute = original_execute
+        adapters.lg_webos.ready = original_ready
+
+    lg["client_key"] = ""
+
+    reject(
+        "LG rejects empty client key",
+        lambda: adapters.ready(LG, lg, command)
+    )
+
+    lg["client_key"] = "PASTE_OR_PAIR_CLIENT_KEY_HERE"
+
+    reject(
+        "LG rejects placeholder client key",
+        lambda: adapters.ready(LG, lg, command)
     )
 
 
@@ -511,6 +615,7 @@ def run():
         test_selection()
         test_cache()
         test_execution_guards()
+        test_lg_execution()
 
     finally:
         adapters._adapter_map = previous_map
