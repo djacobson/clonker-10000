@@ -180,8 +180,8 @@ def run():
     )
 
     check(
-        "LG runtime disabled",
-        not device_types.is_enabled("lg-webos")
+        "LG runtime enabled",
+        device_types.is_enabled("lg-webos")
     )
 
     check(
