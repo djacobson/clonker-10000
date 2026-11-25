@@ -1,370 +1,583 @@
 {
   "rooms": {
-    "room-3": {
+    "room-1": {
       "actions": {
         "back": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
-        },
-        "mute-toggle": {
-          "target": "device-2",
-          "off_path": "",
-          "method": "GET",
-          "on_path": ""
-        },
-        "power-toggle": {
-          "target": "device-3",
-          "off_path": "",
-          "method": "POST",
-          "on_path": ""
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Back"
+          },
+          "target": "device-3"
         },
         "home": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Home"
+          },
+          "target": "device-3"
         },
-        "select": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
-        },
-        "nav-up": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
-        },
-        "skip-forward": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
-        },
-        "volume-down": {
-          "target": "device-2",
-          "path": "",
-          "method": "GET"
-        },
-        "skip-back": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
-        },
-        "nav-left": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
-        },
-        "play-pause": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
-        },
-        "volume-up": {
-          "target": "device-2",
-          "path": "",
-          "method": "GET"
+        "mute-toggle": {
+          "off_command": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/goform/formiPhoneAppDirect.xml?MUOFF"
+          },
+          "on_command": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/goform/formiPhoneAppDirect.xml?MUON"
+          },
+          "target": "device-2"
         },
         "nav-down": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Down"
+          },
+          "target": "device-3"
+        },
+        "nav-left": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Left"
+          },
+          "target": "device-3"
         },
         "nav-right": {
-          "target": "device-3",
-          "path": "",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Right"
+          },
+          "target": "device-3"
+        },
+        "nav-up": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Up"
+          },
+          "target": "device-3"
+        },
+        "play-pause": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Play"
+          },
+          "target": "device-3"
+        },
+        "power-toggle": {
+          "off_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Power"
+          },
+          "on_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Power"
+          },
+          "target": "device-3"
+        },
+        "select": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Select"
+          },
+          "target": "device-3"
+        },
+        "skip-back": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Rev"
+          },
+          "target": "device-3"
+        },
+        "skip-forward": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Fwd"
+          },
+          "target": "device-3"
+        },
+        "volume-down": {
+          "command": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/goform/formiPhoneAppDirect.xml?MVDOWN"
+          },
+          "target": "device-2"
+        },
+        "volume-up": {
+          "command": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/goform/formiPhoneAppDirect.xml?MVUP"
+          },
+          "target": "device-2"
         }
       },
-      "custom_actions": [],
-      "name": "Room 3",
+      "custom_actions": [
+        {
+          "id": "custom-action-1",
+          "name": "Movie",
+          "steps": [
+            {
+              "command": {
+                "kind": "http",
+                "method": "POST",
+                "path": "/keypress/Home"
+              },
+              "target": "device-3",
+              "wait_after_ms": 3000
+            },
+            {
+              "command": {
+                "kind": "http",
+                "method": "GET",
+                "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1"
+              },
+              "target": "device-2",
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-2",
+          "name": "Music",
+          "steps": [
+            {
+              "command": {
+                "kind": "http",
+                "method": "POST",
+                "path": "/keypress/Home"
+              },
+              "target": "device-3",
+              "wait_after_ms": 3000
+            },
+            {
+              "command": {
+                "kind": "http",
+                "method": "GET",
+                "path": "/goform/formiPhoneAppDirect.xml?MSQUICK2"
+              },
+              "target": "device-2",
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-3",
+          "name": "Vinyl",
+          "steps": [
+            {
+              "command": {
+                "kind": "http",
+                "method": "POST",
+                "path": "/keypress/Home"
+              },
+              "target": "device-3",
+              "wait_after_ms": 3000
+            },
+            {
+              "command": {
+                "kind": "http",
+                "method": "GET",
+                "path": "/goform/formiPhoneAppDirect.xml?MSQUICK3"
+              },
+              "target": "device-2",
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-4",
+          "name": "Audio Cycle",
+          "steps": [
+            {
+              "command": {
+                "kind": "http",
+                "method": "GET",
+                "path": "/goform/formiPhoneAppDirect.xml?MSMOVIE"
+              },
+              "target": "device-2",
+              "wait_after_ms": 0
+            }
+          ]
+        }
+      ],
       "devices": {
-        "device-1": "",
-        "device-2": "",
-        "device-3": ""
-      }
+        "device-1": {
+          "endpoint": "",
+          "type": "generic-http"
+        },
+        "device-2": {
+          "endpoint": "192.168.50.44:8080",
+          "type": "denon"
+        },
+        "device-3": {
+          "endpoint": "192.168.50.43:8060",
+          "type": "roku"
+        }
+      },
+      "name": "Den"
     },
     "room-2": {
       "actions": {
         "back": {
-          "target": "device-3",
-          "path": "/keypress/Back",
-          "method": "POST"
-        },
-        "mute-toggle": {
-          "target": "device-3",
-          "off_path": "/keypress/VolumeMute",
-          "method": "POST",
-          "on_path": "/keypress/VolumeMute"
-        },
-        "power-toggle": {
-          "target": "device-3",
-          "off_path": "/keypress/Power",
-          "method": "POST",
-          "on_path": "/keypress/Power"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Back"
+          },
+          "target": "device-3"
         },
         "home": {
-          "target": "device-3",
-          "path": "/keypress/Home",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Home"
+          },
+          "target": "device-3"
         },
-        "select": {
-          "target": "device-3",
-          "path": "/keypress/Select",
-          "method": "POST"
-        },
-        "nav-up": {
-          "target": "device-3",
-          "path": "/keypress/Up",
-          "method": "POST"
-        },
-        "skip-forward": {
-          "target": "device-3",
-          "path": "/keypress/Fwd",
-          "method": "POST"
-        },
-        "volume-down": {
-          "target": "device-3",
-          "path": "/keypress/VolumeDown",
-          "method": "POST"
-        },
-        "skip-back": {
-          "target": "device-3",
-          "path": "/keypress/Rev",
-          "method": "POST"
-        },
-        "nav-left": {
-          "target": "device-3",
-          "path": "/keypress/Left",
-          "method": "POST"
-        },
-        "play-pause": {
-          "target": "device-3",
-          "path": "/keypress/Play",
-          "method": "POST"
-        },
-        "volume-up": {
-          "target": "device-3",
-          "path": "/keypress/VolumeUp",
-          "method": "POST"
+        "mute-toggle": {
+          "off_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/VolumeMute"
+          },
+          "on_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/VolumeMute"
+          },
+          "target": "device-3"
         },
         "nav-down": {
-          "target": "device-3",
-          "path": "/keypress/Down",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Down"
+          },
+          "target": "device-3"
+        },
+        "nav-left": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Left"
+          },
+          "target": "device-3"
         },
         "nav-right": {
-          "target": "device-3",
-          "path": "/keypress/Right",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Right"
+          },
+          "target": "device-3"
+        },
+        "nav-up": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Up"
+          },
+          "target": "device-3"
+        },
+        "play-pause": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Play"
+          },
+          "target": "device-3"
+        },
+        "power-toggle": {
+          "off_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Power"
+          },
+          "on_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Power"
+          },
+          "target": "device-3"
+        },
+        "select": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Select"
+          },
+          "target": "device-3"
+        },
+        "skip-back": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Rev"
+          },
+          "target": "device-3"
+        },
+        "skip-forward": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/Fwd"
+          },
+          "target": "device-3"
+        },
+        "volume-down": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/VolumeDown"
+          },
+          "target": "device-3"
+        },
+        "volume-up": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": "/keypress/VolumeUp"
+          },
+          "target": "device-3"
         }
       },
       "custom_actions": [
         {
-          "name": "Movie",
           "id": "custom-action-1",
+          "name": "Movie",
           "steps": [
             {
+              "command": {
+                "kind": "http",
+                "method": "POST",
+                "path": "/keypress/Home"
+              },
               "target": "device-3",
-              "path": "/keypress/Home",
-              "method": "POST",
               "wait_after_ms": 3000
             },
             {
+              "command": {
+                "kind": "http",
+                "method": "GET",
+                "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1"
+              },
               "target": "device-2",
-              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1",
-              "method": "GET",
               "wait_after_ms": 0
             }
           ]
         },
         {
-          "name": "Music",
           "id": "custom-action-2",
+          "name": "Music",
           "steps": [
             {
+              "command": {
+                "kind": "http",
+                "method": "POST",
+                "path": "/keypress/Home"
+              },
               "target": "device-3",
-              "path": "/keypress/Home",
-              "method": "POST",
               "wait_after_ms": 3000
             },
             {
+              "command": {
+                "kind": "http",
+                "method": "GET",
+                "path": "/goform/formiPhoneAppDirect.xml?MSQUICK2"
+              },
               "target": "device-2",
-              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK2",
-              "method": "GET",
               "wait_after_ms": 0
             }
           ]
         },
         {
-          "name": "Audio Cycle",
           "id": "custom-action-3",
+          "name": "Audio Cycle",
           "steps": [
             {
+              "command": {
+                "kind": "http",
+                "method": "GET",
+                "path": "/goform/formiPhoneAppDirect.xml?MSMOVIE"
+              },
               "target": "device-2",
-              "path": "/goform/formiPhoneAppDirect.xml?MSMOVIE",
-              "method": "GET",
               "wait_after_ms": 0
             }
           ]
         }
       ],
-      "name": "Sunroom",
       "devices": {
-        "device-1": "",
-        "device-2": "192.168.50.40:8080",
-        "device-3": "192.168.50.28:8060"
-      }
+        "device-1": {
+          "endpoint": "",
+          "type": "generic-http"
+        },
+        "device-2": {
+          "endpoint": "192.168.50.40:8080",
+          "type": "denon"
+        },
+        "device-3": {
+          "endpoint": "192.168.50.28:8060",
+          "type": "roku"
+        }
+      },
+      "name": "Sunroom"
     },
-    "room-1": {
+    "room-3": {
       "actions": {
         "back": {
-          "target": "device-3",
-          "path": "/keypress/Back",
-          "method": "POST"
-        },
-        "mute-toggle": {
-          "target": "device-2",
-          "off_path": "/goform/formiPhoneAppDirect.xml?MUOFF",
-          "method": "GET",
-          "on_path": "/goform/formiPhoneAppDirect.xml?MUON"
-        },
-        "power-toggle": {
-          "target": "device-3",
-          "off_path": "/keypress/Power",
-          "method": "POST",
-          "on_path": "/keypress/Power"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
         },
         "home": {
-          "target": "device-3",
-          "path": "/keypress/Home",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
         },
-        "select": {
-          "target": "device-3",
-          "path": "/keypress/Select",
-          "method": "POST"
-        },
-        "nav-up": {
-          "target": "device-3",
-          "path": "/keypress/Up",
-          "method": "POST"
-        },
-        "skip-forward": {
-          "target": "device-3",
-          "path": "/keypress/Fwd",
-          "method": "POST"
-        },
-        "volume-down": {
-          "target": "device-2",
-          "path": "/goform/formiPhoneAppDirect.xml?MVDOWN",
-          "method": "GET"
-        },
-        "skip-back": {
-          "target": "device-3",
-          "path": "/keypress/Rev",
-          "method": "POST"
-        },
-        "nav-left": {
-          "target": "device-3",
-          "path": "/keypress/Left",
-          "method": "POST"
-        },
-        "play-pause": {
-          "target": "device-3",
-          "path": "/keypress/Play",
-          "method": "POST"
-        },
-        "volume-up": {
-          "target": "device-2",
-          "path": "/goform/formiPhoneAppDirect.xml?MVUP",
-          "method": "GET"
+        "mute-toggle": {
+          "off_command": {
+            "kind": "http",
+            "method": "GET",
+            "path": ""
+          },
+          "on_command": {
+            "kind": "http",
+            "method": "GET",
+            "path": ""
+          },
+          "target": "device-2"
         },
         "nav-down": {
-          "target": "device-3",
-          "path": "/keypress/Down",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "nav-left": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
         },
         "nav-right": {
-          "target": "device-3",
-          "path": "/keypress/Right",
-          "method": "POST"
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "nav-up": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "play-pause": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "power-toggle": {
+          "off_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "on_command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "select": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "skip-back": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "skip-forward": {
+          "command": {
+            "kind": "http",
+            "method": "POST",
+            "path": ""
+          },
+          "target": "device-3"
+        },
+        "volume-down": {
+          "command": {
+            "kind": "http",
+            "method": "GET",
+            "path": ""
+          },
+          "target": "device-2"
+        },
+        "volume-up": {
+          "command": {
+            "kind": "http",
+            "method": "GET",
+            "path": ""
+          },
+          "target": "device-2"
         }
       },
-      "custom_actions": [
-        {
-          "name": "Movie",
-          "id": "custom-action-1",
-          "steps": [
-            {
-              "target": "device-3",
-              "path": "/keypress/Home",
-              "method": "POST",
-              "wait_after_ms": 3000
-            },
-            {
-              "target": "device-2",
-              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1",
-              "method": "GET",
-              "wait_after_ms": 0
-            }
-          ]
-        },
-        {
-          "name": "Music",
-          "id": "custom-action-2",
-          "steps": [
-            {
-              "target": "device-3",
-              "path": "/keypress/Home",
-              "method": "POST",
-              "wait_after_ms": 3000
-            },
-            {
-              "target": "device-2",
-              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK2",
-              "method": "GET",
-              "wait_after_ms": 0
-            }
-          ]
-        },
-        {
-          "name": "Vinyl",
-          "id": "custom-action-3",
-          "steps": [
-            {
-              "target": "device-3",
-              "path": "/keypress/Home",
-              "method": "POST",
-              "wait_after_ms": 3000
-            },
-            {
-              "target": "device-2",
-              "path": "/goform/formiPhoneAppDirect.xml?MSQUICK3",
-              "method": "GET",
-              "wait_after_ms": 0
-            }
-          ]
-        },
-        {
-          "name": "Audio Cycle",
-          "id": "custom-action-4",
-          "steps": [
-            {
-              "target": "device-2",
-              "path": "/goform/formiPhoneAppDirect.xml?MSMOVIE",
-              "method": "GET",
-              "wait_after_ms": 0
-            }
-          ]
-        }
-      ],
-      "name": "Den",
+      "custom_actions": [],
       "devices": {
-        "device-1": "",
-        "device-2": "192.168.50.44:8080",
-        "device-3": "192.168.50.43:8060"
-      }
+        "device-1": {
+          "endpoint": "",
+          "type": "generic-http"
+        },
+        "device-2": {
+          "endpoint": "",
+          "type": "generic-http"
+        },
+        "device-3": {
+          "endpoint": "",
+          "type": "generic-http"
+        }
+      },
+      "name": "Room 3"
     }
   },
-  "version": 4
+  "version": 5
 }
