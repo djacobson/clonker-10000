@@ -682,10 +682,16 @@ def poll():
     ]
 
     web_diag.send_attempt()
-
     send_started = time.monotonic_ns()
 
     try:
+        # SOCKET STALL GREMLIN:
+        # Intermittent multi-second stalls have been observed inside
+        # this send call. Root cause remains undetermined.
+        # Observed on the config page (index.html), but not yet
+        # observed on the Test Remote page (remote.html).
+        # Investigate browser request patterns, JavaScript fetch
+        # behavior, and CircuitPython socket handling in the future.
         count = _client.send(chunk)
 
     except OSError as error:
