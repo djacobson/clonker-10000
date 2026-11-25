@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** November 24, 2026  
+**Updated:** November 25, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Baseline:** Chapter 12 — Config v5, typed devices, protocol-aware commands, redesigned configuration editor, verified operational adapters, and optimized configuration persistence  
+**Baseline:** Chapter 13 — Config v5, operational LG webOS, shared Wake-on-LAN transport, and verified typed dispatch  
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
@@ -57,6 +57,8 @@ The former ESP32-S3, XML, and Config v4 designs are historical. The active confi
 | `firmware/clonker/devices/device_adapters.py` | Typed adapter selection, execution, cached mappings and session lifecycle |
 | `firmware/clonker/actions.py` | Shared queue, action dispatch, toggles, compound steps and failure handling |
 | `firmware/clonker/devices/denon.py` | Persistent Denon TCP volume connection and pacing |
+| `firmware/clonker/devices/lg_webos.py` | Authenticated control and pointer WebSockets, bounded SSAP response tracking |
+| `firmware/clonker/net/wake_on_lan.py` | Endpoint-independent UDP magic packet transmission |
 | `firmware/clonker/net/http_transport.py` | Generic bounded blocking HTTP GET/POST |
 | `firmware/clonker/net/web.py` | CONFIG-only inbound HTTP management |
 | `firmware/clonker/www/index.html` | Browser configuration editor |
@@ -70,17 +72,18 @@ The former ESP32-S3, XML, and Config v4 designs are historical. The active confi
 | `firmware/clonker/system/clock.py` | Clock reference |
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
 | `firmware/clonker/system/perf.py` | Shared named performance measurements and statistics |
+| `firmware/clonker/system/flight_recorder.py` | Diagnostic snapshots and transport statistics |
 | `firmware/clonker/display/oled.py` | OLED initialization, polling and display updates |
 
 Preserve package directories and `__init__.py` files. Remove stale duplicate modules when refactoring; a successful copy does not guarantee Python imported the intended version.
 
 ### Preserve the active configuration
 
-`/clonker/device_config.json` is a **runtime asset, not disposable build output**. It may contain newer browser changes than `firmware/clonker/device_config.json`. Back it up before any intentional replacement. Do not overwrite it as part of routine firmware deployment. The sample at [`samples/device_config_roku_denon_sample.json`](../samples/device_config_roku_denon_sample.json) is reference material.
+`/clonker/device_config.json` is a **runtime asset, not disposable build output**. It may contain newer browser changes than `firmware/clonker/device_config.json`. Back it up before any intentional replacement. Do not overwrite it as part of routine firmware deployment. See the [Configuration Recipe Library](../recipes/) for maintained examples.
 
 ## 4. Private settings and development LAN
 
-Keep credentials in the Pico's private `settings.toml`; never commit them or overwrite a working copy during routine deployment. The documented development addresses are installation-specific:
+Keep Wi-Fi credentials in private `settings.toml` and LG client keys in the private active configuration. Never commit real credentials or equipment-specific MAC addresses. The documented development addresses are installation-specific:
 
 | Endpoint | Development address |
 |---|---|
@@ -90,6 +93,8 @@ Keep credentials in the Pico's private `settings.toml`; never commit them or ove
 | Den Roku ECP | `192.168.50.43:8060` |
 | Sunroom AVR-X1800H HTTP | `192.168.50.40:8080` |
 | Sunroom Roku ECP | `192.168.50.28:8060` |
+| Sunroom LG G1 webOS | `192.168.50.20:3000` |
+| Den LG C6H (experimental) | `192.168.50.52` |
 
 The Denon **specialized volume adapter uses TCP port 23** on the configured receiver host; the HTTP endpoint above remains relevant to other Denon commands.
 
@@ -130,11 +135,17 @@ See [Operating Modes](OPERATING_MODES.md) for the complete mode matrix, override
 9. Inspect serial logs for startup, Wi-Fi, loaded rooms, GPIO initialization, adapter and queue errors.
 10. Test the affected feature, including real equipment behavior where relevant. Record observed evidence and update the appropriate documentation.
 
-A repository `firmware/clonker/...` path deploys to `/clonker/...` on CIRCUITPY. `firmware/boot.py` and `firmware/code.py` deploy to `/boot.py` and `/code.py`. Newly added modules such as `device_config.py`, `devices/device_types.py`, and `devices/device_adapters.py` **must also be copied** when required by the running code.
+A repository `firmware/clonker/...` path deploys to `/clonker/...` on CIRCUITPY. `firmware/boot.py` and `firmware/code.py` deploy to `/boot.py` and `/code.py`. New modules and their dependencies must also be copied when required by the running code. Test scripts under `firmware/tests/` deploy to `/tests/`.
 
 ### Deliberate configuration replacement
 
 Before intentionally replacing `/clonker/device_config.json`, preserve primary and backup files, verify Config v5 schema compatibility, check typed device records, endpoints, fundamental commands, and Custom Actions, and test cold-start loading. Config v4 files are not automatically migrated. Do not mix a configuration replacement with an unrelated GPIO or transport change.
+
+### Exporting the active configuration
+
+In CONFIG mode, open `http://192.168.50.12:9090/api/config` (substitute the current Pico address). This returns active RAM configuration, not independent verification of disk contents. For a reusable recipe, remove `filesystem_writable`, `revision`, and `device_types`, preserve stable IDs, replace LG keys with `PASTE_OR_PAIR_CLIENT_KEY_HERE`, and replace real Wake-on-LAN MAC addresses with synthetic placeholders such as `02:00:00:00:00:00`. Keep a private unredacted backup separately.
+
+If a Windows-mounted configuration appears older than the browser configuration, compare the active API output and save logs. A cold restart into SERVICE (USB) refreshed the host view during Chapter 13; the precise cause of the stale view was not established.
 
 ## 7. Configuration regression in DEVICE + CONFIG
 
@@ -145,7 +156,7 @@ Use a reversible edit and record both browser behavior and cold-start persistenc
 - **No-change save:** Confirm unchanged data avoids an unnecessary rewrite and preserves pending queue and toggle history.
 - **Changed save:** Confirm pending queue work and volatile toggle-direction histories are reset; the active validated configuration and adapter selection cache are rebuilt as designed.
 - **Read-only check:** In SERVICE + CONFIG, verify that persistent Save is rejected with HTTP 403 while inspection and Test Remote remain available.
-- **Validation:** Exercise supported room IDs, generic device slots, fourteen fundamental actions, custom-action IDs/steps, methods, paths, wait limits and JSON size constraints as appropriate. Verify malformed data cannot replace the active valid configuration.
+- **Validation:** Exercise supported room IDs, generic device slots, fourteen fundamental actions, custom-action IDs/steps, methods, paths, SSAP URIs and payloads, pointer buttons, Wake-on-LAN MAC/broadcast/port fields, wait limits and JSON size constraints as appropriate. Verify malformed data cannot replace the active valid configuration.
 
 Backup rotation and recovery are safeguards, **not a promise of atomicity under sudden power loss**. The exact schema, file naming and recovery policy belong in [Configuration](CONFIGURATION.md).
 
@@ -157,17 +168,19 @@ In CONFIG, open `/remote.html`, select a room, then run a fundamental or configu
 
 A response indicating **queued** proves admission, not successful network delivery or equipment state. Watch subsequent serial diagnostics and the actual receiver or streamer.
 
-### Generic HTTP versus Denon TCP
+### Operational transport selection
 
 - Generic commands use `net/http_transport.py` with bounded synchronous GET/POST, a new socket per command, and HTTP status-line checking.
 - The adapter resolver recognizes **specific configured Denon HTTP volume-up/down command signatures** and routes them to `devices/denon.py` instead.
 - The specialized Denon adapter uses a persistent TCP connection on **port 23**, sends native `MVUP`/`MVDOWN` commands, and enforces **50 ms minimum spacing**. It does not parse receiver state or automatically retry failed commands.
-- Other Denon commands and Roku ECP remain on generic HTTP. A device's configured endpoint and the exact command path matter to adapter selection; do not assume every volume mapping uses TCP.
+- Other Denon commands use generic HTTP. Roku ECP has specialized persistent tap and hold paths, including volume holds; exact configured command signatures and device types determine routing.
+- LG webOS uses configured SSAP and pointer commands with authenticated session reuse. Obtain the client key using the standalone pairing experiment and enter it manually; integrated pairing remains disabled.
+- Wake-on-LAN is a shared UDP transport for Power Toggle directions and Custom Action steps, independent of device endpoint or client key.
 - The in-memory specialized adapter selection cache is rebuilt when configuration is loaded or successfully changed.
 
 ### Dumb Queue™ and compound actions
 
-The shared queue admits at most **128 entries**. A custom action occupies one entry and advances through ordered steps with cooperative monotonic waits. A future-dated task does not block unrelated eligible work. A paced Denon TCP command that is not ready remains queued and must not be overtaken by later eligible work. One execution failure clears remaining queued work; there are no automatic retries or rollback.
+The shared queue admits at most **128 entries**. A custom action occupies one entry and advances through ordered steps with cooperative monotonic waits. A future-dated task does not block unrelated eligible work. A paced Denon TCP command that is not ready remains queued and must not be overtaken by later eligible work. One execution failure clears remaining queued work; there are no automatic retries or rollback. LG readiness also preserves ordering when pending response capacity or session transitions prevent transmission. SSAP transmission advances the queue and applicable toggle history; a later rejection or timeout cancels remaining work without replay or rollback. Wake-on-LAN success means packet transmission only.
 
 Regression checks should cover:
 
@@ -178,12 +191,31 @@ Regression checks should cover:
 5. Custom action with a wait while unrelated immediate work runs.
 6. Unreachable endpoints, network errors, queue-wide cancellation, and subsequent recovery.
 7. Configuration change while work is pending.
+8. LG SSAP and pointer commands, cold and warm sessions, mute toggles and ordered Custom Actions.
+9. LG asynchronous rejection, pending queue cancellation and recovery without reboot.
+10. Wake-on-LAN from verified network-inaccessible standby, mixed WOL ON / SSAP OFF, and endpoint-independent Custom Actions.
+
+### Focused regression baseline
+
+All six suites passed on the physical Pico after Chapter 13 integration:
+
+| Suite | Assertions passed |
+|---|---:|
+| `test_config_validation.py` | 71 |
+| `test_config_persistence.py` | 56 |
+| `test_typed_adapters.py` | 85 |
+| `test_config_activation.py` | 54 |
+| `test_typed_queue.py` | 153 |
+| `test_typed_physical.py` | 129 |
+| **Total** | **548** |
+
+Run deployed scripts individually from the REPL. These are the focused regression baseline, not an exhaustive test inventory. Live LG G1 rejection and extended-standby wake were verified; actual SSAP response timeout and longer endurance remain outstanding.
 
 **Known-good Chapter 6 evidence:** A Sunroom physical Bourns volume encoder drove the Denon X1800H through TCP. Five slow detents each direction returned to the starting level; moderate and aggressive twisting were also exercised. A ten-command Denon queue test and five mixed-queue regression scenarios were reported passing. These are observed test results, not exhaustive long-uptime certification.
 
 ### Timing and limitations
 
-The main scheduler targets **1 ms physical polling**, **1 ms CONFIG web polling**, **10 ms action polling**, and a **1 ms loop yield**. These are cooperative targets, not guaranteed latencies. Synchronous HTTP and TCP operations temporarily interrupt GPIO polling; fast encoder transitions may be missed during a blocking call. Queue buffering cannot recover a physical transition never sampled.
+The main scheduler targets **1 ms physical polling**, **1 ms CONFIG web polling**, **10 ms action polling**, and a **1 ms loop yield**. These are cooperative targets, not guaranteed latencies. Synchronous HTTP, TCP and bounded LG setup/transmission operations temporarily interrupt GPIO polling; fast encoder transitions may be missed during a blocking call. Queue buffering cannot recover a physical transition never sampled.
 
 See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for precise transport, pacing, ordering and diagnostic behavior.
 
@@ -199,17 +231,19 @@ The Chapter 7 implementation expanded physical input support beyond the original
 | Three-position room selector | Operational; Room 3 configured as placeholder |
 | Bourns volume encoder | Operational in Den and Sunroom |
 | Volume encoder push-to-mute | Integrated |
-| Custom-action encoder | Rotation and selection integrated; further experience testing pending |
+| Custom-action encoder | Operational; rotation, selection and execution |
 | Navigation, Select/OK, Back, Home | Integrated |
 | Play/Pause and Skip Back/Forward | Integrated, including Roku held-key behavior |
-| OLED | Integration and feedback work ongoing |
-| Audible CLONK, battery, final enclosure | Planned or in progress |
+| OLED | Operational; primary physical-control feedback |
+| Battery and enclosure | Assembled and operational |
+| Software sleep/wake | Implemented; longer endurance testing remains |
+| Audible CLONK | Experimental audio hardware shelved |
 
 GPIO assignments are maintained in `controls/pins.py` and documented in [Hardware Design](HARDWARE_DESIGN.md).
 
 Physical inputs use room-aware generic actions routed through the shared dispatcher and queue. Roku held-button behavior uses explicit keydown/keyup handling.
 
-The configured Room 3 placeholder has blank command mappings. Ordinary fundamental actions treat blank mappings as no-ops; held-button safety requires additional verification.
+The configured Room 3 placeholder has blank command mappings. Ordinary fundamental actions treat blank mappings as no-ops. Preserve held-button safety and room capture behavior through regression testing. LG pointer commands do not implement native holds.
 
 ### Physical polling performance
 
@@ -221,7 +255,7 @@ The scheduler records physical polling gaps, execution durations, queue and adap
 
 The current baseline has internal physical diagnostics disabled while scheduler-level PERF remains enabled.
 
-Idle polling is consistently fast. During sustained volume activity, occasional physical execution spikes around 40–50 ms remain unexplained.
+Chapter 8 resolved the repeated configuration-validation overhead in physical dispatch. Do not treat historical physical execution spikes as an unresolved instance of that same defect.
 
 Blocking Roku network operations also produce longer cooperative scheduler gaps. These are distinct measurements and should not be conflated.
 
@@ -262,11 +296,14 @@ Tests are development tools, not necessarily part of the normal Clonker runtime 
 | Symptom | First checks |
 |---|---|
 | Browser unavailable | GP18 CONFIG, Wi-Fi connection, port 9090, listener startup warnings, five-second retry interval |
-| Browser stalls | `WEB DIAG` close reason, `send_zero`, `EAGAIN`, response progress, single-client contention, blocking outbound operations |
+| Browser stalls | `WEB DIAG` close reason, `send_zero`, `EAGAIN`, response progress, single-client contention, blocking outbound operations | The intermittent multi-second socket-send stall remains unresolved; observed on the configuration page, not yet on Test Remote.
 | HTTP allocation failure | `MemoryError` warning, client discard, subsequent browser recovery; investigate heap pressure |
 | HTTP listener restarts | Unexpected `OSError`, listener cleanup, five-second backoff, subsequent successful startup |
 | Save rejected | GP17 DEVICE, stale revision, schema/size validation, filesystem state |
 | Action queued but equipment unchanged | Actual queue execution, configured endpoint/path, adapter choice, transport result, equipment state |
+| LG command fails | Endpoint, private client key, command kind, session diagnostics and asynchronous queue failure |
+| WOL transmitted but TV stays off | Correct equipment MAC, broadcast, port, standby settings and LAN reachability |
+| Host configuration appears stale | Compare active API, save logs and cold SERVICE remount |
 | Volume turns but nothing changes | GP8/GP9 wiring, detent events, selected room, Denon path signature, TCP connection/pacing |
 | Wrong room responds | GP3/GP6/GP7 selection, active configuration, room-aware dispatch |
 | No-op logged | Unconfigured room or deliberately blank ordinary mapping |
@@ -282,7 +319,7 @@ exec(open("/tests/test_room_selector.py").read())
 
 Only run tests that **actually exist on the Pico**. Test filenames and results should be documented as observed, not assumed from the repository. If importing the running application holds resources, interrupt it deliberately before a standalone GPIO test, and restore normal operation afterward.
 
-**Network success is not equipment-state confirmation.** An HTTP 2xx or completed TCP write proves only its respective communication boundary. Clonker does not currently query authoritative power, mute, or volume state.
+**Network success is not equipment-state confirmation.** HTTP status, TCP write, LG SSAP acknowledgement and UDP magic packet transmission establish different communication boundaries. Clonker does not currently reconcile authoritative power, mute or volume state. Use the Flight Recorder (including `lg_transport`) for diagnostic snapshots; protect private configuration exports.
 
 ## 11. Verification vocabulary and handoff
 
@@ -296,12 +333,14 @@ After meaningful work, record the date, changed files, deployed version if known
 
 ### Remaining work
 
-- Continue physical-control reliability testing, particularly rapid encoder input during blocking Roku network operations.
-- Investigate remaining cooperative scheduler gaps separately from the resolved physical execution overhead.
+- Continue physical-control and transport endurance testing, including battery operation and simultaneous browser/physical activity.
+- Investigate the intermittent management HTTP socket-send stall independently of outbound adapter behavior.
 - Extend targeted PERF diagnostics when a specific investigation requires them.
-- Integrate audible CLONK feedback, battery management, and sleep/wake behavior.
-- Verify blank-command safety for physical held-button actions in Room 3.
-- Expand regression coverage for genuine Wi-Fi failures, long uptime, simultaneous browser/physical activity, and interrupted writes.
+- Revisit audible CLONK experiments if desired.
+- Expand persistence fault injection and interrupted-write coverage.
+- Integrate LG pairing and credential handoff; revisit separate manifests.
+- Investigate C6H TCP and TLS certificate trust; secure WebSocket requirements remain unproven.
+- Harden LG upgrade/registration validation, test actual SSAP response timeout, and investigate native pointer holds.
 - Pursue custom destination slots and Apple TV discovery/pairing/authentication later.
 
 Chapter 8 resolved the repeated configuration-validation overhead in physical dispatch, completed primary physical-control OLED feedback, and verified CONFIG HTTP recovery using controlled fault injection.
