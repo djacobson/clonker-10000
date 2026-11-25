@@ -520,14 +520,20 @@ def validate_config(config):
     }
 
 
-def to_json(config):
-    """Canonical compact JSON; deterministic regardless of input key order."""
-    validated = validate_config(config)
+def _serialize_validated(config):
+    """Serialize an already validated canonical configuration."""
     # CircuitPython json.dumps() does not accept ensure_ascii.
-    result = json.dumps(validated, separators=(",", ":"))
+    result = json.dumps(config, separators=(",", ":"))
+
     if len(result.encode("utf-8")) > MAX_CONFIG_BYTES:
         raise ValueError("Configuration exceeds byte limit")
+
     return result
+
+
+def to_json(config):
+    """Canonical compact JSON; deterministic regardless of input key order."""
+    return _serialize_validated(validate_config(config))
 
 
 def from_json(contents):
@@ -654,10 +660,17 @@ def custom_action_details(room_id, action_id):
 def revision(config=None):
     """Stable 32-bit FNV-1a revision over canonical UTF-8 JSON."""
     if config is None:
-        config = current()
+        if _current is None:
+            raise RuntimeError("Configuration not loaded")
+        serialized = _serialize_validated(_current)
+    else:
+        serialized = to_json(config)
+
     value = 2166136261
-    for byte in to_json(config).encode("utf-8"):
+
+    for byte in serialized.encode("utf-8"):
         value = ((value ^ byte) * 16777619) & 0xFFFFFFFF
+
     return "{:08x}".format(value)
 
 
@@ -676,48 +689,56 @@ def _save_mem(stage):
           "alloc=", gc.mem_alloc())
 
 
+def _verify_file_bytes(path, expected):
+    """Verify file contents against already validated JSON bytes.
+
+    Compare bounded chunks to avoid allocating another full
+    configuration-sized buffer.
+    """
+    offset = 0
+
+    with open(path, "rb") as file:
+        while offset < len(expected):
+            chunk = file.read(512)
+
+            if not chunk:
+                raise OSError("JSON file verification failed")
+
+            end = offset + len(chunk)
+
+            if chunk != expected[offset:end]:
+                raise OSError("JSON file verification failed")
+
+            offset = end
+
+        if file.read(1):
+            raise OSError("JSON file contains unexpected data")
+
+
 def _write_verified_temp(path, contents):
-    """Write and read back a temporary file before any rotation."""
+    """Write and verify validated JSON before rotating backups."""
     temp_path = path + ".tmp"
 
     with open(temp_path, "wb") as file:
-        file.write(contents.encode("utf-8"))
+        file.write(contents)
         file.flush()
 
     _save_mem("M6 temp written")
 
-    with open(temp_path, "rb") as file:
-        actual = file.read(MAX_CONFIG_BYTES + 1)
+    _verify_file_bytes(temp_path, contents)
 
-    _save_mem("M6 temp read")
-
-    if actual != contents.encode("utf-8"):
-        raise OSError("Temporary JSON verification failed")
-
-    _save_mem("M6 temp bytes verified")
-
-    if from_json(actual) != from_json(contents):
-        raise ValueError("Temporary JSON validation failed")
-
-    _save_mem("M6 temp validation passed")
+    _save_mem("M6 temp verified")
 
     return temp_path
 
 
 def _replace_with_backup(path, contents):
-    """Rotate verified generations and install a checked replacement."""
+    """Install verified JSON after the caller checks the primary.
 
-    _save_mem("M6 before primary validation")
-
-    # Never rotate the backup chain if the primary is already damaged.
-    if not _backup_looks_valid(path):
-        raise ValueError("Primary JSON configuration is missing or invalid")
-
-    _save_mem("M6 after primary validation")
-
+    The caller must validate the configuration and confirm
+    disk consistency before invoking this function.
+    """
     temp_path = _write_verified_temp(path, contents)
-
-    _save_mem("M6 temp verified")
 
     backup = path + ".bak"
     older = backup + ".old"
@@ -729,26 +750,17 @@ def _replace_with_backup(path, contents):
     except OSError as error:
         if error.errno != 2:
             raise
+
     os.rename(path, backup)
     os.rename(temp_path, path)
 
     _save_mem("M7 primary installed")
 
-    # Check the installed primary before publishing new in-memory state.
-    with open(path, "rb") as file:
-        actual = file.read(MAX_CONFIG_BYTES + 1)
+    # Exact byte equality establishes that the installed file
+    # contains the configuration already validated by save().
+    _verify_file_bytes(path, contents)
 
-    _save_mem("M8 installed file read")
-
-    if actual != contents.encode("utf-8"):
-        raise OSError("Installed JSON verification failed")
-
-    _save_mem("M8 byte verification passed")
-    _save_mem("M9 before installed validation")
-
-    _load_existing(path)
-
-    _save_mem("M9 installed validation passed")
+    _save_mem("M8 installed bytes verified")
 
 
 def save(config, expected_revision, path=None):
@@ -760,55 +772,67 @@ def save(config, expected_revision, path=None):
 
     if _current is None or _current_path is None:
         raise RuntimeError("Configuration not loaded")
+
     if path is None:
         path = _current_path
 
     # Preserve existing path and revision safeguards.
     if path != _current_path:
         raise ValueError("Save path differs from loaded configuration")
+
     if not isinstance(expected_revision, str) or expected_revision != revision():
         raise ValueError("Configuration revision mismatch. Changes not saved. Refresh page.")
 
+    # Validate the incoming configuration exactly once.
     _save_mem("M2 before validation")
+
     validated = validate_config(config)
+
     _save_mem("M2 after validation")
 
-    serialized = to_json(validated)
+    serialized = _serialize_validated(validated).encode("utf-8")
+
     _save_mem("M3 after serialization")
+
     validated_at = time.monotonic_ns()
 
-    # Verify disk consistency before any write.
+    # Validate the existing primary and confirm disk consistency.
     disk = _load_existing(path)
+
     _save_mem("M4 after disk load")
 
     if disk != _current:
         raise ValueError("Configuration changed on disk; reload required")
 
-    if serialized == to_json(_current):
+    # The disk copy is no longer needed.
+    del disk
+
+    # Both objects are validated and canonical.
+    # Avoid serializing the active configuration again.
+    if validated == _current:
         return False
 
     _save_mem("M4 after disk comparison")
 
     # Prepare the replacement cache before modifying disk.
     prepared_cache = device_adapters.prepare_cache(validated)
+
     _save_mem("M5 cache prepared")
 
     checked_at = time.monotonic_ns()
 
-    # Existing verified persistence and backup rotation.
+    # Persist and verify the already validated configuration.
     _replace_with_backup(path, serialized)
+
     persisted_at = time.monotonic_ns()
 
-    _save_mem("M10 before activation")
-
-    # Retire old adapter sessions and publish the prepared
-    # cache only after successful persistence.
+    # Retire old adapter sessions and publish the prepared cache.
     device_adapters.activate(prepared_cache)
     _current = validated
 
-    _save_mem("M10 after activation")
-
     activated_at = time.monotonic_ns()
+
+    _save_mem("M10 after activation")
 
     logger.info(
         "CONFIG PERF: validation={:.1f}ms, "
