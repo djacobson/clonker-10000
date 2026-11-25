@@ -1,7 +1,7 @@
 # The Clonker 10000
 # tests/test_typed_queue.py
 #
-# Chapter 12 -- Typed Dumb Queue regression
+# Chapter 13 -- Typed Dumb Queue regression
 #
 # No filesystem writes or network operations.
 
@@ -91,6 +91,30 @@ def fake_roku_tap(endpoint, method, path, action_id):
 def fake_roku_hold(endpoint, method, path, event):
     record("roku-hold", endpoint, event, path)
     return "Simulated Roku " + event
+
+
+def fake_lg_ready(device, command):
+    return transport_ready
+
+
+def fake_lg_execute(device, command):
+    if not transport_accept:
+        return {
+            "accepted": False,
+            "detail": "Simulated LG busy",
+        }
+
+    record(
+        "lg",
+        device["endpoint"],
+        command["kind"],
+        command,
+    )
+
+    return {
+        "accepted": True,
+        "detail": "Simulated LG transmission",
+    }
 
 
 def fake_cancel():
@@ -199,7 +223,7 @@ def make_room(name, subnet):
         },
         {
             "id": "custom-action-2",
-            "name": "Disabled LG",
+            "name": "LG Volume",
             "steps": [
                 {
                     "target": "device-1",
@@ -592,23 +616,25 @@ def test_failures():
     check("Retry by user starts with ON", sent[-1][3] == "/mute/on")
 
     reset_test()
+    transport_fail = True
 
     actions.dispatch("room-1", "nav-left")
     actions.dispatch("room-2", "home")
 
-    check("Disabled LG fundamental handled", actions.poll())
-    check("Disabled LG sends nothing", len(sent) == 0)
-    check("Disabled LG cancels queue", depth() == 0)
-    check("Disabled LG invokes cleanup", cancel_calls == 1)
+    check("LG fundamental failure handled", actions.poll())
+    check("Failed LG sends nothing", len(sent) == 0)
+    check("Failed LG cancels queue", depth() == 0)
+    check("Failed LG invokes cleanup", cancel_calls == 1)
 
     reset_test()
+    transport_fail = True
 
     actions.dispatch("room-1", "custom-action-2")
     actions.dispatch("room-2", "home")
 
-    check("Disabled LG custom handled", actions.poll())
-    check("Disabled LG custom sends nothing", len(sent) == 0)
-    check("Disabled LG custom cancels queue", depth() == 0)
+    check("LG custom failure handled", actions.poll())
+    check("Failed LG custom sends nothing", len(sent) == 0)
+    check("Failed LG custom cancels queue", depth() == 0)
 
     reset_test()
 
@@ -638,6 +664,81 @@ def test_failures():
     check("Manual clear empties queue", depth() == 0)
 
 
+def test_lg():
+    global transport_ready
+
+    reset_test()
+
+    # Fundamental pointer command.
+    actions.dispatch("room-1", "nav-left")
+
+    check("LG pointer admitted", depth() == 1)
+    check("LG admission sends nothing", len(sent) == 0)
+    check("LG pointer executes", actions.poll())
+
+    check(
+        "LG pointer transmission",
+        sent[-1] == (
+            "lg", "192.168.1.10:3000",
+            "pointer", {"kind": "pointer", "button": "LEFT"}
+        )
+    )
+
+    check("LG transmitted task removed", depth() == 0)
+
+    # SSAP Custom Action.
+    actions.dispatch("room-1", "custom-action-2")
+
+    check("LG Custom Action executes", actions.poll())
+
+    check(
+        "LG Custom Action uses SSAP",
+        sent[-1][0] == "lg"
+        and sent[-1][2] == "ssap"
+        and sent[-1][3]["uri"] == "ssap://audio/volumeUp"
+    )
+
+    check("LG Custom Action completes", depth() == 0)
+
+    # Readiness preserves queue ordering.
+    reset_test()
+    transport_ready = False
+
+    actions.dispatch("room-1", "nav-left")
+    actions.dispatch("room-2", "home")
+
+    check("Busy LG defers execution", not actions.poll())
+    check("Busy LG preserves queue", depth() == 2)
+    check("Busy LG sends nothing", len(sent) == 0)
+
+    transport_ready = True
+
+    check("Ready LG resumes execution", actions.poll())
+    check("LG executes before HTTP", sent[-1][0] == "lg")
+    check("Later HTTP remains queued", depth() == 1)
+
+    # Simulate a late LG response failure.
+    actions.fail_async(
+        adapters.LG_WEBOS,
+        RuntimeError("Simulated LG response failure")
+    )
+
+    check("LG async failure clears queue", depth() == 0)
+    check("LG async failure invokes cleanup", cancel_calls == 1)
+    check(
+        "LG async failure records error",
+        actions.status()["last_error"] is not None
+    )
+    check("LG async failure does not replay", not actions.poll())
+    check("Only original LG transmission", len(sent) == 1)
+
+    # New user input remains operational.
+    actions.dispatch("room-2", "home")
+
+    check("New command after LG failure executes", actions.poll())
+    check("HTTP recovers after LG failure", sent[-1][0] == "http")
+
+
 # -------------------------------------------------
 # Test runner and state restoration
 # -------------------------------------------------
@@ -657,6 +758,8 @@ def run():
         (roku, "volume", fake_roku_volume),
         (roku, "tap", fake_roku_tap),
         (roku, "execute_hold", fake_roku_hold),
+        (adapters.lg_webos, "ready", fake_lg_ready),
+        (adapters.lg_webos, "execute", fake_lg_execute),
         (adapters, "cancel_active", fake_cancel),
         (oled, "show_text", fake_oled),
     )
@@ -691,6 +794,7 @@ def run():
         test_custom()
         test_holds()
         test_failures()
+        test_lg()
 
         completed = True
 
