@@ -769,6 +769,8 @@ def save(config, expected_revision, path=None):
 
     started = time.monotonic_ns()
     _save_mem("M1 save entry")
+    gc.collect()
+    _save_mem("GC1 after collection")
 
     if _current is None or _current_path is None:
         raise RuntimeError("Configuration not loaded")
@@ -797,6 +799,9 @@ def save(config, expected_revision, path=None):
     validated_at = time.monotonic_ns()
 
     # Validate the existing primary and confirm disk consistency.
+    _save_mem("GC2 before collection")
+    gc.collect()
+    _save_mem("GC2 after collection")
     disk = _load_existing(path)
 
     _save_mem("M4 after disk load")
