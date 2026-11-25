@@ -542,7 +542,7 @@
                     a.steps.forEach((s, i) => {
                         const b = el('div', ad, undefined, 'device');
                         el('strong', b, 'Step ' + (i + 1));
-                        commandEditor(b, room, s, 'command', 'Command', true);
+                        commandEditor(b, room, s, 'command', 'Command', true, true);
                         field(b, 'Wait after (ms)', s.wait_after_ms, v => s.wait_after_ms = v === '' ? null :
                             Number(v), { type: 'number', disabled: i === a.steps.length - 1 });
                         const tools = el('div', b, undefined, 'tools');
