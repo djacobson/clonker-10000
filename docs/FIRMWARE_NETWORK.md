@@ -1,673 +1,893 @@
 # The Clonker 10000 — Firmware, Network & Clock
 
-**Updated:** November 18, 2026  
+**Updated:** November 24, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Current baseline:** Chapter 10 — assembled physical controls, Dumb Queue™, device-specific Roku and Denon adapters, persistent Roku HTTP and Denon TCP, OLED feedback, and battery-powered operation  
-**Scope:** Firmware behavior, networking, scheduler timing, protocol adapters, diagnostics, tests, and operational limitations.
+**Current baseline:** Chapter 12 — The Monster Gets Organized  
+**Configuration:** Clonker Config v5
 
 > One Monster. One Dumb Queue™. More than one way to deliver a CLONK.
 
 ---
 
-## 1. Purpose and verified boundary
+## 1. Purpose and Verified Boundary
 
-This document describes **how the running firmware operates**, not a proposed design or complete development diary.
+This document describes the operational firmware, networking mechanisms, scheduling behavior, transport policies, diagnostics, and known limitations.
 
 Related responsibilities:
 
-- [Architecture](ARCHITECTURE.md) — component boundaries and invariants.
-- [Configuration](CONFIGURATION.md) — configuration schema, persistence, and recovery.
-- [Hardware Design](HARDWARE_DESIGN.md) — GPIO, components, and mechanical integration.
-- [Development History](DEVELOPMENT_HISTORY.md) — chronological experiments, decisions, and test evidence.
+- [Architecture](ARCHITECTURE.md) — component boundaries and architectural principles.
+- [Configuration](CONFIGURATION.md) — schema, validation, persistence, and recovery.
+- [Hardware Design](HARDWARE_DESIGN.md) — physical construction and GPIO assignments.
+- [Operating Modes](OPERATING_MODES.md) — filesystem ownership and application modes.
+- [Development History](DEVELOPMENT_HISTORY.md) — chronological experiments and engineering decisions.
 
-### Implemented and exercised
+### 1.1 Operational baseline
 
-- Wi-Fi networking and Config v4 JSON configuration.
+Implemented and exercised:
+
+- Wi-Fi networking.
+- Config v5 JSON configuration.
+- Explicitly typed devices and protocol-aware commands.
+- Central device-type registry.
 - Browser configuration editor and Test Remote.
-- CONFIG-only inbound management HTTP on port 9090.
-- Fourteen fundamental actions and room-specific custom actions.
-- Shared Dumb Queue™ for browser and physical commands.
-- Generic bounded blocking HTTP GET/POST.
-- Signature-based protocol adapter selection.
+- CONFIG-only management HTTP on port 9090.
+- Fourteen fundamental actions.
+- Room-specific Custom Actions.
+- Shared Dumb Queue™.
+- Generic outbound HTTP GET/POST.
 - Persistent Denon TCP volume control.
-- Roku ECP held-key volume control.
-- Roku ECP mute through generic HTTP.
-- GP17 SERVICE/DEVICE and GP18 CONFIG/RUN switches.
-- Physical Power Toggle and three-position room selector.
-- Both Bourns encoders, including volume/mute and custom-action selection/execution.
-- Physical navigation, Home, Back, Select, and playback input integration.
-- Six Roku physical-button holds using keydown/keyup.
-- Initial SH1106 OLED integration and custom-action display feedback.
-- Independent per-room power/mute toggle histories.
-- Cooperative custom-action waits and failure cancellation.
-- Three-room Config v4 installation, including a blank Room 3 placeholder.
-- Improved browser responsiveness during Chapter 7 CONFIG-mode testing.
-- Shared PERF instrumentation for scheduler and subsystem diagnostics.
-- Completed physical wiring, mounting, soldering, and strain relief.
+- Roku ECP persistent navigation and skip taps.
+- Roku ECP physical-button holds.
+- Roku ECP encoder-driven volume holds.
+- Physical room selection.
+- Independent power and mute toggle histories.
+- OLED feedback.
+- Software sleep and wake.
+- Battery-powered operation.
+- Flight Recorder diagnostics.
+- Revision-protected configuration persistence.
+- Configuration recipe import.
 
-**Chapter 7 milestone:** The Clonker now has an assembled physical control interface, room-aware command execution, operational custom-action selection, initial OLED feedback, and performance instrumentation suitable for continued investigation.
+### 1.2 Configuration-ready but not operational
 
-### Pending or not exhaustively tested
+Config v5 supports LG webOS device records, client keys, SSAP commands, and pointer commands.
 
-Further OLED uses, audible feedback, battery/sleep behavior, exhaustive long-uptime operation, and network-related scheduler responsiveness testing remain future work.
+The browser exposes the corresponding configuration fields.
 
-Apple TV pairing/control, custom destination slots, Denon TCP response parsing, and exhaustive outage recovery are also pending.
+The experimental LG adapter remains disconnected from operational dispatch.
 
-The management service has **no application-level authentication**. Use only on a trusted LAN; never expose port 9090 to the public internet.
+LG pairing and authenticated runtime execution are not yet implemented in the production application.
+
+Apple TV and Amazon Fire TV remain future device types.
+
+### 1.3 Outstanding limitations
+
+- Intermittent management HTTP socket-send stalls.
+- Exhaustive interrupted-write recovery testing.
+- Long-duration battery endurance.
+- Complete reliability under arbitrary network failures.
+- Future authenticated protocol integration.
+
+Passing focused regression tests does not establish unlimited operational reliability.
 
 ---
 
-## 2. Firmware layout and ownership
+## 2. Firmware Layout and Ownership
 
-| Repository path | Responsibility |
+| Component | Responsibility |
 |---|---|
-| `firmware/boot.py` | GP17 filesystem ownership at boot |
-| `firmware/code.py` | CircuitPython application entry |
-| `firmware/clonker/main.py` | Initialization, operating modes, cooperative scheduler |
-| `firmware/clonker/device_config_v2.py` | Config v4 validation, active configuration, revisions, persistence |
-| `firmware/clonker/actions.py` | Action admission, Dumb Queue™, execution coordination, cancellation |
-| `firmware/clonker/device_adapters.py` | Command recognition, cached routing, execution and cleanup |
-| `firmware/clonker/devices/denon.py` | Persistent Denon TCP volume transport |
-| `firmware/clonker/devices/roku.py` | Roku ECP held-volume and physical-button holds |
-| `firmware/clonker/net/http_transport.py` | Bounded blocking outbound HTTP |
-| `firmware/clonker/net/web.py` | CONFIG-only inbound HTTP and management APIs |
-| `firmware/clonker/controls/pins.py` | GPIO assignments |
-| `firmware/clonker/controls/buttons.py` | Debounced momentary inputs |
-| `firmware/clonker/controls/selectors.py` | Physical room selection |
-| `firmware/clonker/controls/encoders.py` | Reusable quadrature encoder driver |
-| `firmware/clonker/controls/physical.py` | Physical polling, action mapping, room-aware dispatch, hold context |
-| `firmware/clonker/controls/switches.py` | CONFIG/RUN state and development overrides |
-| `firmware/clonker/system/clock.py` | Clock reference |
-| `firmware/clonker/system/logger.py` | Serial diagnostics |
-| `firmware/clonker/system/perf.py` | Shared named performance measurements and statistics |
-| `firmware/clonker/display/oled.py` | SH1106 OLED initialization, deferred rendering, and polling |
-| `firmware/clonker/www/` | Browser editor and Test Remote |
-| `firmware/clonker/legacy/` | Historical XML code |
+| `firmware/boot.py` | Boot-time filesystem ownership |
+| `firmware/code.py` | Application entry |
+| `clonker/main.py` | Initialization, modes, cooperative scheduler |
+| `clonker/device_config.py` | Config v5 validation, revisions, persistence |
+| `clonker/actions.py` | Dumb Queue™, dispatch, sequencing, cancellation |
+| `clonker/devices/device_types.py` | Device-type registry |
+| `clonker/devices/device_adapters.py` | Adapter selection, execution, lifecycle |
+| `clonker/devices/denon.py` | Persistent Denon TCP volume |
+| `clonker/devices/roku.py` | Roku ECP transport and held-key behavior |
+| `clonker/devices/lg_webos.py` | Experimental LG webOS adapter |
+| `clonker/net/http_transport.py` | Generic outbound HTTP |
+| `clonker/net/web.py` | Inbound management HTTP |
+| `clonker/net/web_diag.py` | Management connection diagnostics |
+| `clonker/controls/` | Physical inputs and coordination |
+| `clonker/display/oled.py` | OLED feedback and rendering |
+| `clonker/system/clock.py` | UTC reference and monotonic timing |
+| `clonker/system/logger.py` | Serial logging |
+| `clonker/system/perf.py` | Performance measurements |
+| `clonker/system/flight_recorder.py` | Diagnostic snapshot capture |
+| `clonker/system/sleep_manager.py` | Software sleep and wake policy |
+| `clonker/www/` | Embedded browser interfaces |
+| `firmware/tests/` | Standalone experiments and regression tests |
 
-The active Pico configuration path is:
+Paths beginning with `clonker/` are relative to the firmware root.
 
-`/clonker/device_config.json`
+Active configuration module filenames no longer contain schema-version suffixes.
 
-The repository's `firmware/` prefix is not part of that runtime path.
+The active configuration version is defined by `CONFIG_VERSION` and the persisted JSON.
 
-The historical filename `device_config_v2.py` does **not** mean the active schema is v2. The current schema is Config v4.
+### 2.1 Separation of responsibilities
 
-### Separation of concerns
+```text
+Physical input / Browser action
+              |
+              v
+        actions.py
+         Dumb Queue™
+              |
+              v
+     Validated configuration
+       Typed device record
+     Protocol-aware command
+              |
+              v
+ devices/device_adapters.py
+              |
+       +------+------+ 
+       |             |
+       v             v
+ Device-specific   Generic
+    adapter         HTTP
+       |             |
+       +------+------+
+              |
+              v
+          Equipment
+```
 
-1. GPIO drivers recognize electrical input events.
-2. Physical coordination translates events into generic actions.
-3. Configuration supplies destinations, methods, and command paths.
-4. `actions.py` owns the shared queue and action lifecycle.
-5. `device_adapters.py` selects and invokes the appropriate transport.
-6. Transport modules perform network operations.
+Physical drivers do not implement network protocols.
 
-Physical controls do not contain Denon or Roku protocol implementation.
+The management web server does not independently execute equipment commands.
 
-There is no second volume queue and no independent execution pipeline for specialized adapters.
+The device registry does not establish connections.
+
+The adapter coordinator does not own a second action queue.
 
 ---
 
-## 3. Startup, modes, and scheduler
+## 3. Startup, Modes, and Cooperative Scheduling
 
 `code.py` starts `clonker.main.main()`.
 
-The application loads the active validated configuration, logs configured rooms, initializes available physical controls, and enters a cooperative event loop.
+The application initializes its services, loads validated configuration, prepares adapter selections, initializes available physical controls, and enters its cooperative event loop.
 
-Missing optional hardware is logged rather than preventing the application from running.
+Missing optional hardware should not prevent the core application from running.
 
-### 3.1 Scheduling constants
+### 3.1 Scheduling targets
 
-```python
-PHYSICAL_CONTROLS_ENABLED = True
-PHYSICAL_POLL_INTERVAL = 0.001
-WEB_POLL_INTERVAL = 0.001
-ACTION_POLL_INTERVAL = 0.01
-```
+The established awake-mode scheduling targets are:
 
-The main loop also uses a short `time.sleep(0.001)` yield.
+| Responsibility | Target interval |
+|---|---:|
+| Physical polling | 1 ms |
+| Management HTTP polling | 1 ms |
+| Action queue polling | 10 ms |
+| Main-loop yield | 1 ms |
 
-These are **target service intervals**, not threads, interrupts, or guaranteed maximum latencies.
+These are target service intervals, not guaranteed maximum latencies.
 
-The cooperative scheduler services, in order:
+The current constants in `main.py` remain authoritative.
+
+The scheduler coordinates:
 
 1. Physical GPIO inputs.
-2. At most one eligible queued action.
+2. Eligible queued action execution.
 3. Protocol adapter maintenance.
-4. CONFIG/RUN mode evaluation.
-5. Inbound management HTTP when enabled.
-6. A short yield.
+4. Operating-mode evaluation.
+5. Management HTTP when enabled.
+6. OLED updates.
+7. Memory monitoring.
+8. Software sleep policy.
+9. Brief cooperative yields.
 
-The Roku adapter continues receiving maintenance polls even when the Dumb Queue™ is empty.
+Adapter maintenance continues even when the action queue is empty.
 
-A held key may require release after the final queued action has completed.
+Roku key releases and Denon receive draining must not depend on the arrival of another user action.
 
-### 3.2 Independent operating-mode switches
+### 3.2 Independent operating modes
 
-| Switch | Open/HIGH | Grounded/LOW | Change requires |
-|---|---|---|---|
-| GP17 | SERVICE — USB owns filesystem writes | DEVICE — Pico owns writes | Full power cycle |
-| GP18 | RUN — management listener off | CONFIG — management listener on | Live switch change |
+| Switch | Open / HIGH | Grounded / LOW |
+|---|---|---|
+| GP17 | SERVICE | DEVICE |
+| GP18 | RUN | CONFIG |
 
-Ctrl+D performs a CircuitPython soft reboot. It is not equivalent to a full power cycle for filesystem ownership.
+GP17 establishes filesystem ownership at cold boot.
 
-SERVICE + CONFIG permits configuration inspection and Test Remote operation but not Pico-side persistent configuration saves.
+GP18 controls the management HTTP listener during operation.
 
-DEVICE + CONFIG permits saves.
+Changing filesystem ownership requires a full power cycle.
 
-DEVICE + RUN is normal remote operation.
+Ctrl+D performs a CircuitPython soft reboot and is not equivalent to a cold boot for filesystem ownership.
 
-The operating-mode switches are independent of receiver power commands.
+| Combination | Behavior |
+|---|---|
+| SERVICE + CONFIG | Browser inspection and action testing; persistent saves disabled |
+| SERVICE + RUN | USB owns filesystem; listener disabled |
+| DEVICE + CONFIG | Persistent browser saves permitted |
+| DEVICE + RUN | Normal physical remote operation |
+
+The physical equipment Power Toggle is independent of both operating-mode switches.
 
 ### 3.3 Physical event polling
 
-Current GPIO assignments:
+The physical coordinator polls:
 
-| Function | GPIO |
-|---|---|
-| Power Toggle | GP2 |
-| Room selector — Den | GP3 |
-| Room selector — Sunroom | GP6 |
-| Room selector — Room 3 | GP7 |
-| Volume encoder A/B | GP8/GP9 |
-| Volume encoder push-to-mute | GP10 |
-| Custom-action encoder A/B | GP11/GP12 |
-| Custom-action encoder pushbutton | GP13 |
-| Navigation Up | GP14 |
-| Navigation Down | GP15 |
-| Navigation Left | GP16 |
-| SERVICE/DEVICE | GP17 |
-| CONFIG/RUN | GP18 |
-| Navigation Right | GP19 |
-| Select / OK | GP20 |
-| Back | GP21 |
-| Home | GP22 |
-| Skip Back | GP26 |
-| Play/Pause | GP27 |
-| Skip Forward | GP28 |
-| OLED I²C reservation | GP4/GP5 |
+- Room selector.
+- Momentary buttons.
+- Volume encoder.
+- Custom Action encoder.
+- Relevant operating-mode and gesture state.
 
-`controls/pins.py` remains the authoritative assignment reference.
+The room selector requires a valid input and approximately 50 ms stability.
 
-`physical.poll()` updates room selection, polls initialized buttons, and polls both active Bourns encoders.
+Ordinary momentary buttons use 30 ms debounce.
 
-The room selector requires a valid grounded input and 50 ms stability.
+Navigation and skip buttons use 30 ms press debounce and 10 ms release debounce.
 
-Momentary buttons use a default 30 ms debounce. The six navigation/skip buttons retain 30 ms press debounce but use 10 ms release debounce for improved responsiveness.
+The encoder driver reports completed rotary movements.
 
-Encoder transitions are decoded by the reusable `Encoder` class.
+The physical coordinator translates those movements into generic actions.
 
-Completed volume movements become `volume-up` or `volume-down` fundamental actions. The volume encoder's separate pushbutton generates `mute-toggle`.
+The browser Test Remote's room selection is independent of the physical selector.
 
-The custom-action encoder cycles through the selected room's ordered custom actions. Its pushbutton dispatches the selected action through the existing execution path.
+### 3.4 Cooperative scheduling limitation
 
-The OLED displays custom-action selections through the deferred display interface. Actual I²C updates occur during OLED polling rather than directly inside the selection handler.
+Synchronous network operations can delay subsequent GPIO polling.
 
-Browser Test Remote room selection remains independent of the physical room selector.
+A nominal 1 ms physical polling target does not guarantee capture of every electrical transition.
 
-Outbound synchronous network operations can delay GPIO polling. Neither the 1 ms target nor the adapter architecture guarantees capture of every electrical transition under all conditions.
+The scheduler cannot preempt a socket operation that has already blocked inside CircuitPython or its networking implementation.
 
-### 3.4 Chapter 7 responsiveness work
-
-Chapter 7 investigated slow Config page loads, occasional Test Remote timeouts, and competition between physical polling, diagnostics, and management HTTP.
-
-Changes included reducing unnecessary polling and diagnostic overhead while preserving the cooperative scheduler.
-
-Subsequent Safari and Chrome tests showed substantially improved responsiveness.
-
-This did not introduce threads, a concurrent web server, or nonblocking outbound networking.
-
-The fundamental limitation remains: a synchronous socket operation can temporarily delay other cooperative tasks.
+Reducing unnecessary validation, logging, and allocation overhead improves scheduler availability without introducing threads or parallel execution.
 
 ---
 
-## 4. Wi-Fi, endpoints, and socket ownership
+## 4. Wi-Fi, Endpoints, and Socket Ownership
 
 CircuitPython `wifi.radio` and `socketpool` provide network access.
 
-Wi-Fi credentials belong in private `settings.toml`, not committed examples.
+Wi-Fi credentials belong in private `settings.toml`, not public examples.
 
-The development installation has used Pico `192.168.50.12`, with management pages such as:
+The development installation has used:
 
-- `http://192.168.50.12:9090/`
-- `http://192.168.50.12:9090/remote.html`
+```text
+http://192.168.50.12:9090/
+http://192.168.50.12:9090/remote.html
+```
 
-These are installation-specific addresses, not firmware defaults.
+These addresses are installation-specific.
 
-### Networking roles
+### 4.1 Networking responsibilities
 
-The firmware has four distinct networking responsibilities:
+The operational firmware has four principal networking responsibilities:
 
-1. **Inbound management HTTP:** Cooperative single-client listener, CONFIG mode only.
-2. **Generic outbound HTTP:** Bounded synchronous requests using fresh TCP connections.
-3. **Denon TCP adapter:** Persistent outbound TCP connection for recognized fundamental volume commands.
-4. **Roku ECP adapter:** Device-specific keypress and held-key behavior, delivered using generic or persistent HTTP according to its transport policy.
+1. Inbound management HTTP.
+2. Generic outbound HTTP.
+3. Persistent Denon TCP.
+4. Roku ECP transport and held-key management.
 
-The generic HTTP transport reuses its SocketPool object but does not reuse individual HTTP TCP connections.
+These mechanisms have different requirements and deliberately different transport policies.
 
-The Denon adapter maintains its own persistent TCP connection and command pacing.
+### 4.2 Socket ownership
 
-The Roku adapter maintains logical held-key state and a separate reusable persistent HTTP connection. Volume, navigation/skip taps, and physical-button keydown/keyup use persistent HTTP. Other actions follow their configured transport policy.
+| Component | Socket behavior |
+|---|---|
+| Management HTTP | Listening socket and one active client |
+| Generic HTTP | Fresh TCP connection per request |
+| Denon | One persistent receiver connection |
+| Roku | Reusable persistent HTTP connection for selected operations |
 
-Persistent requests use a 500 ms per-operation socket timeout and a 1.5-second total request deadline. Connections are eligible for reuse for one second after a successful response. Physical-button keyup failures retain their held-key state and are retried at paced 500 ms intervals. Uncertain navigation taps and keydowns are not automatically replayed.
+The generic HTTP transport reuses its SocketPool object rather than its individual TCP connections.
+
+The Denon adapter owns its connection and pacing state.
+
+The Roku adapter owns persistent HTTP resources and logical held-key state.
+
+Management HTTP does not own outbound equipment sockets.
+
+### 4.3 Independent tuning
+
+Management HTTP and outbound equipment communication should be tuned independently.
+
+The management interface prioritizes reliable administrative transactions and bounded resource use.
+
+Physical remote operations prioritize responsiveness and predictable command execution.
+
+Chapter 12 management HTTP changes did not alter the established outbound Roku, Denon, or generic HTTP transport timing policies.
+
+Do not change working outbound transport settings merely to investigate an inbound management failure.
 
 ---
 
-## 5. Inbound management HTTP
+## 5. Inbound Management HTTP
 
 **Modules:** `clonker/net/web.py`, `clonker/net/web_diag.py`, `clonker/main.py`  
-**Port:** `9090`  
+**Port:** 9090  
 **Availability:** CONFIG mode only  
-**Model:** Nonblocking cooperative listener with one active client.
+**Model:** Cooperative single-client listener.
 
-The management server accepts one client, receives a bounded request, prepares a response, sends bounded chunks, and closes the connection. It is not a concurrent web server.
+The server accepts one client, receives a bounded request, prepares a response, transmits it incrementally, and closes the connection.
 
-Physical controls, the Dumb Queue™, and device-adapter maintenance remain part of the same cooperative application. CONFIG-mode networking is not intended to own or terminate the physical remote.
+It is not a concurrent web server.
 
-| Setting | Current value |
+### 5.1 Operational limits
+
+| Setting | Value |
 |---|---:|
-| `MAX_REQUEST_BYTES` | 10,240 bytes |
-| `MAX_HEADER_BYTES` | 2,048 bytes |
-| `IO_CHUNK_BYTES` | 512 bytes |
-| `IDLE_CLIENT_TIMEOUT_NS` | 200,000,000 (0.2 s) |
-| `CLIENT_TIMEOUT_NS` | 4,000,000,000 (4 s) |
-| `WEB_POLL_INTERVAL_NS` | 1,000,000 (1 ms) |
-| `WEB_LISTENER_RETRY_NS` | 5,000,000,000 (5 s) |
-| `HTTP_DIAGNOSTICS` | `False` |
-| `WEB_DIAGNOSTICS_ENABLED` | `True` |
+| Maximum request size | 18432 bytes |
+| Maximum header size | 2048 bytes |
+| Maximum configuration size | 16384 UTF-8 bytes |
+| Configuration POST body allowance | 16640 bytes |
+| Receive chunk | 128 bytes |
+| Send chunk | 512 bytes |
+| Silent-client timeout | 200 ms |
+| Active-client timeout | 4 seconds |
+| Management polling target | 1 ms |
+| Listener restart delay | 5 seconds |
 
-The polling and listener-retry intervals are defined in `main.py`; request limits and connection timeouts are defined in `web.py`. Detailed connection diagnostics are controlled separately in `web_diag.py`.
+The request capacity includes HTTP framing and headers.
 
-Config's maximum serialized size is 8,192 UTF-8 bytes. HTTP framing and headers also consume request capacity.
+Configuration storage capacity and HTTP request capacity are separate limits.
 
-### 5.1 Management routes
+The application-level timeout cannot interrupt a lower-level socket call that is already blocked.
+
+### 5.2 Management routes
 
 | Request | Responsibility |
 |---|---|
 | `GET /` | Configuration editor |
 | `GET /remote.html` | Browser Test Remote |
-| `GET /api/config` | Active configuration, revision, writability metadata |
-| `GET /api/flight-recorder[?backup=1\|2\|3]` | Download latest or rotated flight-recorder snapshot |
-| `POST /api/config` | Revision-protected validated save |
+| `GET /api/config` | Active configuration and response metadata |
+| `POST /api/config` | Revision-protected configuration save |
 | `GET /api/clock` | Clock source and timestamp |
 | `POST /api/clock?utc=...` | Browser-provided UTC reference |
-| `POST /api/action?room=...&action=...` | Validate and enqueue an action |
+| `POST /api/action?room=...&action=...` | Admit an action to the shared queue |
+| `GET /api/flight-recorder` | Download latest diagnostic snapshot |
+| `GET /api/flight-recorder?backup=1` | Download previous snapshot |
+| `GET /api/flight-recorder?backup=2` | Download older snapshot |
+| `GET /api/flight-recorder?backup=3` | Download oldest retained snapshot |
 
-An API response reporting `queued` means admission, not network transmission or equipment execution.
+An action response reporting `queued` means admission to the Dumb Queue™.
 
-Browser and physical commands converge at the shared action system.
+It does not establish command transmission or actual equipment execution.
 
-### 5.2 Browser connections and bounded streaming
+### 5.3 Configuration API metadata
 
-The single-client model requires careful handling of idle connections, incomplete requests, and slow or blocked sends.
+The configuration GET response includes:
 
-Completely silent clients receive a short idle timeout. Active requests and responses have a longer progress timeout.
+- Active schema version.
+- Configured rooms.
+- Current revision.
+- Filesystem writability.
+- Device-type registry metadata.
 
-Earlier chapters improved browser responsiveness by increasing management polling frequency to approximately 1 ms and reducing diagnostic overhead.
-
-Chapter 8 investigated intermittent Chrome stalls and HTTP memory pressure.
-
-Previously, static HTML responses could require multiple large allocations: reading the entire file, encoding the body, and combining the HTTP header and body. One observed allocation failure involved a 13,824-byte request.
-
-Static HTML is now streamed directly from flash using bounded 512-byte chunks. The response header and current file chunk are retained instead of constructing a complete HTML response in RAM.
-
-Dynamic API responses continue to use the existing response-building path.
-
-The streaming implementation maintains separate counters for the current buffer, total bytes transmitted, and expected response length. Static files advance one chunk at a time through the cooperative poller.
-
-Chapter 8 browser testing confirmed successful delivery of:
-
-- Configuration HTML: 40,679 bytes.
-- Test Remote HTML: 13,806 bytes.
-- Configuration JSON: approximately 5,399 bytes in the tested installation.
-- Clock responses: approximately 181 bytes in the tested installation.
-
-Repeated Chrome navigation and refreshes completed without observed zero-byte sends in the reported tests.
-
-These results demonstrate improved behavior under the tested conditions. They do not conclusively identify the original cause of every browser stall or establish unlimited long-uptime reliability.
-
-### 5.3 Connection-level failure recovery
-
-Chapter 8 introduced explicit recovery boundaries for inbound HTTP failures.
-
-**Memory allocation failure (`MemoryError`):**
-
-- `main.py` catches allocation failures escaping `web.poll()`.
-- `web.abort_low_memory()` discards the active HTTP transaction.
-- Active response, request, file, and client references are released.
-- Connection diagnostics are discarded without normal diagnostic formatting.
-- Garbage collection runs after cleanup.
-- The application continues without deliberately restarting the listener.
-
-**Unexpected network error (`OSError`):**
-
-- Expected nonblocking `EAGAIN` conditions remain ordinary control flow.
-- Receive and send errors normally close the affected client.
-- Unexpected errors escaping `web.poll()` trigger listener teardown and delayed restart.
-- Client cleanup clears connection state before closing resources, so diagnostic failures are less likely to interfere with cleanup.
-
-These recovery paths are intentionally distinct. A connection failure does not necessarily require rebuilding the listening socket.
-
-Chapter 8 used temporary fault injection to verify that simulated `MemoryError` and `OSError` failures were caught and that normal browser operation could resume without restarting the Pico.
-
-The tests establish recovery control-flow behavior, not immunity to every genuine memory-exhaustion or network-stack failure.
-
-### 5.4 Listener lifecycle and recovery
-
-The CONFIG/RUN switch controls the management listener independently of physical command execution.
-
-- Entering CONFIG starts the listener.
-- Entering RUN stops the listener.
-- Startup failures are logged and retried only while CONFIG remains selected.
-- Unexpected listener `accept()` errors other than `EAGAIN` propagate to the main scheduler.
-- The scheduler closes the failed listener and schedules a new startup.
-- The retry interval is controlled by `WEB_LISTENER_RETRY_NS` in `main.py`.
-- Leaving CONFIG resets the retry deadline, allowing the next CONFIG entry to attempt startup immediately.
-
-The current retry interval is five seconds. Failed startup attempts are paced rather than repeated on every scheduler iteration.
-
-Listener shutdown clears internal listener references before socket closure, allowing later startup attempts to create a replacement listener.
-
-Chapter 8 verified two recovery scenarios using temporary fault injection:
-
-1. **Unexpected accept failure:** An injected `OSError(104)` caused listener shutdown followed by successful restart approximately five seconds later. Both browser pages subsequently worked.
-2. **Startup failure:** An injected first-attempt `OSError(104)` caused a logged startup failure, followed by a successful retry approximately five seconds later. Configuration, Test Remote, and API requests completed afterward.
-
-Normal CONFIG → RUN → CONFIG switching was also tested successfully.
-
-These tests validate the implemented retry mechanism. They do not prove recovery from all Wi-Fi radio failures, persistent socket-stack faults, or physical network outages.
-
-### 5.5 Diagnostics and remaining limitations
-
-`web_diag.py` records request and response progress, including:
-
-- Route and request size.
-- Response construction duration.
-- Send attempts and successful sends.
-- Nonblocking `EAGAIN` occurrences.
-- Zero-byte send occurrences.
-- Bytes transmitted and expected response size.
-- Connection closure reason and elapsed time.
-
-Detailed `WEB DIAG` output was useful during Chapter 8 testing and remains separately configurable from low-level HTTP tracing.
-
-A successful `close=complete` entry confirms the HTTP response was transmitted through the server's socket interface. It does not prove that a browser rendered the page or that a queued equipment command executed.
-
-Remaining limitations include:
-
-- One active management client at a time.
-- Cooperative scheduling rather than concurrent request processing.
-- Temporary physical polling delays during synchronous outbound network operations.
-- No application-level authentication; trusted LAN only.
-- No guarantee of recovery from every Wi-Fi or socket-stack failure.
-- Long-uptime behavior and simultaneous high-rate physical/network activity are not exhaustively tested.
-
-The design goal is graceful isolation: a malfunctioning CONFIG interface should not take the physical remote down with it.
-
-### 5.6 Saves and active state
-
-The configuration engine validates schema, revision, filesystem writability, and persistence safeguards.
-
-The active RAM configuration is authoritative.
-
-A successful changed save publishes the validated configuration, rebuilds adapter selections, clears pending queue work, and resets volatile toggle histories.
-
-Adapter lifecycle coordination must account for outstanding Roku held keys when configuration changes.
-
-An unchanged save preserves pending work and toggle state.
-
-A rejected save does not publish a replacement adapter cache.
-
-See [Configuration](CONFIGURATION.md) for exact file rotation, recovery, and revision behavior.
-
-The Pico filesystem does not automatically synchronize with GitHub. Protect browser-edited device configuration during firmware deployment.
-
----
-
-## 6. The Dumb Queue™
-
-**Module:** `clonker/actions.py`  
-**Capacity:** 128 entries
-
-Main interfaces include:
-
-```python
-dispatch(room_id, action_id, delay_seconds=0)
-dispatch_hold(room_id, action_id, event, destination=None, command=None)
-poll()
-clear()
-status()
-```
-
-> One queue. One poller. One shared execution path.
-
-### 6.1 Admission and identity
-
-Admission validates the room, action, delay, and capacity.
-
-Fundamental actions use stable IDs; custom actions use room-specific saved IDs.
-
-Ordinary tasks retain compact identity, step index, and due time rather than copied endpoint definitions.
-
-The actual command is resolved from active configuration when executed.
-
-A custom action occupies one queue entry, advancing one step at a time.
-
-Immediate tasks use `due = 0`; delayed tasks use a `time.monotonic()` deadline.
-
-### 6.2 Eligibility, ordering, and pacing
-
-`poll()` scans for the first eligible task.
-
-A future-dated custom step does not block an immediate action.
-
-Among currently eligible tasks, queue order matters. This is not strict FIFO across delayed work.
-
-A recognized Denon TCP volume command must satisfy the adapter's minimum 50 ms interval.
-
-If the selected eligible command is waiting for pacing, it stays in its queue position and `poll()` returns without executing a later command.
-
-This prevents overtaking.
-
-Pacing uses monotonic time rather than sleeping inside the queue.
-
-The action scheduler targets a 10 ms poll interval, with at most one queued command executed per poll.
-
-### 6.3 Fundamental commands and toggle histories
-
-Ordinary fundamental actions resolve the configured destination, method, and path.
-
-Missing endpoints or blank paths produce logged no-ops.
-
-`power-toggle` and `mute-toggle` select configured ON/OFF paths using independent volatile `(room_id, action_id)` direction histories, defaulting to ON.
-
-History advances only after successful transmission.
-
-Failures and no-ops do not advance it.
-
-This is **last-successful-command direction**, not equipment-state discovery.
-
-HDMI-CEC, other remotes, and device applications can change actual state without Clonker knowing.
-
-### 6.4 Custom actions
-
-Config v4 supports up to 16 custom actions per room, each containing 1–16 ordered steps.
-
-Steps specify a built-in destination, GET/POST, command path, and `wait_after_ms`.
-
-Waits range from 0 to 60,000 ms, with zero required on the final step.
-
-After a successful step, the task is requeued with the next due time calculated after the preceding request completes.
-
-Other eligible actions can run during a wait.
-
-Current custom steps always use generic HTTP, even when their paths resemble recognized specialized volume commands.
-
-There is no macro thread, branching engine, or rollback.
-
-### 6.5 Physical-button hold events
-
-Chapter 7 added a new queued task type:
-
-```python
-{
-    "kind": "hold",
-    "room": room_id,
-    "action": action_id,
-    "event": "pressed",  # or "released"
-    "endpoint": endpoint,
-    "method": method,
-    "path": path,
-    "due": 0,
-}
-```
-
-This example illustrates the relevant fields; the implementation also retains its target information.
-
-Supported fundamental actions are:
+The response-only fields are:
 
 ```text
-nav-up
-nav-down
-nav-left
-nav-right
-skip-back
-skip-forward
+revision
+filesystem_writable
+device_types
 ```
 
-Unlike ordinary fundamental actions, hold tasks preserve their resolved endpoint and command at admission.
+These fields are not persisted as part of the configuration schema.
 
-This is essential because a physical button may remain held while the user changes rooms.
+The browser submits the proposed configuration and expected revision.
 
-The release must return to the original destination.
+The firmware remains the authoritative validator.
 
-The queue processes these events through the existing execution loop.
+### 5.4 Bounded response streaming
 
-There is no separate button-hold queue.
+Static HTML is streamed from flash.
 
-### 6.6 Failure policy and status
+The server retains the response header and current file chunk rather than constructing the entire HTML response in RAM.
 
-An execution exception discards remaining queued tasks, including unfinished custom work, and logs the failure.
+Dynamic API responses use the existing response-building path.
 
-New actions can subsequently be admitted.
+The connection state tracks:
 
-The Dumb Queue™ does not automatically retry failed commands because the remote cannot safely assume whether an uncertain network command reached the equipment.
+- Current send buffer.
+- Buffer offset.
+- Total transmitted bytes.
+- Expected response size.
+- Connection timing.
+- Response construction timing.
 
-This queue policy is distinct from the Roku adapter's bounded attempts to release a previously held key.
+Chapter 8 introduced static streaming after observing unnecessary large allocations during HTML response construction.
 
-Adapter cleanup may require additional network work after queue cancellation.
+Chapter 12 increased management send chunks from 128 to 512 bytes.
 
-`status()` reports current depth, capacity, peak depth, last result, and last error.
+This reduced the number of socket calls needed for ordinary page delivery.
 
-Queue admission, successful network transmission, and confirmed equipment behavior are distinct evidence levels.
+It did not eliminate the intermittent ten-second socket-send stall.
+
+### 5.5 Connection-level recovery
+
+Expected nonblocking `EAGAIN` conditions are ordinary control flow.
+
+Receive and send errors normally terminate the affected client transaction.
+
+A failed client does not automatically require rebuilding the listening socket.
+
+For allocation failures escaping `web.poll()`:
+
+1. The scheduler catches `MemoryError`.
+2. The active HTTP transaction is discarded.
+3. Request, response, file, and client references are released.
+4. Normal diagnostic formatting is bypassed where appropriate.
+5. Garbage collection runs after cleanup.
+6. The application continues.
+
+Unexpected listener errors use a separate teardown and delayed-restart mechanism.
+
+### 5.6 Listener lifecycle
+
+Entering CONFIG starts the management listener.
+
+Entering RUN stops it.
+
+Unexpected listener startup or accept failures are logged.
+
+The scheduler retries listener startup after approximately five seconds while CONFIG remains enabled.
+
+Leaving CONFIG resets the retry deadline.
+
+Earlier fault-injection tests verified:
+
+- Recovery from simulated allocation failures.
+- Recovery from unexpected accept failures.
+- Recovery from an initial listener startup failure.
+- Normal CONFIG → RUN → CONFIG transitions.
+
+These tests establish the intended recovery control flow.
+
+They do not guarantee recovery from every underlying Wi-Fi or socket-stack condition.
+
+### 5.7 Connection diagnostics
+
+`net/web_diag.py` records useful connection-level measurements, including:
+
+- Request route.
+- Request size.
+- Response construction duration.
+- Expected response size.
+- Bytes transmitted.
+- Send attempts.
+- Successful sends.
+- EAGAIN occurrences.
+- Zero-byte sends.
+- Longest individual send duration.
+- Slow-send count.
+- Connection closure reason.
+- Total elapsed time.
+
+Representative output:
+
+```text
+WEB DIAG: close=complete, route=...
+WEB DIAG: send_calls=..., send_ok=..., EAGAIN=...
+WEB DIAG: send_max=...ms, send_slow=...
+```
+
+A `close=complete` entry establishes completion through the server's socket interface.
+
+It does not prove that the browser rendered the response.
+
+Detailed management diagnostics remain useful while the intermittent socket-send investigation is open.
+
+### 5.8 Security
+
+The management service has no application-level authentication or HTTPS.
+
+It is intended for a trusted LAN.
+
+Do not expose it directly to the public internet.
+
+Future authenticated device credentials stored in configuration increase the importance of protecting management access and exported files.
 
 ---
 
-## 7. Device adapter architecture
+## 6. Configuration Persistence and Memory Management
 
-**Module:** `clonker/device_adapters.py`
+**Module:** `clonker/device_config.py`
 
-The adapter layer separates command intent, device-specific behavior, and network delivery.
+The configuration engine owns:
 
-The parent router recognizes supported fundamental command signatures and delegates execution. Individual device modules interpret their commands and own any required state, transport choices, and lifecycle safeguards. The Dumb Queue™ retains scheduling, ordering, and failure policy.
+- Schema validation.
+- Canonical serialization.
+- Active validated RAM configuration.
+- Revision protection.
+- Disk consistency checks.
+- Verified persistence.
+- Backup rotation.
+- Configuration activation.
 
-### 7.1 Supported execution paths
+See [Configuration](CONFIGURATION.md) for the complete schema and persistence contract.
 
-| Adapter / execution path | Selection | Transport |
+### 6.1 Validate at trust boundaries
+
+Full configuration validation constructs normalized configuration objects.
+
+Repeated validation of already trusted configuration creates unnecessary processing and allocation pressure.
+
+Chapter 8 demonstrated this problem in physical-control paths.
+
+Chapter 12 demonstrated a related problem during configuration saves.
+
+The architectural rule is:
+
+**Validate at trust boundaries, not repeatedly throughout the application.**
+
+Runtime consumers use controlled, read-only accessors to validated configuration.
+
+They must not reconstruct the entire configuration merely to resolve a device or command.
+
+### 6.2 Optimized save pipeline
+
+The Chapter 12 save pipeline:
+
+1. Reclaims temporary allocations.
+2. Validates the incoming configuration.
+3. Serializes the validated object.
+4. Reclaims temporary validation and serialization allocations.
+5. Loads and validates the existing primary.
+6. Checks disk consistency.
+7. Prepares replacement adapter selections.
+8. Writes and verifies the temporary file.
+9. Rotates backups and installs the primary.
+10. Verifies the installed bytes.
+11. Activates the replacement configuration.
+
+An unchanged save exits without rewriting flash or replacing active routing state.
+
+Temporary and installed file verification uses bounded 512-byte comparisons.
+
+Already validated serialized data does not require another full JSON parse and validation merely to establish byte equality.
+
+### 6.3 Intentional garbage collection
+
+Two explicit `gc.collect()` calls remain in the production save pipeline:
+
+- At save entry.
+- After incoming validation and serialization, before loading the existing primary.
+
+These are intentional administrative memory-management boundaries.
+
+They are not periodic garbage collection in the latency-sensitive physical-control path.
+
+Do not remove or relocate them without regression testing.
+
+### 6.4 Configuration activation
+
+After a successful changed save:
+
+- Existing adapter sessions are retired.
+- Prepared adapter selections become active.
+- The validated RAM configuration is published.
+- Physical configuration-dependent gesture state is cleared.
+- Pending actions are canceled.
+- Volatile toggle histories are reset.
+
+Session retirement is best effort.
+
+An unchanged save preserves sessions, queue state, and toggle histories.
+
+### 6.5 Persistence versus acknowledgment
+
+Configuration persistence and HTTP response delivery are separate operations.
+
+The primary file may be successfully installed and activated even if the browser does not receive the save acknowledgment.
+
+The browser must not automatically replay a configuration POST following an uncertain outcome.
+
+Instead, reload the active configuration and revision when management HTTP becomes available.
+
+Determine whether the intended change was persisted before attempting another save.
+
+### 6.6 Chapter 12 memory investigation
+
+Temporary `SAVE MEM` checkpoints measured free heap at selected save-processing boundaries.
+
+One successful save entered the pipeline with only 32160 bytes of free heap.
+
+The first explicit garbage collection increased free heap to 243808 bytes.
+
+The second collection reclaimed a further 39456 bytes before disk validation.
+
+These measurements demonstrated substantial reclaimable temporary allocations.
+
+They did not establish a persistent memory leak in CircuitPython or its JSON implementation.
+
+### 6.7 Repeated-save endurance
+
+Twenty consecutive changed browser saves succeeded without rebooting or manually refreshing.
+
+The test covered Room 3 Save Tests 8 through 27.
+
+Selected free-heap measurements:
+
+| Checkpoint | Save 8 | Save 13 | Save 20 | Save 27 |
+|---|---:|---:|---:|---:|
+| After GC1 | 243808 | 235072 | 236400 | 236416 |
+| After GC2 | 230016 | 221280 | 222608 | 222624 |
+| After disk validation | 175376 | 166672 | 167984 | 168016 |
+| After activation | 142048 | 133376 | 134752 | 134784 |
+
+The initial reduction in available heap did not continue progressively.
+
+The final two sampled post-collection measurements differed by only 16 bytes.
+
+No progressive heap depletion was evident in these samples.
+
+### 6.8 Save performance
+
+Representative measured save durations:
+
+| Implementation | Save duration |
+|---|---:|
+| Earlier instrumented implementation | 2361.7 ms |
+| Optimized implementation with targeted GC | 1345.1 ms |
+
+The final sampled save was approximately 43% shorter.
+
+Three additional changed saves succeeded after removal of temporary memory diagnostics.
+
+Post-cleanup configuration save durations were approximately 1.3–1.4 seconds.
+
+Subsequent configuration GET requests completed in approximately 0.4 seconds.
+
+Production `CONFIG PERF` timing remains enabled.
+
+Temporary `SAVE MEM` checkpoints were removed.
+
+### 6.9 Evidence limits
+
+The repeated-save allocation failure was substantially improved under the tested conditions.
+
+Heap fragmentation remains a plausible contributor to earlier allocation failures but was not directly measured.
+
+A CircuitPython JSON memory leak has not been demonstrated.
+
+The intermittent management socket-send stall remains unresolved and must not be conflated with the improved save-memory behavior.
+
+---
+
+## 7. The Dumb Queue™
+
+**Module:** `clonker/actions.py`
+
+The Dumb Queue™ is the shared execution mechanism for physical and browser actions.
+
+Its responsibilities include:
+
+- Action admission.
+- Bounded pending work.
+- Eligibility and ordering.
+- Command resolution.
+- Adapter readiness.
+- Execution.
+- Custom Action progression.
+- Failure cancellation.
+
+### 7.1 Capacity and identity
+
+The queue holds up to 128 entries.
+
+Ordinary tasks identify the room and action.
+
+Custom Action tasks additionally retain step progression and eligibility timing.
+
+Explicit physical hold events retain their original validated device and command references.
+
+The queue does not persist pending work across reboot.
+
+### 7.2 Eligibility
+
+The first eligible task is selected.
+
+A task waiting for a future deadline does not block immediate eligible work.
+
+If the selected adapter is not ready, the task remains pending rather than allowing later eligible work to overtake it.
+
+At most one eligible queued command executes per action poll.
+
+### 7.3 Fundamental actions
+
+Fundamental actions resolve their typed device and protocol-aware command from active validated configuration.
+
+Blank endpoints and selected blank commands produce intentional no-ops.
+
+Disabled device types must not silently fall back to generic HTTP.
+
+### 7.4 Toggle histories
+
+Power and mute toggles use independent ON and OFF command objects.
+
+The dispatcher tracks next-direction history by room and action.
+
+Successful execution advances the history.
+
+Failure or an intentional no-op does not.
+
+A changed configuration save or reboot resets the history.
+
+The remote does not query actual equipment state to determine toggle direction.
+
+### 7.5 Custom Actions
+
+A Custom Action occupies one queue task while progressing through its ordered steps.
+
+Each step executes one configured command.
+
+After successful completion, a nonfinal step establishes its next monotonic eligibility deadline.
+
+Other eligible work may execute during the wait.
+
+Existing Roku and Denon Custom Action steps retain ordinary single-command HTTP behavior.
+
+They do not implicitly acquire specialized hold or repeat behavior.
+
+### 7.6 Failure policy
+
+An execution exception cancels remaining pending work.
+
+Unfinished Custom Actions are canceled.
+
+New work may subsequently be admitted.
+
+Uncertain commands are not automatically replayed.
+
+Adapter-specific key-release cleanup is a separate safety mechanism.
+
+A failed command may already have reached the equipment.
+
+Blind replay could duplicate the intended action.
+
+### 7.7 Physical hold context
+
+Explicit hold events preserve the device and command associated with the original press.
+
+A later room change must not redirect the release.
+
+When queue capacity temporarily prevents release admission, the physical coordinator retains the necessary release context.
+
+This is gesture bookkeeping, not a second execution queue.
+
+A successful changed configuration save invalidates obsolete gesture state.
+
+---
+
+## 8. Device Registry and Adapter Coordinator
+
+**Modules:**
+
+```text
+clonker/devices/device_types.py
+clonker/devices/device_adapters.py
+```
+
+### 8.1 Device registry
+
+The registry defines device identity, supported command kinds, runtime availability, suggested ports, additional attributes, and pairing capability.
+
+| Type | Command kinds | Runtime |
 |---|---|---|
-| `denon-tcp` | Recognized Denon fundamental volume commands | Persistent TCP port 23 |
-| `roku-volume-hold` | Recognized Roku fundamental volume commands | ECP keydown/keyup over persistent HTTP |
-| `roku-button-tap` | Recognized Roku navigation/skip taps | ECP keypress over persistent HTTP |
-| `roku-button-hold` | Supported physical navigation/skip press/release events | ECP keydown/keyup over persistent HTTP |
-| `generic-http` | Other configured commands | Bounded HTTP GET/POST |
+| `generic-http` | HTTP | Enabled |
+| `denon` | HTTP | Enabled |
+| `roku` | HTTP | Enabled |
+| `lg-webos` | SSAP, Pointer | Disabled pending integration |
+| `apple-tv` | None | Future |
+| `fire-tv` | None | Future |
 
-Specialized adapter selection is restricted to recognized fundamental actions. Custom-action steps continue using generic HTTP, even when their command paths resemble specialized fundamental commands.
+The registry does not import protocol implementations or establish network connections.
 
-The six supported navigation/skip controls have separate tap and hold adapter selections. Ordinary taps use `execute()`; physical press/release events use `execute_hold()`.
+### 8.2 Adapter selection
 
-Roku's code-defined transport policy selects generic or persistent HTTP independently of control behavior. It does not change the volume or physical-button hold state machines.
+Config v5 explicitly identifies the device type.
 
-### 7.2 Recognized Denon signatures
+Specialized execution additionally depends on action context and recognized command mappings.
+
+A generic HTTP device does not acquire Denon or Roku specialization solely because its path resembles one of their commands.
+
+### 8.3 Operational execution paths
+
+| Path | Selection | Transport |
+|---|---|---|
+| `denon-tcp` | Recognized Denon fundamental volume | Persistent TCP port 23 |
+| `roku-volume-hold` | Recognized Roku fundamental volume | Persistent ECP keydown/keyup |
+| `roku-button-tap` | Recognized Roku navigation/skip tap | Persistent ECP keypress |
+| `roku-button-hold` | Explicit supported physical hold event | Persistent ECP keydown/keyup |
+| `generic-http` | Other compatible operational HTTP commands | Fresh bounded HTTP request |
+
+### 8.4 Recognized Denon commands
 
 Method: GET
 
 ```text
-/goform/formiPhoneAppDirect.xml?MVUP   -> MVUP
-/goform/formiPhoneAppDirect.xml?MVDOWN -> MVDOWN
+/goform/formiPhoneAppDirect.xml?MVUP
+/goform/formiPhoneAppDirect.xml?MVDOWN
 ```
 
-These signatures select `denon-tcp`.
+The configured device must explicitly be type `denon`.
 
-The configured endpoint identifies the receiver host; the adapter uses native TCP port 23.
+These mappings select native TCP volume execution.
 
-### 7.3 Recognized Roku volume signatures
+### 8.5 Recognized Roku volume commands
 
 Method: POST
 
 ```text
-/keypress/VolumeUp   -> up
-/keypress/VolumeDown -> down
+/keypress/VolumeUp
+/keypress/VolumeDown
 ```
 
-These signatures select `roku-volume-hold`.
+The configured device must explicitly be type `roku`.
 
-The configured paths are used for recognition. The adapter translates them into held-key operations:
+These mappings select encoder-driven held-volume execution.
+
+### 8.6 Recognized Roku navigation and skip commands
+
+Method: POST
 
 ```text
-POST /keydown/VolumeUp
-POST /keyup/VolumeUp
-
-POST /keydown/VolumeDown
-POST /keyup/VolumeDown
+/keypress/Up
+/keypress/Down
+/keypress/Left
+/keypress/Right
+/keypress/Rev
+/keypress/Fwd
 ```
 
-### 7.4 Physical-button hold signatures
+Compatible ordinary actions select persistent taps.
 
-`device_adapters.execute_hold()` recognizes these Roku ECP paths:
+Compatible physical hold events select explicit keydown/keyup execution.
+
+### 8.7 Adapter cache
+
+Specialized fundamental selections are cached by:
 
 ```text
-/keypress/Up    -> Up
-/keypress/Down  -> Down
-/keypress/Left  -> Left
-/keypress/Right -> Right
-/keypress/Rev   -> Rev
-/keypress/Fwd   -> Fwd
+(room_id, action_id)
 ```
 
-The configured method must be POST.
+Physical hold selections use:
 
-A `pressed` event becomes Roku keydown.
+```text
+("hold", room_id, action_id)
+```
 
-A `released` event becomes Roku keyup.
+The cache is derived from validated configuration.
 
-Unsupported methods, paths, or empty endpoints raise execution errors.
+It is not persisted as equipment state.
 
-These restrictions distinguish explicit physical holds from ordinary generic HTTP actions.
+Cache preparation and publication are separate operations.
 
-### 7.5 Adapter cache
+A replacement cache is prepared before changed configuration persistence and published during activation.
 
-Specialized fundamental volume and Roku navigation/skip tap selections are cached by `(room_id, action_id)`. Physical-button hold selections use separate `("hold", room_id, action_id)` keys.
+### 8.8 Lifecycle interface
 
-No adapter identifiers are written into Config v4 JSON.
+The coordinator provides:
 
-`device_adapters.rebuild(config)` constructs a replacement routing map for the active configuration.
+- Execution-path resolution.
+- Cache preparation and publication.
+- Adapter readiness.
+- Ordinary command execution.
+- Supported physical hold execution.
+- Maintenance polling.
+- Active-state cancellation.
+- Session retirement.
 
-`lookup(room_id, action_id)` returns a specialized selection or generic HTTP fallback.
+The coordinator receives typed device records and protocol-aware command objects.
 
-The adapter layer also provides execution, readiness, maintenance polling, and cleanup coordination.
-
-The cache is routing metadata, not an equipment-state cache or second queue.
-
-Transport-specific state belongs to the appropriate adapter.
+Protocol-specific behavior remains in the appropriate adapter.
 
 ---
 
-## 8. Denon persistent TCP adapter
+## 9. Denon Persistent TCP Adapter
 
 **Module:** `clonker/devices/denon.py`  
 **Port:** TCP 23  
-**Supported commands:** `MVUP`, `MVDOWN`
+**Commands:** `MVUP`, `MVDOWN`
 
-Current constants:
+### 9.1 Established timing
 
 ```python
 TCP_PORT = 23
@@ -675,89 +895,176 @@ SOCKET_TIMEOUT = 1.0
 MIN_COMMAND_INTERVAL = 0.05
 ```
 
-### 8.1 Connection lifecycle
+The configured HTTP endpoint identifies the receiver host.
 
-The adapter extracts an IPv4 host from the configured endpoint, which may include an HTTP port.
+Specialized volume execution uses native TCP port 23 independently of the configured HTTP port.
 
-It connects to the receiver on TCP port 23.
+### 9.2 Connection lifecycle
 
-The active socket is reused for subsequent commands to the same host.
+The adapter maintains one persistent receiver connection.
 
-Targeting a different receiver closes the old connection before opening the new one.
+Subsequent commands to the same receiver reuse it.
 
-`close()` resets socket, host, and pacing state.
+Changing receivers retires the previous connection.
 
-The adapter maintains at most one active receiver connection.
+Closing the adapter resets socket, host, and pacing state.
 
-It is not a pool of connections to all rooms.
+It is not a pool of simultaneous receiver connections.
 
-Initial connection and socket writes remain synchronous.
+### 9.3 Pacing
 
-### 8.2 Pacing and transmission
+`ready()` checks the monotonic send deadline.
 
-`ready()` compares monotonic time with the next allowed send time.
+The dispatcher preserves a selected task when the adapter is not ready.
 
-The queue checks readiness before removing the selected command.
+Native volume commands are ASCII strings terminated by carriage return.
 
-`send_volume(endpoint, command)` sends the ASCII native command terminated by carriage return (`\r`).
+Examples:
 
-After a successful write, the next allowed send time is advanced by at least 50 ms.
+```text
+MVUP\r
+MVDOWN\r
+```
 
-If pacing is not ready, the caller preserves the task.
+Successful transmission advances the next allowed send time by at least 50 ms.
 
-An exception closes the connection and propagates to the queue failure policy.
+An execution exception closes the connection and propagates to the queue failure policy.
 
-No automatic retry is attempted.
+Uncertain commands are not automatically retried.
 
-A successful `sendall()` means bytes were handed to the TCP stack. It does not prove that the AVR processed the command or reached a particular volume.
+### 9.4 Receive draining
 
-### 8.3 Not implemented
+Persistent Denon connections can accumulate unread responses and unsolicited receiver messages.
 
-The adapter does not yet:
+Earlier firmware did not sufficiently drain this data.
 
-- Parse CR-terminated Denon status responses.
-- Consume unsolicited receiver messages.
-- Poll receiver state.
-- Maintain multiple simultaneous AVR sockets.
-- Automatically retry uncertain commands.
+Chapter 11 added receive draining and periodic adapter maintenance following an observed freeze during heavy volume use.
 
-Stale connections and long-duration recovery remain subjects for additional testing.
+Aggressive subsequent volume testing did not reproduce that freeze.
+
+Receive draining is transport maintenance.
+
+It does not establish an authoritative receiver-state model.
+
+### 9.5 Chapter 12 verification
+
+Live Denon TCP volume execution passed following the typed-adapter redesign.
+
+Representative observations included:
+
+- Initial volume command: approximately 104 ms.
+- Subsequent command on the existing connection: approximately 3 ms.
+
+During the later management socket investigation:
+
+- Initial connection and command: approximately 204 ms.
+- Subsequent commands: approximately 2.6–2.8 ms.
+
+These measurements are observations, not guaranteed latencies.
+
+### 9.6 Limitations
+
+The adapter does not:
+
+- Maintain authoritative receiver state.
+- Interpret every unsolicited Denon message.
+- Maintain simultaneous connections to every configured AVR.
+- Automatically replay uncertain volume commands.
+- Guarantee actual receiver execution after a successful TCP write.
 
 ---
 
-## 9. Roku ECP held-volume adapter
+## 10. Roku Persistent HTTP Transport
 
-**Module:** `clonker/devices/roku.py`  
-**Transport:** Roku ECP over bounded HTTP POST  
-**Supported directions:** `up`, `down`
+**Module:** `clonker/devices/roku.py`
 
-### 9.1 Design objective
+The Roku adapter uses a code-defined transport policy.
 
-Ordinary Roku ECP volume commands can be sent as individual keypresses.
+Selected ECP operations use persistent HTTP.
 
-However, one HTTP request per encoder detent introduces noticeable overhead during fast rotation.
+Other compatible commands retain ordinary generic HTTP execution.
 
-The held-volume adapter instead treats encoder movement as a temporary key hold.
+### 10.1 Established timing
 
-The first detent starts a hold. Additional same-direction detents extend it locally.
+| Parameter | Value |
+|---|---:|
+| Per-operation socket timeout | 500 ms |
+| Total request deadline | 1.5 seconds |
+| Connection reuse window | 1 second |
+| Failed-release retry interval | 500 ms |
 
-This reduces network traffic while allowing Roku to repeat the held volume command.
+The current adapter constants remain authoritative.
 
-### 9.2 Current timing
+### 10.2 Persistent connection behavior
 
-| Parameter | Value | Purpose |
-|---|---:|---|
-| Idle release | 250 ms | Release after rotation stops |
-| Maximum volume hold | 2 seconds | Bound continuous hold duration |
-| Failed-release retry | 500 ms | Avoid tight retry loops |
+A successful request may leave the connection eligible for reuse.
 
-These are experimental values retained after successful physical testing.
+Repeated compatible requests can avoid a new TCP connection.
 
-They are not guaranteed to produce identical volume changes across Roku models, CEC implementations, or receivers.
+Idle or obsolete connections are retired.
 
-### 9.3 First detent
+Endpoint changes require appropriate connection replacement.
 
-For a new direction, the adapter sends the appropriate keydown request.
+Transport failures close or invalidate the affected connection.
+
+The adapter does not automatically replay uncertain navigation taps or keydown commands.
+
+### 10.3 Navigation and skip taps
+
+Recognized navigation and skip commands use persistent ECP keypress requests.
+
+Examples:
+
+```text
+POST /keypress/Right
+POST /keypress/Left
+POST /keypress/Fwd
+POST /keypress/Rev
+```
+
+Persistent reuse improves repeated button responsiveness without changing the fundamental action vocabulary.
+
+### 10.4 Verified performance
+
+Earlier November 18 testing measured:
+
+- New connection taps: approximately 135–146 ms.
+- Reused connection taps: approximately 34–43 ms.
+
+Chapter 12 regression testing measured:
+
+- New connection tap: approximately 141 ms.
+- Reused taps: approximately 38–39 ms.
+
+Later testing during the management socket investigation measured reused taps at approximately 36–44 ms.
+
+The typed configuration redesign did not introduce an evident regression in these sampled operations.
+
+---
+
+## 11. Roku Encoder-Driven Volume Holds
+
+**Module:** `clonker/devices/roku.py`
+
+The volume adapter converts encoder movement into temporary Roku ECP key holds.
+
+This avoids one HTTP request per encoder detent.
+
+### 11.1 Established timing
+
+| Parameter | Value |
+|---|---:|
+| Idle release | 250 ms |
+| Maximum continuous volume hold | 2 seconds |
+| Failed-release retry | 500 ms |
+
+These are experimentally selected behavior parameters.
+
+They do not guarantee identical volume changes across equipment combinations.
+
+### 11.2 First detent
+
+A new direction starts the appropriate held key.
 
 Example:
 
@@ -765,46 +1072,40 @@ Example:
 POST /keydown/VolumeUp
 ```
 
-After successful acknowledgment, the adapter records:
+Following successful acknowledgment, the adapter records:
 
 - Endpoint.
 - Direction.
 - Hold start time.
 - Idle-release deadline.
 
-The adapter does not mark a key as held before the initial request is acknowledged.
+An uncertain keydown is not automatically replayed.
 
-An uncertain keydown outcome is not automatically retried.
+### 11.3 Same-direction movement
 
-### 9.4 Same-direction movement
-
-While the same key remains held, additional detents refresh the idle deadline.
+Additional same-direction detents extend the idle deadline.
 
 No additional HTTP request is required.
 
 The execution log distinguishes a new `keydown` from a local `extended` operation.
 
-A local extension normally completes in approximately 0 ms because it performs no network I/O.
+Chapter 12 local extension measurements were commonly approximately 0.7–1.0 ms.
 
-This is the principal performance advantage over one HTTP request per detent.
+### 11.4 Idle release
 
-### 9.5 Idle release
+When encoder activity stops, the idle deadline eventually expires.
 
-The main scheduler continues calling adapter maintenance even when the action queue is empty.
-
-When the idle deadline expires, the adapter attempts the corresponding keyup:
+Adapter maintenance attempts the corresponding release:
 
 ```text
 POST /keyup/VolumeUp
 ```
 
-The remote should then stop repeating volume changes.
+This maintenance continues independently of queue depth.
 
-A small amount of visible volume overshoot may occur because the command passes through Roku and potentially HDMI-CEC before reaching the receiver.
+### 11.5 Direction reversal
 
-### 9.6 Direction reversal
-
-When the encoder changes direction, the adapter must release the previous key before beginning the opposite hold.
+Reversal requires release of the previous key before starting the opposite hold.
 
 Example:
 
@@ -813,587 +1114,392 @@ POST /keyup/VolumeUp
 POST /keydown/VolumeDown
 ```
 
-The opposite keydown is not allowed to bypass an unresolved release.
+An unresolved release must not knowingly be bypassed by a new opposing hold.
 
-This avoids knowingly leaving opposing volume commands active.
+### 11.6 Maximum hold
 
-The two HTTP requests still introduce some reversal latency.
+A continuous volume hold is bounded to approximately two seconds.
 
-### 9.7 Maximum-hold behavior
+Continued rotation can require release and a new hold.
 
-A volume hold is limited to approximately two seconds.
+This prevents a single local hold from extending indefinitely.
 
-Continued rotation beyond that boundary releases the previous hold and can begin a new one.
+### 11.7 Failed-release safety
 
-This prevents one uninterrupted local hold from extending indefinitely.
+If keyup fails, unresolved held-key state is retained.
 
-The physical tests showed a new keydown after an extended series of local hold operations, consistent with maximum-hold restart behavior.
+Release attempts are paced rather than retried on every scheduler iteration.
 
-The precise keyup sequence was not independently traced during that experiment.
+This is specialized cleanup behavior, not general action replay.
 
-### 9.8 Failed-release safety
+Network failure can still prevent confirmation that a remote key was released.
 
-If a keyup request fails, the adapter retains the unresolved held-key state.
+### 11.8 Chapter 12 verification
 
-New keydowns must not proceed until the prior release has been resolved.
+Live Sunroom testing verified:
 
-Retry attempts are paced at approximately 500 ms rather than occurring on every fast scheduler poll.
+- Initial volume keydown.
+- Same-direction local extensions.
+- Direction reversal.
+- Idle release.
+- Responsive physical operation.
 
-This is a specialized cleanup mechanism, not a general queue retry policy.
+During the later management HTTP investigation, initial volume keydowns were approximately 113–114 ms, with local extensions around 0.7 ms.
 
-Network failure can still prevent confirmation that the remote received a release.
-
-### 9.9 Lifecycle coordination
-
-Held-key cleanup is relevant when:
-
-- Rotation stops.
-- Direction changes.
-- Maximum hold is reached.
-- Queued work is canceled.
-- Configuration is replaced.
-- Application shuts down.
-
-Cleanup is best effort and remains subject to network availability.
-
-### 9.10 Diagnostics
-
-The Roku adapter wraps outbound HTTP failures with operation-specific context.
-
-A diagnostic can identify keydown or keyup, direction, endpoint, and original exception.
-
-Example:
-
-```text
-ROKU /keyup/VolumeUp -> 192.168.50.28:8060 failed: OSError(119,)
-```
-
-This is illustrative; actual exception formatting depends on CircuitPython and the failure path.
-
-One transient `OSError(119)` occurred during early reversal testing before these diagnostics were added.
-
-The precise failing operation was not established.
-
-Subsequent tests recovered successfully.
-
-### 9.11 What the adapter does not guarantee
+### 11.9 Limitations
 
 The adapter does not guarantee:
 
-- Exactly one receiver volume step per encoder detent.
+- One receiver volume step per encoder detent.
 - A fixed volume-change rate.
-- Zero display lag or overshoot.
-- Delivery confirmation beyond HTTP acknowledgment.
-- Recovery from every network failure.
-- Accurate knowledge of the receiver's actual volume.
-- Guaranteed key release when the remote becomes unreachable.
+- Zero overshoot.
+- Actual receiver volume knowledge.
+- Successful release when equipment becomes unreachable.
 
-It is a time-based physical-control mechanism, not a volume-position controller.
+It is a time-based physical control mechanism, not a volume-position controller.
 
 ---
 
-## 10. Roku physical-button holds — Chapter 7
+## 12. Roku Physical Navigation and Skip Holds
 
-**Modules:** `controls/physical.py`, `actions.py`, `device_adapters.py`, `devices/roku.py`
-
-Physical navigation and skip buttons require different behavior from the encoder's held-volume mechanism.
-
-A button remains logically pressed for as long as the user holds it, subject to the safety limit.
-
-### 10.1 Supported buttons
-
-| Physical button | Fundamental action | Roku ECP key |
-|---|---|---|
-| Up | `nav-up` | `Up` |
-| Down | `nav-down` | `Down` |
-| Left | `nav-left` | `Left` |
-| Right | `nav-right` | `Right` |
-| Skip Back | `skip-back` | `Rev` |
-| Skip Forward | `skip-forward` | `Fwd` |
-
-These six buttons use explicit press/release events.
-
-Other physical buttons continue using ordinary fundamental-action dispatch.
-
-### 10.2 Press handling
-
-The six navigation/skip buttons use a switchable gesture policy controlled by `NAV_PRESS_FIRST` in `controls/physical.py`.
-
-In the currently tested press-first mode:
-
-1. The button driver reports a debounced press.
-2. `physical.py` resolves the selected room, endpoint, and action.
-3. `actions.dispatch()` queues an immediate Roku `keypress`.
-4. The coordinator retains the original destination and press time.
-5. If the press continues beyond 250 ms, `actions.dispatch_hold()` queues a `keydown`.
-6. Roku handles automatic repetition while the key remains held.
-
-Example sustained press:
+**Modules:**
 
 ```text
-Physical NAV_UP pressed
-    |
-    v
-Dumb Queue -> POST /keypress/Up
-    |
-    | Still pressed after 250 ms
-    v
-Dumb Queue -> POST /keydown/Up
-    |
-    v
-Roku automatic repeat
+clonker/controls/physical.py
+clonker/actions.py
+clonker/devices/device_adapters.py
+clonker/devices/roku.py
 ```
 
-A short press sends only the initial `keypress`.
+The four navigation buttons and two skip buttons support specialized Roku tap/hold behavior.
 
-With `NAV_PRESS_FIRST = False`, the original release-first policy remains available. Short presses dispatch `keypress` on release; sustained presses start `keydown` after the same 250 ms threshold.
+### 12.1 Supported controls
 
-The initial `keypress` and later `keydown` may each produce a navigation movement. Hardware testing confirmed this additional movement before automatic repetition, while single taps, rapid taps, sustained holds, and releases behaved well.
+| Action | Roku key |
+|---|---|
+| `nav-up` | Up |
+| `nav-down` | Down |
+| `nav-left` | Left |
+| `nav-right` | Right |
+| `skip-back` | Rev |
+| `skip-forward` | Fwd |
 
-The button driver itself does not send HTTP.
+Specialization requires a compatible explicitly typed Roku device and recognized POST command.
 
-### 10.3 Release handling
+### 12.2 Press-first behavior
 
-On physical release:
-
-1. The button driver reports a debounced release.
-2. `physical.py` retrieves the saved press context.
-3. If a hold started, its release is queued using the original endpoint and command.
-4. The adapter sends the corresponding Roku ECP `keyup`.
-5. If no hold started, press-first mode requires no additional command; release-first mode queues one `keypress`.
-
-Example:
-
-```text
-Physical NAV_UP released
-    |
-    v
-Original room / endpoint / command
-    |
-    v
-actions.dispatch_hold(..., "released")
-    |
-    v
-Dumb Queue
-    |
-    v
-POST /keyup/Up
-```
-
-The original context is important.
-
-If the user changes the room selector while holding a button, the release must still go to the Roku that received the original keydown.
-
-### 10.4 Why hold tasks preserve commands
-
-Ordinary queued fundamental actions resolve their commands from active configuration when eligible.
-
-Hold tasks are different.
-
-They preserve:
-
-- Room ID.
-- Endpoint.
-- Target.
-- Method.
-- Path.
-- Press/release event.
-
-This prevents a later room selection from redirecting the release.
-
-It also avoids having the release depend on newly selected room state.
-
-### 10.5 Hold safety
-
-The physical-button hold mechanism has a maximum hold duration of approximately **30 seconds**.
-
-The Roku module maintains this separately from the two-second encoder-volume hold.
-
-The two mechanisms share the adapter and HTTP transport infrastructure but have distinct hold lifecycles.
-
-Cancellation and shutdown attempt best-effort release cleanup.
-
-A failed keyup may require later cleanup attempts, and complete recovery cannot be guaranteed if the Roku or network becomes unreachable.
-
-### 10.6 Configuration requirements
-
-The explicit physical-button hold adapter requires:
-
-- A configured endpoint.
-- POST method.
-- One of the six recognized Roku ECP keypress paths.
-
-Unsupported paths or blank endpoints are execution errors in the current hold path.
-
-This matters for the current Room 3 placeholder, which contains blank device addresses and command paths.
-
-Ordinary fundamental actions already support blank-command no-ops.
-
-**The physical hold path still needs equivalent blank-command protection before Room 3 can be considered fully safe for all buttons.**
-
-This is a genuine execution boundary, not merely a documentation distinction.
-
-### 10.7 Verification
-
-Chapter 7 testing exercised all six supported physical hold buttons.
-
-The tests established:
-
-- Debounced physical press detection.
-- Queued hold admission.
-- Roku keydown execution.
-- Physical release detection.
-- Roku keyup execution.
-- Practical held-button behavior.
-
-The tests do not establish guaranteed release after every possible network outage or application interruption.
-
-### 10.8 Chapter 11 — Persistent transport refinement and diagnostics
-
-Chapter 11 strengthened Roku physical-button release recovery and moved physical keydown/keyup operations from generic HTTP to the existing persistent HTTP transport.
-
-**Reliability improvements:**
-
-- Failed physical keyup operations retain the original endpoint and key for subsequent release attempts.
-- Release recovery retries are paced at approximately 500 ms.
-- Persistent HTTP requests use a 500 ms per-operation socket timeout and a 1.5-second total request deadline.
-- Failed persistent requests discard the connection.
-- Ordinary navigation taps and keydowns are not automatically replayed because delivery may be ambiguous.
-- Press-first navigation, debounce timing, and the 250 ms hold threshold remain unchanged.
-
-**Stage 2B live verification:**
-
-- Rapid DOWN taps completed successfully.
-- Short and long DOWN holds behaved as expected.
-- DOWN-to-UP reversal completed successfully.
-- Recovery and responsiveness testing showed continued operation.
-- Representative persistent keydown operations completed in approximately 12–22 ms, compared with the earlier generic HTTP baseline of approximately 115–120 ms.
-- Keyup operations generally remained around 115–123 ms during the observed tests.
-- No transport failures were visible in the final Stage 2B screenshots.
-
-These measurements are representative observations, not guaranteed timing limits.
-
-**Flight-recorder transport diagnostics:**
-
-The `roku_transport` provider captures:
-
-- Successful and failed persistent HTTP requests.
-- Successful requests using new versus reused connections.
-- Duration of the last successful request.
-- Last transport error.
-- Current persistent connection state and age.
-- Active physical held key.
-- Pending release state, held-key age, and retry timing.
-
-Counters are maintained in RAM and reset on restart. Detailed diagnostic snapshots are collected only when requested.
-
-No additional network requests, background tasks, or routine filesystem writes are introduced.
-
-These diagnostics provide additional evidence for investigating future Roku connection failures and release-recovery behavior without requiring continuous verbose logging.
-
----
-
-## 11. Generic outbound HTTP transport
-
-**Module:** `clonker/net/http_transport.py`  
-**Interface:** `send(endpoint, method, path)`
-
-The transport accepts dotted IPv4 with optional `:port` (default 80), GET or POST, and an absolute path.
-
-It creates a TCP socket, sends a minimal HTTP/1.1 request with an empty body, reads a bounded status line, accepts HTTP 2xx, and closes the socket in `finally`.
-
-Current constants:
+With:
 
 ```python
-DEFAULT_PORT = 80
-SOCKET_TIMEOUT = 0.5
-TOTAL_TIMEOUT = 1.5
-MAX_STATUS_LINE = 128
-HTTP_DIAGNOSTICS = False
+NAV_PRESS_FIRST = True
 ```
 
-The socket timeout bounds individual blocking operations.
+The physical coordinator:
 
-The total deadline is checked between operations and is not an asynchronous hard stop for a single socket call.
+1. Queues an ordinary tap immediately after the debounced press.
+2. Promotes a sustained press to a hold after 250 ms.
+3. Queues the corresponding release when the button is released.
+4. Does not issue an additional command for an ordinary short-press release.
 
-Non-2xx responses, malformed requests, connection errors, and timeouts raise exceptions for the caller to handle.
+A sustained press may produce an initial movement followed by the native held-key behavior.
 
-The transport does not provide full response-body parsing, TLS, authentication, redirects, persistent HTTP connections, arbitrary POST bodies, or device-specific semantics.
+This was accepted as a practical tradeoff for immediate tap responsiveness.
 
-### 11.1 Generic HTTP remains necessary
+### 12.3 Release-first alternative
 
-Generic HTTP handles:
+With `NAV_PRESS_FIRST = False`, the original release-first behavior remains available.
 
-- Other Roku ECP commands without specialized adapter selection.
-- Roku mute.
-- Denon HTTP power and mute commands.
-- Custom-action steps.
-- Other configured GET/POST actions without specialized signatures.
+Short presses dispatch on release.
 
-Roku mute is deliberately **not** a held-volume operation.
+Sustained presses use hold start and release.
 
-The Sunroom mute configuration uses:
+The choice affects gesture interpretation rather than the underlying Roku protocol.
+
+### 12.4 Ordinary fallback
+
+A compatible HTTP action without specialized hold support receives one ordinary command.
+
+The firmware does not invent repeat behavior for an arbitrary configured HTTP endpoint.
+
+### 12.5 Preserved gesture context
+
+A physical hold retains its original:
+
+- Room.
+- Action.
+- Typed device.
+- Command object.
+- Adapter selection.
+- Gesture timing.
+
+Changing rooms while holding a button must not redirect its release.
+
+A temporarily full queue does not justify discarding the original release context.
+
+### 12.6 Configuration-change reset
+
+A changed configuration save clears outstanding physical gestures and pending release bookkeeping.
+
+The dispatcher clears obsolete queued work.
+
+Adapter activation retires existing sessions.
+
+This prevents a pre-save gesture from restarting against obsolete configuration.
+
+### 12.7 Protocol execution
+
+The Roku adapter translates supported events into:
 
 ```text
-POST /keypress/VolumeMute
+POST /keydown/<key>
+POST /keyup/<key>
 ```
 
-for both ON and OFF paths.
+Physical-button hold state is separate from encoder-driven volume hold state.
 
-This works because the Roku command itself toggles mute.
+A maximum hold safety limit bounds continuous remote key activity.
 
-The Clonker's per-room toggle history still records which logical toggle direction was last successfully sent.
+Failed releases retain their state and use paced retry behavior.
 
-### 11.2 Why HTTP remains bounded and blocking
+Uncertain taps and keydowns are not automatically replayed.
 
-Earlier nonblocking TCP experiments on the tested CircuitPython platform encountered `OSError(119)` and lacked a usable `getsockopt(SO_ERROR)` inspection path.
+### 12.8 Regression evidence
 
-Bounded blocking HTTP was selected for predictable behavior and simplicity.
+The Chapter 12 typed physical regression suite passed 129 assertions.
 
-This does not prove that nonblocking outbound networking is impossible.
+Coverage included:
 
-Historical ordinary HTTP requests often took approximately 86–164 ms, with connection establishment contributing substantially.
+- Immediate tap behavior.
+- Hold promotion.
+- Release behavior.
+- Navigation and skip controls.
+- Room changes during holds.
+- Ordinary HTTP fallback.
+- Blank commands and endpoints.
+- Queue capacity handling.
+- Pending release ordering.
+- Configuration-change reset.
 
-A fresh HTTP connection for every volume detent made rapid physical rotation sluggish.
+Live Roku navigation tap and hold execution also passed.
 
-The specialized Denon and Roku volume adapters address this specific problem in different ways.
-
-Any synchronous outbound socket operation temporarily pauses the cooperative scheduler, including GPIO and management HTTP polling.
-
-The queue can buffer admitted actions. It cannot reconstruct electrical transitions that were never sampled.
-
----
-
-## 12. Equipment mapping and observed behavior
-
-The current development installation contains three configured rooms:
-
-- `room-1` — Den.
-- `room-2` — Sunroom.
-- `room-3` — Room 3, blank placeholder.
-
-Config v4 permits one to three rooms and three generic built-in destinations per room:
-
-- `device-1`
-- `device-2`
-- `device-3`
-
-Browser labels commonly read TV, AVR, and Streaming, but those labels do not enforce protocols.
-
-### 12.1 Development installation endpoints
-
-| Equipment | Installation-specific endpoint | Observation |
-|---|---|---|
-| Den AVR-X3700H | `192.168.50.44:8080` | Denon HTTP and persistent TCP volume |
-| Den Roku Ultra | `192.168.50.43:8060` | Roku ECP commands |
-| Sunroom AVR-X1800H | `192.168.50.40:8080` | Denon HTTP and earlier TCP volume |
-| Sunroom Roku Ultra | `192.168.50.28:8060` | Roku ECP navigation, volume, and mute |
-
-These addresses are records of the development installation, not defaults or configuration requirements.
-
-### 12.2 Current mixed-volume configuration
-
-| Room | Volume action configuration | Selected adapter |
-|---|---|---|
-| Den | Denon HTTP command signatures | `denon-tcp` |
-| Sunroom | Roku ECP VolumeUp/VolumeDown signatures | `roku-volume-hold` |
-
-The Sunroom Roku controls the Denon receiver's volume through the equipment's HDMI-CEC path.
-
-This demonstrates that adapter selection is based on configured command signatures rather than room identity.
-
-### 12.3 Physical Power Toggle
-
-GP2 Power Toggle successfully controlled Den and Sunroom ON/OFF through the selected room and shared queue.
-
-Independent per-room toggle direction histories were observed.
-
-Earlier Room 3 tests produced a safe no-op when the room was unconfigured.
-
-The current Room 3 is configured but contains blank commands, a different condition.
-
-These tests verified equipment behavior, not automatic equipment-state detection.
-
-### 12.4 Physical volume
-
-The Bourns PEC11R-4215F-S0024 encoder on GP8/GP9 generates generic volume actions through `physical.py`.
-
-The Den room uses persistent Denon TCP.
-
-The Sunroom uses Roku held-volume ECP.
-
-The encoder remains a relative control; its shaft position does not encode an absolute volume value.
-
-### 12.5 Physical push-to-mute
-
-The Bourns encoder's separate momentary pushbutton is wired to GND and GP10.
-
-The existing button driver maps `VOLUME_MUTE` to the generic `mute-toggle` fundamental action.
-
-Observed results:
-
-- Sunroom: Roku ECP `VolumeMute`, HTTP 200, receiver mute/unmute confirmed.
-- Den: Denon HTTP mute commands, HTTP 200, receiver mute/unmute confirmed.
-
-No separate mute execution system was required.
-
-### 12.6 Physical navigation and playback
-
-Chapter 7 added the navigation cluster, Back, Home, Select, and playback button integration.
-
-Six buttons use explicit Roku held-key behavior:
-
-- Up.
-- Down.
-- Left.
-- Right.
-- Skip Back.
-- Skip Forward.
-
-Their press and release events are delivered through the same action queue used by the existing physical and browser controls.
-
-### 12.7 Custom-action equipment test
-
-The Sunroom *Movie* action used:
-
-1. Roku `POST /keypress/Home`.
-2. A 3,000 ms wait after the first step completed.
-3. Denon `GET /goform/formiPhoneAppDirect.xml?MSQUICK1`.
-
-Both HTTP requests returned 200, and the queue logged custom completion.
-
-An independent volume command was also observed executing during the custom wait in earlier tests.
+The automated suite and live tests are complementary evidence.
 
 ---
 
-## 13. Clock, logging, and performance diagnostics
+## 13. Generic Outbound HTTP
 
-### 13.1 Clock
+**Module:** `clonker/net/http_transport.py`
 
-**Modules:** `clonker/system/clock.py` and `clonker/system/logger.py`.
+The generic HTTP transport provides bounded synchronous GET and POST requests.
 
-Before browser clock synchronization, firmware uses `DEFAULTTIME` and monotonic uptime rather than asserting an authoritative wall-clock date.
+### 13.1 Responsibilities
 
-The browser can submit UTC Unix time through `/api/clock`.
+It handles:
 
-Readable timestamps are calculated from that reference and subsequent monotonic elapsed time.
+- Ordinary Roku ECP commands.
+- Denon HTTP commands.
+- Existing Roku and Denon Custom Action steps.
+- Other compatible generic HTTP commands.
 
-Queue deadlines, custom waits, Denon pacing, and Roku hold timing use monotonic time.
+Each ordinary request uses a fresh TCP connection.
 
-Browser clock changes must not shift these deadlines.
+The transport reuses its SocketPool object.
+
+It does not reuse individual ordinary HTTP connections.
+
+### 13.2 Transport policy
+
+Generic HTTP remains intentionally small.
+
+It is not:
+
+- A general-purpose browser.
+- A TLS client.
+- A comprehensive HTTP library.
+- An authenticated session framework.
+- A concurrent execution engine.
+
+Current timeout and request-format constants remain defined in `http_transport.py`.
+
+Management HTTP timeout changes must not silently alter outbound transport behavior.
+
+### 13.3 Verified behavior
+
+Chapter 12 live tests exercised generic HTTP power, mute, Home, and Custom Action commands.
+
+Representative observed durations were approximately 110–150 ms.
+
+During the later management socket failure investigation:
+
+- Roku Home completed in approximately 141 ms.
+- The Sunroom Movie Custom Action completed its Roku command, cooperative three-second wait, and Denon command.
+
+These results support continued use of the existing outbound transport.
+
+### 13.4 Failure behavior
+
+Transport exceptions propagate to the dispatcher.
+
+Remaining pending work is canceled.
+
+Uncertain commands are not automatically repeated.
+
+A successful HTTP response is not independent confirmation of physical equipment state.
+
+---
+
+## 14. Development Equipment Configuration
+
+The development installation uses two operational rooms and an optional third test room.
+
+The following addresses describe the Chapter 12 development installation, not firmware defaults.
+
+| Room | Equipment | Endpoint |
+|---|---|---|
+| Den | Denon AVR | `192.168.50.44:8080` |
+| Den | Roku | `192.168.50.43:8060` |
+| Sunroom | Denon AVR | `192.168.50.40:8080` |
+| Sunroom | Roku | `192.168.50.28:8060` |
+
+### 14.1 Mixed volume control
+
+The Den volume encoder targets Denon.
+
+The Sunroom volume encoder targets Roku.
+
+The same physical encoder therefore exercises different transport mechanisms according to the selected room.
+
+No manufacturer-specific behavior is required in the encoder driver.
+
+### 14.2 Power and mute
+
+The development configuration uses Roku for equipment power commands.
+
+Mute mappings are room-specific.
+
+The Den targets Denon mute.
+
+The Sunroom targets Roku mute.
+
+Toggle histories remain independent by room and action.
+
+### 14.3 Custom Actions
+
+The development configuration includes named actions such as:
+
+- Movie.
+- Music.
+- Vinyl.
+- Audio Cycle.
+
+The available list varies by room.
+
+The verified Sunroom Movie sequence performs:
+
+1. Roku Home.
+2. A cooperative 3000 ms wait.
+3. Denon Quick Select 1.
+
+This sequence uses the same Dumb Queue™ as ordinary physical commands.
+
+### 14.4 Room 3
+
+Room 3 has been used as a blank configuration placeholder and management persistence test room.
+
+Blank device endpoints are valid.
+
+Changing the test room name during persistence experiments does not require executing equipment commands.
+
+The browser supports removing and recreating room slots without renumbering existing rooms.
+
+---
+
+## 15. Clock and Timing
+
+**Modules:**
+
+```text
+clonker/system/clock.py
+clonker/system/logger.py
+```
+
+### 15.1 UTC reference
+
+Before browser synchronization, the firmware uses `DEFAULTTIME` and monotonic uptime rather than asserting an authoritative wall-clock date.
+
+The browser can provide UTC Unix time through:
+
+```text
+POST /api/clock?utc=...
+```
+
+Readable timestamps are calculated using that reference and subsequent monotonic elapsed time.
 
 Automated NTP synchronization is not established by the current verified baseline.
 
-### 13.2 Logging
+### 15.2 Monotonic timing
 
-Serial logging records action admission, execution, failures, room changes, and operating-mode transitions.
+Scheduling and elapsed-time measurements use monotonic time.
 
-### Flight recorder — Chapter 10
+This includes:
 
-**Module:** `clonker/system/flight_recorder.py`.
+- Queue eligibility.
+- Custom Action waits.
+- Denon pacing.
+- Roku hold deadlines.
+- Release retry timing.
+- Management connection deadlines.
+- Performance measurement.
+- Memory-monitor intervals.
+- Software sleep inactivity.
 
-The flight recorder retains the most recent 64 logger messages in a bounded RAM ring buffer. Older messages are overwritten as new messages arrive.
+Changing the UTC reference must not shift these deadlines.
 
-Diagnostic providers are registered during application startup and evaluated only when a snapshot is requested:
+Human-readable timestamps and scheduling time are separate concerns.
 
-- `performance` — accumulated PERF statistics.
-- `memory` — heap and memory-monitor statistics.
-- `run_exit_memory` — heap checkpoint captured immediately before a RUN → CONFIG transition.
-- `queue` — pending action queue state.
-- `physical` — button events and dispatch counters.
+### 15.3 Timebase discipline
 
-**RUN → CONFIG memory checkpoint — Chapter 11:**
+Chapter 9 unified application timing around monotonic measurements.
 
-Before CONFIG services start, the memory monitor records uptime,
-free heap, and allocated heap without forcing garbage collection.
-The latest checkpoint is retained in RAM and included in the next
-flight-recorder snapshot as `run_exit_memory`.
+Diagnostic comparisons should use a consistent elapsed-time reference.
 
-This distinguishes memory measured during normal RUN operation
-from memory measured later during CONFIG mode and snapshot capture.
-Differences may reflect garbage collection and temporary allocations,
-not necessarily memory leaks.
+Wall-clock synchronization must not introduce discontinuities into protocol state machines or queue scheduling.
 
-**Verified:** Flight Recorder #7 captured the RUN-exit checkpoint
-at 39 seconds (214,656 bytes free) and the regular memory snapshot
-at 46 seconds (250,960 bytes free).
+---
 
-A completed secret manual-reboot handshake requests a synchronous, streaming snapshot before `microcontroller.reset()`.
+## 16. Logging and Performance Diagnostics
 
-Snapshots are stored on the Pico under `/clonker/`:
+### 16.1 Serial logging
 
-| File | Purpose |
-|---|---|
-| `flight_recorder.txt` | Most recent completed snapshot |
-| `flight_recorder.txt.1` | Previous snapshot |
-| `flight_recorder.txt.2` | Two snapshots ago |
-| `flight_recorder.txt.3` | Three snapshots ago |
-| `flight_recorder.tmp` | Temporary file used during writing |
+Serial diagnostics record:
 
-The writer captures diagnostics and recent log messages, streams them into a human-readable text file, and rotates completed snapshots. Rotation is not fully atomic across power loss.
+- Startup.
+- Configured rooms.
+- Operating-mode transitions.
+- Physical actions.
+- Queue admission.
+- Execution results.
+- Adapter failures.
+- Configuration save timing.
+- Memory observations.
+- Management connection diagnostics.
 
-**Filesystem ownership:** GP17 must select DEVICE mode at cold boot for successful writes. In SERVICE mode, the filesystem is normally read-only to the application. Snapshot failures are caught and recorded in RAM; they do not prevent a deliberate reboot.
+Logs should expose useful context without revealing private credentials or unnecessarily dumping protocol payloads.
 
-**Current persistence policy:** Snapshots are written only during the secret manual-reboot handshake. There are no periodic snapshots, background writes, or filesystem operations in ordinary button dispatch.
+### 16.2 Shared PERF infrastructure
 
-The synchronous write can pause application execution for several hundred milliseconds. Earlier test writes measured approximately 225–484 ms. This is acceptable during deliberate reboot but requires further evaluation before enabling scheduled snapshots.
+**Module:** `clonker/system/perf.py`
 
-#### HTTP snapshot retrieval — Chapter 11
+The reusable performance helper supports:
 
-In CONFIG mode, the management HTTP server provides read-only
-access to the latest completed flight-recorder snapshot and its
-three rotated backups.
-
-| Request | Snapshot |
-|---|---|
-| `GET /api/flight-recorder` | Latest completed snapshot |
-| `GET /api/flight-recorder?backup=1` | Previous snapshot |
-| `GET /api/flight-recorder?backup=2` | Two snapshots ago |
-| `GET /api/flight-recorder?backup=3` | Three snapshots ago |
-
-Responses use `text/plain` with a download filename matching
-the selected snapshot. The existing cooperative HTTP server
-streams the file in bounded chunks rather than loading it
-entirely into RAM.
-
-Invalid backup parameters return HTTP 400. Missing snapshots
-return HTTP 404.
-
-Retrieval never creates, rotates, clears, or modifies snapshots.
-The endpoint is available only while the CONFIG HTTP listener
-is running. It requires no USB connection or filesystem
-ownership change.
-
-The CONFIG server is intended for a trusted local network.
-These endpoints have no independent authentication and should
-not be exposed to the public internet.
-
-The original single-snapshot endpoint was verified on hardware
-on November 19, 2026: an approximately 8 KB HTTP response
-completed in about 398 ms without reported send errors.
-Backup selection requires separate verification.
-
-**Verified:** Read-only write failure handling, DEVICE-mode writes, four-generation rotation, diagnostic-provider capture, and manual-reboot persistence.
-
-**Limitations:** The recorder retains only the most recent 64 messages. A manual-reboot snapshot captures the state at reboot time, not necessarily the state when an earlier malfunction began. An unexpected power loss does not automatically trigger a snapshot.
-
-Keep routine logging modest. Continuous diagnostics can distort timing and browser responsiveness.
-
-### 13.3 Shared PERF infrastructure
-
-**Module:** `clonker/system/perf.py`.
-
-Chapter 7 introduced a reusable performance measurement helper supporting:
-
-- Registration of named measurements.
+- Named measurements.
 - Start/stop timing.
 - Direct elapsed-time recording.
-- Accumulated statistics and snapshots.
-- Resetting measurements between reporting intervals.
+- Accumulated statistics.
+- Snapshot generation.
+- Reporting interval resets.
 
-The main scheduler registers and collects measurements for physical polling, queue activity, adapter activity, management HTTP, OLED polling, and overall loop execution.
-
-The current scheduler-level diagnostic configuration in `main.py` includes:
+The established scheduler-level diagnostic settings include:
 
 ```python
 PERF_ENABLED = True
@@ -1401,17 +1507,13 @@ PERF_INTERVAL_NS = 30_000_000_000
 GC_TEST_ENABLED = False
 ```
 
-PERF reports are generated approximately every 30 seconds.
+PERF reports are generated approximately every 30 seconds when enabled.
 
-The reports include physical polling-gap statistics, execution-duration measurements, and contextual information such as memory availability and OLED refresh activity.
+### 16.3 Physical internal instrumentation
 
-The instrumentation is operational and intended for continued targeted extension.
+The physical coordinator supports focused internal diagnostics.
 
-### 13.4 Physical internal diagnostics
-
-`controls/physical.py` provides optional internal instrumentation.
-
-The current baseline is:
+The established normal baseline is:
 
 ```python
 PHYSICAL_PERF_ENABLED = False
@@ -1423,819 +1525,780 @@ PERF_DISPATCH = False
 PERF_HOLD = False
 ```
 
-The master flag controls whether internal physical instrumentation is active. Individual flags allow more focused measurements.
+Disabling internal physical instrumentation does not disable scheduler-level timing of physical polling.
 
-Disabling internal physical instrumentation does not disable scheduler-level timing of `physical.poll()`.
+Enable only the measurements needed for a specific investigation.
 
-Use focused measurements rather than enabling every diagnostic indiscriminately.
+### 16.4 Interpreting measurements
 
-### 13.5 Interpreting performance measurements
+Distinguish:
 
-Three distinct concepts must not be conflated:
+1. Physical polling gap.
+2. Physical polling execution duration.
+3. Network execution duration.
+4. Adapter maintenance duration.
+5. Management HTTP duration.
+6. Configuration persistence duration.
 
-1. **Physical polling gap:** Time between opportunities to poll physical controls.
-2. **Physical execution duration:** Time spent executing `physical.poll()`.
-3. **Network execution duration:** Time consumed by a blocking transport or adapter operation.
+A blocking network operation can delay the next physical poll without increasing the measured execution duration of the physical poll itself.
 
-A long network request can delay the next physical poll without necessarily increasing the measured execution duration of `physical.poll()` itself.
+Chapter 8 traced physical execution spikes to repeated configuration validation.
 
-Chapter 7 observed occasional physical execution spikes around 40–50 ms during sustained volume activity. Chapter 8 traced these spikes to repeated configuration validation inside the physical dispatch wrapper, before the `physical.dispatch` timer started.
+Replacing that validation with lightweight configuration access substantially reduced physical execution overhead.
 
-Replacing that validation with the lightweight `device_config.has_room()` check reduced observed maximum physical execution to approximately 8 ms, with no polls exceeding 20 ms in the verification test.
+Blocking network operations remain a separate source of scheduler gaps.
 
-Blocking Roku HTTP operations can still produce substantially longer cooperative scheduler gaps. These are separate from the resolved physical execution problem.
+### 16.5 Memory measurements
 
-### 13.6 Garbage-collection experiment
+Free heap and allocated heap are useful observations.
 
-An explicit garbage-collection diagnostic was tested during Chapter 7.
+They do not independently establish the size of the largest available contiguous allocation.
 
-`main.py` retains the optional `GC_TEST_ENABLED` switch, currently disabled.
+Temporary allocation growth between garbage collections is not necessarily a memory leak.
 
-The experiment did not conclusively explain the physical execution spikes.
+Compare equivalent lifecycle checkpoints when evaluating memory trends.
 
-Do not repeat it without identifying what additional evidence a new experiment would provide.
+The Chapter 12 repeated-save experiment demonstrated the value of deliberate collection boundaries and reduced temporary allocation.
 
-See [Development History](DEVELOPMENT_HISTORY.md) for the recorded investigation.
+### 16.6 Production versus experimental diagnostics
+
+Retain useful production diagnostics.
+
+Remove temporary high-volume instrumentation after an investigation concludes.
+
+Chapter 12 retained:
+
+- `CONFIG PERF` timing.
+- Management connection diagnostics.
+- Memory monitoring.
+- Flight Recorder capture.
+
+Temporary `SAVE MEM` checkpoints were removed after successful post-cleanup regression testing.
 
 ---
 
-## 14. Verification record and evidence limits
+## 17. Flight Recorder
 
-### October 21 — outbound HTTP and queue
+**Module:** `clonker/system/flight_recorder.py`
 
-Chapter 3 tests demonstrated Roku GET/POST, Denon HTTP volume, bounded unreachable-endpoint failures, and post-failure recovery without resetting the socket pool.
+The Flight Recorder retains recent diagnostic information for deliberate capture before reboot.
 
-Two reliability runs recorded 24/24 successful reachable requests, two expected unreachable failures, and two successful recoveries.
+### 17.1 RAM history
 
-A five-command burst drained sequentially with HTTP 200 responses and reported times of 117.2, 125.0, 85.9, 85.9, and 85.9 ms.
+The recorder retains the most recent 64 logger messages in a bounded ring buffer.
 
-These were HTTP-era measurements, not specialized adapter performance numbers.
+Older messages are overwritten.
 
-### October 27 — custom actions and toggles
+Diagnostic providers are registered during application startup and evaluated when a snapshot is requested.
 
-The Sunroom Roku Home → 3-second wait → Denon Quick Select 1 sequence completed.
+Established providers include:
 
-An independent Sunroom Volume Up command ran during the wait.
+- Performance statistics.
+- Memory statistics.
+- RUN-exit memory checkpoint.
+- Queue state.
+- Physical event and dispatch counters.
 
-Power and mute histories alternated configured ON/OFF paths.
+Adapter diagnostics can provide additional transport context.
 
-Changed saves reset histories; missing paths and failures did not advance them.
+### 17.2 RUN-exit memory checkpoint
 
-Observed equipment behavior and HTTP acknowledgment were recorded separately.
+Before CONFIG services start, the firmware records a memory checkpoint associated with the RUN → CONFIG transition.
 
-### October 28–29 — modes and inbound pacing
+This captures:
 
-GP2 press/release events, GP17 filesystem mode, and GP18 live CONFIG/RUN changes were exercised.
+- Uptime.
+- Free heap.
+- Allocated heap.
 
-Changing inbound web polling from 10 ms to 1 ms substantially improved Chrome/Safari CONFIG loading.
+The checkpoint does not force garbage collection.
 
-The physical polling system remained enabled during successful browser tests.
+It is retained in RAM for inclusion in the next Flight Recorder snapshot.
 
-### October 31–November 2 — room selector and Power Toggle
+This distinguishes memory observed during normal RUN operation from memory observed later during CONFIG operation and snapshot capture.
 
-The three-position selector first passed a standalone electrical test and was later integrated on GP3/GP6/GP7, preserving GP4/GP5 for I²C.
+Earlier verification recorded:
 
-Den and Sunroom Power Toggle ON/OFF passed.
+- RUN-exit checkpoint at 39 seconds: 214656 bytes free.
+- Regular snapshot at 46 seconds: 250960 bytes free.
 
-At that time, Room 3 was unconfigured and rejected before queue admission.
+The difference did not independently establish a leak.
 
-### November 3 — Denon TCP and mixed queue
+### 17.3 Deliberate snapshot capture
 
-The Denon TCP test exercised ten volume commands over a persistent connection, reporting approximately 606 ms overall and multiple pacing waits.
+A completed secret manual-reboot handshake requests a synchronous diagnostic snapshot before reboot.
 
-Queue regression cases covered:
+The writer streams a human-readable text file.
 
-- Mixed TCP/HTTP ordering.
-- Pacing preservation.
-- Future-dated tasks.
-- Custom-action waits with interleaved volume.
-- Queue cancellation after simulated HTTP failure.
+Completed snapshots are rotated.
 
-The physical Bourns encoder was exercised at slow, moderate, and aggressive rotation rates against the receiver.
+### 17.4 Snapshot files
 
-### November 3 — Roku held-volume
-
-The Sunroom configuration was changed to use Roku ECP volume commands.
-
-Adapter inspection confirmed Den `denon-tcp` and Sunroom `roku-hold` (subsequently renamed `roku-volume-hold`).
-
-Observed physical tests:
-
-| Test | Observation |
+| File | Purpose |
 |---|---|
-| Single clockwise detent | Receiver increased 0.5 dB |
-| Five steady clockwise detents | -35.0 dB to -33.5 dB |
-| Direction reversal | Commands executed in both directions |
-| Fast clockwise rotation | One keydown followed by local extensions |
-| Fast counterclockwise rotation | One keydown followed by local extensions |
-| Approximately three seconds clockwise | Smooth, steady volume increase |
-| Stop after rotation | Very slight overshoot; volume stopped |
-| Transient socket error recovery | Subsequent VolumeDown worked |
-| Later fast/sustained testing | No additional visible errors |
+| `/clonker/flight_recorder.txt` | Latest completed snapshot |
+| `/clonker/flight_recorder.txt.1` | Previous snapshot |
+| `/clonker/flight_recorder.txt.2` | Older snapshot |
+| `/clonker/flight_recorder.txt.3` | Oldest retained snapshot |
+| `/clonker/flight_recorder.tmp` | Temporary write |
 
-Fast and sustained tests were performed in RUN mode.
+Rotation is not fully atomic across power loss.
 
-The receiver's volume bar lagged physical movement slightly but was considered acceptably responsive.
+### 17.5 Filesystem ownership
 
-A later keydown during sustained rotation was consistent with the two-second maximum-hold restart.
+Successful snapshot writes require Pico-owned filesystem writes.
 
-These tests establish practical functionality, not exhaustive timing guarantees.
+In SERVICE mode, the application normally cannot write these files.
 
-### November 3 — physical push-to-mute
+Snapshot failures are caught and do not prevent a deliberate reboot.
 
-GP10 was assigned to the Bourns encoder pushbutton.
+### 17.6 Persistence policy
 
-The existing `VOLUME_MUTE` physical mapping dispatched `mute-toggle`.
+Snapshots are written during the deliberate manual-reboot procedure.
 
-Physical mute and unmute passed in both rooms:
+There are no periodic Flight Recorder flash writes in ordinary physical button dispatch.
 
-- Sunroom through Roku ECP.
-- Den through Denon HTTP.
+Earlier snapshot writes took approximately 225–484 ms.
 
-The logs showed successful command execution and independent per-room toggle histories.
+This synchronous work is acceptable during deliberate reboot.
 
-### November 4–7 — Chapter 7 physical integration
+Scheduled or frequent snapshots would require separate evaluation.
 
-Chapter 7 expanded the GPIO subsystem to include the navigation cluster, playback buttons, and second Bourns encoder wiring.
+### 17.7 HTTP retrieval
 
-The physical mapping table associates button identities with the existing fundamental action vocabulary.
+In CONFIG mode, the existing management server provides read-only retrieval:
 
-The six navigation/skip buttons gained explicit press/release handling.
+```text
+GET /api/flight-recorder
+GET /api/flight-recorder?backup=1
+GET /api/flight-recorder?backup=2
+GET /api/flight-recorder?backup=3
+```
 
-The Roku adapter gained physical-button hold operations, separate from encoder-driven volume holds.
+Responses use plain text and an appropriate download filename.
 
-Physical tests exercised all six held buttons.
+Files are streamed in bounded chunks.
 
-A defective Skip Back tactile switch was replaced during hardware verification.
+Invalid backup parameters return HTTP 400.
 
-### November 4–7 — browser responsiveness
+Missing snapshots return HTTP 404.
 
-Additional Config Mode tests examined scheduler competition, diagnostics, and HTTP responsiveness.
+Retrieval does not create, rotate, clear, or modify snapshots.
 
-After adjustments, Safari and Chrome were both observed loading the Config page and Test Remote responsively.
+The original latest-snapshot endpoint was verified on November 19 with an approximately 8 KB response completing in about 398 ms.
 
-This supports the current practical behavior, not a guarantee under all network conditions.
+Backup selection was implemented; exhaustive retrieval testing of every rotated generation remains a separate verification item.
 
-### November 7 — Room 3 configuration
+### 17.8 Limitations
 
-The development configuration was extended to include `room-3` with blank device addresses and command paths.
+The recorder captures the state at snapshot time.
 
-The physical selector initially failed to log Room 3 selection.
+It does not necessarily preserve the state at the beginning of an earlier malfunction.
 
-Inspection identified a GP7 wire that had pulled out of the Cowbell terminal.
+The 64-message ring buffer can overwrite earlier evidence.
 
-Reseating the wire restored selector operation.
+Unexpected power loss does not automatically trigger a snapshot.
 
-The problem was physical connectivity, not the selector's software mapping.
-
-### November 7–8 — Custom-action encoder and OLED integration
-
-The second Bourns encoder was integrated into the physical coordinator.
-
-Rotation cycles through the currently selected room's ordered custom actions, wrapping around the available entries. Pressing the encoder executes the selected action through the existing dispatcher.
-
-Room changes reset the selection. Empty custom-action lists are handled without attempting execution.
-
-The OLED integration introduced `display/oled.py`, implementing a 128×64 SH1106 display over I²C on GP4/GP5.
-
-The display uses deferred text requests, rate-limited polling, partial updates, and idle display-off. The custom-action selector displays the selected action name or `No customs`.
-
-The initial encoder and OLED implementations are operational. Further user-interface integration remains planned.
-
-### November 8 — Shared performance instrumentation
-
-Performance measurement was consolidated into `system/perf.py`, replacing much of the earlier ad hoc timing bookkeeping.
-
-Scheduler-level measurements now cover physical polling gaps, physical execution, queue execution, adapter execution, management HTTP activity, OLED polling, and main-loop execution.
-
-Optional internal measurements in `controls/physical.py` support more focused investigations.
-
-During Chapter 7, sustained volume testing revealed occasional 40–50 ms physical execution spikes. Blocking Roku operations also produced longer scheduler gaps, but these represent different timing measurements.
-
-Chapter 8 traced the physical execution spikes to repeated configuration validation in the room-availability check. `device_config.current()` reconstructed a validated configuration copy for every physical action, outside the existing `physical.dispatch` timing boundary.
-
-The fix introduced `device_config.has_room()`, which checks the already-validated in-memory configuration without copying or revalidating it. Subsequent testing reduced maximum physical execution from approximately 48 ms to 8 ms, with no physical polls exceeding 20 ms during the observed test interval.
-
-The original investigations, unsuccessful experiments, resolution, and performance-debugging lessons are preserved in [Development History](DEVELOPMENT_HISTORY.md).
-
-### November 15–16 — CONFIG HTTP: The 10-Second Socket Send Stall
-
-Repeated Safari configuration saves and reloads intermittently froze the management HTTP server and physical/OLED responsiveness for approximately 10 seconds. Flight-recorder and HTTP diagnostics isolated the pause to `firmware/clonker/net/web.py`, specifically `count = _client.send(chunk)` (line 622 at investigation time). The measured call duration repeatedly reached approximately **10,005 ms**, even though the accepted client socket had been configured with `settimeout(0)`.
-
-The stall occurred on both large GET responses and a small POST success response. Configuration persistence could complete successfully before Safari reported failure. No consistent memory exhaustion, zero-byte send, or `EAGAIN` explanation was established.
-
-A standalone reproducer, `firmware/tests/socket_send_stall.py`, exercised POST/GET traffic, including flash writes and backup rotation, without reproducing the production stall. Reducing HTTP chunks from 512 to 128 bytes, slowing web polling, and temporarily disabling adapter polling did not eliminate it. SERVICE/DEVICE boot mode, battery versus USB power, and an attached serial console did not establish a reliable trigger.
-
-**Status: unresolved, currently intermittent/not reproducing.** Repeated subsequent configuration saves succeeded, including battery-only operation. Do not mistake the disappearance of symptoms for a proven fix. If it returns, start with the timed `_client.send(chunk)` call and the existing standalone test rather than reopening the entire scheduler or persistence investigation.
-
-#### November 22 — Reproduction and browser recovery
-
-Chapter 11 reproduced the CONFIG HTTP stall during battery-only operation, with no USB or charging cable attached. Flight Recorder diagnostics showed repeated partial configuration GET responses followed by approximately 10,005 ms spent inside a single socket `send()` call. The failure occurred after a successful configuration save.
-
-The browser editor now uses a 6-second configuration GET watchdog, up to three attempts, and a 1.5-second delay between attempts. It reports failure rather than remaining indefinitely in a loading state. A deliberately shortened 100 ms timeout verified the retry exhaustion and failure UI; the normal 6-second timeout was restored afterward.
-
-The watchdog does not interrupt a blocked Pico socket operation and did not recover the observed production failure. Configuration POST is not automatically repeated. The underlying issue remains unresolved and is suspected, but not confirmed, to involve CircuitPython 10.3.1 socket behavior.
-
-Battery-only operation appears correlated with more frequent reproduction, but a power-related cause has not been established. Reevaluate using the existing diagnostics when a suitable stable CircuitPython release becomes available.
-
-#### OLED confirmation of successful configuration persistence
-
-Chapter 10 added an independent OLED acknowledgment for
-successful configuration changes.
-
-In `firmware/clonker/net/web.py`, immediately after
-`device_config.save()` returns successfully:
-
-- A changed configuration displays `CONFIG` / `SAVED!`.
-- An unchanged configuration produces no notification.
-- A rejected or failed save produces no success notification.
-
-The notification uses `oled.show_text()`, which queues the
-display update without performing I2C communication in the
-HTTP request handler.
-
-This confirmation is independent of whether Safari receives
-the HTTP response or successfully reloads the configuration.
-
-It establishes that the configuration engine reported
-successful persistence, not that the HTTP transaction
-completed successfully.
-
-The existing OLED idle timeout clears the notification.
-
-### November 14–15 — Chapter 10: Operation Catch the Gremlin
-
-An intermittent failure appeared during extended operation in the
-Den. After aggressive volume-encoder activity, ordinary physical
-buttons could stop producing both equipment commands and OLED
-feedback. Other controls, including the custom-action encoder and
-room selector, could remain responsive.
-
-The symptoms initially suggested a physical-input or scheduler
-problem. A manually triggered flight recorder was introduced to
-capture recent logs, memory, queue, performance, and physical-input
-state without continuous filesystem writes.
-
-#### Isolating the memory loss
-
-Full-application diagnostics showed free memory falling dramatically
-during repeated Denon volume commands, at times approaching 25 KB.
-
-A standalone regression test,
-`firmware/tests/test_denon_memory.py`, reproduced the behavior
-without the physical controls or application scheduler.
-
-The test repeatedly sent `MVUP` and `MVDOWN` over the persistent
-Denon TCP connection.
-
-Observed behavior included:
-
-- Large reductions in free heap, sometimes in approximately
-  57 KB increments.
-- Little corresponding increase in GC-managed allocations.
-- Immediate memory recovery when the Denon socket was closed.
-
-These observations implicated resources associated with the
-persistent socket rather than ordinary retained Python objects.
-
-The precise internal allocation mechanism within CircuitPython
-was not independently established.
-
-#### Testing the hypothesis
-
-A second standalone test,
-`firmware/tests/test_denon_memory_drain.py`, consumed incoming
-TCP data using nonblocking `recv_into()` calls.
-
-Across three test cycles, it consumed 2,569 incoming bytes in
-354 reads while maintaining a stable heap. The final free-memory
-measurement matched the initial baseline of 359,872 bytes.
-
-This provided strong evidence that unread Denon responses were
-responsible for the observed memory loss.
-
-#### Production correction
-
-The Denon adapter gained bounded, nonblocking receive draining
-through `poll_rx()`.
-
-Initial testing showed that draining immediately after a command
-was not enough, because responses could arrive after that call.
-
-The correction was integrated into the existing
-`device_adapters.poll()` maintenance path, ensuring that incoming
-data is consumed during normal scheduler operation.
-
-The standalone tests subsequently completed without reproducing
-the original progressive memory collapse.
-
-#### Full-application verification
-
-Aggressive bench testing exercised Denon volume, Roku navigation,
-Home, Back, and custom actions.
-
-Free memory remained near 301–306 KB over the observed interval,
-rather than collapsing toward the earlier low-memory condition.
-
-Denon command timing remained approximately 2–3 ms, preserving
-the performance advantage of persistent TCP.
-
-Initial battery-powered use in the Den also showed normal volume,
-navigation, and Select behavior without noticeable performance
-degradation.
-
-The correction is considered provisionally successful. Extended
-real-world operation remains useful for establishing confidence.
-
-#### Engineering lessons
-
-- Persistent TCP connections require receive-side maintenance
-  even when the application only intends to send commands.
-- Socket-associated memory pressure may not resemble an ordinary
-  Python-object memory leak.
-- Closing a socket can be an important diagnostic experiment.
-- A small standalone test can isolate a network problem from
-  an otherwise complicated physical-control application.
-- Existing adapter maintenance hooks should be reused rather
-  than introducing a second scheduler or execution path.
-
-The flight recorder remains available for future investigations.
-The standalone tests remain under `firmware/tests/`, alongside
-other hardware and firmware experiments.
+Continuous excessive logging can reduce the useful historical window and distort application timing.
 
 ---
 
-## 15. Operational limitations and next investigations
+## 18. Software Sleep and Wake
 
-### Physical controls
+**Module:** `clonker/system/sleep_manager.py`
 
-The Chapter 7 physical assembly is complete: controls are mounted, soldered, wired, secured, strain-relieved, and connected through the Pico Cowbell Terminal board.
+The current power-management mechanism is software sleep.
 
-Power Toggle, room selection, volume, mute, navigation, playback, and both Bourns rotary encoders are integrated.
+It is not hardware light sleep or deep sleep.
 
-The custom-action encoder supports room-specific selection, OLED display of the selected action, and push-to-run execution. Its initial implementation is largely complete.
+The CPU continues running to monitor physical wake inputs.
 
-All six Roku physical-button holds have been exercised on real equipment.
+### 18.1 Sleep eligibility
 
-The SH1106 OLED has completed initial application integration. Additional status and feedback uses remain future work.
+Sleep requires:
 
-PERF instrumentation is operational and continues to be extended for targeted investigations.
+- Sleep policy enabled.
+- CONFIG mode inactive.
+- Inactivity timeout elapsed.
+- No pending queued actions.
 
-Audible feedback remains future development. Chapter 9 established rechargeable battery operation and software-managed sleep/wake. Permanent battery installation, charging validation, extended endurance testing, and hardware deep sleep remain future work.
+CONFIG mode inhibits sleep.
 
-### Chapter 9 — Software sleep, Wi-Fi shutdown, and wake recovery
+Physical activity resets inactivity timing.
 
-**Implementation:** `firmware/clonker/system/sleep_manager.py`,
-coordinated by `firmware/clonker/main.py`.
+### 18.2 Sleep entry
 
-Chapter 9 introduced application-level inactivity sleep for the
-Raspberry Pi Pico 2 W running CircuitPython 10.3.1.
+The established sleep sequence:
 
-The implementation does not use hardware light sleep or deep sleep.
-The CPU continues running, with a reduced scheduler polling rate.
+1. Display `Going Zzzz!`.
+2. Close the OLED and release its I²C resources.
+3. Disable the Wi-Fi radio.
+4. Enter software sleep state.
 
-#### Inactivity and eligibility
+Shutdown failures use recovery reboot rather than intentionally remaining partially shut down.
 
-The sleep manager uses `time.monotonic_ns()` to track elapsed time
-since the last recognized physical activity.
+### 18.3 Asleep scheduling
 
-Sleep is permitted only when:
-
-- `SLEEP_ENABLED` is true.
-- CONFIG mode is inactive.
-- The inactivity timeout has expired.
-- The shared action queue has no pending work.
-
-CONFIG mode inhibits sleep and restarts the inactivity timer.
-
-#### Shutdown sequence
-
-When real sleep begins:
-
-1. The OLED displays `Going Zzzz!` for approximately 1.5 seconds.
-2. `oled.close()` switches off the display and releases its I²C bus.
-3. `wifi.radio.enabled = False` disables the wireless radio.
-4. The sleep manager enters its ASLEEP state.
-
-If the shutdown sequence raises an exception, the firmware attempts
-a recovery reboot.
-
-Dry-run mode simulates the state transition without shutting down
-hardware or rebooting.
-
-#### Scheduler behavior
-
-While sleeping:
+While asleep:
 
 - Physical GPIO polling continues.
-- Action-queue execution is suspended.
-- Device-adapter maintenance is suspended.
-- CONFIG management listener startup is suppressed.
+- Action execution is suspended.
+- Adapter maintenance is suspended.
+- Management HTTP cannot start.
 - OLED polling is suspended.
-- Periodic memory-monitor polling is suspended.
-- The main-loop delay increases from 1 ms to 25 ms.
+- Memory-monitor polling is suspended.
+- Main-loop delay increases to 25 ms.
 
-The longer delay reduces application activity while preserving
-physical pushbutton wake detection.
+Very short wake-button presses may be missed.
 
-Normal awake-mode scheduler timing is unchanged.
+### 18.4 Wake behavior
 
-#### Wake and network recovery
+Wake-eligible inputs include supported momentary button presses and a physical CONFIG/RUN switch transition.
 
-Momentary pushbutton presses and CONFIG-switch transitions are
-wake-eligible.
+Encoder rotation and room-selector movement do not wake the Clonker.
 
-Encoder rotation and room-selector movement are ignored while
-sleeping.
+The wake-triggering input is consumed rather than dispatched as an equipment command.
 
-The first wake-eligible input is consumed and must not transmit an
-equipment command.
+Real wake calls `microcontroller.reset()`.
 
-In real sleep mode, the firmware calls `microcontroller.reset()`.
+Normal application initialization restores networking and services.
 
-The normal startup sequence then restores Wi-Fi connectivity,
-initializes application modules, and resumes the appropriate
-CONFIG or RUN operating mode.
+Dry-run sleep restores simulated awake state without rebooting.
 
-This deliberately avoids attempting partial Wi-Fi and socket
-reinitialization within the sleeping application.
+### 18.5 Runtime override
 
-#### Electrical observations
+The physical coordinator recognizes the room-selector sequence:
 
-USB-side measurements at approximately 5 V:
+```text
+1 -> 2 -> 1 -> 2 -> 1 -> 2
+```
 
-| State | Approximate current |
+The sequence must occur within ten seconds while the physical CONFIG switch is enabled.
+
+The sleep manager toggles its volatile enabled state.
+
+OLED confirmation reports:
+
+```text
+SLEEP ON
+SLEEP OFF
+```
+
+A reboot restores the configured startup default.
+
+### 18.6 Earlier power measurements
+
+Approximate USB-side measurements at 5 V:
+
+| Condition | Current |
 |---|---:|
 | Awake RUN | 38 mA |
 | Initial software sleep | 25 mA |
 | Optimized software sleep | 24 mA |
 
-The observed reduction from awake RUN to optimized software sleep
-was approximately 37%.
+These measurements do not include all battery conversion losses or power-module consumption.
 
-These figures do not include the battery module's conversion losses
-or its own electrical consumption.
+Battery-powered sleep and wake have been demonstrated.
 
-The DFRobot DFR0969 dual-18650 module successfully powered the
-application during software sleep and wake testing.
+Earlier overnight testing covered approximately twelve hours.
 
-An approximately 12-hour overnight battery-powered endurance
-test completed successfully on November 14, 2026.
-
-After the test, a physical pushbutton woke Clonker, triggering
-the expected microcontroller reboot and normal startup.
-
-This verified extended overnight wake responsiveness, but not
-maximum battery runtime or full-discharge behavior.
-
-The current production-oriented inactivity timeout is
-600 seconds (10 minutes), replacing the initial 60-second
-development setting.
-
-The sleep manager also supports a volatile runtime enable/disable
-toggle through `toggle_enabled()`. The physical-control coordinator
-invokes it after recognizing the CONFIG-gated secret room-selector
-handshake. Reboot restores the developer-configured startup default.
-
-#### Chapter 10 — Awake-mode battery endurance
-
-On November 15–16, the assembled Clonker completed
-approximately six hours of battery-only operation with
-software sleep disabled and CONFIG mode OFF.
-
-All four DFRobot battery indicators remained solid,
-and the Custom Action encoder responded immediately.
-
-This confirms overnight awake-mode operation and
-responsiveness, but does not establish maximum battery
-runtime or superior energy efficiency.
-
-Software sleep remains available and has demonstrated
-lower Pico USB current consumption. However, the DFRobot
-DFR0969's minimum-load behavior and light-load efficiency
-have not been characterized.
-
-Sleep is temporarily disabled for further RUN-mode
-endurance testing. This is a runtime setting, not a
-removal of the sleep implementation.
-
-For battery hardware details and the unresolved DFRobot
-hypothesis, see [Hardware Design](HARDWARE_DESIGN.md).
-
-#### Limitations
-
-- Software sleep does not stop the CPU.
-- Wake detection depends on continued cooperative GPIO polling.
-- Very short button presses are not guaranteed to be captured.
-- Wi-Fi recovery depends on successful application reboot and startup.
-- The battery module's HOLD behavior and illuminated indicators
-  may affect practical battery runtime.
-- Hardware deep sleep remains a separate future investigation.
-
-See [Architecture](ARCHITECTURE.md) for ownership boundaries and
-[Development History](DEVELOPMENT_HISTORY.md) for experimental
-results.
-
-### Denon TCP
-
-The adapter maintains one persistent TCP connection to the receiver
-for low-latency volume commands. Commands are paced, and uncertain
-transmissions are not automatically retried.
-
-#### Incoming status and socket maintenance — Chapter 10
-
-The Denon receiver sends status information back over the persistent
-connection. These incoming messages must be consumed even when the
-application does not need to interpret them.
-
-During Chapter 10, unread incoming data was found to accumulate in
-the socket's receive buffers, progressively reducing available heap
-memory during sustained volume activity.
-
-`devices/denon.py` now provides `poll_rx()`:
-
-- Uses a reusable 256-byte receive buffer.
-- Performs nonblocking `recv_into()` operations.
-- Limits each invocation to eight reads.
-- Discards incoming status messages without parsing them.
-- Closes the connection on unexpected socket errors.
-
-The existing `device_adapters.poll()` maintenance hook invokes
-`denon.poll_rx()` alongside `roku.poll()`. The main cooperative
-scheduler already calls this hook during normal awake operation.
-
-`send_volume()` also invokes `poll_rx()` after sending a command.
-However, testing demonstrated that immediate post-send draining
-alone was insufficient: receiver responses can arrive later.
-Regular adapter polling is therefore essential.
-
-The design preserves the persistent connection and avoids the
-connection overhead of opening a new socket for each volume command.
-
-No Denon status parser or equipment-state synchronization is
-implemented. Incoming status is intentionally discarded for now.
-
-#### Transport diagnostics — Chapter 11
-
-The Denon adapter maintains lightweight, RAM-only transport
-statistics, available through `transport_snapshot()`.
-
-The snapshot includes:
-
-- Connection state, connected host, and connection age.
-- Connection creation, reuse, and closure counts.
-- Successful and failed sends.
-- Connection and receive failures.
-- Received byte counts and recent transport timing.
-- Last recorded transport error.
-
-These diagnostics help distinguish command failures from
-connection-management problems and incoming status traffic.
-
-Snapshots perform no network or filesystem I/O. They are
-captured by the flight recorder for later inspection.
-
-The connection remains open while healthy. Periodic receive
-draining continues to prevent unread status data from
-accumulating in socket buffers.
-
-### Roku persistent HTTP — November 18–20, 2026
-
-The Roku adapter supports short-lived HTTP/1.1 connection reuse
-for selected Roku ECP commands, including physical navigation
-taps and held-button keydown/keyup operations.
-
-The shared Dumb Queue™ still owns command ordering and execution.
-Protocol-specific connection management remains in
-`devices/roku.py`.
-
-#### Connection policy
-
-- Open a new TCP connection when no reusable connection exists.
-- Reuse the connection for subsequent commands to the same endpoint.
-- Allow reuse only when the previous request completed within
-  the last 1 second, measured using `time.monotonic_ns()`.
-- Close a stale connection before sending another request.
-- Close the connection when the endpoint changes.
-- Close and discard the connection on transport or response errors.
-- Do not automatically replay commands after uncertain failures.
-
-The transport uses HTTP/1.1 keep-alive, bounded socket timeouts,
-and explicit response parsing.
-
-The one-second threshold is a conservative client-side policy,
-not a guaranteed Roku server timeout.
-
-`roku.poll()` also performs cooperative idle-socket cleanup.
-Expired connections are closed without waiting for another
-command. This avoids retaining an unused socket indefinitely.
-
-#### Physical navigation
-
-Six physical buttons support tap/hold classification:
-
-- Up, Down, Left, Right
-- Skip Back, Skip Forward
-
-The physical coordinator uses a 250 ms threshold.
-
-A short tap sends an ordinary `/keypress/` command through the
-shared action queue.
-
-A sustained press uses Roku `/keydown/` and `/keyup/` operations.
-Both paths can use persistent HTTP, but transport selection
-does not change the held-button state machine.
-
-Held-button safeguards remain independent:
-
-- Keydown/keyup sequencing and release-state tracking.
-- Paced keyup retries after uncertain release failures.
-- Maximum-hold protection.
-- Prevention of new keydowns while release is unresolved.
-
-#### Transport diagnostics — Chapter 11
-
-`transport_snapshot()` exposes lightweight, RAM-only statistics
-including new connections, reused connections, successful and
-failed requests, idle closures, and the most recent error.
-
-The snapshot also reports connection state and reuse-window
-information. It performs no network or filesystem I/O.
-
-Flight-recorder snapshots capture these diagnostics for
-post-test analysis.
-
-#### Verified performance
-
-Sunroom Roku testing demonstrated:
-
-| Operation | Approximate duration |
-|---|---:|
-| First command, new TCP connection | 135–146 ms |
-| Subsequent command, reused connection | 34–43 ms |
-
-Rapid physical navigation produced repeated HTTP 200 responses,
-successful connection reuse, and substantially improved perceived
-responsiveness.
-
-A separate press-and-hold regression test confirmed successful
-keydown and keyup operations.
-
-These results demonstrate a substantial reduction in repeated
-command latency. They do not establish guaranteed timing under
-all network conditions.
-
-#### Architectural outcome
-
-No general-purpose connection pool, command batching mechanism,
-or action-queue redesign was required.
-
-Roku-specific optimization remains in the Roku adapter. Generic
-HTTP continues to use its existing transport behavior, and
-Denon retains its separate persistent TCP implementation.
-
-PERF instrumentation remains available for future diagnostics
-and can be disabled during ordinary operation.
-
-### Roku held-volume
-
-The adapter is time-based rather than detent-count-based.
-
-Behavior depends on HTTP responsiveness, Roku repeat behavior, and potentially HDMI-CEC.
-
-Slight display lag and volume overshoot have been observed.
-
-One transient `OSError(119)` occurred during early reversal testing. Later tests recovered and completed without additional visible errors.
-
-The maximum-hold release sequence was inferred from behavior and logs rather than independently traced.
-
-### Roku physical-button holds
-
-The six recognized Roku hold paths require valid endpoints, POST methods, and recognized ECP paths.
-
-The 30-second safety limit reduces the risk of an indefinitely held physical key.
-
-Network failures can still prevent guaranteed key release.
-
-### Generic HTTP
-
-The transport is bounded but synchronous, with a fresh TCP connection per request.
-
-It does not implement TLS, application authentication, or full response-body parsing.
-
-### Input capture
-
-The 1 ms physical poll target helps responsiveness, but blocking network operations can still hide encoder transitions.
-
-### Queue
-
-One execution failure cancels remaining queued work.
-
-There is no general retry or rollback mechanism.
-
-### Room 3
-
-The third selector position and configured Room 3 placeholder are operational.
-
-Ordinary blank fundamental commands produce no-ops.
-
-The explicit physical hold path still needs blank-command protection to avoid execution errors when Room 3 is selected.
-
-No fallback to another room should occur.
-
-### Equipment state
-
-Power/mute histories track successfully transmitted commands, not equipment reality.
-
-### Management
-
-The CONFIG interface is single-client and trusted-LAN-only.
-
-It has no application-level authentication.
-
-### Configuration
-
-Validated writes and backups reduce risk but cannot guarantee recovery from every power loss.
-
-### Future protocols
-
-#### LG webOS — experimental adapter
-
-Chapter 11 laboratory experiments established the feasibility
-of controlling LG webOS televisions directly from CircuitPython
-using two WebSocket connections:
-
-- A registered SSAP control socket for request/response commands.
-- A separate pointer input socket for navigation and button commands.
-
-Successful experiments covered pairing, reusable client keys,
-audio control, application launching, navigation, persistent
-connections, inactivity-based cleanup, nonblocking reception,
-and multiple outstanding SSAP requests.
-
-The laboratory scripts are retained in
-[`firmware/tests/`](../firmware/tests/) as `test_lg_webos_*.py`.
-
-The experimental design is consolidated in
-[`lg_webos.py`](../firmware/clonker/devices/lg_webos.py),
-including pairing helpers, transport management, response
-correlation, temporary development credentials, and diagnostics.
-
-This adapter is intentionally not connected to production
-device routing. Its combined implementation still requires
-hardware verification.
-
-The planned configuration redesign directly supports future
-integration of this adapter through explicit device typing,
-protocol-independent configuration, and device-specific
-configuration attributes.
-
-The draft adapter should be reviewed when designing the new
-configuration schema and adapter interfaces.
-
-Existing Roku, Denon, and generic HTTP behavior must be
-regression-tested under the redesigned configuration before
-LG webOS production integration begins.
-
-#### Apple TV
-
-Apple TV discovery, pairing, authenticated sessions, and
-commands are not implemented.
-
-### Further investigations
-
-Useful future tests include:
-
-- Distinguish delays occurring inside `physical.poll()` from cooperative scheduler gaps caused by blocking network operations.
-- Extend targeted PERF measurements only when they can answer a specific diagnostic question.
-- Stale Denon TCP connections after AVR restart.
-- Switching receivers during bursts.
-- Network interruption during Roku keydown or keyup.
-- Physical-button release after room changes and failures.
-- Blank-command safety for physical held buttons in Room 3.
-- Roku held-volume under simultaneous CONFIG-mode browser activity.
-- High-rate encoder capture during other HTTP operations.
-- Queue pressure and malformed responses.
-- Long-uptime operation and repeated reconnects.
-- Additional OLED feedback integration and display-performance testing.
-
-Future physical features should reuse the existing encoder/button drivers, physical coordinator, adapter selection, and shared queue.
-
-Do not introduce speculative protocol modules or a second action execution path merely because it is possible.
-
-**The Dumb Queue™ buffers traffic. It does not repeal the laws of TCP.**
+Full-discharge endurance and hardware-assisted sleep remain separate investigations.
 
 ---
 
-## 16. Related documents
+## 19. The Intermittent Ten-Second Socket Gremlin
 
-- [Architecture](ARCHITECTURE.md) — component boundaries and system invariants.
-- [Configuration & Recovery](CONFIGURATION.md) — Config v4 schema, revisions, persistence, recovery.
-- [Operating Modes](OPERATING_MODES.md) — GP17/GP18 procedures.
-- [Hardware Design](HARDWARE_DESIGN.md) — components, GPIO, mechanical integration.
-- [Development & Deployment](DEVELOPMENT.md) — iPad-first workflow and tests.
-- [Development History](DEVELOPMENT_HISTORY.md) — chronological experiments and evidence.
-- [Configuration Recipes](../recipes/) — curated, complete Config v4 examples and the GitHub-hosted recipe browser; not deployed to the Pico.
+**Status: OPEN**
+
+This issue predates Config v5 and remains unresolved after Chapter 12.
+
+It must be distinguished from the configuration-save allocation failures that were substantially improved through save-pipeline optimization.
+
+### 19.1 Observed behavior
+
+Individual management socket sends occasionally take approximately ten seconds to return despite intended nonblocking operation.
+
+Symptoms include:
+
+- Partial HTML responses.
+- Partial JSON responses.
+- Browser timeouts.
+- Uncertain save outcomes.
+- Repeated failures across new client connections.
+- Successful byte counts returned after unusually long send calls.
+
+The duration is remarkably consistent, often close to 10005 ms.
+
+This is suggestive of an internal timeout mechanism but does not identify the responsible implementation layer.
+
+### 19.2 Earlier investigation
+
+November 15–16 experiments investigated:
+
+- Management chunk size.
+- Web polling frequency.
+- Adapter polling interaction.
+- Filesystem ownership.
+- Battery versus USB power.
+- Attached serial console.
+- Flash writes and backup rotation.
+
+No reliable trigger was established.
+
+The standalone `socket_send_stall.py` experiment did not reproduce the production failure.
+
+### 19.3 Chapter 12 production observations
+
+The failure occurred during ordinary GET requests as well as configuration saves.
+
+Representative observations with 128-byte send chunks included:
+
+- Configuration responses stalling after approximately 1664 transmitted bytes.
+- HTML responses stalling after approximately 1662 or 2046 transmitted bytes.
+- Individual send durations around 10005 ms.
+- No corresponding EAGAIN events.
+
+Small clock responses sometimes continued working.
+
+Both Safari and Chrome experienced failures.
+
+Stopping and restarting the management listener did not reliably clear the condition.
+
+### 19.4 Standalone socket pacing laboratory
+
+**Test:**
+
+```text
+firmware/tests/socket_send_pacing.py
+```
+
+The laboratory uses a separate HTTP listener on port 9091.
+
+It allows adjustment of:
+
+- Response body size.
+- Send chunk size.
+- Send delay.
+- Connection cooldown.
+- Repeated request count.
+
+The laboratory is independent of the production configuration editor and does not perform configuration flash writes.
+
+### 19.5 Laboratory results
+
+| Body size | Chunk | Delay | Requests | Result |
+|---|---:|---:|---:|---|
+| 8700 bytes | 128 | 0 ms | 20 | 20/20 |
+| 37500 bytes | 128 | 0 ms | 20 | 20/20 |
+| 37500 bytes | 128 | 5 ms | 20 | 20/20 |
+| 37500 bytes | 128 | 0 ms | 40, two browsers | 40/40 |
+
+One concurrent-client test produced 384 EAGAIN events during a successful response.
+
+The response completed in approximately 882 ms without a slow-send event.
+
+This demonstrates successful handling of substantial nonblocking backpressure within the laboratory.
+
+It does not establish that the laboratory reproduces every relevant production condition.
+
+The server still processes one active client at a time.
+
+Across the explicitly counted batches, 100 requests succeeded.
+
+The production ten-second stall was not reproduced.
+
+### 19.6 Management chunk-size change
+
+Production management send chunks were increased from 128 to 512 bytes.
+
+Ordinary page delivery became more efficient.
+
+The original intermittent stall nevertheless returned.
+
+Chunk size alone is therefore not a demonstrated solution.
+
+No artificial send delays or connection cooldowns were introduced into the production management server.
+
+### 19.7 Distinguishing the two failures
+
+Following the configuration-save memory improvements, twenty consecutive changed saves succeeded.
+
+After normal physical operation and a CONFIG → RUN → CONFIG transition, Save Test 28 encountered another management HTTP failure.
+
+The serial log established:
+
+- Configuration validation succeeded.
+- Disk consistency checks succeeded.
+- Persistence succeeded.
+- Installed file verification succeeded.
+- Configuration activation succeeded.
+- Physical and queue resets succeeded.
+
+The subsequent HTTP acknowledgment stalled.
+
+A single send of only 188 bytes took approximately 10004 ms.
+
+This establishes that a large response is not necessary for the failure to occur.
+
+### 19.8 Persistent failure state
+
+Subsequent requests showed:
+
+| Request | Expected bytes | Sent bytes | Longest send |
+|---|---:|---:|---:|
+| POST `/api/config` | 188 | 188 | 10004.2 ms |
+| GET `/` | 37578 | 638 | 10004.7 ms |
+| GET `/api/config` | 8773 | 1024 | 10004.2 ms |
+| GET `/api/config` | 8773 | 1024 | 10004.3 ms |
+
+The failure persisted across multiple management client connections.
+
+No configuration allocation failure accompanied this incident.
+
+### 19.9 Outbound operation during investigation
+
+Browser tabs were closed.
+
+Without rebooting or changing operating modes, physical controls were exercised.
+
+Observed successful operations included:
+
+- Generic HTTP Roku Home.
+- Persistent Roku navigation taps.
+- Roku volume holds.
+- Denon persistent TCP volume.
+- Sunroom Movie Custom Action.
+
+Representative measurements:
+
+| Operation | Observed duration |
+|---|---:|
+| Roku Home | 141.3 ms |
+| New Roku navigation connection | 140.5 ms |
+| Reused navigation connection | 35.8–44.4 ms |
+| Roku volume keydown | 113–114 ms |
+| Local volume extension | 0.7 ms |
+| Initial Denon connection | 203.8 ms |
+| Subsequent Denon volume | 2.6–2.8 ms |
+
+The physical controls remained responsive during these tests.
+
+This establishes healthy outbound operation between failed management requests.
+
+It does not establish physical responsiveness during an individual ten-second blocking send.
+
+### 19.10 Recovery without reboot
+
+Following the physical-control tests, management HTTP recovered.
+
+Successful responses included:
+
+| Request | Bytes | Total duration |
+|---|---:|---:|
+| GET `/` | 37578 | 575.1 ms |
+| GET `/api/clock` | 180 | 32.2 ms |
+| GET `/api/config` | 8773 | 406.5 ms |
+| GET `/api/config` | 8773 | 420.0 ms |
+
+No slow sends or EAGAIN events were reported in these successful responses.
+
+The recovered configuration confirmed that Save Test 28 had persisted.
+
+Save Test 29 subsequently succeeded.
+
+No reboot, explicit listener restart, or manual REPL garbage collection was required.
+
+### 19.11 What remains unknown
+
+The recovery mechanism was not isolated.
+
+Possible contributors include:
+
+- Expiration of TCP connection state.
+- Closing browser tabs.
+- Elapsed time without management requests.
+- Outbound socket activity.
+- Production socket lifecycle behavior.
+- CircuitPython or underlying networking-stack behavior.
+
+None has been established as the root cause.
+
+The experiments do not prove a CircuitPython, CYW43, or lwIP defect.
+
+### 19.12 Next recurrence procedure
+
+If the failure returns:
+
+1. Preserve serial diagnostics.
+2. Avoid immediately repeating an uncertain configuration POST.
+3. Close Clonker browser tabs.
+4. Leave CONFIG mode unchanged.
+5. Avoid physical equipment commands for two minutes.
+6. Attempt one direct GET of `/api/config`.
+7. Record whether recovery occurred.
+
+This proposed passive-recovery experiment separates elapsed time and browser disconnection from outbound equipment activity.
+
+If passive recovery fails, repeat the previously successful outbound-control experiment.
+
+Do not introduce speculative networking changes until the evidence justifies them.
+
+### 19.13 Engineering conclusion
+
+The observed configuration allocation failures and intermittent socket stalls are distinguishable failure mechanisms.
+
+A shared underlying contributor has not been ruled out.
+
+The optimized persistence pipeline should remain intact.
+
+Working outbound transport policies should remain intact.
+
+The socket pacing laboratory and useful production connection diagnostics should be preserved.
+
+**The Monster has two gremlins. One has been substantially addressed. The other remains under investigation.**
+
+---
+
+## 20. Future LG webOS Networking
+
+**Experimental module:**
+
+```text
+clonker/devices/lg_webos.py
+```
+
+The draft adapter remains outside operational dispatch.
+
+Config v5 was designed in direct support of its eventual integration.
+
+### 20.1 Configuration foundation
+
+The current schema supports:
+
+- Explicit `lg-webos` device type.
+- Endpoint.
+- Client key.
+- SSAP URI.
+- Optional JSON payload.
+- Pointer button command.
+
+The browser provides corresponding editing fields.
+
+The pairing control remains disabled.
+
+### 20.2 Experimental responsibilities
+
+The draft adapter explores:
+
+- WebSocket communication.
+- Pairing.
+- Client-key registration.
+- Authenticated control sessions.
+- Pointer sessions.
+- Bounded response tracking.
+- Cooperative response processing.
+- Session cleanup.
+
+These are experimental mechanisms, not established production behavior.
+
+### 20.3 Integration requirements
+
+Future operational integration must define:
+
+- Session readiness.
+- Credential handling.
+- Command completion semantics.
+- Response deadlines.
+- Asynchronous error propagation.
+- Configuration-change session retirement.
+- Custom Action timing.
+- Pairing lifecycle.
+
+A transmitted command is not necessarily acknowledged.
+
+An acknowledged command does not establish actual television state.
+
+### 20.4 Shared execution requirement
+
+The LG adapter must integrate with the existing dispatcher and Dumb Queue™.
+
+Protocol response metadata may belong to the adapter.
+
+It must not become a second independent command execution queue.
+
+Uncertain commands must not be automatically replayed.
+
+### 20.5 Memory discipline
+
+LG introduces additional JSON processing and authenticated session state.
+
+The Chapter 12 lessons concerning temporary allocations and redundant validation apply directly.
+
+Avoid reconstructing trusted configuration in the runtime command path.
+
+Bound protocol buffers and pending response metadata.
+
+Protect credentials from logs and public configuration recipes.
+
+### 20.6 Future Apple TV and Fire TV
+
+Apple TV and Fire TV remain reserved future device types.
+
+Authenticated or encrypted protocol requirements should first be investigated using standalone experiments.
+
+Do not import a large desktop protocol framework into the Pico without establishing its resource requirements.
+
+---
+
+## 21. Regression Tests and Verification
+
+Standalone experiments and regression tests live in:
+
+```text
+firmware/tests/
+```
+
+They are deployed to:
+
+```text
+/tests/
+```
+
+on the Pico.
+
+A typical test is launched from the CircuitPython REPL:
+
+```python
+exec(open("/tests/test_filename.py").read())
+```
+
+The directory includes application regression tests and independent hardware, protocol, and CircuitPython experiments.
+
+Not every test should be run against an active production application.
+
+Persistence tests may require Pico-owned filesystem writes.
+
+### 21.1 Chapter 12 automated suites
+
+| Test | Initial result |
+|---|---:|
+| `test_config_validation.py` | 49/49 |
+| `test_config_persistence.py` | 56/56 |
+| `test_typed_adapters.py` | 56/56 |
+| `test_config_activation.py` | 54/54 |
+| `test_typed_queue.py` | 92/92 |
+| `test_typed_physical.py` | 129/129 |
+| **Total** | **436/436** |
+
+These are implementation-stage results.
+
+They do not establish that every suite was rerun after the subsequent persistence optimization.
+
+### 21.2 Live Chapter 12 regression
+
+Live equipment testing exercised:
+
+- Generic HTTP.
+- Denon persistent TCP volume.
+- Roku persistent taps.
+- Roku explicit button holds.
+- Roku encoder-driven volume holds.
+- Room selection.
+- Independent mute histories.
+- Custom Actions.
+- Configuration editor operations.
+- Repeated configuration saves.
+- Management mode transitions.
+
+The five operational execution paths remained functional in the observed tests.
+
+### 21.3 Browser editor verification
+
+Browser tests exercised:
+
+- Registry-driven device selectors.
+- Disabled future device types.
+- LG configuration-only fields.
+- Protocol-aware command editing.
+- Independent toggle commands.
+- Custom Action creation and renaming.
+- Stable Custom Action identifiers.
+- Step ordering and delays.
+- Room removal and recreation.
+- Minimum room count.
+- Obsolete recipe rejection.
+- Valid Config v5 import.
+- Persistent changed saves.
+
+Configuration editing support does not establish operational LG command execution.
+
+### 21.4 Persistence endurance
+
+Twenty consecutive changed saves succeeded after the memory-management improvements.
+
+Five consecutive manual page refreshes also succeeded.
+
+A subsequent save completed internally but encountered the unresolved management socket stall.
+
+Management operation recovered without reboot.
+
+Three further changed saves succeeded after temporary memory diagnostics were removed.
+
+### 21.5 Remaining regression boundaries
+
+Further testing remains appropriate for:
+
+- Persistence and activation suites against the final optimized implementation.
+- Interrupted-write recovery scenarios.
+- Failures occurring after primary installation.
+- Long-duration battery operation.
+- Repeated management failure and recovery.
+- Exhaustive rotated Flight Recorder retrieval.
+- Future LG runtime integration.
+
+Record the scope of each completed test.
+
+Do not convert partial regression coverage into a claim of exhaustive reliability.
+
+---
+
+## 22. Operational Rules Worth Preserving
+
+- Keep management HTTP and outbound equipment transport policies independent.
+- Use one shared Dumb Queue™.
+- Preserve monotonic timing.
+- Validate configuration at trust boundaries.
+- Trust already validated configuration through controlled accessors.
+- Avoid unnecessary full configuration copies.
+- Verify persisted bytes without redundant reconstruction.
+- Retain intentional administrative garbage collection boundaries.
+- Preserve physical press/release ownership.
+- Do not redirect an unavailable room.
+- Do not automatically replay uncertain commands.
+- Distinguish successful persistence from successful acknowledgment.
+- Keep adapter maintenance independent of queue depth.
+- Keep credentials out of logs and public recipes.
+- Preserve useful standalone experiments.
+- Do not confuse temporary allocations with a proven memory leak.
+- Do not declare an unresolved socket defect fixed merely because it has temporarily recovered.
+
+**Clonker controls intent. Equipment owns state.**
+
+**One Monster. One Dumb Queue™.**
+
+---
+
+## 23. Related Documents
+
+- [Architecture](ARCHITECTURE.md)
+- [Configuration, Persistence & Recovery](CONFIGURATION.md)
+- [Configuration Redesign](CONFIGURATION_REDESIGN.md)
+- [Cooperative HTTP Server](COOPERATIVE_HTTP_SERVER.md)
+- [Operating Modes](OPERATING_MODES.md)
+- [Hardware Design](HARDWARE_DESIGN.md)
+- [Development & Deployment](DEVELOPMENT.md)
+- [Development History](DEVELOPMENT_HISTORY.md)
+- [Configuration Recipes](../recipes/)
 
 ---
 
