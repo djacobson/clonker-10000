@@ -64,6 +64,9 @@ _last_activity = 0
 # Bounded HTTP processing diagnostics.
 _stage = "IDLE"
 _expected_request_bytes = 0
+# Reusable receive storage for the single active HTTP client.
+_receive_buffer = bytearray(IO_CHUNK_BYTES)
+_receive_view = memoryview(_receive_buffer)
 
 # Optional static-file stream for the current response.
 _file = None
@@ -169,6 +172,10 @@ def _request_complete(request):
     additionally require one valid Content-Length and the entire body.
     """
     global _expected_request_bytes
+    # Once validated, reuse the expected request length
+    # while receiving the remaining POST body.
+    if _expected_request_bytes:
+        return len(request) >= _expected_request_bytes
     header_end = request.find(b"\r\n\r\n")
 
     if header_end < 0:
@@ -569,16 +576,18 @@ def poll():
             # Let main.py manage listener teardown and retry backoff.
             raise
 
-        try:
-            client.settimeout(0)
-
-        except OSError:
-            client.close()
-            return
-
+        # Register ownership immediately so low-memory recovery
+        # can close the socket even if initialization fails.
         _client = client
         _expected_request_bytes = 0
         _stage = "CLIENT_INITIALIZE"
+
+        try:
+            _client.settimeout(0)
+
+        except OSError:
+            _close_client("client_initialize_error")
+            return
         _request = bytearray()
         _response = None
         _file = None
@@ -625,10 +634,9 @@ def poll():
     # Read a bounded chunk, accumulating until the request is complete.
     if _response is None:
         _stage = "RECEIVE"
-        buf = bytearray(IO_CHUNK_BYTES)
 
         try:
-            count = _client.recv_into(buf)
+            count = _client.recv_into(_receive_buffer)
 
         except OSError as error:
             if not _socket_would_block(error):
@@ -644,7 +652,7 @@ def poll():
 
         _last_activity = now
         _stage = "REQUEST_EXTEND"
-        _request.extend(memoryview(buf)[:count])
+        _request.extend(_receive_view[:count])
 
         if len(_request) > MAX_REQUEST_BYTES:
             logger.warning("HTTP request exceeded size limit")
@@ -664,7 +672,8 @@ def poll():
             return
 
         _stage = "REQUEST_LINE"
-        first_line = bytes(_request).split(b"\r\n", 1)[0]
+        line_end = _request.find(b"\r\n")
+        first_line = bytes(_request[:line_end])
 
         http_trace("REQUEST: {}".format(first_line))
 
