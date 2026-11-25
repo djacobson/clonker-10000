@@ -4253,6 +4253,633 @@ application.
 
 **Less sleek. More CLONK.**
 
+### Chapter 12 — The Monster Gets Organized
+
+**November 24, 2026**
+
+The LG webOS experiments exposed an architectural limitation
+in the existing configuration model.
+
+Device identity was largely inferred from configured HTTP
+command patterns. That approach had served the Clonker well,
+but authenticated devices and additional command protocols
+deserved a more explicit foundation.
+
+Rather than force LG webOS into the existing configuration
+model, Chapter 12 reorganized the model first.
+
+The objective was not to reinvent the Clonker.
+
+It was to prepare the Monster for additional equipment
+without sacrificing the simplicity, responsiveness, and
+reliability of its existing controls.
+
+#### Clonker Config v5
+
+The configuration redesign introduced:
+
+- Explicitly typed device records.
+- A centralized device-type registry.
+- Protocol-aware command objects.
+- Independent ON and OFF command definitions.
+- Stable room, device, and Custom Action identifiers.
+- Device-specific configuration attributes.
+- Configuration support for future authenticated protocols.
+
+The familiar TV, AVR, and Streaming labels were retained
+as organizational roles rather than device-type restrictions.
+
+A television can control volume. A streaming device can
+control equipment power. The configuration determines
+the destination, not the physical control or its label.
+
+The active configuration engine became:
+
+`firmware/clonker/device_config.py`
+
+Schema versioning remains explicit in the configuration,
+but active Python module filenames no longer require
+version-number suffixes.
+
+The new device registry and adapter coordinator reside in:
+
+- `firmware/clonker/devices/device_types.py`
+- `firmware/clonker/devices/device_adapters.py`
+
+The registry describes device capabilities without importing
+operational protocol implementations or establishing network
+connections.
+
+Detailed design decisions are retained in
+[Configuration Redesign](CONFIGURATION_REDESIGN.md).
+
+*Apparently, even Monsters benefit from a little organization.*
+
+---
+
+### Chapter 12 — One Monster. Still One Dumb Queue™
+
+The configuration redesign was integrated incrementally.
+
+Existing Roku, Denon, and generic HTTP behavior was preserved
+while the dispatcher and physical coordinator transitioned
+to typed devices and protocol-aware commands.
+
+No second execution queue was introduced.
+
+#### Configuration activation
+
+A changed configuration save now coordinates:
+
+- Preparation of replacement adapter selections.
+- Verified configuration persistence.
+- Retirement of existing adapter sessions.
+- Publication of the new validated configuration.
+- Invalidation of obsolete physical hold gestures.
+- Cancellation of pending actions.
+- Reset of volatile toggle histories.
+
+An unchanged save preserves existing operational state.
+
+Physical hold events retain the validated device and command
+associated with their original press.
+
+Changing rooms while holding a button must not redirect
+its eventual release.
+
+#### Focused automated verification
+
+Six standalone regression suites were developed and
+executed on the Pico during implementation.
+
+| Test | Result |
+|---|---:|
+| `test_config_validation.py` | 49/49 |
+| `test_config_persistence.py` | 56/56 |
+| `test_typed_adapters.py` | 56/56 |
+| `test_config_activation.py` | 54/54 |
+| `test_typed_queue.py` | 92/92 |
+| `test_typed_physical.py` | 129/129 |
+| **Total** | **436/436** |
+
+These results describe the initial implementation-stage
+tests, not a complete rerun following every subsequent
+optimization.
+
+All six tests are retained in `firmware/tests/`.
+
+#### Live equipment regression
+
+The new configuration and adapter architecture was
+subsequently exercised on the actual Den and Sunroom
+equipment.
+
+All five operational execution paths were demonstrated:
+
+- Generic HTTP.
+- Denon persistent TCP volume.
+- Roku persistent button taps.
+- Roku explicit physical-button holds.
+- Roku encoder-driven volume holds.
+
+Representative execution measurements included:
+
+| Operation | Observed duration |
+|---|---:|
+| Generic HTTP Roku power | 144.2 ms |
+| Roku navigation, new connection | 140.8 ms |
+| Roku navigation, reused connection | 38–39 ms |
+| Roku hold start | 12.5 ms |
+| Roku volume hold extension | 0.7–0.8 ms |
+| Denon volume, initial connection | 103.8 ms |
+| Denon volume, reused connection | 2.7 ms |
+
+Room selection, independent mute histories, and Custom
+Actions were also exercised successfully.
+
+The Sunroom Movie Custom Action continued to execute
+its Roku command, cooperative three-second wait, and
+Denon Quick Select command.
+
+No corrective changes to the established outbound
+transport timing policies were required.
+
+**Status: PASS — typed configuration and operational
+adapter regression verified within the tested scope.**
+
+#### Engineering lesson
+
+An architectural redesign does not necessarily require
+reinventing the mechanisms that already work.
+
+**One Monster. One Dumb Queue™.**
+
+---
+
+### Chapter 12 — The Monster Gets a Makeover
+
+The embedded configuration editor received a substantial
+redesign to support Config v5.
+
+The editor now obtains device-type metadata directly
+from the firmware registry.
+
+It no longer independently defines the supported device
+architecture.
+
+#### Editor improvements
+
+- Registry-driven device-type selectors.
+- Compact device configuration rows.
+- Conditional device-specific attributes.
+- Protocol-aware command editors.
+- Independent ON and OFF command editing.
+- Automatically generated, read-only Custom Action IDs.
+- Ordered Custom Action steps with configurable delays.
+- Room creation and removal without renumbering.
+- Configuration recipe browsing and JSON import.
+- Revision-protected persistent saves.
+
+Changing a device type does not silently rewrite existing
+commands.
+
+Incompatible mappings remain visible and require deliberate
+correction before saving.
+
+#### Preparing for LG webOS
+
+LG webOS can now be configured using:
+
+- A typed device record.
+- An endpoint.
+- An editable client key.
+- SSAP command URIs.
+- Optional JSON payloads.
+- Pointer button commands.
+
+A conditional pairing button is present but disabled.
+
+Apple TV and Amazon Fire TV appear as unavailable future
+device types.
+
+The experimental LG adapter remains intentionally
+disconnected from operational dispatch.
+
+Configuration support is not a claim of runtime support.
+
+#### Recipe import
+
+The editor can load a Config v5 JSON recipe into its
+editable configuration model.
+
+Import does not immediately persist the configuration.
+
+The user can inspect and modify the imported recipe before
+explicitly saving it.
+
+Obsolete Config v4 recipes are rejected rather than
+silently migrated.
+
+Published recipes must exclude private authentication
+credentials.
+
+A placeholder such as:
+
+`PASTE_OR_PAIR_CLIENT_KEY_HERE`
+
+can preserve the intended configuration structure without
+publishing a real LG client key.
+
+The hosted recipe library requires corresponding Config v5
+updates.
+
+#### Verification
+
+Browser testing demonstrated device-type selection,
+protocol-aware editing, independent toggle definitions,
+Custom Action identity preservation, step reordering,
+room removal and recreation, minimum room enforcement,
+obsolete recipe rejection, and valid Config v5 import.
+
+Persistent browser saves were subsequently exercised
+during the configuration memory investigation.
+
+**Status: PASS — Config v5 editor behavior verified
+within the tested scope.**
+
+*The Monster is becoming suspiciously civilized.*
+
+---
+
+### Chapter 12 — The Monster Cleans Up After Itself
+
+Repeated configuration saves exposed another important
+memory-management problem.
+
+The earlier Chapter 8 investigation had demonstrated
+that repeatedly validating trusted configuration could
+severely degrade physical-control responsiveness.
+
+Chapter 12 encountered a related problem in the
+configuration persistence pipeline.
+
+#### The symptom
+
+After several successful configuration saves, another
+save failed during allocation-intensive processing.
+
+The failure occurred before the existing primary
+configuration had been loaded for comparison.
+
+The previous successfully persisted configuration
+remained intact.
+
+Temporary memory diagnostics were added to identify
+allocation pressure at individual save boundaries.
+
+#### The findings
+
+One subsequent save entered the pipeline with only
+32160 bytes of free heap.
+
+Explicit garbage collection increased available heap
+to 243808 bytes.
+
+A second collection, following incoming configuration
+validation and serialization, reclaimed another
+39456 bytes.
+
+The observations demonstrated substantial reclaimable
+temporary allocation.
+
+They did not establish a persistent memory leak in
+CircuitPython or its JSON library.
+
+#### The solution
+
+The save pipeline was reorganized to avoid redundant
+reconstruction of already validated configuration.
+
+The revised implementation:
+
+- Validates the proposed configuration once.
+- Serializes the validated configuration directly.
+- Loads and validates the existing primary for comparison.
+- Compares validated objects for consistency and changes.
+- Prepares replacement adapter selections.
+- Preserves verified temporary-file persistence.
+- Preserves backup rotation.
+- Verifies installed bytes using bounded comparisons.
+- Activates the replacement configuration.
+
+Two intentional garbage collection boundaries remain:
+
+1. At save entry.
+2. After incoming validation and serialization, before
+   loading the existing primary.
+
+Verification of already validated serialized bytes no
+longer requires another complete JSON reconstruction.
+
+The temporary and installed files are compared using
+bounded 512-byte reads.
+
+#### Repeated-save endurance
+
+Twenty consecutive changed browser saves succeeded
+without rebooting.
+
+The test used successive Room 3 names, beginning with
+Save Test 8 and ending with Save Test 27.
+
+Selected free-heap observations:
+
+| Checkpoint | Save 8 | Save 13 | Save 20 | Save 27 |
+|---|---:|---:|---:|---:|
+| After first GC | 243808 | 235072 | 236400 | 236416 |
+| After second GC | 230016 | 221280 | 222608 | 222624 |
+| After activation | 142048 | 133376 | 134752 | 134784 |
+
+After the initial variation, equivalent memory checkpoints
+remained comparatively stable.
+
+The experiment did not exhibit progressive heap depletion
+across the sampled saves.
+
+#### Production cleanup
+
+Temporary `SAVE MEM` instrumentation was removed.
+
+Both explicit garbage collection boundaries were retained,
+along with useful `CONFIG PERF` timing.
+
+Three additional changed saves were successfully completed
+after deploying the cleaned-up implementation.
+
+| Save | Configuration processing |
+|---|---:|
+| Save Test 30 | 1321.6 ms |
+| Save Test 31 | 1294.7 ms |
+| Save Test 32 | 1435.2 ms |
+
+All three saves completed without allocation failures
+or slow socket sends.
+
+Subsequent configuration GET requests completed in
+approximately 400 ms.
+
+#### Engineering lesson
+
+The Chapter 8 and Chapter 12 investigations established
+a recurring architectural principle:
+
+**Validate at trust boundaries, not repeatedly throughout
+the application.**
+
+Already validated data should not be reconstructed merely
+to inspect, serialize, compare, or verify it.
+
+Explicit garbage collection can be appropriate at
+allocation-intensive administrative boundaries.
+
+It should not be introduced indiscriminately into
+latency-sensitive physical-control paths.
+
+**Status: PASS — repeated-save allocation behavior
+substantially improved under the tested conditions.**
+
+Exhaustive interrupted-write testing and rerunning the
+earlier persistence suites against the final optimized
+implementation remain separate verification tasks.
+
+*Even a Monster needs to take out the garbage.*
+
+---
+
+### Chapter 12 — The Ten-Second Gremlin
+
+The intermittent management HTTP socket-send problem
+survived the configuration redesign and memory improvements.
+
+This problem is distinguishable from the configuration
+allocation failures described above.
+
+#### The recurring signature
+
+Individual socket sends occasionally required approximately
+ten seconds to return despite intended nonblocking operation.
+
+The failure occurred during ordinary configuration GET
+requests and static HTML delivery, as well as during
+configuration saves.
+
+Both Safari and Chrome exhibited the problem.
+
+Typical individual send durations were remarkably
+consistent, around 10004–10005 ms.
+
+Small clock responses sometimes continued working while
+larger responses failed.
+
+Stopping and restarting the management listener did not
+reliably clear the condition.
+
+#### The standalone pacing laboratory
+
+A new standalone experiment was developed:
+
+`firmware/tests/socket_send_pacing.py`
+
+The laboratory provides a separate HTTP listener on
+port 9091 and permits adjustment of response size,
+send chunk size, send pacing, connection cooldown,
+and repeated request count.
+
+The experiment does not use the production configuration
+editor or perform configuration flash writes.
+
+| Response body | Chunk | Delay | Result |
+|---|---:|---:|---:|
+| 8700 bytes | 128 | 0 ms | 20/20 |
+| 37500 bytes | 128 | 0 ms | 20/20 |
+| 37500 bytes | 128 | 5 ms | 20/20 |
+| 37500 bytes, two browsers | 128 | 0 ms | 40/40 |
+| **Total** | | | **100/100** |
+
+One response encountered 384 EAGAIN events and still
+completed successfully in approximately 882 ms.
+
+No ten-second send stall was reproduced.
+
+The experiment demonstrated that response size and
+concurrent browser demand alone were insufficient
+to reproduce the production failure.
+
+It did not establish equivalence between the laboratory
+and production networking environments.
+
+#### Production chunk-size adjustment
+
+Management send chunks were increased from 128 to
+512 bytes.
+
+This reduced the number of socket calls required for
+ordinary page delivery.
+
+The intermittent stall nevertheless returned.
+
+The outbound equipment transport settings were left
+unchanged.
+
+#### Save Test 28
+
+Following twenty successful changed saves and additional
+normal physical operation, another management HTTP
+failure occurred.
+
+The configuration processing log established that
+Save Test 28 had successfully completed validation,
+persistence, installed-file verification, and activation.
+
+The subsequent HTTP acknowledgment consisted of only
+188 bytes.
+
+Its socket send took approximately 10004 ms.
+
+The browser could not reliably determine the save outcome.
+
+Subsequent HTML and configuration GET requests also
+experienced ten-second stalls.
+
+This established two important facts:
+
+- A large response is not necessary to trigger the stall.
+- Successful configuration persistence does not guarantee
+  successful delivery of its HTTP acknowledgment.
+
+The configuration memory improvements remained effective
+during this incident.
+
+#### The Monster keeps CLONKing
+
+The browser tabs were closed and the physical controls
+were exercised without rebooting the Clonker.
+
+Successful operations included:
+
+- Generic HTTP Roku Home.
+- Persistent Roku navigation.
+- Roku volume holds.
+- Denon TCP volume.
+- The Sunroom Movie Custom Action.
+
+Outbound operation remained responsive between failed
+management requests.
+
+Physical responsiveness during an individual blocking
+socket call was not established.
+
+#### Unexpected recovery
+
+Management HTTP subsequently recovered without rebooting
+or explicitly restarting the listener.
+
+Successful configuration GET requests completed in
+approximately 406–420 ms.
+
+The recovered configuration confirmed that Save Test 28
+had persisted.
+
+Save Test 29 subsequently succeeded.
+
+The exact recovery mechanism was not isolated.
+
+Elapsed time, browser disconnection, outbound socket
+activity, and underlying connection-state expiration
+remain possible contributors.
+
+None has been established as the cause.
+
+#### Engineering conclusion
+
+The management socket stall remains an open investigation.
+
+The available evidence does not conclusively establish
+a CircuitPython, CYW43, or lwIP defect.
+
+The successful configuration memory improvements
+should remain intact.
+
+Working outbound transport policies should remain intact.
+
+The standalone pacing laboratory and production
+connection diagnostics should be preserved.
+
+Future investigations should isolate one meaningful
+variable at a time.
+
+An uncertain configuration POST must not be automatically
+replayed. Reload the active configuration and revision
+when management communication becomes available.
+
+Detailed measurements and a proposed next-recurrence
+procedure are retained in
+[Firmware, Network & Clock](FIRMWARE_NETWORK.md).
+
+**Status: OPEN — intermittent management socket-send
+stall remains unresolved.**
+
+*The Monster has apparently acquired a Gremlin.*
+
+---
+
+### Chapter 12 — Engineering Summary
+
+Chapter 12 established the Config v5 operational baseline
+without replacing the Clonker's fundamental execution model.
+
+| Workstream | Result |
+|---|---|
+| Typed configuration | Implemented |
+| Device registry | Implemented |
+| Protocol-aware commands | Implemented |
+| Adapter coordinator | Integrated |
+| Configuration activation | Verified |
+| Automated implementation tests | 436/436 |
+| Live operational adapter paths | 5/5 exercised |
+| Configuration editor | Verified |
+| Repeated changed saves | 20 consecutive successes |
+| Production cleanup regression | 3/3 changed saves |
+| Management socket stall | Open |
+| LG configuration support | Implemented |
+| LG runtime integration | Deferred |
+| LG pairing integration | Deferred |
+
+The principal architectural and engineering lessons were:
+
+- Explicit device identity is preferable to inferring
+  identity from command syntax.
+- New protocols should extend the existing execution
+  architecture rather than create parallel command queues.
+- Configuration activation must invalidate obsolete
+  routing and physical gesture state.
+- Validation belongs at trust boundaries.
+- Temporary allocation pressure is not proof of a leak.
+- Persistence and acknowledgment are separate events.
+- Management networking and outbound equipment networking
+  deserve independent transport policies.
+- An unresolved failure must not be declared fixed merely
+  because it has temporarily recovered.
+
+The LG webOS draft remains available for future integration.
+
+Its configuration foundation is now in place.
+
+The Monster is ready to learn another language without
+forgetting how to speak the ones it already knows.
+
+**Less sleek. More CLONK.**
+
 ---
 
 **THE CLONKER 10000**
