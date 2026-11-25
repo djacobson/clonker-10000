@@ -1482,7 +1482,8 @@ the planning stage rather than the current operational state.
 | Stable Custom Action identifiers | Implemented |
 | Optional room management | Implemented |
 | Config v5 recipe import | Verified |
-| Hosted recipe library update | Pending |
+| Hosted recipe library update | Published and verified end-to-end |
+| Test Remote configuration awareness | Implemented and live-tested |
 | Configuration persistence optimization | Verified |
 | LG SSAP and pointer configuration | Implemented |
 | LG client-key editing | Implemented |

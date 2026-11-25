@@ -4871,6 +4871,71 @@ The principal architectural and engineering lessons were:
 - An unresolved failure must not be declared fixed merely
   because it has temporarily recovered.
 
+### Chapter 12 — Final Browser and Recipe Regression
+
+The Test Remote received a small configuration-aware
+update before Chapter 12 closeout.
+
+The previously hardcoded room selector now uses the
+saved configuration returned by the existing
+`GET /api/config` request.
+
+- Room names reflect the saved configuration.
+- Rooms appear in physical selector order.
+- Missing rooms are omitted without renumbering.
+- Custom Actions remain associated with their room.
+- Execution controls remain disabled until configuration
+  loading succeeds.
+- Room switching is disabled during action submission.
+- Selected Custom Actions survive fundamental and
+  Custom Action submissions.
+
+No additional API endpoints, HTTP requests, Python
+modules, or execution paths were introduced.
+
+Live Safari testing confirmed room population, room-specific
+Custom Action lists, empty Custom Action handling,
+fundamental command execution, Custom Action execution,
+and selection retention.
+
+Renamed or removed rooms and configuration-fetch failure
+handling were reviewed in source but not separately
+exercised in the live Test Remote.
+
+#### Hosted recipe library
+
+The GitHub-hosted recipe library was updated to Config v5.
+
+The original Roku and Denon starter recipe was replaced
+with a human-readable export of the working configuration,
+preserving all three rooms, 42 fundamental actions,
+seven Custom Actions, device endpoints, stable identifiers,
+command definitions, and step delays.
+
+The recipe catalog, website instructions, and recipe
+documentation were updated accordingly.
+
+Two automatic GitHub Pages deployments failed during
+the final deployment step. A fresh manual workflow
+execution against `main` succeeded.
+
+No workflow changes were required. The original deployment
+failure cause was not established.
+
+End-to-end testing confirmed:
+
+- Updated Config v5 website and catalog.
+- Configuration JSON preview.
+- Recipe JSON download.
+- Import into the Clonker configuration editor.
+- Correct room, device, and Custom Action population.
+
+The recipe was imported for inspection without requiring
+a configuration save.
+
+The browser Test Remote and hosted recipe library are
+verified against the Chapter 12 Config v5 baseline.
+
 The LG webOS draft remains available for future integration.
 
 Its configuration foundation is now in place.

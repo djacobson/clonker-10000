@@ -480,6 +480,27 @@ Existing Roku and Denon HTTP Custom Action steps retain single-command generic H
 
 The physical Custom Action encoder selects an action and runs it when pressed. The browser Test Remote uses the same dispatcher.
 
+The Test Remote populates its room selector and Custom Action
+lists from the saved configuration using `GET /api/config`.
+
+Rooms appear in physical selector order using their configured
+names. Missing rooms are omitted without renumbering.
+
+The Test Remote does not use unsaved configuration editor
+changes. Refresh the Test Remote after saving a changed
+configuration.
+
+Execution controls remain disabled until configuration loading
+succeeds and while an action submission is in progress.
+
+Fundamental and Custom Action submissions preserve the selected
+Custom Action. Changing rooms repopulates the Custom Action
+selector for the newly selected room.
+
+The Test Remote submits only room and action identifiers.
+Device resolution, protocol selection, command execution,
+and queue management remain firmware responsibilities.
+
 The Sunroom Movie action has been verified with:
 
 1. Roku Home.
