@@ -1,9 +1,9 @@
 # The Clonker 10000 — System Architecture
 
-**Updated:** November 24, 2026  
+**Updated:** November 25, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Repository:** [djacobson/clonker-10000](https://github.com/djacobson/clonker-10000)  
-**Current baseline:** Chapter 12 — The Monster Gets Organized  
+**Current baseline:** Chapter 13 — The Monster Learns Another Language  
 **Configuration:** Clonker Config v5
 
 > **Clonker controls intent, not reality. Controlled devices own their own state.**
@@ -83,16 +83,16 @@ For a standalone discussion of cooperative HTTP server design, bounded memory us
                  devices/device_adapters.py
                  Selection / Cache / Execute
                              |
-               +-------------+-------------+
-               |             |             |
-               v             v             v
-           Denon TCP      Roku ECP     Generic HTTP
-           Persistent     Tap / Hold    GET / POST
-           Port 23        Volume Hold
-               |             |             |
-               v             v             v
-           Denon AVR        Roku       Configured
-                                        Equipment
+       +----------+----------+----------+----------+
+       |          |          |          |          |
+       v          v          v          v          v
+   Denon TCP   Roku ECP   Generic    LG webOS    Wake-on-LAN
+   Persistent  Tap/Hold   HTTP       SSAP/Pointer UDP magic
+   Port 23     Volume     GET/POST   WebSockets   packet
+       |          |          |          |          |
+       v          v          v          v          v
+   Denon AVR     Roku    Configured    LG TV     Compatible
+                         Equipment               Equipment
 ```
 
 ### 2.1 Configuration management
@@ -154,7 +154,7 @@ It does not independently define the supported device architecture.
 
 Adapter maintenance continues independently of queue depth.
 
-For example, a Roku volume key may require release after ordinary queued work has completed.
+For example, a Roku volume key may require release and an LG SSAP request may require response processing after ordinary queued work has completed.
 
 This maintenance is not a second action queue.
 
@@ -192,7 +192,8 @@ This maintenance is not a second action queue.
 | `firmware/clonker/devices/device_adapters.py` | Adapter selection, cache, execution, lifecycle coordination |
 | `firmware/clonker/devices/denon.py` | Persistent Denon TCP volume transport |
 | `firmware/clonker/devices/roku.py` | Roku ECP persistent taps, button holds, volume holds |
-| `firmware/clonker/devices/lg_webos.py` | Experimental LG webOS adapter; not connected to operational dispatch |
+| `firmware/clonker/devices/lg_webos.py` | Authenticated LG control and pointer sessions, bounded asynchronous response tracking |
+| `firmware/clonker/net/wake_on_lan.py` | Temporary UDP socket and Wake-on-LAN magic packet transmission |
 | `firmware/clonker/net/http_transport.py` | Generic bounded outbound HTTP |
 | `firmware/clonker/net/web.py` | CONFIG-mode management HTTP |
 | `firmware/clonker/net/web_diag.py` | Management HTTP connection diagnostics |
@@ -206,6 +207,7 @@ This maintenance is not a second action queue.
 | `firmware/clonker/system/logger.py` | Serial diagnostics |
 | `firmware/clonker/system/perf.py` | Shared performance instrumentation |
 | `firmware/clonker/system/sleep_manager.py` | Software sleep and wake policy |
+| `firmware/clonker/system/flight_recorder.py` | Diagnostic snapshots and registered transport providers |
 | `firmware/clonker/display/oled.py` | Deferred OLED rendering, acknowledgment, idle behavior |
 | `firmware/clonker/www/index.html` | Embedded configuration editor |
 | `firmware/clonker/www/remote.html` | Embedded Test Remote |
@@ -326,7 +328,7 @@ Any configurable device type may occupy any of the three slots.
 
 Actions explicitly identify their target device slot.
 
-A room's physical volume encoder does not need to know whether volume is controlled by a Denon receiver, Roku, or future LG television adapter.
+A room's physical volume encoder does not need to know whether volume is controlled by a Denon receiver, Roku, or LG television adapter.
 
 ### 5.2 Typed devices
 
@@ -367,10 +369,10 @@ The registry defines:
 
 | Device type | Command kinds | Current status |
 |---|---|---|
-| `generic-http` | HTTP | Operational |
-| `denon` | HTTP | Operational |
-| `roku` | HTTP | Operational |
-| `lg-webos` | SSAP, Pointer | Configuration only |
+| `generic-http` | HTTP, Wake-on-LAN | Operational |
+| `denon` | HTTP, Wake-on-LAN | Operational |
+| `roku` | HTTP, Wake-on-LAN | Operational |
+| `lg-webos` | SSAP, Pointer, Wake-on-LAN | Operational on tested equipment |
 | `apple-tv` | None | Future |
 | `fire-tv` | None | Future |
 
@@ -382,7 +384,7 @@ Both firmware validation and browser presentation use this shared metadata.
 
 Command compatibility and runtime availability are separate concepts.
 
-A configuration may describe an LG webOS device before its runtime adapter is integrated.
+A structurally valid LG device record may contain a blank or placeholder client key; authenticated execution requires a usable key.
 
 ### 5.4 Protocol-aware command objects
 
@@ -419,7 +421,20 @@ LG pointer example:
 }
 ```
 
-The latter two representations are supported by configuration validation and editing but are not yet operational execution paths.
+SSAP and pointer commands are operational on the tested Sunroom LG G1.
+
+Wake-on-LAN example:
+
+```json
+{
+  "kind": "wake-on-lan",
+  "mac": "02:00:00:00:00:00",
+  "broadcast": "192.168.50.255",
+  "port": 9
+}
+```
+
+Wake-on-LAN is available for either Power Toggle direction and Custom Action steps on all operational device types. It requires neither a device endpoint nor an authentication key. The example MAC is a synthetic placeholder.
 
 The dispatcher handles command objects without requiring manufacturer-specific command syntax in physical controls.
 
@@ -431,7 +446,7 @@ Neither causes actions to fall back to another room.
 
 Blank fundamental commands and blank device endpoints are valid configuration.
 
-The ordinary action path treats these conditions as intentional no-ops.
+The ordinary action path treats blank commands and missing required endpoints as intentional no-ops. Wake-on-LAN is endpoint-independent.
 
 The physical hold path also checks for blank commands and endpoints before admitting specialized hold work.
 
@@ -587,9 +602,9 @@ The dispatcher maintains volatile next-direction histories keyed by room and act
 
 Unknown history begins with the configured ON command.
 
-History advances after successful execution.
+History advances after successful execution. For LG SSAP and Wake-on-LAN, this means successful transmission, not confirmation of equipment state.
 
-Failures and intentional no-ops do not advance it.
+Immediate failures and intentional no-ops do not advance it. A subsequent asynchronous LG failure does not roll back history already advanced.
 
 A reboot or successful changed configuration save resets the histories.
 
@@ -618,6 +633,8 @@ Custom Action steps resolve through their configured device types.
 Existing Denon and Roku HTTP Custom Action steps retain ordinary single-command generic HTTP execution.
 
 They do not implicitly acquire fundamental-action hold or repeat behavior.
+
+LG SSAP and pointer steps use the LG adapter; Wake-on-LAN steps use the shared UDP transport. SSAP step waits begin at successful transmission rather than acknowledgement.
 
 There is no branching engine, macro thread, rollback system, nested workflow engine, or independent Custom Action queue.
 
@@ -682,7 +699,7 @@ Among currently eligible tasks, queue order matters.
 
 If the selected eligible adapter is not ready, the queue preserves the task rather than allowing later eligible commands to overtake it.
 
-Denon TCP pacing is an example of this behavior.
+Denon TCP pacing and LG pending-response capacity or session-transition readiness are examples of this behavior.
 
 At most one eligible queued command is executed per action poll.
 
@@ -694,7 +711,7 @@ After successful completion of a nonfinal step:
 2. Calculate the next eligible monotonic deadline.
 3. Return the task to pending work.
 
-The configured wait begins after successful completion of the preceding step.
+The configured wait begins after successful completion of the preceding step. For LG SSAP and Wake-on-LAN this is successful transmission.
 
 The final step completes the Custom Action.
 
@@ -713,6 +730,8 @@ The adapter translates those events into protocol-specific operations.
 ### 8.5 Failure policy
 
 An execution exception cancels remaining pending work, including unfinished Custom Actions.
+
+An asynchronous LG request failure also cancels remaining pending work through the dispatcher. Commands already transmitted are not replayed or rolled back; some subsequent commands may already have been transmitted before the failure is detected.
 
 New work may subsequently be admitted.
 
@@ -737,7 +756,8 @@ Examples:
 - Denon owns a persistent TCP socket and pacing deadline.
 - Roku owns persistent HTTP resources and held-key state.
 - Generic HTTP owns temporary request sockets.
-- A future authenticated adapter may own session credentials and pending response metadata.
+- LG owns authenticated control and pointer sockets and bounded pending response metadata.
+- Wake-on-LAN owns only a temporary UDP socket during transmission.
 
 Such state does not constitute permission to create another action queue.
 
@@ -767,10 +787,10 @@ A generic HTTP device does not acquire Roku or Denon specialization merely becau
 | `roku-volume-hold` | Encoder-driven Roku volume holds |
 | `roku-button-tap` | Persistent Roku navigation and skip taps |
 | `roku-button-hold` | Explicit Roku navigation and skip holds |
+| `lg-webos` | Authenticated SSAP and pointer commands |
+| `wake-on-lan` | UDP magic packets for power and Custom Actions |
 
-These paths were exercised on physical equipment during Chapter 12 regression testing.
-
-LG webOS is not an operational execution path in the current baseline.
+The original five paths were exercised on physical equipment during Chapter 12. Chapter 13 hardware-tested LG and Wake-on-LAN on the Sunroom G1.
 
 ### 9.2 Specialized command recognition
 
@@ -804,6 +824,8 @@ Specialization additionally requires the appropriate explicitly configured devic
 Unrecognized compatible HTTP commands use ordinary generic HTTP.
 
 Disabled device types must not silently fall back to generic HTTP.
+
+Wake-on-LAN is selected by command kind before manufacturer-specific routing, after device availability and compatibility checks. LG SSAP and pointer commands select the LG adapter.
 
 ### 9.3 Adapter cache
 
@@ -855,11 +877,12 @@ Examples include:
 - Releasing a Roku volume hold.
 - Retrying a failed key release.
 - Draining unread Denon TCP data.
+- Processing bounded LG SSAP responses and retiring failed or idle LG sessions.
 - Retiring idle or obsolete transport resources.
 
 Changed configuration activation retires existing adapter sessions.
 
-This prevents old session state from silently surviving a changed endpoint, device type, or future credential update.
+This prevents old session state from silently surviving a changed endpoint, device type, or credential update.
 
 Cleanup is best effort.
 
@@ -961,7 +984,25 @@ The transport is intentionally small.
 
 It is not a general browser, TLS client, authentication framework, or full HTTP response-processing library.
 
-### 10.6 Why these paths coexist
+### 10.6 LG webOS
+
+**Module:** `clonker/devices/lg_webos.py`
+
+The adapter uses authenticated control WebSockets and a separate pointer WebSocket, with one active endpoint/key identity. Session reuse avoids repeated setup for rapid commands. Endpoint or credential changes retire obsolete sessions.
+
+SSAP requests carry configured URIs and optional JSON payloads. Pointer commands carry configured button names. Native LG hold/release is not implemented.
+
+Successful transmission advances the dispatcher. SSAP request IDs and deadlines remain in bounded adapter metadata until responses arrive. The adapter polls receive data cooperatively; rejection or response timeout retires the session and propagates failure to the dispatcher. Idle transport failures without pending requests do not cancel unrelated queued work.
+
+Connection setup, registration, pointer acquisition and transmission still include bounded blocking operations. This is not a fully nonblocking WebSocket implementation.
+
+### 10.7 Wake-on-LAN
+
+**Module:** `clonker/net/wake_on_lan.py`
+
+The transport sends one 102-byte magic packet to the configured IPv4 broadcast destination and UDP port using a temporary socket. It closes the socket after the attempt. Successful transmission is not a wake acknowledgement. There are no automatic retries, persistent sessions or response tracking.
+
+### 10.8 Why these paths coexist
 
 Denon volume benefits from persistent native TCP.
 
@@ -970,6 +1011,8 @@ Roku volume benefits from minimizing HTTP requests during repeated encoder movem
 Roku navigation benefits from persistent taps and explicit keydown/keyup behavior.
 
 Ordinary commands remain well served by bounded generic HTTP.
+
+LG benefits from authenticated session reuse and asynchronous SSAP response processing. Wake-on-LAN provides a separate endpoint-independent wake mechanism.
 
 The architecture allows these approaches to coexist without changing physical controls or creating separate execution pipelines.
 
@@ -1055,7 +1098,7 @@ Pressing the shaft generates `mute-toggle`.
 
 The selected room and active configuration determine the target equipment.
 
-The encoder driver does not know whether the command uses Denon TCP, Roku ECP, generic HTTP, or a future protocol.
+The encoder driver does not know whether the command uses Denon TCP, Roku ECP, generic HTTP, LG webOS, or another protocol.
 
 ### 11.5 Custom Action encoder
 
@@ -1090,7 +1133,7 @@ Press-first operation can produce an additional initial movement when a sustaine
 
 This was accepted as a practical tradeoff for immediate tap responsiveness.
 
-Compatible ordinary HTTP commands without specialized hold support receive one ordinary action rather than an invented repeat mechanism.
+Compatible commands without specialized hold support, including LG pointer commands, receive one ordinary action rather than an invented repeat mechanism.
 
 ### 11.7 Press and release ownership
 
@@ -1223,6 +1266,8 @@ The scheduler polls the adapter coordinator even when no queued action is ready.
 
 Roku release handling and Denon receive draining are examples of maintenance that must not depend on queue depth.
 
+LG response processing also runs independently of queue depth. The coordinator returns an adapter/error pair on LG asynchronous failure; the main loop forwards it to `actions.fail_async()` to cancel pending work.
+
 This remains cooperative work within the same application loop.
 
 ### 12.4 Performance instrumentation
@@ -1303,9 +1348,7 @@ The editor does not silently translate incompatible commands when a device type 
 
 The user must resolve incompatible mappings before saving.
 
-LG webOS configuration editing is implemented.
-
-Operational LG pairing and command execution remain deferred.
+LG SSAP, pointer and Wake-on-LAN editing and execution are operational. Client keys are manually entered; integrated pairing remains deferred.
 
 ### 13.3 Test Remote
 
@@ -1355,6 +1398,8 @@ Recovery without a reboot was observed.
 
 The precise trigger and recovery mechanism remain unknown.
 
+Chapter 13 observations associate the stall with the configuration page rather than the Test Remote so far. Browser request patterns and CircuitPython socket behavior remain investigation candidates, not established causes.
+
 Physical controls, Roku commands, Denon volume, and Custom Actions remained functional between stalled management requests.
 
 Responsiveness during an individual blocking socket operation has not been established.
@@ -1381,7 +1426,7 @@ It is intended for a trusted LAN.
 
 Do not expose it directly to the public internet.
 
-Future device credentials stored in configuration increase the importance of protecting management access and exported configuration files.
+Configuration now contains operational LG credentials. Protect management access and exported configuration files; the configuration API includes stored client keys.
 
 ---
 
@@ -1535,37 +1580,21 @@ Do not introduce additional sleep modes or lifecycle interfaces until concrete r
 
 ---
 
-## 15. Future Protocol Integration
+## 15. Protocol Integration and Future Work
 
-Config v5 establishes the architectural foundation for authenticated and non-HTTP device protocols.
+Config v5 establishes the architectural foundation for authenticated and non-HTTP device protocols. Configuration support does not automatically imply runtime support.
 
-Configuration support does not automatically imply runtime support.
+### 15.1 LG webOS integration
 
-### 15.1 LG webOS
+**Module:** `clonker/devices/lg_webos.py`
 
-**Experimental module:** `clonker/devices/lg_webos.py`
+Chapter 12 established typed LG records and command objects in direct support of the experimental adapter. Chapter 13 connected the adapter to operational dispatch and verified native control on the Sunroom LG G1.
 
-LG webOS research has established a draft adapter and standalone protocol experiments.
-
-The configuration redesign was undertaken in direct support of future integration of this adapter.
-
-Config v5 already supports:
-
-- Explicit LG device typing.
-- Configurable endpoint.
-- Stored client key.
-- SSAP URI and optional JSON payload.
-- Pointer button commands.
-- Conditional client-key editing.
-- A reserved pairing control in the editor.
-
-The pairing control remains disabled.
-
-The draft adapter is not connected to operational dispatch.
+Standalone pairing remains the method for obtaining a client key. The editor supports manual key entry; its integrated pairing control remains disabled.
 
 ### 15.2 LG integration boundaries
 
-Future integration must distinguish:
+Keep these responsibilities distinct:
 
 - Initial pairing.
 - Stored credential handling.
@@ -1575,41 +1604,27 @@ Future integration must distinguish:
 - Response processing.
 - Session retirement.
 
-Pairing and authenticated session setup are not ordinary equipment commands.
-
-The existing draft includes experimental session management and bounded response tracking.
-
-These mechanisms require further integration and verification before becoming operational firmware behavior.
+Pairing and authenticated session setup are not ordinary equipment commands. Existing cooperative pairing helpers and separate pairing/runtime manifests are retained. Integrated credential handoff, cancellation and manifest unification remain future work.
 
 ### 15.3 Command completion semantics
 
-A transmitted command is not necessarily an acknowledged command.
+A transmitted command is not necessarily an acknowledged command. An acknowledged command is not necessarily proof of physical equipment state.
 
-An acknowledged command is not necessarily proof of physical equipment state.
+LG uses transmit-and-continue semantics. Successful transmission removes a fundamental task or advances a Custom Action step, starts its configured wait and advances applicable toggle history.
 
-Future LG integration must explicitly define when a queued command is considered complete.
+Pending SSAP response metadata belongs to the adapter, not a second execution queue. Readiness prevents additional transmission when pending capacity or session-transition constraints require it.
 
-This is particularly important for Custom Action steps whose subsequent waits depend on successful completion.
+Asynchronous rejection or timeout cancels remaining queued work. Already transmitted commands are not replayed or rolled back. Live rejection and recovery were verified; an actual response-timeout experiment remains outstanding.
 
-Pending protocol response metadata may belong to an adapter.
+### 15.4 Credential lifecycle and compatibility
 
-It must not become a second independent action execution queue.
+Stored credentials must remain associated with the intended device. A changed endpoint or credential must not silently reuse an obsolete authenticated session.
 
-Asynchronous protocol errors must be reconciled with the existing dispatcher failure policy.
+Public recipes must exclude real client keys and equipment-specific MAC addresses. A blank key or published placeholder can be structurally valid without making authenticated execution ready.
 
-Do not automatically replay commands with uncertain outcomes.
+The newer Den LG C6H remains experimental. Pico TCP tests reached port 3001 but failed on port 3000; TLS experiments on both televisions failed certificate verification before WebSocket upgrade. These results do not establish that secure WebSockets are required or that the C6H is unsupported.
 
-### 15.4 Credential lifecycle
-
-Stored credentials must remain associated with the intended device.
-
-A changed endpoint or credential must not silently reuse an obsolete authenticated session.
-
-Public configuration recipes must exclude real client keys and other private authentication material.
-
-A blank key or published placeholder can be structurally valid without making a device operationally ready.
-
-Pairing, authentication, and ordinary command execution must remain distinct responsibilities.
+Future work includes certificate trust, secure WebSockets, upgrade and registration validation, native pointer holds, and longer endurance testing.
 
 ### 15.5 Apple TV
 
@@ -1734,6 +1749,10 @@ For example:
 
 A published placeholder is not an operational credential.
 
+Use a synthetic MAC such as `02:00:00:00:00:00` for published Wake-on-LAN commands. Replace it with the intended equipment MAC before use.
+
+The active configuration can be exported via `GET /api/config`; remove response-only metadata and sanitize credentials before publication. This is an active RAM export, not independent disk verification.
+
 Sanitized recipes must be validated before publication.
 
 **Recipes help configure the Clonker; they do not become a runtime dependency.**
@@ -1799,22 +1818,23 @@ Not every test is intended to run against an active production application.
 Some persistence tests require Pico-owned filesystem writes.
 
 ### 18.3 Chapter 12 focused regression suites
+### 18.3 Focused regression suites
 
-| Test | Initial result |
-|---|---:|
-| `test_config_validation.py` | 49/49 |
-| `test_config_persistence.py` | 56/56 |
-| `test_typed_adapters.py` | 56/56 |
-| `test_config_activation.py` | 54/54 |
-| `test_typed_queue.py` | 92/92 |
-| `test_typed_physical.py` | 129/129 |
-| **Total** | **436/436** |
+| Test | Chapter 12 | Chapter 13 |
+|---|---:|---:|
+| `test_config_validation.py` | 49/49 | 71/71 |
+| `test_config_persistence.py` | 56/56 | 56/56 |
+| `test_typed_adapters.py` | 56/56 | 85/85 |
+| `test_config_activation.py` | 54/54 | 54/54 |
+| `test_typed_queue.py` | 92/92 | 153/153 |
+| `test_typed_physical.py` | 129/129 | 129/129 |
+| **Total** | **436/436** | **548/548** |
 
-These are the initial implementation-stage results.
+Chapter 12 results represent implementation-stage runs. All six Chapter 13 suites passed on the physical Pico after LG and Wake-on-LAN integration, before final comment and editor-label cleanup.
 
-They do not imply that every suite was rerun after every subsequent optimization.
+Live testing verified LG SSAP volume, pointer navigation, mute toggles, Custom Actions, network failure recovery, asynchronous rejection cancellation and extended-standby Wake-on-LAN. Actual response-timeout testing and longer endurance remain outstanding.
 
-Live regression testing additionally exercised operational Roku, Denon, and generic HTTP execution, physical controls, Custom Actions, configuration editing, and repeated persistent browser saves.
+The Flight Recorder registers the LG transport snapshot as `lg_transport`, exposing session, transmission, response and failure statistics without client keys.
 
 ### 18.4 Development discipline
 
@@ -1852,6 +1872,8 @@ Passing focused tests does not establish exhaustive reliability.
 | Chapter 12 | Typed devices, protocol-aware commands, central registry, redesigned editor |
 | Chapter 12 | Configuration activation lifecycle and obsolete gesture invalidation |
 | Chapter 12 | Reduced redundant validation and bounded persistence verification |
+| Chapter 13 | Operational LG webOS, asynchronous response handling and shared queue failure propagation |
+| Chapter 13 | Reusable Wake-on-LAN transport and endpoint-independent power commands |
 
 Chapter 12 reorganized the existing architecture rather than replacing its fundamental execution model.
 
@@ -1859,7 +1881,7 @@ The shared action vocabulary, Dumb Queue™, physical controls, cooperative sche
 
 The principal architectural change is that device identity and command protocol are now explicit configuration data.
 
-This establishes a cleaner foundation for future authenticated protocols.
+Chapter 13 exercised that foundation without changing the schema version or introducing a second execution queue.
 
 Detailed experiments, dated measurements, and historical implementation decisions belong in [Development History](DEVELOPMENT_HISTORY.md).
 
@@ -1874,6 +1896,8 @@ The current baseline includes operational:
 - Roku persistent button taps.
 - Roku explicit button holds.
 - Roku encoder-driven volume holds.
+- LG webOS SSAP and pointer commands on tested equipment.
+- Wake-on-LAN power and Custom Action commands.
 - Physical room selection.
 - Fundamental and Custom Action execution.
 - Config v5 validation and persistence.
@@ -1886,8 +1910,12 @@ Remaining boundaries include:
 - Intermittent management HTTP socket-send stalls.
 - Exhaustive interrupted-write recovery testing.
 - Longer-term battery endurance and reliability.
-- Operational LG webOS integration.
-- Operational LG pairing.
+- Integrated LG pairing and credential handoff.
+- LG runtime/pairing manifest unification.
+- Secure WebSocket and certificate-trust research for newer LG televisions.
+- Native LG pointer hold/release support.
+- WebSocket upgrade and registration validation hardening.
+- Actual LG response-timeout testing and longer transport endurance.
 - Additional user-defined device destinations.
 - Apple TV and Fire TV protocol research.
 - Future hardware-assisted sleep.
