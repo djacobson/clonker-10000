@@ -29,6 +29,8 @@ Power and mute use independent, volatile ON/OFF command histories.
 
 import time
 
+from clonker.devices import device_adapters
+from clonker.devices import device_types
 from clonker.system import logger
 from clonker.devices import device_adapters
 from clonker import device_config
@@ -89,12 +91,13 @@ def dispatch(room_id, action_id, delay_seconds=0):
             if is_toggle else (action["command"],)
         )
 
-        configured = bool(
-            device["endpoint"]
-            and any(
-                not device_config.command_is_blank(command)
-                for command in commands
+        configured = any(
+            not device_config.command_is_blank(command)
+            and (
+                command["kind"] == device_types.WAKE_ON_LAN
+                or bool(device["endpoint"])
             )
+            for command in commands
         )
 
     else:
@@ -109,7 +112,8 @@ def dispatch(room_id, action_id, delay_seconds=0):
 
         # All steps are validated by the configuration engine.
         configured = all(
-            device_config.resolve_endpoint(
+            step["command"]["kind"] == device_types.WAKE_ON_LAN
+            or device_config.resolve_endpoint(
                 room, step["target"]
             )
             for step in action["steps"]
@@ -282,7 +286,10 @@ def poll():
 
             # Unlike fundamental actions, a missing custom
             # destination is an execution failure.
-            if not device["endpoint"]:
+            if (
+                not device["endpoint"]
+                and command["kind"] != device_types.WAKE_ON_LAN
+            ):
                 raise ValueError(
                     "Custom destination is unconfigured"
                 )
@@ -325,7 +332,10 @@ def poll():
 
             # Fundamental actions retain blank-command no-ops.
             if (
-                not device["endpoint"]
+                (
+                    not device["endpoint"]
+                    and command["kind"] != device_types.WAKE_ON_LAN
+                )
                 or device_config.command_is_blank(command)
             ):
                 _queue.pop(selected)
@@ -339,11 +349,8 @@ def poll():
                 _last_error = None
                 return True
 
-            if (
-                device["type"] == "lg-webos"
-                and action_id in (
-                    "mute-toggle", "power-toggle"
-                )
+            if action_id in (
+                "mute-toggle", "power-toggle"
             ):
                 adapter = device_adapters.resolve(
                     device, kind, action_id, command
