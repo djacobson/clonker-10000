@@ -11,8 +11,34 @@
 <div class="tag">LESS SLEEK. MORE CLONK.</div>
 <h1>THE CLONKER 10000</h1><p>Recipe Library · Browse complete configuration examples before loading them into your Clonker.</p>
 <section class="panel"><label for="choice"><strong>Choose a recipe</strong></label><p><small>Recipes are curated by the project maintainer. Selecting one does not change your Clonker.</small></p><select id="choice" disabled><option>Loading recipes…</option></select><p id="status" role="status"></p></section>
-<section class="panel" id="detail" hidden><div class="tag" id="category"></div><h2 id="title"></h2><p id="summary"></p><div id="description"></div><h3>Rooms</h3><ul id="rooms"></ul><h3>Custom actions</h3><ul id="actions"></ul><div class="actions"><button id="preview">Preview configuration JSON</button><a class="action" id="download" download>Download JSON</a></div><details id="jsonDetails"><summary>Configuration JSON preview</summary><pre id="json"></pre></details><p><small>Prototype only. No direct installation, validation against the Pico, or automatic IP substitution.</small></p></section>
-<p><small>GitHub-hosted recipe library · Schema v4 · Static HTML + JSON</small></p>
+<section class="panel" id="detail" hidden>
+  <div class="tag" id="category"></div>
+  <h2 id="title"></h2>
+  <p id="summary"></p>
+  <div id="description"></div>
+  <h3>Rooms</h3>
+  <ul id="rooms"></ul>
+  <h3>Custom Actions</h3>
+  <ul id="actions"></ul>
+  <div class="actions">
+    <button id="preview">Preview configuration JSON</button>
+    <a class="action" id="download" download>Download JSON</a>
+  </div>
+  <details id="jsonDetails">
+    <summary>Configuration JSON preview</summary>
+    <pre id="json"></pre>
+  </details>
+  <h3>Load into your Clonker</h3>
+  <ol>
+    <li>Download the recipe JSON file.</li>
+    <li>Open your Clonker configuration editor in CONFIG mode.</li>
+    <li>Import the downloaded recipe using the editor's recipe import control.</li>
+    <li>Review device types, endpoints, commands, and Custom Actions.</li>
+    <li>Explicitly save the configuration when ready.</li>
+  </ol>
+  <p><small>Importing a recipe does not automatically save it. Saving requires DEVICE + CONFIG mode. Device addresses are not automatically substituted. Future device types may require additional firmware support and authentication.</small></p>
+</section>
+<p><small>GitHub-hosted recipe library · Config v5 · Static HTML + JSON</small></p>
 </main>
 <script>
 'use strict';

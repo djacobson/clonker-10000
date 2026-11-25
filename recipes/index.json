@@ -4,26 +4,28 @@
     {
       "id": "david-roku-denon-starter",
       "title": "David's Roku + Denon Setup",
-      "category": "TWO ACTIVE ROOMS",
-      "summary": "David's complete Clonker configuration: Denon-centric Den and Roku-centric Sunroom, with an unused third room.",
+      "category": "CONFIG V5 · TWO ACTIVE ROOMS",
+      "summary": "David's working Clonker configuration: Denon-centric Den and Roku-centric Sunroom, with an unused third room.",
       "description": [
-        "Room 1, Den, uses a Roku for navigation and playback, with a Denon receiver handling volume and mute. It includes Denon custom actions Movie, Music, and Vinyl that invoke Denon Quick Select presets.",
-        "Room 2, Sunroom, uses Roku for navigation and playback, also Roku for volume and mute controlling Denon AVR via HDMI CEC (Note: Roku vol for testing, which also applies to Roku smart TVs), includes additional Denon audio custom actions.",
-        "Device IP addresses are included and will be replaced as part of any future full-recipe import. Review every endpoint and action before saving."
+        "This complete Config v5 recipe is based on a working configuration exported from the physical Clonker.",
+        "Room 1, Den, uses Roku for navigation and playback, with a Denon receiver handling volume and mute. Movie, Music, and Vinyl Custom Actions invoke Denon Quick Select presets.",
+        "Room 2, Sunroom, uses Roku for navigation, playback, volume, and mute, controlling the Denon AVR volume through HDMI CEC. This also demonstrates the Roku volume command approach applicable to compatible Roku smart TVs.",
+        "The recipe includes explicitly typed devices, protocol-aware commands, stable Custom Action identifiers, and an unconfigured third room.",
+        "Download the JSON file and import it through the Clonker configuration editor. Review and customize all device endpoints and commands before explicitly saving. IP addresses are not automatically substituted."
       ],
       "rooms": [
-        "Room 1 -- Den: Roku navigation, Denon volume/mute, four custom actions",
-        "Room 2 -- Sunroom: Roku navigation, Roku volume/mute, three custom actions",
+        "Room 1 -- Den: Roku navigation, Denon volume/mute, four Custom Actions",
+        "Room 2 -- Sunroom: Roku navigation, Roku volume/mute, three Custom Actions",
         "Room 3 -- Present but unconfigured; available for future expansion"
       ],
       "custom_actions": [
-        "Den: Movie → Roku Home, then Denon Quick Select 1",
-        "Den: Music → Roku Home, then Denon Quick Select 2",
-        "Den: Vinyl → Roku Home, then Denon Quick Select 3",
-        "Den: Audio Cycle → Denon Audio Modes each select steps through menu",
-        "Sunroom: Movie → Roku Home, then Denon Quick Select 1",
-        "Sunroom: Music → Roku Home, then Denon Quick Select 2",
-        "Sunroom: Audio Cycle → Denon Audio Modes each select steps through menu"
+        "Den: Movie → Roku Home, wait 3 seconds, Denon Quick Select 1",
+        "Den: Music → Roku Home, wait 3 seconds, Denon Quick Select 2",
+        "Den: Vinyl → Roku Home, wait 3 seconds, Denon Quick Select 3",
+        "Den: Audio Cycle → Cycle Denon Movie listening modes",
+        "Sunroom: Movie → Roku Home, wait 3 seconds, Denon Quick Select 1",
+        "Sunroom: Music → Roku Home, wait 3 seconds, Denon Quick Select 2",
+        "Sunroom: Audio Cycle → Cycle Denon Movie listening modes"
       ],
       "file": "david-roku-denon-starter.json"
     }
