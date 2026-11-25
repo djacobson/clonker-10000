@@ -682,13 +682,6 @@ def _backup_looks_valid(path):
         return False
 
 
-def _save_mem(stage):
-    """Temporary save-pipeline heap diagnostics."""
-    print("SAVE MEM:", stage,
-          "free=", gc.mem_free(),
-          "alloc=", gc.mem_alloc())
-
-
 def _verify_file_bytes(path, expected):
     """Verify file contents against already validated JSON bytes.
 
@@ -723,11 +716,7 @@ def _write_verified_temp(path, contents):
         file.write(contents)
         file.flush()
 
-    _save_mem("M6 temp written")
-
     _verify_file_bytes(temp_path, contents)
-
-    _save_mem("M6 temp verified")
 
     return temp_path
 
@@ -754,13 +743,9 @@ def _replace_with_backup(path, contents):
     os.rename(path, backup)
     os.rename(temp_path, path)
 
-    _save_mem("M7 primary installed")
-
     # Exact byte equality establishes that the installed file
     # contains the configuration already validated by save().
     _verify_file_bytes(path, contents)
-
-    _save_mem("M8 installed bytes verified")
 
 
 def save(config, expected_revision, path=None):
@@ -768,9 +753,9 @@ def save(config, expected_revision, path=None):
     global _current
 
     started = time.monotonic_ns()
-    _save_mem("M1 save entry")
+    # Configuration saves are allocation-intensive. Reclaim
+    # temporary HTTP and configuration objects before proceeding.
     gc.collect()
-    _save_mem("GC1 after collection")
 
     if _current is None or _current_path is None:
         raise RuntimeError("Configuration not loaded")
@@ -786,25 +771,15 @@ def save(config, expected_revision, path=None):
         raise ValueError("Configuration revision mismatch. Changes not saved. Refresh page.")
 
     # Validate the incoming configuration exactly once.
-    _save_mem("M2 before validation")
-
     validated = validate_config(config)
-
-    _save_mem("M2 after validation")
-
     serialized = _serialize_validated(validated).encode("utf-8")
-
-    _save_mem("M3 after serialization")
-
     validated_at = time.monotonic_ns()
 
     # Validate the existing primary and confirm disk consistency.
-    _save_mem("GC2 before collection")
+    # Reclaim temporary validation and serialization allocations
+    # before loading and validating the existing primary.
     gc.collect()
-    _save_mem("GC2 after collection")
     disk = _load_existing(path)
-
-    _save_mem("M4 after disk load")
 
     if disk != _current:
         raise ValueError("Configuration changed on disk; reload required")
@@ -817,18 +792,12 @@ def save(config, expected_revision, path=None):
     if validated == _current:
         return False
 
-    _save_mem("M4 after disk comparison")
-
     # Prepare the replacement cache before modifying disk.
     prepared_cache = device_adapters.prepare_cache(validated)
-
-    _save_mem("M5 cache prepared")
-
     checked_at = time.monotonic_ns()
 
     # Persist and verify the already validated configuration.
     _replace_with_backup(path, serialized)
-
     persisted_at = time.monotonic_ns()
 
     # Retire old adapter sessions and publish the prepared cache.
@@ -836,8 +805,6 @@ def save(config, expected_revision, path=None):
     _current = validated
 
     activated_at = time.monotonic_ns()
-
-    _save_mem("M10 after activation")
 
     logger.info(
         "CONFIG PERF: validation={:.1f}ms, "
