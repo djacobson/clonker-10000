@@ -1,105 +1,313 @@
+
 # The Clonker 10000 — Configuration, Persistence & Recovery
 
-**Design reference:** November 7, 2026  
+**Design reference:** November 24, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Active schema:** Clonker Config v4 (JSON)  
-**Baseline:** Chapter 7 — three configured rooms, physical navigation/playback controls, Roku button holds, Dumb Queue™, and protocol adapters operational
+**Active schema:** Clonker Config v5 (JSON)  
+**Baseline:** Chapter 12 — The Monster Gets Organized
 
 > Clonker controls intent, not reality. A command can be accepted, transmitted, and acknowledged without proving what the television actually did.
 
 ---
 
-## 1. Scope and sources of truth
+## 1. Scope and Sources of Truth
 
-This is the authoritative **configuration schema, validation, persistence, and recovery** reference. Its implementation is `firmware/clonker/device_config_v2.py`, whose historical filename does **not** indicate the active schema version. `CONFIG_VERSION = 4` is authoritative. The browser editor must agree.
+This document is the authoritative reference for configuration schema, validation, persistence, and recovery.
 
-The source repository holds maintained firmware and an example configuration; the running Pico's `/clonker/device_config.json` is the active, potentially newer, user-edited configuration. Never overwrite that file casually during firmware deployment.
+The active implementation is:
 
-Other responsibilities: [Architecture](ARCHITECTURE.md) covers boundaries; [Firmware, Network & Clock](FIRMWARE_NETWORK.md) covers execution, queue, adapters, and timing; [Operating Modes](OPERATING_MODES.md) covers filesystem ownership; [Hardware Design](HARDWARE_DESIGN.md) covers wiring; [Development & Deployment](DEVELOPMENT.md) covers procedure; [Development History](DEVELOPMENT_HISTORY.md) preserves dated evidence.
+- `firmware/clonker/device_config.py`
+- `firmware/clonker/devices/device_types.py`
+- `firmware/clonker/devices/device_adapters.py`
 
-### Planned configuration redesign — Chapter 12
+`CONFIG_VERSION = 5` defines the active schema version. Active Python module filenames no longer carry configuration version suffixes.
 
-The proposed Config v5 architecture is documented in
-[Configuration Redesign](CONFIGURATION_REDESIGN.md).
+The source repository contains maintained firmware and configuration examples. The running Pico's `/clonker/device_config.json` is the active, potentially newer, user-edited configuration.
 
-The redesign introduces explicitly typed devices,
-a more compact configuration editor, automatic Custom
-Action ID generation, and an extensible foundation
-for device-specific attributes and future pairing.
+Never overwrite the active configuration casually during firmware deployment.
 
-It directly supports the eventual integration of the
-experimental LG webOS adapter while preserving existing
-Roku, Denon, and generic HTTP functionality.
+### Related documentation
 
-The redesign remains a proposal. This document continues
-to describe the currently implemented Config v4 schema
-until the replacement architecture has been implemented
-and regression-tested.
+- [Architecture](ARCHITECTURE.md)
+- [Configuration Redesign](CONFIGURATION_REDESIGN.md)
+- [Firmware, Network & Clock](FIRMWARE_NETWORK.md)
+- [Operating Modes](OPERATING_MODES.md)
+- [Hardware Design](HARDWARE_DESIGN.md)
+- [Development & Deployment](DEVELOPMENT.md)
+- [Development History](DEVELOPMENT_HISTORY.md)
 
 ### Design commitments
 
-- A fixed, small vocabulary of fundamental actions; editable room-specific command mappings.
-- Stable IDs for rooms, devices, and custom actions. Display names are not identifiers.
-- Strict schema validation, bounded storage, and deterministic serialized output.
-- Blank endpoints and ordinary fundamental command paths are valid intentional no-ops.
-- No implicit repair, migration, retries, or equipment-state inference.
-- All browser and physical actions share the same dispatcher and Dumb Queue™.
+- A fixed vocabulary of fundamental actions with editable room-specific mappings.
+- Explicitly typed devices and protocol-aware command objects.
+- Stable room, device, and Custom Action identifiers.
+- Strict validation at configuration trust boundaries.
+- Efficient access to already validated configuration.
+- Deterministic serialization and bounded storage.
+- Intentional no-ops for blank fundamental commands and endpoints.
+- No implicit migration, repair, command replay, or equipment-state inference.
+- One shared dispatcher and One Dumb Queue™.
 
-## 2. Files and ownership
+## 2. Files and Ownership
 
 | File | Role |
 |---|---|
-| `/clonker/device_config.json` | Primary active JSON on Pico |
-| `/clonker/device_config.json.bak` | Previous valid primary after a changed save |
-| `/clonker/device_config.json.bak.old` | Older rotated backup |
-| `/clonker/device_config.json.tmp` | Verified temporary write before rotation |
-| `firmware/clonker/device_config.json` | Repository copy; not automatically authoritative over Pico |
-| `samples/device_config_roku_denon_sample.json` | Readable complete two-room example |
-| `firmware/clonker/device_config_v2.py` | Current Config v4 engine despite legacy filename |
+| `/clonker/device_config.json` | Active primary configuration |
+| `/clonker/device_config.json.bak` | Previous primary |
+| `/clonker/device_config.json.bak.old` | Older backup generation |
+| `/clonker/device_config.json.tmp` | Verified temporary write |
+| `firmware/clonker/device_config.json` | Repository configuration copy |
+| `firmware/clonker/device_config.py` | Active configuration engine |
+| `firmware/clonker/devices/device_types.py` | Central device-type registry |
+| `firmware/clonker/devices/device_adapters.py` | Adapter selection and lifecycle coordinator |
+| `firmware/clonker/www/index.html` | Embedded configuration editor |
+| `firmware/clonker/www/remote.html` | Embedded Test Remote |
+| `recipes/` | Hosted configuration recipe library |
 
-GP17 SERVICE (USB) makes the USB host the filesystem writer; GP17 DEVICE makes Pico firmware the writer. **Persistent browser saves require DEVICE + CONFIG** (GP17 grounded at cold boot; GP18 grounded at runtime). SERVICE + CONFIG permits inspection and action testing, but rejects saves. RUN disables the management HTTP listener; it does not disable the queue or physical controls.
+Filesystem ownership is established at cold boot.
 
-## 3. Exact Config v4 shape
+- SERVICE (USB): USB host owns filesystem writes.
+- DEVICE: Pico firmware owns filesystem writes.
+- CONFIG: Management HTTP listener enabled.
+- RUN: Management HTTP listener disabled.
 
-The root object has **exactly** `version` and `rooms`:
+Persistent browser saves require DEVICE + CONFIG.
+
+SERVICE + CONFIG permits inspection and action testing but rejects persistent configuration saves.
+
+Physical controls and the shared action dispatcher remain operational independently of the management listener.
+
+See [Operating Modes](OPERATING_MODES.md) for switch assignments and operating procedures.
+
+## 3. Config v5 Schema
+
+The root object contains exactly two fields:
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "rooms": {
-    "room-1": { "name": "Den", "devices": {}, "actions": {}, "custom_actions": [] }
+    "room-1": {
+      "name": "Den",
+      "devices": {},
+      "actions": {},
+      "custom_actions": []
+    }
   }
 }
 ```
 
-**The fragment above illustrates keys only and is not deployable:** the `devices` and `actions` objects must contain all required entries.
+This fragment illustrates the structure only. It is not a complete deployable configuration.
 
-The `rooms` object contains **one to three** of the stable IDs `room-1`, `room-2`, and `room-3`. They may be omitted individually, but at least one room must exist. The current development installation contains Den (`room-1`), Sunroom (`room-2`), and a configured Room 3 placeholder (`room-3`) with blank device addresses and command paths. The physical selector recognizes all three positions. An unconfigured room and a configured room containing blank commands are distinct conditions; neither should cause an action to fall back to another room.
+### 3.1 Rooms
 
-Every configured room has **exactly** these four keys:
+One to three configured rooms are supported.
 
-| Key | Value |
+Reserved room identifiers:
+
+- `room-1`
+- `room-2`
+- `room-3`
+
+Rooms may be omitted individually, but at least one must exist.
+
+Each configured room contains exactly:
+
+| Field | Description |
 |---|---|
-| `name` | Nonblank string, maximum 40 characters; trimmed on validation |
-| `devices` | Exactly `device-1`, `device-2`, `device-3` |
-| `actions` | Exactly the 14 fundamental action IDs |
-| `custom_actions` | Ordered array of 0–16 custom action definitions |
+| `name` | User-visible room name |
+| `devices` | Three typed device records |
+| `actions` | Fourteen fundamental action definitions |
+| `custom_actions` | Ordered array of Custom Actions |
 
-### 3.1 Built-in device destinations
+Room names are nonblank strings of at most 40 characters and are trimmed during validation.
 
-| Stable ID | UI identity | Typical equipment |
-|---|---|---|
-| `device-1` | TV | Currently blank endpoints |
-| `device-2` | AVR | Denon AVR-X3700H / AVR-X1800H |
-| `device-3` | Streaming | Roku Ultra |
+Room identifiers are stable. Removing a room does not renumber the remaining rooms.
 
-Each `devices` value is a string containing either `""`, a dotted IPv4 address, or `IPv4:port` with a numeric port from 1 to 65535. Hostnames, IPv6 literals, and URL schemes are not supported. Validation checks syntax, **not** reachability. An empty endpoint is legal and yields a no-op for commands addressed to it.
+An unconfigured room and a configured room with blank endpoints are distinct conditions. Neither causes commands to fall back to another room.
 
-Development LAN examples (not permanent defaults): Den AVR `192.168.50.44:8080`, Den Roku `192.168.50.43:8060`, Sunroom AVR `192.168.50.40:8080`, Sunroom Roku `192.168.50.28:8060`. Actual values come from the Pico's loaded configuration. TCP Denon volume uses port **23** based on the host extracted from the configured AVR endpoint; it does not change the stored endpoint format.
+### 3.2 Device slots
 
-### 3.2 Fundamental action IDs
+Each configured room contains exactly three built-in device slots.
 
-Each configured room must define **all fourteen** IDs, even when individual mappings are intentionally blank:
+| Stable ID | Editor role label |
+|---|---|
+| `device-1` | TV |
+| `device-2` | AVR |
+| `device-3` | Streaming |
+
+These labels are organizational conveniences, not device-type restrictions.
+
+A Roku, Denon, generic HTTP device, or other configurable device type may occupy any slot.
+
+Fundamental actions and Custom Action steps explicitly identify their target slot.
+
+### 3.3 Typed device records
+
+Unlike Config v4, device entries are objects rather than endpoint strings.
+
+Example:
+
+```json
+"devices": {
+  "device-1": {
+    "type": "generic-http",
+    "endpoint": ""
+  },
+  "device-2": {
+    "type": "denon",
+    "endpoint": "192.168.50.44:8080"
+  },
+  "device-3": {
+    "type": "roku",
+    "endpoint": "192.168.50.43:8060"
+  }
+}
+```
+
+These addresses are development LAN examples, not permanent defaults.
+
+Every device record contains a `type` and an `endpoint`. Additional fields are determined by the device-type registry.
+
+An endpoint may contain:
+
+- An empty string.
+- A dotted IPv4 address.
+- A dotted IPv4 address followed by a numeric port from 1 to 65535.
+
+Hostnames, IPv6 literals, and URL schemes are not supported.
+
+Endpoint validation checks syntax, not network reachability.
+
+### 3.4 Device-type registry
+
+`devices/device_types.py` is the central source of device-type metadata.
+
+The registry defines:
+
+- Stable type identifier.
+- Display label.
+- Runtime availability.
+- Suggested default port.
+- Supported command kinds.
+- Device-specific attributes.
+- Pairing capability.
+
+| Type ID | Display label | Suggested port | Command kinds | Status |
+|---|---|---:|---|---|
+| `generic-http` | Generic HTTP | 80 | HTTP | Operational |
+| `denon` | Denon AVR | 8080 | HTTP | Operational |
+| `roku` | Roku ECP | 8060 | HTTP | Operational |
+| `lg-webos` | LG webOS | 3000 | SSAP, Pointer | Configuration only |
+| `apple-tv` | Apple TV | — | — | Future |
+| `fire-tv` | Amazon Fire TV | — | — | Future |
+
+The registry is lightweight configuration metadata. It does not import protocol adapters or perform network operations.
+
+Suggested ports are not necessarily the ports used by specialized transports. For example, Denon TCP volume uses port 23.
+
+Command compatibility and runtime availability are separate concepts.
+
+LG webOS configuration is intentionally supported before runtime integration. Apple TV and Fire TV remain unavailable for configuration and execution.
+
+### 3.5 Device-specific attributes
+
+LG webOS device records include a client key:
+
+```json
+{
+  "type": "lg-webos",
+  "endpoint": "192.168.50.100:3000",
+  "client_key": ""
+}
+```
+
+The client key is a string of at most 512 characters.
+
+A blank key is valid configuration data but does not establish an authenticated device session.
+
+The editor exposes an editable client-key field and a pairing control for LG webOS. The pairing control remains disabled pending runtime integration.
+
+A valid LG configuration does not imply that LG commands can currently execute.
+
+Client keys must be treated as credentials and excluded from public configuration recipes.
+
+## 4. Protocol-Aware Commands
+
+Every command object explicitly declares its protocol kind.
+
+The command kind must be compatible with the configured target device type.
+
+### 4.1 HTTP commands
+
+```json
+{
+  "kind": "http",
+  "method": "POST",
+  "path": "/keypress/Home"
+}
+```
+
+Rules:
+
+- Method must be `GET` or `POST`.
+- Path must be a string of at most 512 characters.
+- A nonblank path must begin with `/`.
+- A blank path is permitted for fundamental actions.
+- Custom Action steps require nonblank commands.
+
+The HTTP command kind is used by generic HTTP, Denon, and Roku devices.
+
+Specialized adapter selection is based on the explicitly configured device type, action context, and recognized command mapping.
+
+### 4.2 LG SSAP commands
+
+```json
+{
+  "kind": "ssap",
+  "uri": "ssap://audio/setMute",
+  "payload": {
+    "mute": true
+  }
+}
+```
+
+Rules:
+
+- URI must be a string of at most 512 characters.
+- A nonblank URI must begin with `ssap://`.
+- The URI must contain a command after the prefix.
+- Whitespace is not permitted within a nonblank URI.
+- `payload` is optional.
+- When present, the payload must be a JSON object.
+- A blank URI cannot have a payload.
+- Nested JSON objects and arrays are supported.
+- Nonfinite numeric values are rejected.
+
+Payload object keys are normalized into deterministic order.
+
+The schema does not maintain a fixed inventory of supported SSAP commands. Users may configure protocol-compatible commands as needed.
+
+### 4.3 LG pointer commands
+
+```json
+{
+  "kind": "pointer",
+  "button": "HOME"
+}
+```
+
+The button field supports up to 64 characters using uppercase letters, digits, underscores, and hyphens.
+
+A blank button is permitted for fundamental actions.
+
+The validator checks the command representation, not whether a particular television implements the requested button.
+
+SSAP and pointer commands are configuration-ready but are not yet connected to the operational dispatcher.
+
+## 5. Fundamental Actions
+
+Every configured room defines all fourteen fundamental action IDs.
 
 ```text
 volume-up     volume-down     mute-toggle
@@ -108,40 +316,92 @@ select        back            home            play-pause
 skip-back     skip-forward    power-toggle
 ```
 
-There are two shapes:
+### 5.1 Ordinary fundamental actions
 
-**Ordinary fundamental action** (12 IDs other than the two toggles):
+Twelve fundamental actions use a target and a single command object.
 
 ```json
 "volume-up": {
   "target": "device-2",
-  "method": "GET",
-  "path": "/goform/formiPhoneAppDirect.xml?MVUP"
+  "command": {
+    "kind": "http",
+    "method": "GET",
+    "path": "/goform/formiPhoneAppDirect.xml?MVUP"
+  }
 }
 ```
 
-**Toggle action** (`mute-toggle` and `power-toggle` only):
+An LG configuration example:
+
+```json
+"volume-up": {
+  "target": "device-1",
+  "command": {
+    "kind": "ssap",
+    "uri": "ssap://audio/volumeUp"
+  }
+}
+```
+
+The second example illustrates future LG execution configuration, not currently operational LG control.
+
+### 5.2 Toggle actions
+
+`mute-toggle` and `power-toggle` use separate ON and OFF command objects.
 
 ```json
 "power-toggle": {
   "target": "device-3",
-  "method": "POST",
-  "on_path": "/keypress/PowerOn",
-  "off_path": "/keypress/PowerOff"
+  "on_command": {
+    "kind": "http",
+    "method": "POST",
+    "path": "/keypress/PowerOn"
+  },
+  "off_command": {
+    "kind": "http",
+    "method": "POST",
+    "path": "/keypress/PowerOff"
+  }
 }
 ```
 
-The target must be one of the three built-in IDs. The method is exactly `GET` or `POST`. Ordinary `path`, toggle `on_path`, and toggle `off_path` are strings of at most **512 characters**. An empty path is valid for fundamental actions. Nonempty paths are sent as configured; the schema does not prove that a device supports them. A blank endpoint or selected blank path produces an intentional no-op, not an invented substitute command.
+Both commands target the same device but are independently configurable.
 
-### 3.3 Power and mute direction history
+Their methods, paths, payloads, or compatible command kinds need not be identical.
 
-Toggle commands are not physical state queries. The dispatcher keeps **volatile, independent next-direction histories** per room and toggle action, selecting configured ON/OFF paths. A successful execution advances the history; failed requests, blank selected paths, and missing endpoints do not. A changed configuration save clears all histories; an unchanged save preserves them. History is lost on reboot.
+### 5.3 Toggle direction history
 
-An external remote, HDMI-CEC, or manual equipment control can change actual state independently. Therefore `power-toggle` means **send the next remembered command**, not “discover and invert actual power state.” Browser Test Remote and physical GP2 Power Toggle use the same action semantics. GP2 controls configured room equipment; it does **not** turn the Pico itself on or off.
+Toggle commands do not query actual equipment state.
 
-## 4. Custom actions (implemented)
+The dispatcher maintains independent volatile next-direction histories for each room and toggle action.
 
-Custom actions are room-specific, ordered, user-named sequences. They are **not** replacements for the fourteen fundamental actions. Each custom action has exactly `id`, `name`, and `steps`:
+A successful execution advances the history.
+
+Failed execution, missing endpoints, and selected blank commands do not advance it.
+
+A changed configuration save resets all toggle histories. An unchanged save preserves them.
+
+History is lost on reboot.
+
+External remotes, HDMI-CEC, and manual equipment controls may independently change actual equipment state.
+
+The physical Power Toggle controls configured room equipment; it does not turn the Pico itself on or off.
+
+### 5.4 Intentional no-ops
+
+Blank fundamental commands and blank device endpoints are valid.
+
+A selected blank command or missing endpoint produces an intentional no-op rather than an invented substitute command.
+
+Physical hold handling also checks blank commands and endpoints before admitting specialized hold work.
+
+## 6. Custom Actions
+
+Custom Actions are room-specific, ordered, user-named command sequences.
+
+They supplement the fourteen fundamental actions rather than replacing them.
+
+Example:
 
 ```json
 {
@@ -150,98 +410,299 @@ Custom actions are room-specific, ordered, user-named sequences. They are **not*
   "steps": [
     {
       "target": "device-3",
-      "method": "POST",
-      "path": "/keypress/Home",
+      "command": {
+        "kind": "http",
+        "method": "POST",
+        "path": "/keypress/Home"
+      },
       "wait_after_ms": 3000
     },
     {
       "target": "device-2",
-      "method": "GET",
-      "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1",
+      "command": {
+        "kind": "http",
+        "method": "GET",
+        "path": "/goform/formiPhoneAppDirect.xml?MSQUICK1"
+      },
       "wait_after_ms": 0
     }
   ]
 }
 ```
 
-| Constraint | Current rule |
+### 6.1 Constraints
+
+| Constraint | Rule |
 |---|---|
-| Custom actions | 0–16 per room |
-| ID | 1–40 characters; lowercase `a-z`, digits, hyphen; cannot start/end with hyphen |
-| ID uniqueness | Unique within each room |
-| Name | Nonblank, maximum 60 characters; trimmed |
-| Steps | 1–16 per action, in declared order |
-| Target | Only `device-1`, `device-2`, `device-3` |
-| Method | `GET` or `POST` |
-| Path | Nonempty string beginning `/`, maximum 512 characters |
-| `wait_after_ms` | Integer 0–60000, not a boolean |
-| Final step | Must have `wait_after_ms: 0` |
+| Custom Actions per room | 0–16 |
+| ID length | 1–40 characters |
+| ID characters | Lowercase letters, digits, hyphens |
+| ID boundaries | Cannot begin or end with a hyphen |
+| ID uniqueness | Within each room |
+| Name | Nonblank, maximum 60 characters |
+| Steps | 1–16 |
+| Target | Existing built-in device slot |
+| Command | Nonblank, compatible with target device type |
+| Wait | Integer 0–60000 milliseconds |
+| Final step wait | Exactly zero |
 
-A custom action is admitted as one queue task. Each successful step sends one command; when more steps remain, the task is rescheduled **after** the completed request using its `wait_after_ms`. Other eligible work can execute during the delay. A step failure clears pending queue work. No nested macros, loops, branches, automatic retries, rollback, or parallel executor exist.
+Boolean values are not accepted as integer waits.
 
-The Sunroom “Movie” action was verified with Roku Home → cooperative 3000 ms wait → Denon Quick Select 1. The physical custom-action encoder and press-to-run remain pending; the browser editor and Test Remote custom actions work today.
+Custom Action names are trimmed during validation.
 
-### 4.1 Future custom destinations — design only
+### 6.2 Stable identifiers
 
-The agreed extension reserves `device-4` onward for user-defined destinations, with stable IDs, editable names, and endpoints in an optional per-room `custom_devices` collection. Fundamental actions would continue to target the three built-in slots; custom steps could reference additional destinations. Deleting one destination must never renumber or silently retarget another.
+The browser generates identifiers for new Custom Actions automatically.
 
-**Config v4 rejects `custom_devices` and `device-4` targets.** Their future shape, capacity, and validation are not implemented. Apple TV may require discovery, pairing, authentication, and a stateful protocol adapter; its planned support does not imply compatibility with today's stateless HTTP commands. No PS5 or other custom-device support should be claimed until implemented and tested.
+Identifiers are displayed read-only and remain unchanged when an action is renamed or reordered.
 
-## 5. Validation and storage limits
+New identifiers are generated with the intent of avoiding collisions across the configuration.
 
-`validate_config()` returns a new normalized, ordered object. It requires exact fields at every defined level, rejects unknown keys, unsupported versions, wrong types, invalid targets, malformed endpoints, duplicate custom-action IDs, invalid steps, and out-of-range values. It preserves canonical room order `room-1` through `room-3`, fundamental action order, and declared custom-action order. Names are trimmed. The input object is not edited in place.
+Existing identifiers are preserved, and firmware validation requires uniqueness within each room.
 
-| Constant / constraint | Value |
+### 6.3 Execution semantics
+
+A Custom Action enters the shared queue as one task.
+
+Each step executes one configured command.
+
+After successful completion of a nonfinal step, the task is rescheduled using that step's `wait_after_ms`.
+
+Other eligible queue work may execute during the delay.
+
+A failed step clears remaining pending work according to normal dispatcher failure policy.
+
+There are no nested macros, loops, branches, parallel executors, automatic retries, or rollback operations.
+
+Custom Action steps resolve through the configured device type.
+
+Existing Roku and Denon HTTP Custom Action steps retain single-command generic HTTP execution. They do not implicitly acquire fundamental-action hold or repeat behavior.
+
+The physical Custom Action encoder selects an action and runs it when pressed. The browser Test Remote uses the same dispatcher.
+
+The Sunroom Movie action has been verified with:
+
+1. Roku Home.
+2. Cooperative 3000 ms wait.
+3. Denon Quick Select 1.
+
+## 7. Validation and Storage Limits
+
+| Constraint | Value |
 |---|---:|
-| `CONFIG_VERSION` | 4 |
-| `MAX_CONFIG_BYTES` | 8192 UTF-8 bytes |
-| `MAX_ROOM_NAME_LENGTH` | 40 characters |
-| `MAX_PATH_LENGTH` | 512 characters |
-| `MAX_CUSTOM_ACTION_ID_LENGTH` | 40 characters |
-| `MAX_CUSTOM_ACTION_NAME_LENGTH` | 60 characters |
-| `MAX_CUSTOM_ACTIONS_PER_ROOM` | 16 |
-| `MAX_STEPS_PER_ACTION` | 16 |
-| `MAX_WAIT_AFTER_MS` | 60000 |
-| Supported rooms | 1–3 |
-| Built-in devices per room | Exactly 3 |
+| `CONFIG_VERSION` | 5 |
+| `MAX_CONFIG_BYTES` | 16384 UTF-8 bytes |
+| Room name | 40 characters |
+| HTTP path | 512 characters |
+| SSAP URI | 512 characters |
+| Pointer button | 64 characters |
+| LG client key | 512 characters |
+| Custom Action ID | 40 characters |
+| Custom Action name | 60 characters |
+| Custom Actions per room | 16 |
+| Steps per Custom Action | 16 |
+| Maximum step wait | 60000 ms |
+| Configured rooms | 1–3 |
+| Device slots per room | Exactly 3 |
 | Fundamental actions per room | Exactly 14 |
 
-`to_json()` serializes validated configuration compactly with deterministic field ordering and checks the UTF-8 byte limit. `from_json()` bounds the incoming byte count before parsing and validates the result. A pretty-printed sample can exceed the limit even if its compact canonical equivalent fits; use the provided sample as a reference rather than blindly copying it onto the Pico.
+`validate_config()` returns a new normalized, ordered configuration object.
 
-The standard CircuitPython JSON parser is used; there is **no special duplicate-key detector**. Validation does not verify command semantics, network reachability, endpoint safety, device capabilities, or actual equipment state.
+It rejects missing and unknown fields, unsupported versions, malformed endpoints, invalid identifiers, incompatible command kinds, unavailable future device types, and invalid Custom Action definitions.
 
-## 6. Active RAM state and revisions
+It preserves canonical room, device, and fundamental action ordering, together with the declared order of Custom Actions and their steps.
 
-`load()` publishes a validated configuration to module-owned RAM, and rebuilds the adapter cache. `current()` returns a validated **copy**, protecting the active object from accidental external mutation. Internal `action_details()` and `custom_action_details()` return direct references for efficient execution; callers must treat them as read-only. A queued action uses the current validated configuration when it executes, subject to queue clearing on changed saves.
+The input object is not modified in place.
 
-`revision()` computes a deterministic **32-bit FNV-1a** hash over canonical UTF-8 JSON and formats it as eight lowercase hexadecimal digits. It is a stale-editor concurrency token, **not** cryptographic authentication or a globally unique content identifier.
+`to_json()` validates and serializes compact canonical JSON.
 
-The browser obtains the current revision with `GET /api/config` and submits that expected revision with `POST /api/config`. A mismatch rejects the save and asks the editor to refresh. The engine also compares the current primary file to the RAM snapshot before writing, preventing silent overwrites of out-of-band disk changes.
+`from_json()` bounds the incoming byte count before parsing and validating.
 
-If the submitted configuration serializes identically to the active configuration, `save()` returns `False`: **no unnecessary flash write, backup rotation, queue clear, or toggle reset**. A changed successful save returns `True`, publishes the new RAM configuration, rebuilds the adapter cache, clears pending action work, and resets toggle histories via the management save path.
+`_serialize_validated()` serializes an already validated object without repeating full validation.
 
-## 7. Exact save and backup behavior
+The standard CircuitPython JSON parser is used. There is no separate duplicate-key detector.
 
-`save(config, expected_revision, path=None)` requires a previously successful load and permits saving **only to the primary path bound by that load**. It checks the expected RAM revision, validates and canonicalizes the new object, reads and validates the primary disk file, and rejects any mismatch with active RAM. If the primary is absent or damaged, normal save **does not repair it** merely because startup loaded a backup.
+Pretty-printed JSON may exceed the byte limit even when its compact equivalent fits.
 
-For a genuinely changed configuration, the engine:
+The 16 KiB limit is a storage and parsing boundary, not a guarantee that every theoretically valid configuration can be processed within available heap memory.
 
-1. Writes compact JSON to `device_config.json.tmp` and flushes it.
-2. Reads the temporary file back, compares exact bytes, and validates it again.
-3. Verifies the current primary is valid before rotating backups.
-4. Renames existing `.bak` to `.bak.old` when present.
-5. Renames the primary to `.bak`.
-6. Renames verified `.tmp` to the primary filename.
-7. Reads back and validates the installed primary.
-8. Rebuilds the adapter cache and publishes the new validated RAM snapshot.
+Validation does not establish network reachability, equipment compatibility with a specific command, authentication success, or actual equipment state.
 
-The HTTP management save path then clears pending queue work and resets volatile toggle histories for a changed save. The individual renames are **not a single power-loss-atomic transaction**. Verified writes and two backup generations reduce risk but do not guarantee recovery from every sudden interruption. The full interrupted-write matrix remains untested.
+## 8. Validation Boundaries and Memory Management
 
-**Important:** A save returning successfully is distinct from a physical equipment action succeeding. Saving configuration does not itself execute its actions.
+### 8.1 Engineering principle
 
-## 8. Startup loading and deliberate recovery
+**Validate at trust boundaries, not repeatedly throughout the application.**
 
-Normal `load()` attempts candidates in this order:
+Once configuration data has been validated, use it directly through controlled, read-only accessors.
+
+Do not reconstruct validated configuration objects merely to inspect a room, resolve a device, select a Custom Action, or execute a command.
+
+When verifying persisted data that has already been validated, verify the actual bytes rather than repeatedly parsing and reconstructing the same configuration.
+
+This principle is particularly important on a memory-constrained CircuitPython microcontroller.
+
+### 8.2 Runtime access
+
+The configuration engine owns the active validated RAM snapshot.
+
+Internal accessors include:
+
+- `has_room()`
+- `action_details()`
+- `custom_action_details()`
+- `custom_actions_for_room()`
+- `resolve_device()`
+- `resolve_endpoint()`
+- `command_is_blank()`
+
+These provide efficient access to already validated configuration.
+
+Returned internal object references must be treated as read-only.
+
+`current()` provides a validated copy for consumers requiring an independent configuration object, including management API response construction.
+
+Do not use full configuration copies in frequently executed physical-control or dispatcher paths.
+
+### 8.3 Chapter 12 save optimization
+
+Repeated full validation and serialization previously created substantial temporary allocation pressure during configuration saves.
+
+Observed failures included HTTP memory allocation errors, unsuccessful saves, and uncertain browser save outcomes.
+
+The save pipeline was refactored to:
+
+- Validate the incoming configuration once.
+- Serialize the validated object directly.
+- Validate the existing primary once for disk consistency.
+- Compare validated configuration objects directly.
+- Verify temporary and installed files using bounded byte comparisons.
+- Avoid reconstructing validated objects during file verification.
+
+Two intentional `gc.collect()` calls remain in the save pipeline:
+
+1. At save entry, before validation and other allocation-intensive work.
+2. After incoming validation and serialization, before loading the existing primary.
+
+These collection boundaries reclaim temporary objects before subsequent allocation-intensive operations.
+
+They are intentional production behavior, not leftover debugging instrumentation.
+
+Do not remove or relocate them without regression testing.
+
+### 8.4 Observed results
+
+Following the save refactoring and explicit garbage collection boundaries:
+
+- Twenty consecutive changed browser saves succeeded, covering Save Tests 8 through 27.
+- Three additional changed saves succeeded after removal of temporary memory diagnostics.
+- Post-cleanup configuration save times were approximately 1.3–1.4 seconds.
+- Subsequent configuration GET requests completed in approximately 0.4 seconds.
+
+These tests provide evidence that the observed allocation-failure problem was substantially improved.
+
+They do not establish that CircuitPython's JSON implementation contains a memory leak.
+
+The intermittent HTTP socket-send stall remains a separate unresolved issue.
+
+## 9. Active RAM State and Revisions
+
+`load()` validates a configuration candidate, prepares its adapter cache, activates the cache, and publishes the configuration to module-owned RAM.
+
+A successful load binds the primary file path for subsequent saves.
+
+`revision()` computes a deterministic 32-bit FNV-1a hash over canonical UTF-8 JSON, represented as eight lowercase hexadecimal digits.
+
+The revision is a stale-editor concurrency token, not cryptographic authentication or a globally unique identifier.
+
+The browser obtains the current revision with `GET /api/config` and submits the expected revision with `POST /api/config`.
+
+A revision mismatch rejects the save.
+
+The engine also reads and validates the existing primary and compares it against the active RAM configuration.
+
+An out-of-band disk change rejects the save rather than silently overwriting unexpected data.
+
+### 9.1 Unchanged saves
+
+If the incoming validated configuration equals the active validated configuration, `save()` returns `False`.
+
+An unchanged save does not:
+
+- Rewrite flash.
+- Rotate backups.
+- Replace the adapter cache.
+- Retire adapter sessions.
+- Clear pending actions.
+- Reset toggle histories.
+
+### 9.2 Changed saves
+
+A changed successful save returns `True`.
+
+The new validated configuration and prepared adapter cache become active.
+
+Existing adapter sessions are retired on a best-effort basis.
+
+The HTTP management save path then resets physical configuration-dependent gesture state, clears pending queue work, and resets toggle histories.
+
+This prevents previously captured physical gestures from continuing to use obsolete device mappings.
+
+Saving configuration does not itself execute configured equipment actions.
+
+## 10. Exact Save and Backup Behavior
+
+`save(config, expected_revision, path=None)` requires a previously successful load.
+
+Saving is permitted only to the primary path bound by that load.
+
+The changed-save pipeline is:
+
+1. Reclaim temporary allocations at save entry.
+2. Check the bound path and expected revision.
+3. Validate the incoming configuration.
+4. Serialize the validated configuration into canonical UTF-8 bytes.
+5. Reclaim temporary validation and serialization allocations.
+6. Read and validate the existing primary.
+7. Compare the existing primary against active RAM.
+8. Return without writing if the incoming configuration is unchanged.
+9. Prepare the replacement adapter cache.
+10. Write and flush the temporary file.
+11. Verify the temporary file against the validated serialized bytes.
+12. Rotate the existing backup to `.bak.old` when present.
+13. Rename the primary to `.bak`.
+14. Rename the verified temporary file to the primary filename.
+15. Verify the installed primary against the validated serialized bytes.
+16. Retire old adapter sessions and publish the prepared cache.
+17. Publish the new validated RAM configuration.
+
+Temporary and installed file verification uses bounded 512-byte reads and checks for unexpected trailing data.
+
+The temporary and installed files are not redundantly parsed and validated after exact byte equality has been established.
+
+Individual filesystem renames do not constitute a single power-loss-atomic transaction.
+
+Verified writes and two backup generations reduce risk but do not guarantee recovery from every possible interruption.
+
+The complete interrupted-write matrix remains untested.
+
+### 10.1 Save performance diagnostics
+
+Production `CONFIG PERF` logging reports:
+
+- Validation.
+- Disk consistency check and cache preparation.
+- Persistence.
+- Activation.
+- Total configuration save time.
+
+HTTP POST performance logging provides additional management-path timing.
+
+Temporary `SAVE MEM` checkpoints used during Chapter 12 troubleshooting were removed after successful regression testing.
+
+## 11. Startup Loading and Deliberate Recovery
+
+Normal loading attempts candidates in this order:
 
 ```text
 /clonker/device_config.json
@@ -249,105 +710,312 @@ Normal `load()` attempts candidates in this order:
 /clonker/device_config.json.bak.old
 ```
 
-Each candidate must parse and validate under the **current schema version**. Errors are logged, then the next candidate is tried. If all fail, startup raises an error rather than fabricating a default. Loading a valid backup provides a working RAM configuration but **does not overwrite, delete, or repair** a damaged primary. Subsequent ordinary saves refuse to overwrite that invalid primary.
+Each candidate must parse and validate under the active schema version.
 
-The private `_recover_missing_file()` helper is an **explicit**, narrow operation for a **missing** primary; it may rename a valid backup into place. It will not replace an existing damaged primary. It is not part of normal automatic loading. Do not casually invoke private recovery helpers during routine deployment.
+If all candidates fail, startup raises an error rather than fabricating a default configuration.
 
-Recommended recovery sequence:
+Loading a valid backup does not automatically overwrite, delete, or repair a damaged primary.
 
-1. Capture the serial error and identify which generation failed and why.
-2. Preserve the primary, `.bak`, and `.bak.old` externally before modifying anything.
-3. Check `CONFIG_VERSION`, JSON structure, and deployed firmware compatibility.
-4. Examine whether the primary is missing, truncated, malformed, or an older schema.
-5. Validate a matching backup or known-good exported configuration.
-6. Enter SERVICE (USB) through a **full power cycle** before host-side file restoration.
-7. Restore a deliberate, compatible primary; return to DEVICE and cold boot.
-8. Confirm loaded rooms and actions, browser display, and a harmless real action.
+Ordinary saves refuse to overwrite an absent, invalid, or unexpectedly changed primary.
 
-A Config v2/v3 JSON backup does not become valid Config v4 merely because it parses. Schema migrations are not automatic; preserve compatible firmware/configuration pairs when experimenting with version changes.
+The private `_recover_missing_file()` helper is a separate, explicit operation for a missing primary.
 
-## 9. Browser editor and management API
+It may rename a valid backup into place but does not replace an existing damaged primary.
 
-The management service is available **only in CONFIG**, on port **9090**, and has no application-level authentication or HTTPS. Keep it on a trusted LAN; do not forward it to the public internet. The editor and Test Remote are operational, not mockups.
+It is not part of ordinary automatic loading.
+
+### Recommended recovery procedure
+
+1. Capture the serial error.
+2. Preserve the primary and both backup generations externally.
+3. Confirm the active firmware schema version.
+4. Determine whether the primary is missing, malformed, truncated, or incompatible.
+5. Identify a compatible backup or known-good exported configuration.
+6. Enter SERVICE through a full power cycle before host-side restoration.
+7. Restore the intended primary.
+8. Return to DEVICE and cold boot.
+9. Confirm loaded rooms, browser configuration, and a harmless real action.
+
+Older schema backups do not become valid Config v5 files merely because they contain valid JSON.
+
+Automatic schema migration is not implemented.
+
+Preserve compatible firmware and configuration pairs when experimenting with schema changes.
+
+## 12. Browser Editor and Management API
+
+The management HTTP service listens on port 9090 in CONFIG mode.
+
+It has no application-level authentication or HTTPS.
+
+Use it only on a trusted LAN. Do not expose the management service to the public internet.
 
 | Request | Purpose |
 |---|---|
 | `GET /` | Configuration editor |
 | `GET /remote.html` | Test Remote |
-| `GET /api/config` | Active config plus response-only revision and filesystem-writable metadata |
-| `POST /api/config` | Validate and revision-check a save |
-| `POST /api/action?room=...&action=...` | Enqueue fundamental or custom action |
+| `GET /api/config` | Configuration and response-only metadata |
+| `POST /api/config` | Revision-protected configuration save |
+| `POST /api/action?room=...&action=...` | Enqueue an action |
 | `GET /api/clock` | Clock status |
-| `POST /api/clock?utc=...` | Browser-provided UTC sync |
+| `POST /api/clock?utc=...` | Browser-provided UTC synchronization |
+| `GET /api/flight-recorder` | Flight Recorder download |
 
-`revision` and `filesystem_writable` are API metadata, **not stored JSON schema fields**. The POST handler removes the submitted revision before passing the configuration to the validator. A read-only filesystem rejects persistent saves (HTTP 403). Validation and revision errors produce error responses. Action acceptance reports admission to the queue, not completion.
+Configuration GET response metadata includes:
 
-Current inbound implementation limits (see `firmware/clonker/net/web.py` for changes): port `9090`; maximum request `10240` bytes; maximum headers `2048` bytes; I/O chunks `512` bytes; idle silent-client timeout **0.2 s**; active-client timeout **4.0 s**. The cooperative server handles one client at a time. Browser responsiveness can still be affected by synchronous outbound execution.
+- `revision`
+- `filesystem_writable`
+- `device_types`
 
-The editor exposes room names, built-in device endpoints, fourteen fundamental mappings, toggle ON/OFF paths, ordered custom actions and steps, revision-aware saves, and clock tools. It does not provide arbitrary new room IDs, additional built-in action IDs, nested macros, or custom-device destinations. Browser action tests use the same dispatcher as physical controls.
+These are API metadata, not persisted configuration schema fields.
 
-### Configuration Recipes
+The browser constructs the persisted configuration from `version` and `rooms`.
 
-The repository's top-level [`recipes/`](../recipes/) directory contains maintainer-curated, complete configuration examples. The GitHub-hosted recipe browser provides descriptions, previews, and JSON downloads.
+It includes the expected revision when submitting a save.
 
-The embedded configuration editor provides **Browse Recipes** and **Import JSON** controls. Import replaces the browser editor's contents, including device IP addresses, but does not immediately save anything to the Pico. The user reviews, edits, validates, and explicitly saves the imported configuration.
+The POST handler removes the revision before passing the configuration to the validator.
 
-The recipe library is not copied to the Pico and requires no Config v4 schema change.
+A read-only filesystem rejects persistent saves.
 
-### Configuration refresh recovery
+Action acceptance indicates admission to the shared queue, not completion or equipment-state confirmation.
 
-Configuration GET requests use a browser-side 6-second timeout, with up to three attempts separated by 1.5 seconds. If refreshing fails, the editor reports the failure instead of waiting indefinitely. The browser does not automatically repeat a configuration POST.
+### 12.1 Editor capabilities
 
-A successful POST does not guarantee that the subsequent GET will succeed. When refresh fails after a save, reload the page and verify the persisted configuration before making additional changes.
+The Config v5 editor supports:
 
-See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for the unresolved CircuitPython socket-send investigation.
+- Adding and removing configured rooms.
+- Stable room identifiers.
+- Compact typed device rows.
+- Registry-driven device-type selectors.
+- Device-specific attributes.
+- Protocol-aware fundamental command editors.
+- Independent toggle command objects.
+- Ordered Custom Actions and steps.
+- Automatically generated Custom Action identifiers.
+- Revision-aware configuration saves.
+- Configuration recipe browsing and JSON import.
+- Clock tools and access to the Test Remote.
 
-## 10. Action execution and transport boundary
+The last configured room cannot be removed.
 
-Configuration describes **what** command is associated with an action. The shared dispatcher and Dumb Queue™ decide **when** to execute; adapters and transports decide **how** to deliver. Keep these concerns separate.
+Changing a device type or command target may make existing commands incompatible. Existing commands are not silently translated into another protocol.
 
-- Queue capacity is **128**. Each poll executes at most one eligible outbound command.
-- Future-dated custom steps do not block unrelated immediately eligible work.
-- A failed execution clears remaining queued work; there are no automatic retries.
-- Generic configured commands use bounded, synchronous HTTP GET/POST.
-- The Denon adapter recognizes the configured **fundamental** `volume-up`/`volume-down` GET paths exactly matching `/goform/formiPhoneAppDirect.xml?MVUP` and `?MVDOWN`; those use a persistent TCP connection on port **23**, sending `MVUP` or `MVDOWN` with carriage return.
-- Denon TCP volume commands have a **50 ms minimum spacing**. A command waiting for pacing stays queued and preserves ordering. Other configured commands, including custom-action steps, remain on generic HTTP unless separately supported.
-- Adapter mappings are rebuilt when configuration changes. No new configuration schema fields are required for the Denon TCP optimization.
-- A network success or HTTP 2xx is not proof that the receiver or television changed state. The TCP adapter likewise does not parse equipment responses into authoritative state.
+The user must resolve incompatible mappings before saving.
 
-The Bourns physical volume encoder on GP8/GP9 generates generic volume actions, not Denon-specific commands. Physical room selection (GP3/GP6/GP7) determines which configured room receives them. GP2 Power Toggle and the browser Test Remote share the same action path. The volume encoder push-to-mute, custom-action encoder, navigation buttons, OLED, audio feedback, and future sleep/ignition system remain pending.
+LG SSAP and pointer editing are implemented. LG runtime execution and operational pairing remain deferred.
 
-For transport details, exact scheduler intervals, and test evidence, use [Firmware, Network & Clock](FIRMWARE_NETWORK.md), not duplicated configuration rules here.
+Apple TV and Fire TV appear as unavailable future device types.
 
-## 11. Regression checklist
+### 12.2 HTTP implementation limits
 
-The Bourns physical volume encoder on GP8/GP9 generates generic volume actions, not Denon-specific commands. Physical room selection (GP3/GP6/GP7) determines which configured room receives them. GP2 Power Toggle, volume push-to-mute, navigation, playback buttons, and the browser Test Remote share the same action system.
+| Setting | Value |
+|---|---:|
+| Listener port | 9090 |
+| Maximum request bytes | 18432 |
+| Maximum header bytes | 2048 |
+| Configuration POST body limit | 16640 bytes |
+| Receive chunk | 128 bytes |
+| Send chunk | 512 bytes |
+| Silent-client timeout | 200 ms |
+| Active-client timeout | 4 seconds |
 
-Chapter 7 added six explicit Roku physical-button holds (navigation Up/Down/Left/Right and Skip Back/Forward). These use queued press/release events and require a valid Roku endpoint, POST method, and recognized ECP command path. Unlike ordinary fundamental actions, the current hold execution path does not yet treat blank commands as no-ops. See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for implementation details.
+The cooperative management server handles one client at a time.
 
-- **Schema:** Reject unknown/missing keys, unsupported versions, invalid room IDs, invalid endpoints, missing fundamental actions, invalid toggle fields, and custom-action rule violations.
-- **Size:** Test the 8192-byte serialized limit, including multibyte UTF-8 cases where relevant.
-- **Stale editor:** Save from Tab A; verify stale Tab B is rejected until refreshed.
-- **Unchanged save:** Confirm no flash rewrite or queue/toggle reset.
-- **Changed save:** Confirm persistence after cold boot, backup rotation, adapter rebuild, and queue/toggle reset.
-- **Filesystem:** Confirm SERVICE + CONFIG rejects saves and DEVICE + CONFIG permits valid saves.
-- **Out-of-band change:** Confirm disk/RAM mismatch rejects a save rather than overwriting an unexpected primary.
-- **Recovery:** Test primary, `.bak`, `.bak.old` fallback separately; verify fallback does not silently repair primary.
-- **Execution:** Test both rooms, configured no-ops, power/mute histories, custom step waits, mixed HTTP/TCP ordering, and failures clearing the queue.
-- **Physical:** Verify all three room-selector positions, Power Toggle, volume/mute, navigation and playback buttons, and Roku press/release behavior. For configured Room 3, verify ordinary blank-command no-ops separately from physical hold behavior; blank-command protection for holds remains pending.
+The application-level timeout cannot interrupt a lower-level socket operation that has already blocked.
 
-Record what was actually exercised rather than labeling the entire checklist “passed.” The documented Denon volume bench tests included five slow and ten moderate clicks in each direction and aggressive turning, with volume returning to its starting level. A separate TCP pacing test sent ten commands in approximately 606 ms; mixed-transport queue regression tests covered ordering, waits, and failure clearing. Those are useful evidence, not exhaustive long-duration guarantees.
+Chapter 12 testing observed individual socket sends taking approximately ten seconds despite the intended nonblocking operation.
 
-## 12. History and future compatibility
+See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for investigation details.
 
-- **XML v1:** Historical engine and migration context; not the active format.
-- **Config v2:** JSON foundation with fixed mappings; historical.
-- **Config v3:** Generic `device-1`/`device-2`/`device-3` slots; historical.
-- **Config v4:** Optional configured rooms, fourteen fundamental actions, ordered custom actions, revision-protected persistence; **active**.
-- **Chapter 6 transport:** Denon TCP volume adapter and physical encoder use the existing Config v4 mappings; **no schema bump**.
-- **Deferred:** `custom_devices`/`device-4` onward, Apple TV protocol integration, and any new schema required by those capabilities.
+### 12.3 Save and refresh uncertainty
 
-Dated migrations, bench experiments, and prior implementation snapshots belong in [Development History](DEVELOPMENT_HISTORY.md). Do not preserve obsolete behavior as if it were current, and do not silently delete historically meaningful decisions.
+A successful persistence operation does not guarantee successful delivery of the HTTP response or subsequent configuration refresh.
+
+The browser does not automatically repeat configuration POST requests.
+
+If a save outcome is reported as uncertain:
+
+1. Do not immediately repeat the save.
+2. Allow the current HTTP operation to finish.
+3. Reload the configuration when the management service responds.
+4. Verify whether the intended change was persisted.
+5. Continue editing only after obtaining the current configuration and revision.
+
+The intermittent socket-send stall can temporarily affect ordinary GET requests as well as save responses.
+
+Recovery without a reboot was observed during Chapter 12 testing, but the precise trigger and recovery mechanism remain unknown.
+
+Physical controls and outbound Roku and Denon operations were verified to remain functional between stalled management requests.
+
+Responsiveness during an individual blocking socket call has not been established.
+
+## 13. Configuration Recipes
+
+The top-level [recipes/](../recipes/) directory contains maintainer-curated configuration examples.
+
+The hosted recipe browser provides descriptions, JSON previews, and downloads.
+
+The embedded configuration editor provides Browse Recipes and Import JSON controls.
+
+Import replaces the browser's editable configuration contents but does not immediately persist anything to the Pico.
+
+The user reviews and edits the imported configuration before explicitly saving it.
+
+The active device registry and current revision remain management metadata rather than imported recipe data.
+
+### 13.1 Compatibility
+
+The active editor requires Config v5 recipes.
+
+Older Config v4 recipes are rejected rather than silently migrated.
+
+The hosted recipe library is maintained separately from the Pico firmware.
+
+Existing published recipes must be updated to Config v5 before they can be imported into the current editor.
+
+### 13.2 Publishing recipes
+
+A published recipe should preserve:
+
+- Schema version.
+- Stable room and device identifiers.
+- Device types.
+- Fundamental command mappings.
+- Custom Action identifiers and names.
+- Custom Action and step ordering.
+- Protocol payloads.
+- Step delays.
+
+Remove or replace sensitive credentials before publication.
+
+For example:
+
+```json
+"client_key": "PASTE_OR_PAIR_CLIENT_KEY_HERE"
+```
+
+A placeholder may be structurally valid configuration data, but it is not an operational authentication credential.
+
+Do not publish live client keys, passwords, or other private authentication material.
+
+Review device endpoints and replace private information as appropriate for the intended example.
+
+Validate the sanitized recipe against the active schema before publication.
+
+Readable, pretty-printed recipes are preferred for human inspection. The Pico persists compact canonical JSON.
+
+## 14. Configuration and Execution Boundaries
+
+Configuration describes what command is associated with an action.
+
+The dispatcher and One Dumb Queue™ decide when to execute it.
+
+Device adapters and transports decide how to deliver it.
+
+The central device-type registry establishes command compatibility and availability.
+
+The adapter coordinator resolves operational execution behavior using the declared device type and command context.
+
+The queue remains shared by physical controls and browser actions.
+
+### Current operational execution paths
+
+- Generic HTTP.
+- Denon persistent TCP volume.
+- Roku persistent button taps.
+- Roku native button holds.
+- Roku volume holds.
+
+The Denon TCP optimization uses recognized fundamental volume commands on port 23.
+
+Roku specialized execution requires the explicitly configured Roku device type and compatible command mapping.
+
+A generic HTTP device does not acquire Roku or Denon specialization merely because its command path resembles one of their commands.
+
+Custom Action steps retain single-command semantics.
+
+LG webOS runtime integration will extend this architecture rather than introduce a separate action executor.
+
+See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for transport behavior, timing, and failure policy.
+
+## 15. Regression Testing
+
+The test inventory lives in the repository's `firmware/tests/` directory and is deployed to `/tests/` on the Pico.
+
+Chapter 12 introduced the following focused regression suites:
+
+| Test | Purpose | Initial result |
+|---|---|---:|
+| `test_config_validation.py` | Config v5 validation | 49/49 |
+| `test_config_persistence.py` | Persistence and recovery | 56/56 |
+| `test_typed_adapters.py` | Typed adapter selection | 56/56 |
+| `test_config_activation.py` | Configuration and adapter activation lifecycle | 54/54 |
+| `test_typed_queue.py` | Dispatcher and typed command execution | 92/92 |
+| `test_typed_physical.py` | Physical gesture and queue integration | 129/129 |
+| **Total** | **Initial automated assertions** | **436/436** |
+
+These results represent the individual implementation-stage test runs. They are not a claim that every suite was rerun after every subsequent optimization.
+
+Additional live testing verified Roku, Denon, generic HTTP, room selection, Custom Actions, toggle behavior, editor operations, and repeated browser saves.
+
+### Regression checklist
+
+- Reject malformed and incompatible configuration data.
+- Verify serialized size limits and UTF-8 handling.
+- Reject stale revisions.
+- Preserve state during unchanged saves.
+- Verify changed-save persistence and backup rotation.
+- Verify adapter activation and session retirement.
+- Reject unexpected disk changes.
+- Verify backup fallback without implicit repair.
+- Confirm SERVICE mode rejects persistent browser saves.
+- Confirm DEVICE + CONFIG permits valid saves.
+- Exercise repeated saves without rebooting.
+- Verify room addition and removal without renumbering.
+- Verify stable Custom Action identifiers.
+- Verify protocol-aware editor behavior.
+- Reject obsolete recipe versions.
+- Verify blank endpoint and command behavior.
+- Exercise physical and browser action paths.
+- Verify Custom Action ordering and delays.
+- Verify queue failure cancellation.
+- Confirm physical gesture state is reset after configuration changes.
+- Verify configuration reload after a cold boot.
+- Monitor memory behavior during repeated management operations.
+
+Record what was actually exercised.
+
+Passing focused tests does not establish exhaustive long-duration reliability or compatibility with every possible equipment configuration.
+
+## 16. History and Future Compatibility
+
+| Schema | Historical significance |
+|---|---|
+| XML v1 | Original configuration foundation |
+| JSON v2 | Fixed JSON command mappings |
+| JSON v3 | Generic built-in device identifiers |
+| JSON v4 | Optional rooms, fourteen fundamental actions, Custom Actions, revision-protected persistence |
+| JSON v5 | Typed devices, protocol-aware commands, centralized registry, redesigned editor |
+
+Config v5 is the active schema.
+
+Historical implementation details belong in [Development History](DEVELOPMENT_HISTORY.md).
+
+The original Chapter 12 design and architectural decisions are preserved in [Configuration Redesign](CONFIGURATION_REDESIGN.md).
+
+### Deferred capabilities
+
+- Operational LG webOS adapter integration.
+- LG pairing and authenticated session management.
+- Additional user-defined device destinations.
+- `device-4` and subsequent stable destination identifiers.
+- Apple TV protocol integration.
+- Amazon Fire TV protocol integration.
+- Further investigation of intermittent management socket stalls.
+
+Additional device destinations are not part of the active Config v5 schema.
+
+Future extensions must preserve stable identifiers, explicit device typing, protocol-aware commands, validation boundaries, and the shared action execution architecture.
 
 ---
 
