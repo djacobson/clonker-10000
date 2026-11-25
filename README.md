@@ -34,7 +34,8 @@ And perhaps a case that opens with actual lunchbox latches.
     <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython 10.3.1<br>
     <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (planned)<br>
     <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
-    <b>Televisions:</b> LG webOS (configuration-ready, experimental adapter) · Samsung, TCL, and others (future possibilities)<br>
+    <b>Televisions:</b> LG webOS (working on tested G1) · Samsung, TCL, and others (future possibilities)<br>
+    <b>Power management:</b> Wake-on-LAN · Configurable power commands<br>
     <b>Configuration:</b> Browser editor · Config v5 · Typed devices · Custom Actions<br>
     <b>Physical controls:</b> Room selector · Power · Volume/Mute · Navigation · Playback
   </sub>
@@ -233,18 +234,19 @@ The second rotary encoder selects and executes room-specific custom actions dire
 
 ### Device Compatibility Roadmap
 
-Current tested equipment includes:
+Current tested equipment and protocols include:
 
 - **Denon AV receivers**, using HTTP commands and persistent TCP for recognized volume actions.
 - **Roku streaming devices**, using ECP commands, including held-key behavior.
+- **LG webOS televisions**, using authenticated WebSocket connections, SSAP commands, and pointer navigation. Operational integration has been hardware-tested on the Sunroom LG G1.
+- **Generic HTTP devices**, using configurable GET and POST commands.
+- **Wake-on-LAN-compatible equipment**, using configurable UDP magic packets. Extended-standby wake-up has been hardware-tested on the LG G1.
 
-**LG webOS is the next experimental protocol.**
+The [LG webOS adapter](firmware/clonker/devices/lg_webos.py) is fully connected to the typed-device architecture and the existing command dispatcher.
 
-Standalone CircuitPython experiments have successfully demonstrated TV pairing, reusable client keys, navigation, audio control, application launching, and persistent WebSocket connections.
+LG pairing has been demonstrated through standalone CircuitPython experiments. Client keys are currently entered manually in the configuration editor.
 
-A [draft LG webOS adapter](firmware/clonker/devices/lg_webos.py) consolidates these experiments but is not yet integrated into the running Clonker.
-
-The completed Config v5 redesign directly supports its future integration, including editable client keys, SSAP commands, pointer commands, and a reserved pairing control.
+Compatibility with newer LG televisions, including the Den C6H, remains under investigation.
 
 **Apple TV and Amazon Fire TV remain future compatibility objectives.**
 
@@ -488,7 +490,11 @@ The TV, AVR, and Streaming labels are organizational conveniences, not restricti
 
 A centralized device-type registry supplies capabilities to both the firmware and browser editor.
 
-Config v5 also provides configuration support for future LG webOS SSAP commands, structured JSON payloads, pointer commands, and client keys. Operational LG execution and pairing remain pending.
+Config v5 supports operational LG webOS SSAP commands, structured JSON payloads, pointer commands, and configuration-owned client keys.
+
+Wake-on-LAN commands can be assigned to either direction of a fundamental Power Toggle or to individual Custom Action steps. They support configurable MAC addresses, IPv4 broadcast destinations, and UDP ports.
+
+LG client keys can be entered manually. Integrated pairing remains a future enhancement.
 
 The current Room 3 placeholder has blank equipment commands. Unconfigured controls safely do nothing rather than silently redirecting commands to another room.
 
@@ -514,7 +520,7 @@ See [Operating Modes](docs/OPERATING_MODES.md).
 
 ## Where the Monster Stands
 
-**November 24, 2026 — Chapter 12 milestone: The Monster Gets Organized.**
+**November 25, 2026 — Chapter 13 milestone: The Monster Learns Another Language.**
 
 The Clonker 10000 is still in extreme beta.
 
@@ -534,6 +540,10 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 - **Custom actions at your fingertips:** Rotate the second Bourns encoder to choose an action, then press to execute it. The OLED inverts to acknowledge the CLONK.
 - **A screen that speaks:** The OLED identifies rooms, displays selected actions, reports volume direction and mute feedback, and sleeps after inactivity. All without constantly redrawing itself.
 - **A more organized brain:** Wi-Fi, Config v5, explicitly typed devices, a redesigned browser editor, fourteen fundamental actions, Custom Actions, and the same beloved Dumb Queue™.
+- **The Monster speaks webOS:** Native LG television control through authenticated WebSockets, SSAP commands, and pointer buttons.
+- **Wake up, sleepy television:** Configurable Wake-on-LAN commands for power management and Custom Actions.
+- **A different kind of picture show:** The Sunroom Picture Cycle Custom Action advances the LG picture mode with a single press of the Custom Action knob.
+- **One queue, many languages:** Roku, Denon, LG webOS, generic HTTP, and Wake-on-LAN commands share the same execution architecture. 
 - **A more responsive workshop:** CONFIG-mode browser improvements and Chapter 8 physical polling optimizations are operational.
 - **The Monster goes cordless — and gets sleepy:** Chapter 9 delivered a permanently installed rechargeable power system with two 18650 cells, a DFRobot module, and external USB-C charging. Software-managed sleep/wake is operational, while Chapter 10 investigates battery endurance and power-system behavior.
 
@@ -571,7 +581,9 @@ Of course, that won't stop us from wanting to know *why* it works.
 - Continue reliability and failure-recovery testing, including the intermittent CONFIG HTTP send stall.
 - Investigate hardware deep sleep when supported.
 - Continue expanding the typed-device architecture as new protocols are integrated.
-- Integrate the experimental LG webOS adapter and device pairing.
+- Integrate LG device pairing into the configuration editor.
+- Investigate secure WebSocket connectivity and certificate trust for newer LG televisions.
+- Explore native LG button hold/release behavior.
 - Expand future compatibility, including Apple TV and Amazon Fire TV.
 - Explore additional OLED feedback where it provides real value.
 
@@ -581,19 +593,23 @@ The physical controls are assembled and operational. The rechargeable power syst
 
 Chapter 11 ventured into new territory: direct control of LG webOS televisions using WebSockets, authenticated connections, and reusable client keys.
 
-Chapter 12 reorganized the Clonker's configuration architecture to accommodate these new protocols without disrupting its existing Roku and Denon capabilities.
+Chapter 12 reorganized the Clonker's configuration architecture to accommodate new protocols without disrupting its existing Roku and Denon capabilities.
 
-Config v5 is now operational, with explicitly typed devices, a redesigned browser editor, and configuration support for future authenticated devices.
+Chapter 13 put that architecture to work. Native LG webOS control is now operational on the Sunroom LG G1, including SSAP commands, pointer navigation, persistent WebSocket connections, and asynchronous response handling.
 
-Six focused automated regression suites passed a combined 436 assertions during development, followed by successful live equipment testing.
+The Monster also learned Wake-on-LAN, allowing it to wake compatible equipment even after its ordinary network control service becomes unavailable.
 
-We also substantially improved configuration-save memory management, completing twenty consecutive changed saves without rebooting.
+The Sunroom's Picture Cycle Custom Action demonstrates native television control alongside the existing Roku and Denon commands, without changing the fundamental physical controls.
 
-The next major software adventure is integrating the experimental LG webOS adapter and its pairing mechanism.
+Six focused automated regression suites now pass a combined **548 assertions with zero failures**, supplemented by successful live equipment testing.
 
-See the [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) for the architectural journey.
+And all of this still runs through the same beloved Dumb Queue™.
 
-**The Monster Gets Organized.**
+See the [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) for the architectural journey and the [Clonker Recipes](recipes/) for complete example configurations.
+
+**The Monster Learns Another Language.**
+
+Integrated LG pairing and compatibility with newer LG televisions remain future adventures.
 
 Of course, we still haven't entirely evicted the CONFIG HTTP gremlin. Apparently, it has a ten-second lease.
 
