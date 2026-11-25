@@ -19,7 +19,13 @@ and Custom Actions.
 - `david-roku-denon-starter.json` — a complete Config v5
   recipe based on a working configuration exported
   from the physical Clonker.
-
+- `david-lg-webos-starter.json` — an experimental,
+  single-room LG webOS Config v5 recipe created
+  for Chapter 13 adapter integration and testing.
+  Includes SSAP commands, pointer commands,
+  a placeholder client key, and temporary
+  integration-test Custom Actions.
+ 
 The catalog's `index_version` is independent of the
 Clonker configuration schema version.
 
@@ -74,7 +80,7 @@ every device is reachable or operational.
 Never publish live authentication credentials,
 client keys, passwords, or access tokens.
 
-For future LG webOS recipes, replace actual client
+For LG webOS recipes, replace actual client
 keys with the explicit placeholder:
 
 `PASTE_OR_PAIR_CLIENT_KEY_HERE`
