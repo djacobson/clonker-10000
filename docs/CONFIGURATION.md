@@ -1,10 +1,9 @@
-
 # The Clonker 10000 — Configuration, Persistence & Recovery
 
-**Design reference:** November 24, 2026  
+**Design reference:** November 25, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
 **Active schema:** Clonker Config v5 (JSON)  
-**Baseline:** Chapter 12 — The Monster Gets Organized
+**Baseline:** Chapter 13 — The Monster Learns Another Language
 
 > Clonker controls intent, not reality. A command can be accepted, transmitted, and acknowledged without proving what the television actually did.
 
@@ -44,7 +43,7 @@ Never overwrite the active configuration casually during firmware deployment.
 - Strict validation at configuration trust boundaries.
 - Efficient access to already validated configuration.
 - Deterministic serialization and bounded storage.
-- Intentional no-ops for blank fundamental commands and endpoints.
+- Intentional no-ops for blank fundamental commands and missing required endpoints; Wake-on-LAN is endpoint-independent.
 - No implicit migration, repair, command replay, or equipment-state inference.
 - One shared dispatcher and One Dumb Queue™.
 
@@ -195,10 +194,10 @@ The registry defines:
 
 | Type ID | Display label | Suggested port | Command kinds | Status |
 |---|---|---:|---|---|
-| `generic-http` | Generic HTTP | 80 | HTTP | Operational |
-| `denon` | Denon AVR | 8080 | HTTP | Operational |
-| `roku` | Roku ECP | 8060 | HTTP | Operational |
-| `lg-webos` | LG webOS | 3000 | SSAP, Pointer | Configuration only |
+| `generic-http` | Generic HTTP | 80 | HTTP, Wake-on-LAN | Operational |
+| `denon` | Denon AVR | 8080 | HTTP, Wake-on-LAN | Operational |
+| `roku` | Roku ECP | 8060 | HTTP, Wake-on-LAN | Operational |
+| `lg-webos` | LG webOS | 3000 | SSAP, Pointer, Wake-on-LAN | Operational |
 | `apple-tv` | Apple TV | — | — | Future |
 | `fire-tv` | Amazon Fire TV | — | — | Future |
 
@@ -208,7 +207,7 @@ Suggested ports are not necessarily the ports used by specialized transports. Fo
 
 Command compatibility and runtime availability are separate concepts.
 
-LG webOS configuration is intentionally supported before runtime integration. Apple TV and Fire TV remain unavailable for configuration and execution.
+LG webOS runtime execution is operational on tested equipment. Apple TV and Fire TV remain unavailable for configuration and execution.
 
 ### 3.5 Device-specific attributes
 
@@ -226,9 +225,9 @@ The client key is a string of at most 512 characters.
 
 A blank key is valid configuration data but does not establish an authenticated device session.
 
-The editor exposes an editable client-key field and a pairing control for LG webOS. The pairing control remains disabled pending runtime integration.
+The editor exposes an editable client-key field and a reserved pairing control. Runtime authentication is operational using manually entered client keys; integrated pairing remains disabled.
 
-A valid LG configuration does not imply that LG commands can currently execute.
+Blank keys and `PASTE_OR_PAIR_CLIENT_KEY_HERE` are valid configuration data but are rejected for authenticated LG execution. Wake-on-LAN does not require an LG client key.
 
 Client keys must be treated as credentials and excluded from public configuration recipes.
 
@@ -303,7 +302,33 @@ A blank button is permitted for fundamental actions.
 
 The validator checks the command representation, not whether a particular television implements the requested button.
 
-SSAP and pointer commands are configuration-ready but are not yet connected to the operational dispatcher.
+SSAP and pointer commands are operational through the LG webOS adapter and shared dispatcher.
+
+### 4.4 Wake-on-LAN commands
+
+```json
+{
+  "kind": "wake-on-lan",
+  "mac": "02:00:00:00:00:00",
+  "broadcast": "192.168.50.255",
+  "port": 9
+}
+```
+
+Wake-on-LAN is a reusable transport command supported by all operational device types.
+
+- `mac` contains six colon-separated hexadecimal octets, normalized to uppercase.
+- A blank MAC is permitted for fundamental Power Toggle commands, but not Custom Action steps.
+- `broadcast` must be a nonblank dotted-decimal IPv4 address.
+- `port` must be an integer from 1 through 65535.
+
+The editor defaults to broadcast address `255.255.255.255` and UDP port 9.
+
+Wake-on-LAN is permitted only for either direction of a fundamental Power Toggle or individual Custom Action steps. It requires neither a device endpoint nor authentication credentials.
+
+The transport sends one 102-byte UDP magic packet through a temporary socket. Successful transmission does not confirm equipment wake-up. No automatic retries, response tracking, or additional execution queue are introduced.
+
+Extended-standby wake-up has been hardware-tested on the Sunroom LG G1.
 
 ## 5. Fundamental Actions
 
@@ -343,7 +368,7 @@ An LG configuration example:
 }
 ```
 
-The second example illustrates future LG execution configuration, not currently operational LG control.
+The second example illustrates operational LG SSAP volume control, hardware-tested on the Sunroom LG G1.
 
 ### 5.2 Toggle actions
 
@@ -377,7 +402,9 @@ The dispatcher maintains independent volatile next-direction histories for each 
 
 A successful execution advances the history.
 
-Failed execution, missing endpoints, and selected blank commands do not advance it.
+For LG SSAP and Wake-on-LAN, successful transmission advances the history without confirming equipment state. A subsequent asynchronous LG failure does not roll back that history.
+
+Immediate execution failures, missing required endpoints, and selected blank commands do not advance it. Wake-on-LAN does not require a device endpoint.
 
 A changed configuration save resets all toggle histories. An unchanged save preserves them.
 
@@ -391,7 +418,7 @@ The physical Power Toggle controls configured room equipment; it does not turn t
 
 Blank fundamental commands and blank device endpoints are valid.
 
-A selected blank command or missing endpoint produces an intentional no-op rather than an invented substitute command.
+A selected blank command or missing required endpoint produces an intentional no-op rather than an invented substitute command. Wake-on-LAN does not require an endpoint.
 
 Physical hold handling also checks blank commands and endpoints before admitting specialized hold work.
 
@@ -477,6 +504,10 @@ There are no nested macros, loops, branches, parallel executors, automatic retri
 Custom Action steps resolve through the configured device type.
 
 Existing Roku and Denon HTTP Custom Action steps retain single-command generic HTTP execution. They do not implicitly acquire fundamental-action hold or repeat behavior.
+ 
+LG Custom Action steps may execute SSAP or pointer commands. Wake-on-LAN steps are supported for all operational device types and require neither a device endpoint nor an LG authentication key.
+
+For LG SSAP commands, successful transmission starts the configured step delay without waiting for a response. A subsequent asynchronous failure cancels remaining queued work.
 
 The physical Custom Action encoder selects an action and runs it when pressed. The browser Test Remote uses the same dispatcher.
 
@@ -518,6 +549,7 @@ The Sunroom Movie action has been verified with:
 | SSAP URI | 512 characters |
 | Pointer button | 64 characters |
 | LG client key | 512 characters |
+| Wake-on-LAN UDP port | 1–65535 |
 | Custom Action ID | 40 characters |
 | Custom Action name | 60 characters |
 | Custom Actions per room | 16 |
@@ -790,6 +822,8 @@ Configuration GET response metadata includes:
 
 These are API metadata, not persisted configuration schema fields.
 
+The GET response includes configuration-owned LG client keys. Treat exports as private until sanitized.
+
 The browser constructs the persisted configuration from `version` and `rooms`.
 
 It includes the expected revision when submitting a save.
@@ -823,7 +857,9 @@ Changing a device type or command target may make existing commands incompatible
 
 The user must resolve incompatible mappings before saving.
 
-LG SSAP and pointer editing are implemented. LG runtime execution and operational pairing remain deferred.
+LG SSAP, pointer, and Wake-on-LAN editing and execution are operational. LG client keys are entered manually; integrated pairing remains disabled.
+
+Wake-on-LAN appears only for Power Toggle commands and Custom Action steps on operational device types.
 
 Apple TV and Fire TV appear as unavailable future device types.
 
@@ -919,11 +955,19 @@ A placeholder may be structurally valid configuration data, but it is not an ope
 
 Do not publish live client keys, passwords, or other private authentication material.
 
+Replace equipment-specific Wake-on-LAN MAC addresses with a synthetic, structurally valid placeholder such as `02:00:00:00:00:00`.
+
 Review device endpoints and replace private information as appropriate for the intended example.
 
 Validate the sanitized recipe against the active schema before publication.
 
 Readable, pretty-printed recipes are preferred for human inspection. The Pico persists compact canonical JSON.
+
+### 13.3 Exporting the active configuration
+
+Use `GET /api/config` to export the active in-memory configuration. Remove the response-only `device_types`, `revision`, and `filesystem_writable` fields before publication. Retain `version` and `rooms`, including stable identifiers. The API does not independently verify disk persistence.
+
+When copying directly from CIRCUITPY, rebooting into USB service mode can help avoid stale host filesystem views.
 
 ## 14. Configuration and Execution Boundaries
 
@@ -946,6 +990,9 @@ The queue remains shared by physical controls and browser actions.
 - Roku persistent button taps.
 - Roku native button holds.
 - Roku volume holds.
+- LG webOS SSAP requests with asynchronous response handling.
+- LG webOS pointer buttons.
+- Wake-on-LAN UDP magic packets.
 
 The Denon TCP optimization uses recognized fundamental volume commands on port 23.
 
@@ -955,7 +1002,11 @@ A generic HTTP device does not acquire Roku or Denon specialization merely becau
 
 Custom Action steps retain single-command semantics.
 
-LG webOS runtime integration will extend this architecture rather than introduce a separate action executor.
+LG webOS and Wake-on-LAN extend this architecture without introducing a separate action executor.
+
+LG SSAP commands use transmit-and-continue semantics. Successful transmission completes the queue task or advances its Custom Action step; responses are handled asynchronously. An asynchronous request failure cancels remaining queued work. Already transmitted commands are not replayed or rolled back.
+
+Wake-on-LAN completes upon successful UDP packet transmission, not confirmation of equipment wake-up.
 
 See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for transport behavior, timing, and failure policy.
 
@@ -963,21 +1014,21 @@ See [Firmware, Network & Clock](FIRMWARE_NETWORK.md) for transport behavior, tim
 
 The test inventory lives in the repository's `firmware/tests/` directory and is deployed to `/tests/` on the Pico.
 
-Chapter 12 introduced the following focused regression suites:
+Chapter 12 introduced six focused regression suites. Chapter 13 extended validation, adapter, and queue coverage for LG webOS and Wake-on-LAN.
 
-| Test | Purpose | Initial result |
-|---|---|---:|
-| `test_config_validation.py` | Config v5 validation | 49/49 |
-| `test_config_persistence.py` | Persistence and recovery | 56/56 |
-| `test_typed_adapters.py` | Typed adapter selection | 56/56 |
-| `test_config_activation.py` | Configuration and adapter activation lifecycle | 54/54 |
-| `test_typed_queue.py` | Dispatcher and typed command execution | 92/92 |
-| `test_typed_physical.py` | Physical gesture and queue integration | 129/129 |
-| **Total** | **Initial automated assertions** | **436/436** |
+| Test | Purpose | Chapter 12 | Chapter 13 |
+|---|---|---:|---:|
+| `test_config_validation.py` | Config v5 validation | 49/49 | 71/71 |
+| `test_config_persistence.py` | Persistence and recovery | 56/56 | 56/56 |
+| `test_typed_adapters.py` | Typed adapter selection | 56/56 | 85/85 |
+| `test_config_activation.py` | Configuration and adapter activation lifecycle | 54/54 | 54/54 |
+| `test_typed_queue.py` | Dispatcher and typed command execution | 92/92 | 153/153 |
+| `test_typed_physical.py` | Physical gesture and queue integration | 129/129 | 129/129 |
+| **Total** | **Automated assertions** | **436/436** | **548/548** |
 
-These results represent the individual implementation-stage test runs. They are not a claim that every suite was rerun after every subsequent optimization.
+Chapter 12 results represent implementation-stage runs. All six suites passed on the physical Pico after Chapter 13 LG and Wake-on-LAN integration, before final comment and editor-label cleanup.
 
-Additional live testing verified Roku, Denon, generic HTTP, room selection, Custom Actions, toggle behavior, editor operations, and repeated browser saves.
+Live testing verified Roku, Denon, generic HTTP, room selection, Custom Actions, toggle behavior, editor operations, repeated saves, LG SSAP and pointer commands, asynchronous rejection cancellation, network failure recovery, and Wake-on-LAN from extended standby. Actual LG response-timeout behavior remains to be tested.
 
 ### Regression checklist
 
@@ -1000,6 +1051,8 @@ Additional live testing verified Roku, Denon, generic HTTP, room selection, Cust
 - Exercise physical and browser action paths.
 - Verify Custom Action ordering and delays.
 - Verify queue failure cancellation.
+- Verify asynchronous LG failure cancellation without replay or rollback.
+- Verify Wake-on-LAN validation, endpoint-independent execution, and extended-standby wake-up.
 - Confirm physical gesture state is reset after configuration changes.
 - Verify configuration reload after a cold boot.
 - Monitor memory behavior during repeated management operations.
@@ -1026,8 +1079,9 @@ The original Chapter 12 design and architectural decisions are preserved in [Con
 
 ### Deferred capabilities
 
-- Operational LG webOS adapter integration.
-- LG pairing and authenticated session management.
+- Integrated LG pairing and credential handoff through the configuration editor.
+- Secure WebSocket connectivity and certificate trust for newer LG televisions.
+- Native LG pointer button hold/release behavior.
 - Additional user-defined device destinations.
 - `device-4` and subsequent stable destination identifiers.
 - Apple TV protocol integration.
