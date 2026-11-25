@@ -13,6 +13,7 @@ DEFAULT_TYPE = "generic-http"
 HTTP = "http"
 SSAP = "ssap"
 POINTER = "pointer"
+WAKE_ON_LAN = "wake-on-lan"
 
 # Registry order determines device selector display order.
 #
@@ -34,7 +35,7 @@ DEVICE_TYPES = {
         "label": "Generic HTTP",
         "enabled": True,
         "default_port": 80,
-        "command_kinds": (HTTP,),
+        "command_kinds": (HTTP, WAKE_ON_LAN),
         "attributes": (),
         "pairing": False,
     },
@@ -42,7 +43,7 @@ DEVICE_TYPES = {
         "label": "Denon AVR",
         "enabled": True,
         "default_port": 8080,
-        "command_kinds": (HTTP,),
+        "command_kinds": (HTTP, WAKE_ON_LAN),
         "attributes": (),
         "pairing": False,
     },
@@ -50,7 +51,7 @@ DEVICE_TYPES = {
         "label": "Roku ECP",
         "enabled": True,
         "default_port": 8060,
-        "command_kinds": (HTTP,),
+        "command_kinds": (HTTP, WAKE_ON_LAN),
         "attributes": (),
         "pairing": False,
     },
@@ -58,7 +59,7 @@ DEVICE_TYPES = {
         "label": "LG webOS",
         "enabled": True,
         "default_port": 3000,
-        "command_kinds": (SSAP, POINTER),
+        "command_kinds": (SSAP, POINTER, WAKE_ON_LAN),
         "attributes": ("client_key",),
         "pairing": True,
     },
