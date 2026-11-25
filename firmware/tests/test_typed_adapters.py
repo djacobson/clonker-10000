@@ -600,6 +600,110 @@ def test_lg_execution():
     )
 
 
+def test_wake_on_lan():
+    command = {
+        "kind": "wake-on-lan",
+        "mac": "02:00:00:AB:CD:EF",
+        "broadcast": "192.168.1.255",
+        "port": 9,
+    }
+
+    wol = adapters.WAKE_ON_LAN
+
+    for type_id in (
+        "generic-http", "denon", "roku", "lg-webos"
+    ):
+        check(
+            type_id + " power Wake-on-LAN routing",
+            resolve(
+                type_id, "fundamental",
+                "power-toggle", command
+            ) == wol
+        )
+
+        check(
+            type_id + " custom Wake-on-LAN routing",
+            resolve(
+                type_id, "custom",
+                "custom-action-1", command
+            ) == wol
+        )
+
+    check(
+        "Wake-on-LAN always ready",
+        adapters.ready(wol, device("lg-webos"), command)
+    )
+
+    calls = []
+    original_send = adapters.wake_on_lan.send
+
+    def fake_send(cmd):
+        calls.append(cmd)
+        return 102
+
+    def fake_failure(cmd):
+        raise OSError("Simulated UDP failure")
+
+    try:
+        adapters.wake_on_lan.send = fake_send
+
+        # Deliberately blank endpoint and client key.
+        lg = device("lg-webos")
+
+        result = adapters.execute(wol, lg, command)
+
+        check(
+            "Wake-on-LAN accepted without endpoint or key",
+            result["accepted"]
+        )
+
+        check(
+            "Wake-on-LAN preserves command parameters",
+            len(calls) == 1 and calls[0] == command
+        )
+
+        check(
+            "Wake-on-LAN reports transmitted bytes",
+            "102 bytes" in result["detail"]
+        )
+
+        check(
+            "Wake-on-LAN reports elapsed time",
+            "total_ms" in result
+        )
+
+        reject(
+            "Wake-on-LAN adapter rejects SSAP",
+            lambda: adapters.execute(
+                wol, lg, ssap("ssap://system/turnOff")
+            )
+        )
+
+        reject(
+            "LG WebSocket adapter rejects Wake-on-LAN",
+            lambda: adapters.execute(LG, lg, command)
+        )
+
+        reject(
+            "HTTP adapter rejects Wake-on-LAN",
+            lambda: adapters.execute(
+                HTTP, device("generic-http"), command
+            )
+        )
+
+        adapters.wake_on_lan.send = fake_failure
+
+        try:
+            adapters.execute(wol, lg, command)
+        except OSError:
+            check("Wake-on-LAN failure propagated", True)
+        else:
+            check("Wake-on-LAN failure propagated", False)
+
+    finally:
+        adapters.wake_on_lan.send = original_send
+
+
 def run():
     gc.collect()
     heap_before = gc.mem_free()
@@ -616,6 +720,7 @@ def run():
         test_cache()
         test_execution_guards()
         test_lg_execution()
+        test_wake_on_lan()
 
     finally:
         adapters._adapter_map = previous_map

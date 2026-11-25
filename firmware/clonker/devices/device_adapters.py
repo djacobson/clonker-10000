@@ -312,8 +312,8 @@ def execute(adapter, device, command, action_id=None):
         if (
             device["type"] != "lg-webos"
             or not device_types.is_enabled("lg-webos")
-            or not device_types.supports_command(
-                "lg-webos", command["kind"]
+            or command["kind"] not in (
+                device_types.SSAP, device_types.POINTER
             )
         ):
             raise ValueError("Unsupported LG execution")
