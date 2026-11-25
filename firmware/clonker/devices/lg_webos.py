@@ -30,7 +30,7 @@ from clonker.devices import device_types
 IDLE_NS = 10_000_000_000
 OP_TIMEOUT = 0.5
 SETUP_NS = 1_500_000_000
-RESPONSE_NS = 1_500_000_000  # Proposed; lab used 5 seconds.
+RESPONSE_NS = 1_500_000_000  # SSAP response deadline (1.5 seconds).
 MAX_PENDING = 8
 MAX_READS = 4
 MAX_FRAMES = 8
@@ -543,8 +543,9 @@ def _poll_connection(conn, control):
 def poll():
     """Bounded RX and maintenance. Raises on asynchronous failure.
 
-    Future dispatcher must propagate failures to its existing cancellation
-    policy even though transmitted commands have already left the queue.
+    The adapter coordinator propagates asynchronous failures to the
+    dispatcher, which cancels remaining queued tasks. Transmitted
+    commands have already left the queue and are never replayed.
     No sleep, no connection creation, no application keep-alive requests.
     PONG writes can briefly block; handshake/send are not nonblocking either.
     """
@@ -741,14 +742,15 @@ def verify_client_key(endpoint, client_key=None):
                 pass
 
 
-# Integration TODOs (intentionally no changes outside this module):
-# - Decide configuration schema, permanent key storage and pairing UI.
-# - Test cooperative pairing, credential handoff and both manifests on Pico.
-# - Future shutdown/config transitions must call pair_cancel() as appropriate.
-# - Decide generic adapter contract for ready/execute/poll and delayed failures.
-# - Add perf.register/record instrumentation following Denon conventions.
-# - Test pointer lifetime, ping/pong, partial frames, burst writes, error paths,
-#   response timeout, endpoint switching, memory and scheduler latency.
-# - Test secure WebSocket support and upgrade validation before production use.
-# - Decide whether registration and pointer acquisition need cooperative states.
-# - Do not infer power, playback, skip or native hold support from permissions.
+# Remaining LG development items:
+# - Integrate cooperative pairing with the configuration editor.
+# - Test credential handoff and pairing cancellation during config transitions.
+# - Evaluate unification of the runtime and pairing manifests.
+# - Investigate secure WebSocket support and certificate trust for newer TVs.
+# - Strengthen WebSocket upgrade and registration response validation.
+# - Extend testing of response timeouts, partial frames, ping/pong,
+#   endpoint switching, memory endurance and scheduler latency.
+# - Evaluate cooperative connection setup and pointer acquisition if needed.
+# - Evaluate native pointer button hold/release support.
+# - Consider additional performance instrumentation if needed.
+# - Do not infer command support from manifest permissions alone.
