@@ -356,6 +356,10 @@ def main():
     flight_recorder.register_provider(
         "denon_transport", device_adapters.denon.transport_snapshot
     )
+    flight_recorder.register_provider(
+        "lg_transport",
+        device_adapters.lg_webos.transport_snapshot
+    )
 
     try:
         while True:
@@ -418,7 +422,11 @@ def main():
                     started = perf.start()
 
                 try:
-                    device_adapters.poll()
+                    failure = device_adapters.poll()
+
+                    if failure is not None:
+                        adapter, error = failure
+                        actions.fail_async(adapter, error)
                 except Exception as exc:
                     logger.warning(
                         "Device adapter maintenance failed: {}".format(

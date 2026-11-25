@@ -398,7 +398,12 @@ def poll():
 
     roku.poll()
     denon.poll_rx()
-    lg_webos.poll()
+    try:
+        lg_webos.poll()
+    except Exception as error:
+        return LG_WEBOS, error
+
+    return None
 
 
 def cancel_active():
