@@ -469,6 +469,121 @@ def run():
         == ["room-1", "room-2"]
     )
 
+    # Wake-on-LAN command validation.
+
+    check(
+        "Wake-on-LAN supported by operational devices",
+        all(
+            device_types.supports_command(t, "wake-on-lan")
+            for t in ("generic-http", "denon", "roku", "lg-webos")
+        )
+    )
+
+    config = make_config()
+    room = config["rooms"]["room-2"]
+
+    wake = {
+        "kind": "wake-on-lan",
+        "mac": "02:00:00:ab:cd:ef",
+        "broadcast": "192.168.1.255",
+        "port": 9,
+    }
+
+    room["actions"]["power-toggle"] = {
+        "target": "device-1",
+        "on_command": dict(wake),
+        "off_command": ssap("ssap://system/turnOff"),
+    }
+
+    result = cfg.validate_config(config)
+    power = result["rooms"]["room-2"]["actions"]["power-toggle"]
+
+    check(
+        "Mixed Wake-on-LAN and SSAP power toggle",
+        power["on_command"]["kind"] == "wake-on-lan"
+        and power["off_command"]["kind"] == "ssap"
+    )
+
+    check(
+        "MAC normalized to uppercase",
+        power["on_command"]["mac"] == "02:00:00:AB:CD:EF"
+    )
+
+    check(
+        "Wake-on-LAN configuration round trip",
+        cfg.from_json(cfg.to_json(config)) == result
+    )
+
+    room["devices"]["device-1"]["endpoint"] = ""
+    room["devices"]["device-1"]["client_key"] = ""
+
+    check(
+        "Wake-on-LAN without endpoint or client key",
+        cfg.validate_config(config)["rooms"]["room-2"]
+        ["actions"]["power-toggle"]["on_command"]["port"] == 9
+    )
+
+    step = room["custom_actions"][0]["steps"][0]
+    step["command"] = dict(wake)
+    step["command"]["port"] = 7
+
+    check(
+        "Custom Wake-on-LAN with alternative port",
+        cfg.validate_config(config)["rooms"]["room-2"]
+        ["custom_actions"][0]["steps"][0]["command"]["port"] == 7
+    )
+
+    for field, invalid in (
+        ("mac", "02:00:00:AB:CD"),
+        ("mac", "02:00:00:AB:CD:GG"),
+        ("mac", 123),
+        ("broadcast", ""),
+        ("broadcast", "192.168.1.256"),
+        ("broadcast", "192.168.1.255:9"),
+        ("port", 0),
+        ("port", 65536),
+        ("port", "9"),
+        ("port", True),
+    ):
+        step["command"] = dict(wake)
+        step["command"][field] = invalid
+        reject("Reject invalid Wake-on-LAN " + field, config)
+
+    step["command"] = dict(wake)
+    del step["command"]["port"]
+    reject("Reject missing Wake-on-LAN port", config)
+
+    step["command"] = dict(wake)
+    step["command"]["extra"] = True
+    reject("Reject extra Wake-on-LAN field", config)
+
+    step["command"] = dict(wake)
+    step["command"]["mac"] = ""
+    reject("Reject blank custom Wake-on-LAN", config)
+
+    step["command"] = dict(wake)
+
+    room["actions"]["power-toggle"]["on_command"]["mac"] = ""
+
+    result = cfg.validate_config(config)
+
+    check(
+        "Blank fundamental Wake-on-LAN permitted",
+        cfg.command_is_blank(
+            result["rooms"]["room-2"]["actions"]
+            ["power-toggle"]["on_command"]
+        )
+    )
+
+    room["actions"]["nav-up"]["command"] = dict(wake)
+    reject("Reject Wake-on-LAN navigation command", config)
+    room["actions"]["nav-up"]["command"] = pointer("UP")
+
+    room["actions"]["mute-toggle"]["on_command"] = dict(wake)
+    reject("Reject Wake-on-LAN mute command", config)
+
+    del wake, result, power, step
+
     del config, second, room, validated, serialized, command
 
     gc.collect()
