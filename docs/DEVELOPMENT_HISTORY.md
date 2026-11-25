@@ -4947,6 +4947,708 @@ forgetting how to speak the ones it already knows.
 
 ---
 
+## November 25, 2026
+
+### Chapter 13 — The Monster Learns Another Language
+
+Chapter 12 reorganized the Monster's configuration model
+in anticipation of additional equipment protocols.
+
+Chapter 13 put that architecture to work.
+
+The objectives were to connect the experimental LG webOS
+adapter to operational dispatch, preserve the existing
+execution architecture, and verify the integration against
+actual television hardware.
+
+The Raspberry Pi Pico 2 W and CircuitPython 10.3.1
+remained the development platform.
+
+Clonker Config v5 remained the configuration schema.
+
+No additional command execution queue was introduced.
+
+### Chapter 13 — Teaching the Monster webOS
+
+The existing LG laboratory experiments provided the
+foundation for the production adapter.
+
+These experiments had established authenticated WebSocket
+registration, SSAP requests, pointer connections, pairing,
+session reuse, and asynchronous response processing.
+
+The production integration removed experimental command
+tables and development credential fallbacks in favor of
+configuration-owned device and command records.
+
+The adapter was connected to:
+
+- The device-type registry.
+- The typed adapter coordinator.
+- The shared action dispatcher.
+- Cooperative scheduler maintenance.
+- Configuration activation and session retirement.
+- Flight Recorder diagnostics.
+
+LG webOS became an operational device type.
+
+The configuration editor enabled normal LG device
+selection and manual client-key entry.
+
+Integrated pairing remained deliberately deferred.
+
+The existing standalone pairing procedure and separate
+pairing and runtime manifests were retained.
+
+#### Initial development equipment
+
+The Sunroom LG G1 became the initial operational test
+television.
+
+An unsuccessful pairing attempt revealed that the
+television's previously documented IP address had changed.
+
+The correct endpoint was established as:
+
+`192.168.50.20:3000`
+
+Standalone pairing succeeded, and the resulting client
+key was entered into the configuration editor.
+
+The endpoint and credential survived a configuration
+save and subsequent reboot.
+
+Both development LG televisions received DHCP address
+reservations.
+
+No actual client keys were included in published recipes
+or diagnostic documentation.
+
+### Chapter 13 — Transmit and Continue
+
+The LG integration required an explicit decision about
+asynchronous command completion.
+
+The chosen approach was deliberately simple:
+
+**Transmit the command and continue.**
+
+Successful transmission advances the shared dispatcher.
+
+For SSAP requests, the adapter retains bounded response
+metadata containing the information needed to associate
+subsequent responses with transmitted requests.
+
+This metadata is not another command execution queue.
+
+The adapter's readiness checks prevent transmission when
+pending capacity or session-transition requirements
+make another command inappropriate.
+
+Custom Action waits begin after successful transmission.
+
+Applicable power and mute toggle histories also advance
+at that boundary.
+
+A later asynchronous failure:
+
+- Retires the failed LG session.
+- Reports the failure through the adapter coordinator.
+- Invokes the dispatcher's asynchronous failure handler.
+- Cancels remaining pending queue work.
+
+Previously transmitted commands are not replayed.
+
+Previously advanced toggle histories are not rolled back.
+
+An asynchronous failure may be detected after additional
+commands have already been transmitted.
+
+This limitation was accepted rather than introducing
+transactional equipment control or another execution
+scheduler.
+
+The existing Dumb Queue™ remained the single owner of
+queued execution.
+
+### Chapter 13 — The First Native LG CLONKs
+
+The initial LG integration passed all six focused
+regression suites on the physical Pico.
+
+| Regression suite | Assertions passed |
+|---|---:|
+| Configuration validation | 49 |
+| Configuration persistence | 56 |
+| Typed adapters | 68 |
+| Configuration activation | 54 |
+| Typed queue | 121 |
+| Typed physical controls | 129 |
+| **Total** | **477** |
+
+No assertion failures were reported.
+
+Live Sunroom G1 testing then verified:
+
+- Native SSAP volume up and down.
+- Independent mute-on and mute-off payloads.
+- Physical volume encoder push-to-mute.
+- Pointer navigation and selection.
+- Home and Back commands.
+- Rapid successive pointer commands.
+- Session retirement and reconnection.
+- Ordered Custom Action execution.
+- Configured waits between SSAP and pointer commands.
+
+Representative observed command execution durations:
+
+| Operation | Duration |
+|---|---:|
+| Initial SSAP volume command | 139.6 ms |
+| Warm SSAP volume commands | 6.2–20.2 ms |
+| Warm pointer navigation | 5.2–5.7 ms |
+| Warm mute commands | 6.7–7.0 ms |
+| Pointer reconnection after idle | 384.9 ms |
+
+These are observed dispatcher execution durations,
+not comprehensive equipment-response latency measurements.
+
+Native LG pointer hold and release behavior was not
+implemented.
+
+#### Network failure and recovery
+
+Disconnecting the television from the network produced
+a bounded LG transmission failure.
+
+The dispatcher reported the failure and cleared pending
+work.
+
+After network restoration, another Home command
+successfully established a new session.
+
+No Clonker reboot was required.
+
+#### Asynchronous rejection experiment
+
+A temporary Custom Action was configured with:
+
+1. An intentionally invalid SSAP URI.
+2. A three-second wait.
+3. A valid pointer RIGHT command.
+
+The invalid request was successfully transmitted.
+
+The subsequent LG response produced an asynchronous
+request failure before the scheduled pointer step.
+
+The dispatcher reported one pending task discarded.
+
+The pointer step did not execute.
+
+A subsequent manually requested RIGHT command succeeded
+without rebooting the Pico.
+
+This established the live asynchronous rejection,
+queue cancellation, and recovery path.
+
+An actual SSAP response-timeout experiment remains
+outstanding.
+
+### Chapter 13 — The Flight Recorder Speaks LG
+
+The LG transport registered a dedicated Flight Recorder
+provider named `lg_transport`.
+
+A diagnostic snapshot following approximately 25 minutes
+of development testing recorded:
+
+| Measurement | Observed value |
+|---|---:|
+| SSAP requests transmitted | 20 |
+| SSAP requests acknowledged | 19 |
+| SSAP requests abandoned | 1 |
+| Pointer commands transmitted | 103 |
+| Transport failures | 2 |
+| Response timeouts | 0 |
+| Pending SSAP responses | 0 |
+| Control session opens | 20 |
+| Pointer session opens | 15 |
+| Control session reuses | 103 |
+| Pointer session reuses | 88 |
+| Idle session retirements | 19 |
+
+The two transport failures were consistent with the
+intentional network-disconnection and invalid-request
+experiments.
+
+Both LG connections were inactive at snapshot time.
+
+No client key was exposed in the transport diagnostics.
+
+Periodic heap measurements remained reasonably stable
+during the observed operating interval.
+
+Configuration processing and Flight Recorder generation
+produced additional temporary allocation pressure.
+
+The measurements did not establish a memory leak.
+
+Longer LG transport and battery endurance testing
+remained appropriate.
+
+### Chapter 13 — Picture Cycle
+
+With native LG pointer commands operational, attention
+turned to a practical everyday Custom Action.
+
+The original LG remote was used to investigate the
+television's Quick Settings menu.
+
+The resulting sequence was implemented entirely through
+configuration:
+
+| Step | Pointer command | Wait after command |
+|---|---|---:|
+| 1 | MENU | 500 ms |
+| 2 | RIGHT | 250 ms |
+| 3 | ENTER | 250 ms |
+| 4 | RIGHT | 500 ms |
+| 5 | MENU | 0 ms |
+
+The sequence opens Quick Settings, selects the picture
+mode control, advances the picture mode, and dismisses
+the menu.
+
+The configured waits total 1,500 milliseconds.
+
+Repeated physical Custom Action encoder tests
+successfully cycled the G1 picture mode.
+
+Typical complete execution took approximately
+1.6 seconds, with additional cold-session setup time
+when required.
+
+The sequence assumes the expected initial television
+menu state.
+
+It does not query the current picture mode or maintain
+a separate menu-state model.
+
+No additional firmware changes were necessary.
+
+This was a particularly satisfying demonstration of
+configuration-driven equipment automation.
+
+### Chapter 13 — The Monster Wakes the Television
+
+The LG pointer POWER command initially appeared capable
+of both turning the television off and waking it.
+
+Further testing revealed an important limitation.
+
+The command worked during short standby intervals,
+but eventually the television stopped accepting ordinary
+webOS network connections.
+
+The television's Quick Start+ and mobile wake settings
+were enabled.
+
+A standalone Wake-on-LAN experiment was developed in:
+
+`firmware/tests/test_lg_webos_wake.py`
+
+The Pico constructed a standard 102-byte magic packet
+and transmitted it to the development LAN broadcast
+address using UDP port 9.
+
+The initial standalone transmission took approximately
+0.7 milliseconds.
+
+The television awakened after ordinary pointer
+communication had already failed.
+
+Additional testing established that Wake-on-LAN:
+
+- Awakened the television during short standby.
+- Awakened it after ordinary webOS connectivity ceased.
+- Left an already powered-on television powered on.
+
+The SSAP command:
+
+`ssap://system/turnOff`
+
+successfully turned the television off.
+
+This provided distinct wake and shutdown commands
+suitable for the existing independent Power Toggle
+directions.
+
+### Chapter 13 — A New Transport, Not a New Queue
+
+Wake-on-LAN was implemented as a reusable command kind
+rather than a special case inside the LG adapter.
+
+Config v5 was extended without changing its version.
+
+The command record contains:
+
+- `kind`: `wake-on-lan`
+- `mac`: destination MAC address
+- `broadcast`: IPv4 broadcast destination
+- `port`: UDP destination port
+
+The command kind is available for Power Toggle directions
+and Custom Action steps across operational device types.
+
+It is not available for unrelated fundamental actions.
+
+The UDP port is configurable, with port 9 as the
+configuration editor's default.
+
+The transport implementation resides in:
+
+`firmware/clonker/net/wake_on_lan.py`
+
+It constructs one magic packet, creates a temporary
+UDP socket, transmits the packet, and closes the socket.
+
+No persistent session, response tracking, automatic
+retry, or equipment-state polling was introduced.
+
+Wake-on-LAN does not require the selected device's
+ordinary endpoint or authentication credential.
+
+The typed adapter coordinator routes it by command kind.
+
+Successful transmission advances the existing dispatcher
+and applicable toggle history.
+
+Transmission does not prove that the television or
+other equipment actually awakened.
+
+The configuration validator, editor, adapter coordinator,
+dispatcher, and regression suites were extended to
+support the new command kind.
+
+Physical controls required no manufacturer-specific
+changes.
+
+### Chapter 13 — The Extended Standby Test
+
+The Sunroom G1 Power Toggle was configured with:
+
+- ON: Wake-on-LAN.
+- OFF: SSAP `ssap://system/turnOff`.
+
+Physical Power Toggle testing verified:
+
+- Wake-on-LAN while the television was already on.
+- SSAP shutdown.
+- Wake-on-LAN after short standby.
+- Another SSAP shutdown.
+- Wake-on-LAN after extended standby.
+
+During the extended standby test, an ordinary pointer
+command failed after the television ceased accepting
+webOS connections.
+
+The subsequent physical Power Toggle successfully
+awakened the television approximately 11 minutes and
+18 seconds after shutdown.
+
+Observed production Wake-on-LAN execution durations
+were approximately 2.4–2.6 milliseconds.
+
+The successful wake required no Clonker reboot.
+
+A separate TV Wake Custom Action also demonstrated
+Wake-on-LAN outside the fundamental Power Toggle.
+
+The existing remembered toggle-direction model was
+retained.
+
+External equipment power changes can still cause the
+remembered direction to differ from actual equipment
+state.
+
+### Chapter 13 — Regression Expansion
+
+Following Wake-on-LAN integration, all six focused
+regression suites were rerun on the physical Pico.
+
+| Regression suite | Chapter 12 | LG integration | LG + WOL |
+|---|---:|---:|---:|
+| Configuration validation | 49 | 49 | 71 |
+| Configuration persistence | 56 | 56 | 56 |
+| Typed adapters | 56 | 68 | 85 |
+| Configuration activation | 54 | 54 | 54 |
+| Typed queue | 92 | 121 | 153 |
+| Typed physical controls | 129 | 129 | 129 |
+| **Total passed** | **436** | **477** | **548** |
+
+All 548 assertions passed with zero failures.
+
+The final total represented 112 additional assertions
+over the Chapter 12 implementation-stage baseline.
+
+Coverage included:
+
+- LG device availability and adapter selection.
+- Missing and placeholder client-key handling.
+- Independent SSAP toggle payloads.
+- LG readiness and queue ordering.
+- Immediate and asynchronous failure cancellation.
+- Recovery without automatic replay.
+- Wake-on-LAN field validation.
+- Endpoint-independent execution.
+- Mixed Wake-on-LAN and SSAP power commands.
+- Wake-on-LAN Custom Action ordering.
+- Transport failure and subsequent recovery.
+
+Final comment and equivalent editor-label cleanup
+followed these successful regression runs.
+
+The results do not constitute exhaustive protocol,
+persistence, or long-duration reliability testing.
+
+### Chapter 13 — The Windows Time Machine
+
+While preparing a public LG configuration recipe,
+a discrepancy appeared between the browser's active
+configuration and the JSON file retrieved through
+the Windows-mounted CIRCUITPY filesystem.
+
+The retrieved file did not contain the latest
+Wake-on-LAN configuration changes.
+
+Browser inspection, save diagnostics, and OLED
+Custom Action selection indicated that the newer
+configuration was active.
+
+A deliberate Custom Action rename was saved and
+observed through the running application.
+
+A subsequent cold reboot into SERVICE (USB) mode
+and fresh filesystem mount exposed the expected
+updated configuration file.
+
+The observations strongly suggested a stale host
+filesystem view.
+
+The precise underlying cause was not established.
+
+No firmware persistence change was made in response.
+
+The incident also prompted a useful development
+workflow improvement:
+
+`GET /api/config`
+
+can provide the active configuration directly from
+the running Clonker.
+
+The response includes additional management metadata
+that must be removed when producing a reusable recipe:
+
+- `filesystem_writable`
+- `revision`
+- `device_types`
+
+The API represents active RAM configuration.
+
+It is not independent verification of persisted bytes.
+
+Private credentials and equipment MAC addresses must
+be sanitized before publication.
+
+### Chapter 13 — The Other LG
+
+Attention briefly turned to the newer Den LG C6H.
+
+The development endpoint was:
+
+`192.168.50.52`
+
+Standalone pairing attempts from the Pico failed
+before WebSocket registration.
+
+Windows TCP connectivity tests succeeded against
+both ports 3000 and 3001.
+
+A standalone Pico test was developed in:
+
+`firmware/tests/test_lg_webos_tcp.py`
+
+The Pico produced a different result:
+
+| Television | TCP 3000 | TCP 3001 |
+|---|---|---|
+| Sunroom G1 | Success | Success |
+| Den C6H | Failure | Success |
+
+The C6H port 3000 failure was reproducible.
+
+The test was extended to investigate secure
+WebSocket connectivity on port 3001.
+
+TLS socket wrapping succeeded on both televisions,
+but connection establishment failed certificate
+verification before WebSocket upgrade.
+
+The experiments did not establish whether the
+newer television requires secure WebSockets.
+
+They also did not establish that the television
+is incompatible with the Clonker.
+
+The investigation was deliberately shelved.
+
+Future experiments may examine certificate trust,
+the differing TCP behavior, and secure WebSocket
+registration.
+
+No production transport changes were made for
+the C6H investigation.
+
+### Chapter 13 — Recipes for a More Multilingual Monster
+
+The hosted configuration recipe library was updated
+to reflect the operational integrations.
+
+#### David's LG webOS Starter
+
+A focused single-room Sunroom recipe demonstrates:
+
+- Native LG SSAP volume and mute commands.
+- Pointer navigation.
+- Wake-on-LAN power ON.
+- SSAP power OFF.
+- Picture Cycle.
+- TV Wake.
+
+Unassigned media transport commands remain blank.
+
+The recipe contains a placeholder client key and
+synthetic MAC addresses.
+
+It requires installation-specific values before
+authenticated operation and Wake-on-LAN can work.
+
+#### David's Roku + Denon + LG Setup
+
+The existing everyday development recipe was updated
+without replacing its established Roku and Denon
+command mappings.
+
+All three room records, 42 fundamental action
+definitions, and seven original Custom Actions
+were preserved.
+
+The Sunroom Picture Cycle Custom Action was added.
+
+Both LG television records were defined.
+
+The Den C6H record has no assigned LG commands
+while its connectivity investigation remains open.
+
+The Sunroom configuration retains its established
+Roku-centric equipment control behavior while
+adding native LG picture-mode automation.
+
+The recipe contains eight Custom Actions and two
+active rooms, with the third room unconfigured.
+
+The complete restored mixed-device configuration
+was not separately certified through a full
+end-to-end regression sequence during this chapter.
+
+The recipe catalog and instructions were updated
+to describe the new capabilities and credential
+replacement requirements.
+
+### Chapter 13 — The Gremlin Is Still in There
+
+The intermittent management HTTP socket-send stall
+from Chapter 12 remains unresolved.
+
+Chapter 13 observations suggested that the stall
+had occurred during configuration editor activity,
+but had not yet been observed on the browser
+Test Remote page.
+
+A source comment was added near the affected
+socket send call to preserve this observation.
+
+Browser request patterns, JavaScript fetch behavior,
+and CircuitPython socket handling remain possible
+investigation areas.
+
+None was established as the root cause.
+
+The successful LG and Wake-on-LAN integrations
+must not be confused with a resolution of this
+independent management networking issue.
+
+### Chapter 13 — Engineering Summary
+
+Chapter 13 established operational LG webOS control
+on the Sunroom G1 and introduced a reusable
+Wake-on-LAN transport.
+
+The Config v5 architecture accommodated both
+integrations without another schema version,
+another execution queue, or manufacturer-specific
+physical control logic.
+
+The final implementation retained:
+
+- One Dumb Queue™.
+- Explicit typed device and command records.
+- Configuration-owned equipment commands.
+- Independent power and mute toggle directions.
+- Controlled configuration activation.
+- Adapter-owned transport resources.
+- Bounded asynchronous response metadata.
+- Queue-wide failure cancellation.
+- No automatic replay of uncertain commands.
+
+All six focused regression suites passed,
+comprising 548 assertions.
+
+The chapter also established practical everyday
+LG picture-mode automation and extended-standby
+television wake behavior.
+
+The remaining development boundaries include:
+
+- Integrated LG pairing and credential handoff.
+- Pairing and runtime manifest consolidation.
+- Newer LG television connectivity.
+- Secure WebSocket and certificate trust.
+- WebSocket upgrade and registration validation.
+- Native LG pointer hold and release.
+- Actual SSAP response-timeout testing.
+- Longer transport, memory, and battery endurance.
+- The intermittent management HTTP socket gremlin.
+
+Current operational specifications belong in the
+configuration, architecture, firmware networking,
+and development reference documents.
+
+The laboratory scripts remain in the Clonker Test
+Kitchen Sink™ for future investigations.
+
+The Monster learned another language.
+
+It also learned how to wake a sleeping television.
+
+And it still has only one Dumb Queue™.
+
+**Less sleek. More CLONK.**
+
+---
+
 **THE CLONKER 10000**
 
 *Less sleek. More CLONK.*
