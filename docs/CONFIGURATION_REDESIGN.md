@@ -8,8 +8,9 @@
 **Implemented schema:** Config v5  
 
 > **Historical design record:** This document preserves the
-> agreed Chapter 12 proposal. See Section 23 for implementation
-> results and current sources of truth.
+> agreed Chapter 12 proposal. See Section 23 for the original
+> implementation outcome and Section 24 for the Chapter 13
+> operational integration addendum.
 
 > Configure the device. Configure the intent.
 > Let the adapter speak the protocol.
@@ -1543,6 +1544,153 @@ remain useful starting points for the next integration phase.
 
 Preserve the existing Dumb Queue™, operational adapter
 behavior, and validation boundaries.
+
+## 24. Chapter 13 — Operational Integration Addendum
+
+**Completed:** November 25, 2026  
+**Chapter:** The Monster Learns Another Language  
+**Configuration:** Config v5 retained
+
+Chapter 13 exercised the configuration foundation established
+by Chapter 12 through operational LG webOS integration and the
+addition of a reusable Wake-on-LAN transport.
+
+The original proposal and Chapter 12 implementation outcome
+remain preserved above as historical engineering records.
+
+### 24.1 LG implementation decisions
+
+| Design question | Chapter 13 resolution |
+|---|---|
+| Runtime availability | LG webOS enabled |
+| Client credentials | Configuration-owned, manually entered |
+| Control connection | Reusable authenticated WebSocket |
+| Pointer connection | Separate reusable WebSocket |
+| Command completion | Successful transmission |
+| SSAP responses | Bounded asynchronous tracking |
+| Adapter readiness | Pending capacity and session readiness |
+| Asynchronous failure | Cancel remaining queued work |
+| Custom Action waits | Begin at successful transmission |
+| Toggle history | Advances at successful transmission |
+| Session retirement | Endpoint, credential, failure, idle and configuration lifecycle |
+| Automatic replay | Not permitted |
+| Integrated pairing | Deferred |
+
+The adapter retains pending response metadata, not a second
+command execution queue.
+
+Commands already transmitted cannot be recalled. An
+asynchronous failure does not roll back previously advanced
+toggle history or replay uncertain commands.
+
+### 24.2 Wake-on-LAN extension
+
+Config v5 was extended with the `wake-on-lan` command kind
+without introducing a new schema version.
+
+The command contains:
+
+- Destination MAC address.
+- IPv4 broadcast address.
+- UDP destination port.
+
+Wake-on-LAN is available for independent Power Toggle
+directions and Custom Action steps across operational
+device types.
+
+It requires neither a device endpoint nor an authentication
+credential.
+
+Successful execution means transmission of the 102-byte
+magic packet, not confirmation that equipment has awakened.
+
+### 24.3 Architectural invariants preserved
+
+- One shared Dumb Queue™.
+- Explicit device types and command kinds.
+- Configuration-owned equipment commands.
+- Validation at trust boundaries.
+- Lightweight access to validated runtime configuration.
+- Stable room and Custom Action identifiers.
+- Independent power and mute toggle histories.
+- Configuration activation and session retirement.
+- No automatic replay of uncertain commands.
+- No independent protocol execution queues.
+
+The configuration redesign accommodated both new execution
+paths without replacing the dispatcher or introducing
+manufacturer-specific behavior into physical controls.
+
+### 24.4 Verification
+
+All six focused regression suites passed on the physical
+Pico following LG and Wake-on-LAN integration.
+
+| Regression suite | Chapter 12 | Chapter 13 |
+|---|---:|---:|
+| Configuration validation | 49 | 71 |
+| Configuration persistence | 56 | 56 |
+| Typed adapters | 56 | 85 |
+| Configuration activation | 54 | 54 |
+| Typed queue | 92 | 153 |
+| Typed physical controls | 129 | 129 |
+| **Total passed** | **436** | **548** |
+
+Live Sunroom LG G1 testing verified:
+
+- Native SSAP volume and mute commands.
+- Pointer navigation.
+- Ordered Custom Actions.
+- Network failure and subsequent recovery.
+- Asynchronous SSAP rejection and queue cancellation.
+- Wake-on-LAN following extended television standby.
+- Mixed Wake-on-LAN ON and SSAP OFF power commands.
+- Wake-on-LAN Custom Action execution.
+
+The LG Picture Cycle Custom Action also demonstrated
+configuration-driven television menu automation without
+additional firmware changes.
+
+### 24.5 Configuration Recipe Library
+
+Chapter 13 established or updated two development recipes:
+
+- David's LG webOS Starter.
+- David's Roku + Denon + LG Setup.
+
+Published recipes use placeholder client keys and synthetic
+MAC addresses where applicable.
+
+The active configuration API also provides a convenient
+export source, subject to removal of response-only metadata
+and sanitization of equipment-specific information.
+
+### 24.6 Remaining integration work
+
+- Integrated LG pairing and credential handoff.
+- Pairing and runtime manifest consolidation.
+- Secure WebSocket and certificate-trust experiments.
+- Newer LG television compatibility.
+- WebSocket upgrade and registration validation.
+- Native LG pointer hold and release behavior.
+- Actual SSAP response-timeout testing.
+- Longer transport and memory endurance testing.
+
+The newer Den LG C6H investigation remains experimental.
+
+The intermittent management HTTP socket-send stall also
+remains unresolved and is separate from the successful
+protocol integration.
+
+Current operational behavior is documented in
+[Configuration](CONFIGURATION.md),
+[Architecture](ARCHITECTURE.md), and
+[Firmware Network](FIRMWARE_NETWORK.md).
+
+The active firmware remains authoritative.
+
+**The Monster learned another language without forgetting
+how to speak its original ones.**
 
 **The configuration foundation is ready.
 The Monster's next language awaits.**
