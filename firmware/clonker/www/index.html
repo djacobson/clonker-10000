@@ -348,7 +348,7 @@
         const clone = x => JSON.parse(JSON.stringify(x));
         const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
         const toggle = id => id === 'mute-toggle' || id === 'power-toggle';
-        const selectable = id => types[id] && (types[id].enabled || id === 'lg-webos');
+        const selectable = id => types[id] && types[id].enabled;
         const blank = (kind = 'http', method = 'GET') => kind === 'ssap' ? { kind, uri: '' } :
             kind === 'pointer' ? { kind, button: '' } : { kind: 'http', method, path: '' };
 
@@ -628,7 +628,7 @@
                         if (meta.pairing) {
                             button(pairingRow, 'Pair', () => {
                             }, true);
-                            el('p', b, 'Pairing and runtime integration are not available yet.', 'note');
+                            el('p', b, 'Enter an existing client key. Integrated pairing is not available yet.', 'note');
                         }
                     }
                 }
