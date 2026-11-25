@@ -1,0 +1,195 @@
+{
+  "version": 5,
+  "rooms": {
+    "room-1": {
+      "name": "Sunroom",
+      "devices": {
+        "device-1": {
+          "type": "lg-webos",
+          "endpoint": "192.168.50.47:3000",
+          "client_key": "PASTE_OR_PAIR_CLIENT_KEY_HERE"
+        },
+        "device-2": {
+          "type": "generic-http",
+          "endpoint": ""
+        },
+        "device-3": {
+          "type": "generic-http",
+          "endpoint": ""
+        }
+      },
+      "actions": {
+        "volume-up": {
+          "target": "device-1",
+          "command": {
+            "kind": "ssap",
+            "uri": "ssap://audio/volumeUp"
+          }
+        },
+        "volume-down": {
+          "target": "device-1",
+          "command": {
+            "kind": "ssap",
+            "uri": "ssap://audio/volumeDown"
+          }
+        },
+        "mute-toggle": {
+          "target": "device-1",
+          "on_command": {
+            "kind": "ssap",
+            "uri": "ssap://audio/setMute",
+            "payload": {
+              "mute": true
+            }
+          },
+          "off_command": {
+            "kind": "ssap",
+            "uri": "ssap://audio/setMute",
+            "payload": {
+              "mute": false
+            }
+          }
+        },
+        "nav-up": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": "UP"
+          }
+        },
+        "nav-down": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": "DOWN"
+          }
+        },
+        "nav-left": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": "LEFT"
+          }
+        },
+        "nav-right": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": "RIGHT"
+          }
+        },
+        "select": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": "ENTER"
+          }
+        },
+        "back": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": "BACK"
+          }
+        },
+        "home": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": "HOME"
+          }
+        },
+        "play-pause": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": ""
+          }
+        },
+        "skip-back": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": ""
+          }
+        },
+        "skip-forward": {
+          "target": "device-1",
+          "command": {
+            "kind": "pointer",
+            "button": ""
+          }
+        },
+        "power-toggle": {
+          "target": "device-1",
+          "on_command": {
+            "kind": "ssap",
+            "uri": ""
+          },
+          "off_command": {
+            "kind": "ssap",
+            "uri": ""
+          }
+        }
+      },
+      "custom_actions": [
+        {
+          "id": "custom-action-1",
+          "name": "Get Volume",
+          "steps": [
+            {
+              "target": "device-1",
+              "command": {
+                "kind": "ssap",
+                "uri": "ssap://audio/getVolume"
+              },
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-2",
+          "name": "Launch Home",
+          "steps": [
+            {
+              "target": "device-1",
+              "command": {
+                "kind": "ssap",
+                "uri": "ssap://system.launcher/launch",
+                "payload": {
+                  "id": "com.webos.app.home"
+                }
+              },
+              "wait_after_ms": 0
+            }
+          ]
+        },
+        {
+          "id": "custom-action-3",
+          "name": "Home & Right",
+          "steps": [
+            {
+              "target": "device-1",
+              "command": {
+                "kind": "ssap",
+                "uri": "ssap://system.launcher/launch",
+                "payload": {
+                  "id": "com.webos.app.home"
+                }
+              },
+              "wait_after_ms": 1500
+            },
+            {
+              "target": "device-1",
+              "command": {
+                "kind": "pointer",
+                "button": "RIGHT"
+              },
+              "wait_after_ms": 0
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
