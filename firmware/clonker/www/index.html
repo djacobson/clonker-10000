@@ -334,7 +334,9 @@
         const DEVICE_LABELS = { 'device-1': 'TV', 'device-2': 'AVR', 'device-3': 'Streaming' };
         const ACTION_IDS = ['volume-up', 'volume-down', 'mute-toggle', 'nav-up', 'nav-down', 'nav-left',
             'nav-right', 'select', 'back', 'home', 'play-pause', 'skip-back', 'skip-forward', 'power-toggle'];
-        const KIND_LABELS = { http: 'HTTP', ssap: 'SSAP', pointer: 'Pointer' };
+        const KIND_LABELS = {
+            http: 'HTTP', ssap: 'SSAP', pointer: 'Pointer', 'wake-on-lan': 'Wake-on-LAN'
+        };
         const $ = id => document.getElementById(id);
 
         // Editor model and response-only metadata are kept separately.
@@ -350,7 +352,9 @@
         const toggle = id => id === 'mute-toggle' || id === 'power-toggle';
         const selectable = id => types[id] && types[id].enabled;
         const blank = (kind = 'http', method = 'GET') => kind === 'ssap' ? { kind, uri: '' } :
-            kind === 'pointer' ? { kind, button: '' } : { kind: 'http', method, path: '' };
+            kind === 'pointer' ? { kind, button: '' } :
+            kind === 'wake-on-lan' ? { kind, mac: '', broadcast: '255.255.255.255', port: 9 } :
+            { kind: 'http', method, path: '' };
 
         // DOM construction helpers
 
@@ -417,12 +421,13 @@
                 types[room.devices[id].type].label }));
         }
 
-        function commandEditor(parent, room, owner, key, label, includeTarget = false) {
+        function commandEditor(parent, room, owner, key, label, includeTarget = false, allowWake = false) {
             const box = el('div', parent);
             function draw() {
                 box.replaceChildren();
                 const c = owner[key];
-                const supported = types[room.devices[owner.target].type].command_kinds;
+                const supported = types[room.devices[owner.target].type].command_kinds
+                    .filter(k => allowWake || k !== 'wake-on-lan');
                 const choices = [...new Set([...supported, c.kind])].map(k => ({
                     value: k,
                     label: (KIND_LABELS[k] || k) + (supported.includes(k) ? '' : ' (incompatible)')
@@ -464,6 +469,15 @@
                 else if (c.kind === 'pointer') {
                     field(box, 'Pointer button', c.button, v => c.button = v, { max: 64 });
                 }
+                else if (c.kind === 'wake-on-lan') {
+                    field(box, 'MAC address', c.mac, v => c.mac = v, { max: 17 });
+                    const row = el('div', box, undefined, 'row');
+                    field(row, 'Broadcast address', c.broadcast, v => c.broadcast = v, { max: 15 });
+                    const port = field(row, 'UDP port', c.port,
+                        v => c.port = v === '' ? null : Number(v), { type: 'number' });
+                    port.min = 1;
+                    port.max = 65535;
+                }
             }
             draw();
         }
@@ -482,8 +496,8 @@
             const commands = el('div', box);
             function draw() {
                 commands.replaceChildren();
-                commandEditor(commands, room, a, 'on_command', 'ON');
-                commandEditor(commands, room, a, 'off_command', 'OFF');
+                commandEditor(commands, room, a, 'on_command', 'ON', false, id === 'power-toggle');
+                commandEditor(commands, room, a, 'off_command', 'OFF', false, id === 'power-toggle');
             }
             draw();
         }
@@ -686,7 +700,7 @@
                         requireThat(typeof v.client_key === 'string' && v.client_key.length <= 512, id +
                             ': invalid client key');
                 }
-                function check(a, k, where, allowBlank) {
+                function check(a, k, where, allowBlank, allowWake = !allowBlank) {
                     requireThat(object(a) && DEVICE_IDS.includes(a.target), where + ': invalid target');
                     const x = a[k];
                     requireThat(object(x) && types[r.devices[a.target].type].command_kinds.includes(x.kind),
@@ -720,16 +734,33 @@
                             requireThat(value && object(x.payload), where +
                                 ': payload requires URI and JSON object');
                     }
-                    else {
+                    else if (x.kind === 'pointer') {
                         value = x.button;
                         requireThat(typeof value === 'string' && /^[A-Z0-9_-]{0,64}$/.test(value), where +
                             ': invalid pointer button');
+                    }
+                    else if (x.kind === 'wake-on-lan') {
+                        requireThat(allowWake, where + ': Wake-on-LAN not permitted');
+                        value = x.mac;
+                        requireThat(typeof value === 'string' &&
+                            (!value || /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(value)),
+                            where + ': invalid MAC address');
+                        requireThat(typeof x.broadcast === 'string' &&
+                            /^\d{1,3}(\.\d{1,3}){3}$/.test(x.broadcast) &&
+                            x.broadcast.split('.').every(v => Number(v) <= 255),
+                            where + ': invalid broadcast address');
+                        requireThat(Number.isInteger(x.port) && x.port >= 1 && x.port <= 65535,
+                            where + ': invalid Wake-on-LAN port');
+                        x.mac = value.toUpperCase();
+                    }
+                    else {
+                        throw new Error(where + ': unsupported command kind');
                     }
                     requireThat(allowBlank || value, where + ': command cannot be blank');
                 }
                 for (const a of ACTION_IDS) {
                     for (const k of toggle(a) ? ['on_command', 'off_command'] : ['command'])
-                        check(r.actions[a], k, id + ' / ' + a + ' / ' + k, true);
+                        check(r.actions[a], k, id + ' / ' + a + ' / ' + k, true, a === 'power-toggle');
                 }
                 requireThat(r.custom_actions.length <= 16, id + ': too many custom actions');
                 const seen = new Set();
