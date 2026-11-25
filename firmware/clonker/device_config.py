@@ -20,6 +20,7 @@ A successful load binds the file path for subsequent saves.
 import json
 import os
 import time
+import gc
 from clonker.system import logger
 from clonker.devices import device_types
 from clonker.devices import device_adapters
@@ -668,27 +669,56 @@ def _backup_looks_valid(path):
         return False
 
 
+def _save_mem(stage):
+    """Temporary save-pipeline heap diagnostics."""
+    print("SAVE MEM:", stage,
+          "free=", gc.mem_free(),
+          "alloc=", gc.mem_alloc())
+
+
 def _write_verified_temp(path, contents):
     """Write and read back a temporary file before any rotation."""
     temp_path = path + ".tmp"
+
     with open(temp_path, "wb") as file:
         file.write(contents.encode("utf-8"))
         file.flush()
+
+    _save_mem("M6 temp written")
+
     with open(temp_path, "rb") as file:
         actual = file.read(MAX_CONFIG_BYTES + 1)
+
+    _save_mem("M6 temp read")
+
     if actual != contents.encode("utf-8"):
         raise OSError("Temporary JSON verification failed")
+
+    _save_mem("M6 temp bytes verified")
+
     if from_json(actual) != from_json(contents):
         raise ValueError("Temporary JSON validation failed")
+
+    _save_mem("M6 temp validation passed")
+
     return temp_path
 
 
 def _replace_with_backup(path, contents):
     """Rotate verified generations and install a checked replacement."""
+
+    _save_mem("M6 before primary validation")
+
     # Never rotate the backup chain if the primary is already damaged.
     if not _backup_looks_valid(path):
         raise ValueError("Primary JSON configuration is missing or invalid")
+
+    _save_mem("M6 after primary validation")
+
     temp_path = _write_verified_temp(path, contents)
+
+    _save_mem("M6 temp verified")
+
     backup = path + ".bak"
     older = backup + ".old"
 
@@ -702,12 +732,23 @@ def _replace_with_backup(path, contents):
     os.rename(path, backup)
     os.rename(temp_path, path)
 
+    _save_mem("M7 primary installed")
+
     # Check the installed primary before publishing new in-memory state.
     with open(path, "rb") as file:
         actual = file.read(MAX_CONFIG_BYTES + 1)
+
+    _save_mem("M8 installed file read")
+
     if actual != contents.encode("utf-8"):
         raise OSError("Installed JSON verification failed")
+
+    _save_mem("M8 byte verification passed")
+    _save_mem("M9 before installed validation")
+
     _load_existing(path)
+
+    _save_mem("M9 installed validation passed")
 
 
 def save(config, expected_revision, path=None):
@@ -715,6 +756,7 @@ def save(config, expected_revision, path=None):
     global _current
 
     started = time.monotonic_ns()
+    _save_mem("M1 save entry")
 
     if _current is None or _current_path is None:
         raise RuntimeError("Configuration not loaded")
@@ -727,20 +769,29 @@ def save(config, expected_revision, path=None):
     if not isinstance(expected_revision, str) or expected_revision != revision():
         raise ValueError("Configuration revision mismatch. Changes not saved. Refresh page.")
 
+    _save_mem("M2 before validation")
     validated = validate_config(config)
+    _save_mem("M2 after validation")
+
     serialized = to_json(validated)
+    _save_mem("M3 after serialization")
     validated_at = time.monotonic_ns()
 
     # Verify disk consistency before any write.
     disk = _load_existing(path)
+    _save_mem("M4 after disk load")
+
     if disk != _current:
         raise ValueError("Configuration changed on disk; reload required")
 
     if serialized == to_json(_current):
         return False
 
+    _save_mem("M4 after disk comparison")
+
     # Prepare the replacement cache before modifying disk.
     prepared_cache = device_adapters.prepare_cache(validated)
+    _save_mem("M5 cache prepared")
 
     checked_at = time.monotonic_ns()
 
@@ -748,10 +799,14 @@ def save(config, expected_revision, path=None):
     _replace_with_backup(path, serialized)
     persisted_at = time.monotonic_ns()
 
+    _save_mem("M10 before activation")
+
     # Retire old adapter sessions and publish the prepared
     # cache only after successful persistence.
     device_adapters.activate(prepared_cache)
     _current = validated
+
+    _save_mem("M10 after activation")
 
     activated_at = time.monotonic_ns()
 
