@@ -738,6 +738,44 @@ def test_lg():
     check("New command after LG failure executes", actions.poll())
     check("HTTP recovers after LG failure", sent[-1][0] == "http")
 
+    # LG toggle direction and independent SSAP payloads.
+    reset_test()
+
+    room = cfg._current["rooms"]["room-1"]
+
+    room["actions"]["mute-toggle"] = {
+        "target": "device-1",
+        "on_command": {
+            "kind": "ssap",
+            "uri": "ssap://audio/setMute",
+            "payload": {"mute": True},
+        },
+        "off_command": {
+            "kind": "ssap",
+            "uri": "ssap://audio/setMute",
+            "payload": {"mute": False},
+        },
+    }
+
+    actions.dispatch("room-1", "mute-toggle")
+    actions.dispatch("room-1", "mute-toggle")
+
+    check("LG mute ON executes", actions.poll())
+    check("LG mute ON transport", sent[-1][0] == "lg")
+    check(
+        "LG mute ON payload",
+        sent[-1][3]["payload"] == {"mute": True}
+    )
+    check("LG mute ON OLED", displayed[-1] == ("MUTE ON",))
+
+    check("LG mute OFF executes", actions.poll())
+    check(
+        "LG mute OFF payload",
+        sent[-1][3]["payload"] == {"mute": False}
+    )
+    check("LG mute OFF OLED", displayed[-1] == ("MUTE OFF",))
+    check("LG toggle queue drained", depth() == 0)
+
 
 # -------------------------------------------------
 # Test runner and state restoration
