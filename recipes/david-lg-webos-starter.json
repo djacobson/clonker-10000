@@ -5,187 +5,195 @@
       "name": "Sunroom",
       "devices": {
         "device-1": {
+          "client_key": "PASTE_OR_PAIR_CLIENT_KEY_HERE",
           "type": "lg-webos",
-          "endpoint": "192.168.50.20:3000",
-          "client_key": "PASTE_OR_PAIR_CLIENT_KEY_HERE"
+          "endpoint": "192.168.50.20:3000"
         },
         "device-2": {
-          "type": "generic-http",
-          "endpoint": ""
+          "endpoint": "",
+          "type": "generic-http"
         },
         "device-3": {
-          "type": "generic-http",
-          "endpoint": ""
+          "endpoint": "",
+          "type": "generic-http"
         }
       },
       "actions": {
-        "volume-up": {
+        "back": {
           "target": "device-1",
           "command": {
-            "kind": "ssap",
-            "uri": "ssap://audio/volumeUp"
-          }
-        },
-        "volume-down": {
-          "target": "device-1",
-          "command": {
-            "kind": "ssap",
-            "uri": "ssap://audio/volumeDown"
+            "button": "BACK",
+            "kind": "pointer"
           }
         },
         "mute-toggle": {
           "target": "device-1",
           "on_command": {
-            "kind": "ssap",
-            "uri": "ssap://audio/setMute",
             "payload": {
               "mute": true
-            }
+            },
+            "kind": "ssap",
+            "uri": "ssap://audio/setMute"
           },
           "off_command": {
-            "kind": "ssap",
-            "uri": "ssap://audio/setMute",
             "payload": {
               "mute": false
-            }
-          }
-        },
-        "nav-up": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": "UP"
-          }
-        },
-        "nav-down": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": "DOWN"
-          }
-        },
-        "nav-left": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": "LEFT"
-          }
-        },
-        "nav-right": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": "RIGHT"
-          }
-        },
-        "select": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": "ENTER"
-          }
-        },
-        "back": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": "BACK"
-          }
-        },
-        "home": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": "HOME"
-          }
-        },
-        "play-pause": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": ""
-          }
-        },
-        "skip-back": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": ""
-          }
-        },
-        "skip-forward": {
-          "target": "device-1",
-          "command": {
-            "kind": "pointer",
-            "button": ""
+            },
+            "kind": "ssap",
+            "uri": "ssap://audio/setMute"
           }
         },
         "power-toggle": {
           "target": "device-1",
           "on_command": {
-            "kind": "ssap",
-            "uri": ""
+            "port": 9,
+            "kind": "wake-on-lan",
+            "mac": "02:00:00:00:00:00",
+            "broadcast": "192.168.50.255"
           },
           "off_command": {
-            "kind": "ssap",
-            "uri": ""
+            "uri": "ssap://system/turnOff",
+            "kind": "ssap"
+          }
+        },
+        "home": {
+          "target": "device-1",
+          "command": {
+            "button": "HOME",
+            "kind": "pointer"
+          }
+        },
+        "select": {
+          "target": "device-1",
+          "command": {
+            "button": "ENTER",
+            "kind": "pointer"
+          }
+        },
+        "nav-up": {
+          "target": "device-1",
+          "command": {
+            "button": "UP",
+            "kind": "pointer"
+          }
+        },
+        "skip-forward": {
+          "target": "device-1",
+          "command": {
+            "button": "",
+            "kind": "pointer"
+          }
+        },
+        "volume-down": {
+          "target": "device-1",
+          "command": {
+            "uri": "ssap://audio/volumeDown",
+            "kind": "ssap"
+          }
+        },
+        "skip-back": {
+          "target": "device-1",
+          "command": {
+            "button": "",
+            "kind": "pointer"
+          }
+        },
+        "nav-left": {
+          "target": "device-1",
+          "command": {
+            "button": "LEFT",
+            "kind": "pointer"
+          }
+        },
+        "play-pause": {
+          "target": "device-1",
+          "command": {
+            "button": "",
+            "kind": "pointer"
+          }
+        },
+        "volume-up": {
+          "target": "device-1",
+          "command": {
+            "uri": "ssap://audio/volumeUp",
+            "kind": "ssap"
+          }
+        },
+        "nav-down": {
+          "target": "device-1",
+          "command": {
+            "button": "DOWN",
+            "kind": "pointer"
+          }
+        },
+        "nav-right": {
+          "target": "device-1",
+          "command": {
+            "button": "RIGHT",
+            "kind": "pointer"
           }
         }
       },
       "custom_actions": [
         {
-          "id": "custom-action-1",
-          "name": "Get Volume",
+          "name": "Picture Cycle",
+          "id": "ca-mww7rlvq-g5l5phct",
           "steps": [
             {
+              "wait_after_ms": 500,
               "target": "device-1",
               "command": {
-                "kind": "ssap",
-                "uri": "ssap://audio/getVolume"
-              },
-              "wait_after_ms": 0
-            }
-          ]
-        },
-        {
-          "id": "custom-action-2",
-          "name": "Launch Home",
-          "steps": [
-            {
-              "target": "device-1",
-              "command": {
-                "kind": "ssap",
-                "uri": "ssap://system.launcher/launch",
-                "payload": {
-                  "id": "com.webos.app.home"
-                }
-              },
-              "wait_after_ms": 0
-            }
-          ]
-        },
-        {
-          "id": "custom-action-3",
-          "name": "Home & Right",
-          "steps": [
-            {
-              "target": "device-1",
-              "command": {
-                "kind": "ssap",
-                "uri": "ssap://system.launcher/launch",
-                "payload": {
-                  "id": "com.webos.app.home"
-                }
-              },
-              "wait_after_ms": 1500
+                "button": "MENU",
+                "kind": "pointer"
+              }
             },
             {
+              "wait_after_ms": 250,
               "target": "device-1",
               "command": {
-                "kind": "pointer",
-                "button": "RIGHT"
-              },
-              "wait_after_ms": 0
+                "button": "RIGHT",
+                "kind": "pointer"
+              }
+            },
+            {
+              "wait_after_ms": 250,
+              "target": "device-1",
+              "command": {
+                "button": "ENTER",
+                "kind": "pointer"
+              }
+            },
+            {
+              "wait_after_ms": 500,
+              "target": "device-1",
+              "command": {
+                "button": "RIGHT",
+                "kind": "pointer"
+              }
+            },
+            {
+              "wait_after_ms": 0,
+              "target": "device-1",
+              "command": {
+                "button": "MENU",
+                "kind": "pointer"
+              }
+            }
+          ]
+        },
+        {
+          "name": "TV Wake",
+          "id": "ca-mww8nzyf-sm9j6orl",
+          "steps": [
+            {
+              "wait_after_ms": 0,
+              "target": "device-1",
+              "command": {
+                "port": 9,
+                "kind": "wake-on-lan",
+                "mac": "02:00:00:00:00:00",
+                "broadcast": "192.168.50.255"
+              }
             }
           ]
         }
