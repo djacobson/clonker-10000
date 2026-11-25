@@ -618,9 +618,23 @@ def from_json(contents):
 
 
 def _load_existing(path):
-    """Read and validate one file, without changing active state."""
+    """Read and validate one file, without changing active state.
+
+    Bound the read by the actual file size rather than allocating
+    a maximum-sized buffer for every configuration load.
+    """
+    size = os.stat(path)[6]
+
+    if size > MAX_CONFIG_BYTES:
+        raise ValueError("Configuration exceeds byte limit")
+
     with open(path, "rb") as file:
-        return from_json(file.read(MAX_CONFIG_BYTES + 1))
+        contents = file.read(size + 1)
+
+    if len(contents) != size:
+        raise ValueError("Configuration file size changed during read")
+
+    return from_json(contents)
 
 
 def load(path=None):
