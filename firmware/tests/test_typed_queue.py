@@ -117,6 +117,16 @@ def fake_lg_execute(device, command):
     }
 
 
+def fake_wake(command):
+    record(
+        "wake-on-lan",
+        command["broadcast"],
+        command["port"],
+        command,
+    )
+    return 102
+
+
 def fake_cancel():
     global cancel_calls
     cancel_calls += 1
@@ -777,6 +787,158 @@ def test_lg():
     check("LG toggle queue drained", depth() == 0)
 
 
+def test_wake_on_lan():
+    global transport_fail
+
+    reset_test()
+
+    wake = {
+        "kind": "wake-on-lan",
+        "mac": "02:00:00:AB:CD:EF",
+        "broadcast": "192.168.1.255",
+        "port": 9,
+    }
+
+    off = {
+        "kind": "ssap",
+        "uri": "ssap://system/turnOff",
+    }
+
+    room = cfg._current["rooms"]["room-1"]
+
+    room["actions"]["power-toggle"] = {
+        "target": "device-1",
+        "on_command": dict(wake),
+        "off_command": dict(off),
+    }
+
+    # Mixed-protocol power toggle.
+
+    result = actions.dispatch("room-1", "power-toggle")
+
+    check("Wake power configured", result["configured"])
+    check("Wake power admitted", depth() == 1)
+    check("Wake admission sends nothing", len(sent) == 0)
+    check("Wake power ON executes", actions.poll())
+
+    check(
+        "Power ON uses Wake-on-LAN",
+        sent[-1] == (
+            "wake-on-lan",
+            wake["broadcast"],
+            wake["port"],
+            wake,
+        )
+    )
+
+    check("Wake power ON completes", depth() == 0)
+
+    actions.dispatch("room-1", "power-toggle")
+
+    check("SSAP power OFF executes", actions.poll())
+
+    check(
+        "Power OFF uses LG SSAP",
+        sent[-1][0] == "lg"
+        and sent[-1][3] == off
+    )
+
+    actions.dispatch("room-1", "power-toggle")
+
+    check("Power toggle returns to Wake", actions.poll())
+    check("Power ON uses Wake again", sent[-1][0] == "wake-on-lan")
+
+    # Wake-on-LAN does not require an endpoint or client key.
+
+    actions._toggle_next.clear()
+
+    room["devices"]["device-1"]["endpoint"] = ""
+    room["devices"]["device-1"]["client_key"] = ""
+
+    result = actions.dispatch("room-1", "power-toggle")
+
+    check("Wake configured without endpoint", result["configured"])
+    check("Wake executes without endpoint", actions.poll())
+    check("Endpoint-free Wake transmitted", sent[-1][0] == "wake-on-lan")
+
+    # Blank fundamental Wake command is a no-op.
+
+    actions._toggle_next.clear()
+    room["actions"]["power-toggle"]["on_command"]["mac"] = ""
+
+    before = len(sent)
+    result = actions.dispatch("room-1", "power-toggle")
+
+    check("Blank Wake unconfigured", not result["configured"])
+    check("Blank Wake processed", actions.poll())
+    check("Blank Wake sends nothing", len(sent) == before)
+    check("Blank Wake queue drained", depth() == 0)
+
+    # Mixed-protocol Custom Action.
+
+    reset_test()
+
+    room = cfg._current["rooms"]["room-1"]
+
+    room["devices"]["device-1"]["endpoint"] = ""
+    room["devices"]["device-1"]["client_key"] = ""
+
+    room["custom_actions"].append({
+        "id": "wake-test",
+        "name": "Wake Test",
+        "steps": [
+            {
+                "target": "device-1",
+                "command": dict(wake),
+                "wait_after_ms": 0,
+            },
+            {
+                "target": "device-3",
+                "command": http("/keypress/Home"),
+                "wait_after_ms": 0,
+            },
+        ],
+    })
+
+    result = actions.dispatch("room-1", "wake-test")
+
+    check("Wake Custom Action configured", result["configured"])
+    check("Wake Custom Action first step", actions.poll())
+    check("Custom Wake transmitted first", sent[-1][0] == "wake-on-lan")
+    check("Custom Action retains one entry", depth() == 1)
+
+    check("Wake Custom Action second step", actions.poll())
+    check("Custom HTTP transmitted second", sent[-1][0] == "http")
+    check("Wake Custom Action completes", depth() == 0)
+
+    # Failed Wake transmission cancels all remaining work.
+
+    sent.clear()
+    transport_fail = True
+
+    actions.dispatch("room-1", "wake-test")
+    actions.dispatch("room-2", "home")
+
+    check("Wake failure processes task", actions.poll())
+    check("Wake failure clears queue", depth() == 0)
+    check("Wake failure sends nothing", len(sent) == 0)
+    check("Wake failure invokes cleanup", cancel_calls == 1)
+
+    check(
+        "Wake failure records error",
+        actions.status()["last_error"] is not None
+    )
+
+    transport_fail = False
+
+    check("Wake failure does not replay", not actions.poll())
+
+    actions.dispatch("room-2", "home")
+
+    check("New command after Wake failure executes", actions.poll())
+    check("HTTP recovers after Wake failure", sent[-1][0] == "http")
+
+
 # -------------------------------------------------
 # Test runner and state restoration
 # -------------------------------------------------
@@ -798,6 +960,7 @@ def run():
         (roku, "execute_hold", fake_roku_hold),
         (adapters.lg_webos, "ready", fake_lg_ready),
         (adapters.lg_webos, "execute", fake_lg_execute),
+        (adapters.wake_on_lan, "send", fake_wake),
         (adapters, "cancel_active", fake_cancel),
         (oled, "show_text", fake_oled),
     )
@@ -833,6 +996,7 @@ def run():
         test_holds()
         test_failures()
         test_lg()
+        test_wake_on_lan()
 
         completed = True
 
