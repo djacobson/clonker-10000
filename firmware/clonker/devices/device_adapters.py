@@ -27,6 +27,7 @@ from clonker.net import http_transport
 from clonker.devices import device_types
 from clonker.devices import denon
 from clonker.devices import roku
+from clonker.devices import lg_webos
 
 
 ROKU_VOLUME_HOLD = "roku-volume-hold"

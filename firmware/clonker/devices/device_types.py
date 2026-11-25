@@ -56,7 +56,7 @@ DEVICE_TYPES = {
     },
     "lg-webos": {
         "label": "LG webOS",
-        "enabled": False,
+        "enabled": True,
         "default_port": 3000,
         "command_kinds": (SSAP, POINTER),
         "attributes": ("client_key",),
