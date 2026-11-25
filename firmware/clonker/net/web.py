@@ -23,6 +23,7 @@ import json
 import errno
 import storage
 import os
+import gc
 
 from clonker.system import clock, logger
 from clonker.net import web_diag
@@ -60,6 +61,9 @@ _sent = 0
 _sent_total = 0
 _response_total = 0
 _last_activity = 0
+# Bounded HTTP processing diagnostics.
+_stage = "IDLE"
+_expected_request_bytes = 0
 
 # Optional static-file stream for the current response.
 _file = None
@@ -108,8 +112,13 @@ def _close_client(reason="closed"):
     if client is not None:
         try:
             client.close()
-        except OSError:
-            pass
+        except OSError as error:
+            try:
+                logger.warning(
+                    "HTTP client close error: {}".format(error)
+                )
+            except MemoryError:
+                pass
 
     # Diagnostics must never prevent connection cleanup.
     if client is not None:
@@ -159,6 +168,7 @@ def _request_complete(request):
     GET and clock-sync requests need only their headers; configuration POSTs
     additionally require one valid Content-Length and the entire body.
     """
+    global _expected_request_bytes
     header_end = request.find(b"\r\n\r\n")
 
     if header_end < 0:
@@ -194,7 +204,8 @@ def _request_complete(request):
     if header_end + 4 + lengths[0] > MAX_REQUEST_BYTES:
         raise ValueError("Configuration request too large")
 
-    return len(request) >= header_end + 4 + lengths[0]
+    _expected_request_bytes = header_end + 4 + lengths[0]
+    return len(request) >= _expected_request_bytes
 
 
 def _json_error(message, status="400 Bad Request"):
@@ -262,6 +273,7 @@ def _build_response(first_line, request=None):
 
     For other routes, initial_bytes contains the complete response.
     """
+    global _stage
     logger.debug("HTTP request: {}".format(first_line))
     content_type = "application/json"
     file_path = None
@@ -322,12 +334,15 @@ def _build_response(first_line, request=None):
     # Include response-only configuration metadata.
     # current() returns a copy, so these fields are not saved.
     elif first_line.startswith(b"GET /api/config "):
+        _stage = "GET_CONFIG_COPY"
         config = device_config.current()
         config["filesystem_writable"] = (
             not storage.getmount("/").readonly
         )
+        _stage = "GET_CONFIG_REVISION"
         config["revision"] = device_config.revision()
         config["device_types"] = device_types.DEVICE_TYPES
+        _stage = "GET_CONFIG_JSON"
         body = json.dumps(config)
         status = "200 OK"
 
@@ -357,6 +372,7 @@ def _build_response(first_line, request=None):
             )
         else:
             try:
+                _stage = "POST_HEADERS"
                 header_end = request.find(b"\r\n\r\n")
                 headers = bytes(
                     request[:header_end]
@@ -375,9 +391,11 @@ def _build_response(first_line, request=None):
                     raise ValueError("Missing Content-Length")
 
                 body_start = header_end + 4
+                _stage = "POST_BODY_COPY"
                 body_bytes = bytes(
                     request[body_start:body_start + length]
                 )
+                _stage = "POST_JSON"
                 submitted = json.loads(
                     body_bytes.decode("utf-8")
                 )
@@ -393,11 +411,13 @@ def _build_response(first_line, request=None):
 
                 post_started = time.monotonic_ns()
 
+                _stage = "POST_SAVE"
                 changed = device_config.save(
                     submitted, expected_revision
                 )
                 saved_at = time.monotonic_ns()
 
+                _stage = "POST_ACTIVATION"
                 if changed:
                     # Discard physical gestures captured under
                     # the previous configuration.
@@ -415,9 +435,11 @@ def _build_response(first_line, request=None):
                     oled.show_text("CONFIG", "SAVED!")
                 cleared_at = time.monotonic_ns()
 
+                _stage = "POST_REVISION"
                 new_revision = device_config.revision()
                 revised_at = time.monotonic_ns()
 
+                _stage = "POST_RESPONSE"
                 body = json.dumps({
                     "message": (
                         "Configuration saved"
@@ -485,6 +507,7 @@ def _build_response(first_line, request=None):
         )
         return header, file_path, len(header) + file_size
 
+    _stage = "RESPONSE_ENCODE"
     payload = body.encode("utf-8")
     header = _http_header(
         status, content_type, len(payload)
@@ -501,8 +524,10 @@ def _advance_file():
     has reached EOF or a read error has closed the connection.
     """
     global _response, _sent
+    global _stage
 
     try:
+        _stage = "FILE_READ"
         data = _file.read(WEB_SEND_CHUNK_BYTES)
     except OSError as error:
         logger.warning("HTTP file read error: {}".format(error))
@@ -523,6 +548,7 @@ def poll():
     global _client, _request, _response
     global _sent, _sent_total, _response_total
     global _last_activity, _file
+    global _stage, _expected_request_bytes
 
     if _listener is None:
         return
@@ -532,6 +558,7 @@ def poll():
     # Accept a new client if the server is idle.
     if _client is None:
         try:
+            _stage = "ACCEPT"
             client, address = _listener.accept()
 
         except OSError as error:
@@ -550,6 +577,8 @@ def poll():
             return
 
         _client = client
+        _expected_request_bytes = 0
+        _stage = "CLIENT_INITIALIZE"
         _request = bytearray()
         _response = None
         _file = None
@@ -595,6 +624,7 @@ def poll():
 
     # Read a bounded chunk, accumulating until the request is complete.
     if _response is None:
+        _stage = "RECEIVE"
         buf = bytearray(IO_CHUNK_BYTES)
 
         try:
@@ -613,6 +643,7 @@ def poll():
             return
 
         _last_activity = now
+        _stage = "REQUEST_EXTEND"
         _request.extend(memoryview(buf)[:count])
 
         if len(_request) > MAX_REQUEST_BYTES:
@@ -621,6 +652,7 @@ def poll():
             return
 
         try:
+            _stage = "REQUEST_COMPLETE"
             if not _request_complete(_request):
                 return
 
@@ -631,6 +663,7 @@ def poll():
             _close_client("invalid_request")
             return
 
+        _stage = "REQUEST_LINE"
         first_line = bytes(_request).split(b"\r\n", 1)[0]
 
         http_trace("REQUEST: {}".format(first_line))
@@ -640,11 +673,13 @@ def poll():
             build_started = time.monotonic_ns()
 
         try:
+            _stage = "BUILD_RESPONSE"
             response, file_path, total_bytes = _build_response(
                 first_line, _request
             )
 
             if file_path is not None:
+                _stage = "FILE_OPEN"
                 _file = open(file_path, "rb")
 
         except OSError as error:
@@ -677,6 +712,7 @@ def poll():
         return
 
     # Send the current response buffer incrementally.
+    _stage = "SEND_PREPARE"
     chunk = memoryview(_response)[
         _sent:_sent + WEB_SEND_CHUNK_BYTES
     ]
@@ -692,6 +728,7 @@ def poll():
         # observed on the Test Remote page (remote.html).
         # Investigate browser request patterns, JavaScript fetch
         # behavior, and CircuitPython socket handling in the future.
+        _stage = "SEND"
         count = _client.send(chunk)
 
     except OSError as error:
@@ -725,15 +762,21 @@ def poll():
 
 
 def abort_low_memory():
-    """Discard the active HTTP transaction with minimal allocation.
+    """Discard the active HTTP transaction and report failure context.
 
     Keep the listening socket open so a later request can succeed.
-    The caller performs garbage collection after cleanup.
+    Release resources before constructing diagnostic messages.
     """
     global _client, _request, _response, _file
     global _sent, _sent_total, _response_total, _last_activity
 
-    # Release large references before doing anything else.
+    free_before = gc.mem_free()
+    request_bytes = len(_request) if _request is not None else 0
+    expected_bytes = _expected_request_bytes
+    sent_bytes = _sent_total
+    response_bytes = _response_total
+    stage = _stage
+
     client = _client
     file_handle = _file
 
@@ -749,17 +792,45 @@ def abort_low_memory():
 
     web_diag.discard()
 
+    file_close_failed = False
+    socket_close_failed = False
+
     if file_handle is not None:
         try:
             file_handle.close()
         except Exception:
-            pass
+            file_close_failed = True
 
     if client is not None:
         try:
             client.close()
         except Exception:
-            pass
+            socket_close_failed = True
+
+    client = None
+    file_handle = None
+
+    gc.collect()
+
+    try:
+        logger.warning(
+            "HTTP MEMORY: stage={}, request={}, expected={}, "
+            "sent={}, response={}, free_before={}, "
+            "free_after={}, socket_close_failed={}, "
+            "file_close_failed={}".format(
+                stage,
+                request_bytes,
+                expected_bytes,
+                sent_bytes,
+                response_bytes,
+                free_before,
+                gc.mem_free(),
+                socket_close_failed,
+                file_close_failed,
+            )
+        )
+    except MemoryError:
+        pass
 
 
 def stop():
