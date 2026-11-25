@@ -101,7 +101,7 @@ CONFIG enables the Clonker browser management service on the trusted local netwo
 
 The IP address is installation-specific, not a firmware default.
 
-CONFIG exposes validated Config v4 inspection, revision-protected saves when the Pico filesystem is writable, browser clock synchronization, and the Test Remote. The browser can enqueue fundamental and custom actions; the shared Dumb Queue™ executes them using the appropriate transport. **Queued is not the same as executed**, and a network acknowledgment does not establish actual equipment state.
+CONFIG exposes validated Config v5 inspection, revision-protected saves when the Pico filesystem is writable, browser clock synchronization, configuration recipe import, and the Test Remote. The browser can enqueue fundamental and Custom Actions; the shared Dumb Queue™ executes them using the appropriate operational adapter. **Queued is not the same as executed**, and a network acknowledgment does not establish actual equipment state.
 
 Physical controls continue operating in CONFIG. Enabling the browser does not disable the remote.
 
@@ -378,11 +378,13 @@ The physical GP17 and GP18 behavior was verified October 29, 2026. Chapter 6 sub
 
 ## 6. Configuration persistence and safe saves
 
-The active schema is **Clonker Config v4**, despite the historical implementation filename `device_config_v2.py`.
+The active schema is **Clonker Config v5**, implemented by `device_config.py` with explicitly typed devices and protocol-aware command objects.
 
 Browser saves require DEVICE + CONFIG. In SERVICE + CONFIG, inspection and Test Remote actions remain possible, but `POST /api/config` rejects persistence with HTTP 403 because the Pico filesystem is read-only.
 
-A valid changed save checks the expected revision, validates the configuration, performs guarded filesystem writes and backup handling, publishes the new RAM configuration, rebuilds the in-memory specialized adapter selection cache, clears pending queued actions, and resets volatile power/mute direction histories. An unchanged save avoids unnecessary persistence and preserves pending work and toggle histories.
+A valid changed save checks the expected revision, validates the proposed configuration, checks disk consistency, prepares replacement adapter selections, and performs guarded filesystem writes, backup rotation, and bounded byte verification. Activation retires existing adapter sessions and publishes the replacement configuration and adapter cache. The management save handler clears obsolete physical gesture state, pending queued actions, and volatile power/mute direction histories. An unchanged save avoids unnecessary persistence and preserves existing operational state.
+
+Successful persistence and successful HTTP acknowledgment are separate events. If a save outcome is uncertain because of a management connection failure, reload the active configuration and revision before attempting another save. Do not automatically replay the POST.
 
 A revision conflict should be resolved by refreshing the editor and reconciling changes, not bypassing the check. Backup rotation reduces risk; it does not promise recovery from every interrupted write or sudden power loss.
 

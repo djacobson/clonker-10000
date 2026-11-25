@@ -246,13 +246,13 @@ The operational GPIO assignment is GP3/GP6/GP7, preserving GP4/GP5 for the OLED 
 
 ### 6.1 Room 3 placeholder
 
-The installed Config v4 configuration includes `room-3` as a placeholder.
+The installed development Config v5 configuration includes `room-3` as a placeholder.
 
 It has:
 
-- Three device slots with blank addresses.
-- Fourteen defined fundamental actions with blank command paths.
-- An empty custom-action list.
+- Three explicitly typed device slots with blank endpoints.
+- Fourteen defined fundamental actions with blank commands.
+- An empty Custom Action list.
 
 The browser configuration editor can populate these fields.
 
@@ -823,7 +823,8 @@ Installed and operational components should not be confused with future software
 | `display/oled.py` | OLED initialization, rendering, and polling |
 | `system/perf.py` | Shared performance measurements |
 | `actions.py` | Shared Dumb Queue™ and action execution |
-| `device_adapters.py` | Specialized command selection |
+| `devices/device_types.py` | Device-type registry and protocol capabilities |
+| `devices/device_adapters.py` | Typed adapter selection and execution |
 | `devices/denon.py` | Denon transport and persistent TCP volume |
 | `devices/roku.py` | Roku transport and held-button behavior |
 
@@ -1166,7 +1167,7 @@ Detailed experiments and measured results are recorded in
 ## 19. Related documents
 
 - [Architecture](ARCHITECTURE.md) — system boundaries, dispatcher, queue, adapters.
-- [Configuration & Recovery](CONFIGURATION.md) — Config v4 schema, persistence, revision protection.
+- [Configuration & Recovery](CONFIGURATION.md) — Config v5 schema, typed devices, persistence, revision protection.
 - [Firmware, Network & Clock](FIRMWARE_NETWORK.md) — scheduler, Roku/Denon transports, diagnostics.
 - [Operating Modes](OPERATING_MODES.md) — SERVICE/DEVICE and CONFIG/RUN behavior.
 - [Development & Deployment](DEVELOPMENT.md) — development workflow, deployment, tests.

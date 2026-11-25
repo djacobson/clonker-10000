@@ -1,9 +1,9 @@
 # THE CLONKER 10000
 ## Development, Deployment & Testing
 
-**Updated:** November 10, 2026  
+**Updated:** November 24, 2026  
 **Platform:** Raspberry Pi Pico 2 W (RP2350) / CircuitPython 10.3.1  
-**Baseline:** Chapter 8 — Config v4, three-room physical control, completed OLED feedback, resolved physical execution overhead, bounded CONFIG HTML streaming, and HTTP failure recovery  
+**Baseline:** Chapter 12 — Config v5, typed devices, protocol-aware commands, redesigned configuration editor, verified operational adapters, and optimized configuration persistence  
 **Repository:** https://github.com/djacobson/clonker-10000
 
 > Built with modern software, vintage mechanical ambitions, and a development process carefully designed to minimize contact with an aging Windows laptop.
@@ -43,7 +43,7 @@ GitHub establishes the maintained source. **The actual Pico filesystem establish
 - **Windows laptop:** GitHub Desktop, USB file transfer, and serial diagnostics. PuTTY is useful for sustained serial sessions; the CircuitPython browser console may become unresponsive during long sessions.
 - **CircuitPython REPL:** Use for inspection and deliberately scoped tests. Ctrl+C interrupts the running application; Ctrl+D soft-reloads. Neither substitutes for a cold power cycle when changing GP17 filesystem ownership.
 
-The former ESP32-S3 and XML designs are historical. `device_config_v2.py` is the active module despite its historical filename: its schema is **Clonker Config v4**.
+The former ESP32-S3, XML, and Config v4 designs are historical. The active configuration module is `device_config.py`, implementing **Clonker Config v5**. Schema versioning is explicit in the JSON configuration rather than the Python module filename.
 
 ## 3. Active firmware map
 
@@ -52,8 +52,9 @@ The former ESP32-S3 and XML designs are historical. `device_config_v2.py` is the
 | `firmware/boot.py` | GP17 filesystem ownership at boot |
 | `firmware/code.py` | Application entry point |
 | `firmware/clonker/main.py` | Startup and cooperative scheduler |
-| `firmware/clonker/device_config_v2.py` | Config v4 validation, RAM snapshot, revisions, persistence and recovery |
-| `firmware/clonker/device_adapters.py` | Specialized adapter selection and cached mapping |
+| `firmware/clonker/device_config.py` | Config v5 validation, RAM configuration, revisions, persistence and recovery |
+| `firmware/clonker/devices/device_types.py` | Central device-type registry and protocol capabilities |
+| `firmware/clonker/devices/device_adapters.py` | Typed adapter selection, execution, cached mappings and session lifecycle |
 | `firmware/clonker/actions.py` | Shared queue, action dispatch, toggles, compound steps and failure handling |
 | `firmware/clonker/devices/denon.py` | Persistent Denon TCP volume connection and pacing |
 | `firmware/clonker/net/http_transport.py` | Generic bounded blocking HTTP GET/POST |
@@ -129,11 +130,11 @@ See [Operating Modes](OPERATING_MODES.md) for the complete mode matrix, override
 9. Inspect serial logs for startup, Wi-Fi, loaded rooms, GPIO initialization, adapter and queue errors.
 10. Test the affected feature, including real equipment behavior where relevant. Record observed evidence and update the appropriate documentation.
 
-A repository `firmware/clonker/...` path deploys to `/clonker/...` on CIRCUITPY. `firmware/boot.py` and `firmware/code.py` deploy to `/boot.py` and `/code.py`. Newly added modules such as `device_adapters.py`, `devices/denon.py`, and `controls/encoders.py` **must also be copied** when required by the running code.
+A repository `firmware/clonker/...` path deploys to `/clonker/...` on CIRCUITPY. `firmware/boot.py` and `firmware/code.py` deploy to `/boot.py` and `/code.py`. Newly added modules such as `device_config.py`, `devices/device_types.py`, and `devices/device_adapters.py` **must also be copied** when required by the running code.
 
 ### Deliberate configuration replacement
 
-Before intentionally replacing `/clonker/device_config.json`, preserve primary and backup files, verify Config v4 schema compatibility, check room/device addresses and custom actions, and test cold-start loading. Do not mix a configuration migration with an unrelated GPIO or transport change.
+Before intentionally replacing `/clonker/device_config.json`, preserve primary and backup files, verify Config v5 schema compatibility, check typed device records, endpoints, fundamental commands, and Custom Actions, and test cold-start loading. Config v4 files are not automatically migrated. Do not mix a configuration replacement with an unrelated GPIO or transport change.
 
 ## 7. Configuration regression in DEVICE + CONFIG
 
