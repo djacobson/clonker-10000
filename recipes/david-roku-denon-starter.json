@@ -216,8 +216,9 @@
       ],
       "devices": {
         "device-1": {
-          "endpoint": "",
-          "type": "generic-http"
+          "client_key": "PASTE_OR_PAIR_CLIENT_KEY_HERE",
+          "endpoint": "192.168.50.52:3000",
+          "type": "lg-webos"
         },
         "device-2": {
           "endpoint": "192.168.50.44:8080",
@@ -418,12 +419,59 @@
               "wait_after_ms": 0
             }
           ]
+        },
+        {
+          "id": "ca-mwwfgcd3-2cjh1d90",
+          "name": "Picture Cycle",
+          "steps": [
+            {
+              "command": {
+                "button": "MENU",
+                "kind": "pointer"
+              },
+              "target": "device-1",
+              "wait_after_ms": 500
+            },
+            {
+              "command": {
+                "button": "RIGHT",
+                "kind": "pointer"
+              },
+              "target": "device-1",
+              "wait_after_ms": 250
+            },
+            {
+              "command": {
+                "button": "ENTER",
+                "kind": "pointer"
+              },
+              "target": "device-1",
+              "wait_after_ms": 250
+            },
+            {
+              "command": {
+                "button": "RIGHT",
+                "kind": "pointer"
+              },
+              "target": "device-1",
+              "wait_after_ms": 500
+            },
+            {
+              "command": {
+                "button": "MENU",
+                "kind": "pointer"
+              },
+              "target": "device-1",
+              "wait_after_ms": 0
+            }
+          ]
         }
       ],
       "devices": {
         "device-1": {
-          "endpoint": "",
-          "type": "generic-http"
+          "client_key": "PASTE_OR_PAIR_CLIENT_KEY_HERE",
+          "endpoint": "192.168.50.20:3000",
+          "type": "lg-webos"
         },
         "device-2": {
           "endpoint": "192.168.50.40:8080",
