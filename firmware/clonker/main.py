@@ -520,15 +520,20 @@ def main():
                     try:
                         web.poll()
 
-                    except MemoryError:
-                        # HTTP memory exhaustion must not terminate
-                        # the physical remote application.
+                    except MemoryError as error:
+                        # Preserve physical remote operation when
+                        # an incoming HTTP allocation fails.
                         web.abort_low_memory()
-                        gc.collect()
-                        logger.warning(
-                            "HTTP memory allocation failed; "
-                            "client discarded"
-                        )
+
+                        try:
+                            logger.warning(
+                                "HTTP memory allocation failed; "
+                                "client discarded; error={!r}".format(
+                                    error
+                                )
+                            )
+                        except MemoryError:
+                            pass
 
                     except OSError as error:
                         # Unexpected listener/accept failure.
