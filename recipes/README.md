@@ -16,9 +16,12 @@ and Custom Actions.
 - `index.json` — maintainer-controlled recipe catalog,
   including titles, descriptions, room summaries,
   and Custom Action descriptions.
-- `david-roku-denon-starter.json` — a complete Config v5
-  recipe based on a working configuration exported
-  from the physical Clonker.
+- `david-roku-denon-starter.json` — David's everyday
+  two-room configuration combining Roku ECP, Denon AVR
+  control, and native LG webOS commands. Updated during
+  Chapter 13 to include the Sunroom Picture Cycle Custom
+  Action. The Den LG device is defined but its native
+  control remains under investigation.
 - `david-lg-webos-starter.json` — a hardware-tested,
   single-room LG webOS Config v5 recipe developed
   during Chapter 13. Includes native SSAP and pointer
@@ -56,6 +59,35 @@ for the subsequent save operation.
 Saving requires DEVICE + CONFIG mode and remains
 subject to firmware validation, revision protection,
 and normal persistence safeguards.
+
+## Exporting a working configuration
+
+A running Clonker exposes its active configuration at:
+
+    http://<clonker-ip>:9090/api/config
+
+This provides a convenient alternative to copying
+`device_config.json` from the CIRCUITPY filesystem.
+
+The API response includes three response-only fields
+that must be removed when preparing a recipe:
+
+- `device_types`
+- `revision`
+- `filesystem_writable`
+
+Retain the configuration version and complete rooms
+object, including all stable identifiers.
+
+The API represents the active in-memory configuration.
+It is not an independent verification of disk persistence.
+
+Always sanitize client keys and equipment-specific MAC
+addresses before publishing an exported configuration.
+
+When copying the configuration directly from CIRCUITPY,
+rebooting into USB service mode can help avoid stale
+host filesystem views.
 
 ## Equipment-specific settings
 

@@ -3,19 +3,21 @@
   "recipes": [
     {
       "id": "david-roku-denon-starter",
-      "title": "David's Roku + Denon Setup",
+      "title": "David's Roku + Denon + LG Setup",
       "category": "CONFIG V5 · TWO ACTIVE ROOMS",
-      "summary": "David's working Clonker configuration: Denon-centric Den and Roku-centric Sunroom, with an unused third room.",
+      "summary": "David's everyday Clonker configuration, combining Roku ECP, Denon AVR control, and native LG webOS commands.",
       "description": [
-        "This complete Config v5 recipe is based on a working configuration exported from the physical Clonker.",
+        "This complete Config v5 recipe is based on the active configuration exported from the physical Clonker using its configuration API.",
         "Room 1, Den, uses Roku for navigation and playback, with a Denon receiver handling volume and mute. Movie, Music, and Vinyl Custom Actions invoke Denon Quick Select presets.",
-        "Room 2, Sunroom, uses Roku for navigation, playback, volume, and mute, controlling the Denon AVR volume through HDMI CEC. This also demonstrates the Roku volume command approach applicable to compatible Roku smart TVs.",
-        "The recipe includes explicitly typed devices, protocol-aware commands, stable Custom Action identifiers, and an unconfigured third room.",
-        "Download the JSON file and import it through the Clonker configuration editor. Review and customize all device endpoints and commands before explicitly saving. IP addresses are not automatically substituted."
+        "Room 2, Sunroom, uses Roku for navigation, playback, volume, and mute, controlling the Denon AVR volume through HDMI CEC.",
+        "The Sunroom also uses native LG webOS pointer commands for its Picture Cycle Custom Action, demonstrating three device types working together in one room.",
+        "The Den LG television is defined but has no assigned commands. Native control of this newer LG model remains under investigation.",
+        "The recipe includes stable Custom Action identifiers, placeholder LG client keys, and an unconfigured third room.",
+        "Download and import the JSON file through the Clonker configuration editor. Review device endpoints, commands, and authentication credentials before explicitly saving."
       ],
       "rooms": [
         "Room 1 -- Den: Roku navigation, Denon volume/mute, four Custom Actions",
-        "Room 2 -- Sunroom: Roku navigation, Roku volume/mute, three Custom Actions",
+        "Room 2 -- Sunroom: Roku navigation, Roku volume/mute, native LG Picture Cycle, four Custom Actions",
         "Room 3 -- Present but unconfigured; available for future expansion"
       ],
       "custom_actions": [
@@ -25,7 +27,8 @@
         "Den: Audio Cycle → Cycle Denon Movie listening modes",
         "Sunroom: Movie → Roku Home, wait 3 seconds, Denon Quick Select 1",
         "Sunroom: Music → Roku Home, wait 3 seconds, Denon Quick Select 2",
-        "Sunroom: Audio Cycle → Cycle Denon Movie listening modes"
+        "Sunroom: Audio Cycle → Cycle Denon Movie listening modes",
+        "Sunroom: Picture Cycle → Advance the LG picture mode using native pointer commands"
       ],
       "file": "david-roku-denon-starter.json"
     },
