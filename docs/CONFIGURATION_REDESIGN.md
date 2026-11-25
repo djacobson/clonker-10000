@@ -3,9 +3,13 @@
 **Proposed:** November 24, 2026  
 **Origin:** Chapter 11  
 **Target:** Chapter 12  
-**Status:** Design agreed — implementation pending  
-**Current schema:** Config v4  
-**Target schema:** Config v5  
+**Status:** Implemented — operational Config v5 baseline established  
+**Original schema:** Config v4  
+**Implemented schema:** Config v5  
+
+> **Historical design record:** This document preserves the
+> agreed Chapter 12 proposal. See Section 23 for implementation
+> results and current sources of truth.
 
 > Configure the device. Configure the intent.
 > Let the adapter speak the protocol.
@@ -1450,26 +1454,97 @@ Implement and test LG protocol execution afterward.
 Do not implement speculative functionality for future
 device types without an established requirement.
 
-## 23. Sources of truth
+## 23. Implementation outcome and sources of truth
 
-Until the redesign is implemented, the current working
-configuration architecture remains documented in:
+**Implementation status: November 24, 2026**
+
+The Chapter 12 configuration redesign has been implemented
+and integrated into the operational Clonker firmware.
+
+Config v5 is now the active configuration schema.
+
+This document is retained as the original agreed design
+proposal and implementation plan. Its earlier descriptions,
+proposed decisions, and verification checklists reflect
+the planning stage rather than the current operational state.
+
+### 23.1 Implementation results
+
+| Workstream | Status |
+|---|---|
+| Config v5 schema and validation | Implemented |
+| Central device-type registry | Implemented |
+| Typed adapter coordinator | Integrated |
+| Protocol-aware command objects | Implemented |
+| Configuration activation lifecycle | Verified |
+| Physical gesture invalidation | Verified |
+| Configuration editor redesign | Verified |
+| Stable Custom Action identifiers | Implemented |
+| Optional room management | Implemented |
+| Config v5 recipe import | Verified |
+| Hosted recipe library update | Pending |
+| Configuration persistence optimization | Verified |
+| LG SSAP and pointer configuration | Implemented |
+| LG client-key editing | Implemented |
+| LG pairing control | Present, disabled |
+| LG runtime integration | Deferred |
+| Apple TV and Fire TV | Reserved future types |
+
+Six focused automated regression suites passed a combined
+436 assertions during implementation.
+
+All five existing operational execution paths were exercised
+successfully on physical equipment.
+
+Subsequent configuration persistence improvements passed
+twenty consecutive changed browser saves, followed by
+additional successful post-cleanup regression tests.
+
+The original intermittent management HTTP socket-send
+stall remains unresolved.
+
+These results do not imply exhaustive reliability testing
+or a complete rerun of every earlier regression suite
+against the final optimized persistence implementation.
+
+### 23.2 Current sources of truth
+
+The implemented configuration and operational architecture
+are now documented in:
 
 - [Configuration, Persistence & Recovery](CONFIGURATION.md)
 - [Architecture](ARCHITECTURE.md)
 - [Firmware Network](FIRMWARE_NETWORK.md)
 - [Development History](DEVELOPMENT_HISTORY.md)
 
+These documents supersede the planning-stage descriptions
+in this proposal wherever implementation details differ.
+
+The active firmware remains the authoritative source
+for exact behavior and implementation constants.
+
+### 23.3 Future LG integration
+
 Experimental LG protocol knowledge resides primarily in:
 
 - [LG webOS draft adapter](../firmware/clonker/devices/lg_webos.py)
 - [Firmware laboratory tests](../firmware/tests/)
 
-This document records the agreed architectural direction
-and implementation plan for Chapter 12.
+The draft adapter remains intentionally disconnected
+from operational dispatch.
 
-It does not supersede the existing implemented schema
-until the redesign has been completed and regression-tested.
+The configuration redesign establishes its integration
+foundation without prematurely committing to asynchronous
+completion, authenticated session, or pairing behavior.
+
+The LG-specific implementation and verification checklists
+remain useful starting points for the next integration phase.
+
+Preserve the existing Dumb Queue™, operational adapter
+behavior, and validation boundaries.
+
+**The configuration foundation is ready.
+The Monster's next language awaits.**
 
 ---
 
