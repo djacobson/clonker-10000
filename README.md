@@ -34,8 +34,8 @@ And perhaps a case that opens with actual lunchbox latches.
     <b>Controller:</b> Raspberry Pi Pico 2 W · CircuitPython 10.3.1<br>
     <b>Streaming:</b> Roku Ultra (working) · Apple TV (planned) · Amazon Fire TV (planned)<br>
     <b>Audio:</b> Denon AVRs (working) · Other network-capable AVRs (future)<br>
-    <b>Televisions:</b> LG webOS (experimental adapter) · Samsung, TCL, and others (future possibilities)<br>
-    <b>Configuration:</b> Browser editor · Config v4 · Custom actions<br>
+    <b>Televisions:</b> LG webOS (configuration-ready, experimental adapter) · Samsung, TCL, and others (future possibilities)<br>
+    <b>Configuration:</b> Browser editor · Config v5 · Typed devices · Custom Actions<br>
     <b>Physical controls:</b> Room selector · Power · Volume/Mute · Navigation · Playback
   </sub>
 </p>
@@ -244,7 +244,7 @@ Standalone CircuitPython experiments have successfully demonstrated TV pairing, 
 
 A [draft LG webOS adapter](firmware/clonker/devices/lg_webos.py) consolidates these experiments but is not yet integrated into the running Clonker.
 
-The next configuration redesign directly supports its future integration.
+The completed Config v5 redesign directly supports its future integration, including editable client keys, SSAP commands, pointer commands, and a reserved pairing control.
 
 **Apple TV and Amazon Fire TV remain future compatibility objectives.**
 
@@ -467,29 +467,34 @@ For the engineering details, see [System Architecture](docs/ARCHITECTURE.md) and
 
 ### Configuration
 
-The current **Clonker Config v4** system supports:
+The current **Clonker Config v5** system supports:
 
-- One to three rooms.
-- Three generic built-in device destinations per room.
+- One to three independently configured rooms.
+- Three built-in device destinations per room, organized as TV, AVR, and Streaming.
+- Explicit device types and device-specific attributes.
 - Fourteen fundamental actions per room.
-- GET and POST command definitions.
-- Separate configured power and mute paths.
-- Named custom actions with ordered steps and waits.
+- Protocol-aware command definitions.
+- Independent ON and OFF commands for power and mute.
+- Named Custom Actions with stable identifiers, ordered steps, and waits.
+- Browser-based room creation and removal.
+- Configuration recipe import.
 - Revision checking and stale-edit protection.
 - Validated saves, backups, and recovery.
 - Intentional blank commands for ordinary actions.
 
 Configuration is stored as JSON and edited through the browser.
 
-The current Room 3 placeholder has blank equipment commands. Ordinary actions safely do nothing there; explicit Roku held-button dispatch still needs equivalent blank-command protection.
+The TV, AVR, and Streaming labels are organizational conveniences, not restrictions. A volume command can target a television, receiver, or streaming device according to the room's configuration.
 
-The configuration system is designed to avoid silently sending commands to another room when the selected room is unavailable.
+A centralized device-type registry supplies capabilities to both the firmware and browser editor.
 
-See [Configuration & Recovery](docs/CONFIGURATION.md).
+Config v5 also provides configuration support for future LG webOS SSAP commands, structured JSON payloads, pointer commands, and client keys. Operational LG execution and pairing remain pending.
 
-The proposed Config v5 redesign will introduce explicit device types, a compact device configuration table, automatic Custom Action IDs, and support for future device-specific attributes and pairing.
+The current Room 3 placeholder has blank equipment commands. Unconfigured controls safely do nothing rather than silently redirecting commands to another room.
 
-See [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) for the planned architecture.
+See [Configuration & Recovery](docs/CONFIGURATION.md) for the implemented schema and [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) for the architectural decisions behind it.
+
+**Configure the device. Configure the intent. Let the adapter speak the protocol.**
 
 ### Management Interface
 
@@ -509,7 +514,7 @@ See [Operating Modes](docs/OPERATING_MODES.md).
 
 ## Where the Monster Stands
 
-**November 24, 2026 — Chapter 11 milestone.**
+**November 24, 2026 — Chapter 12 milestone: The Monster Gets Organized.**
 
 The Clonker 10000 is still in extreme beta.
 
@@ -528,7 +533,7 @@ But it's no longer just a collection of ambitious electronics, colorful wires, a
 - **Buttons that understand holding:** Six Roku navigation and skip buttons support explicit press/release behavior.
 - **Custom actions at your fingertips:** Rotate the second Bourns encoder to choose an action, then press to execute it. The OLED inverts to acknowledge the CLONK.
 - **A screen that speaks:** The OLED identifies rooms, displays selected actions, reports volume direction and mute feedback, and sleeps after inactivity. All without constantly redrawing itself.
-- **A working brain:** Wi-Fi, browser configuration, fourteen fundamental actions, custom actions, and the Dumb Queue™.
+- **A more organized brain:** Wi-Fi, Config v5, explicitly typed devices, a redesigned browser editor, fourteen fundamental actions, Custom Actions, and the same beloved Dumb Queue™.
 - **A more responsive workshop:** CONFIG-mode browser improvements and Chapter 8 physical polling optimizations are operational.
 - **The Monster goes cordless — and gets sleepy:** Chapter 9 delivered a permanently installed rechargeable power system with two 18650 cells, a DFRobot module, and external USB-C charging. Software-managed sleep/wake is operational, while Chapter 10 investigates battery endurance and power-system behavior.
 
@@ -565,7 +570,7 @@ Of course, that won't stop us from wanting to know *why* it works.
 - Characterize practical battery runtime, charging behavior, and DFRobot power-management efficiency.
 - Continue reliability and failure-recovery testing, including the intermittent CONFIG HTTP send stall.
 - Investigate hardware deep sleep when supported.
-- Redesign the configuration architecture for explicitly typed devices.
+- Continue expanding the typed-device architecture as new protocols are integrated.
 - Integrate the experimental LG webOS adapter and device pairing.
 - Expand future compatibility, including Apple TV and Amazon Fire TV.
 - Explore additional OLED feedback where it provides real value.
@@ -576,15 +581,21 @@ The physical controls are assembled and operational. The rechargeable power syst
 
 Chapter 11 ventured into new territory: direct control of LG webOS televisions using WebSockets, authenticated connections, and reusable client keys.
 
-The laboratory experiments were successful, and an experimental LG webOS adapter now exists. It remains disconnected from the running application.
+Chapter 12 reorganized the Clonker's configuration architecture to accommodate these new protocols without disrupting its existing Roku and Denon capabilities.
 
-Before integrating it, Chapter 12 will revisit the Clonker's configuration architecture, introducing explicitly typed devices, a more compact browser editor, and the foundation for future device pairing.
+Config v5 is now operational, with explicitly typed devices, a redesigned browser editor, and configuration support for future authenticated devices.
 
-See the [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) proposal.
+Six focused automated regression suites passed a combined 436 assertions during development, followed by successful live equipment testing.
+
+We also substantially improved configuration-save memory management, completing twenty consecutive changed saves without rebooting.
+
+The next major software adventure is integrating the experimental LG webOS adapter and its pairing mechanism.
+
+See the [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) for the architectural journey.
 
 **The Monster Gets Organized.**
 
-Of course, we still haven't entirely evicted the CONFIG HTTP gremlin.
+Of course, we still haven't entirely evicted the CONFIG HTTP gremlin. Apparently, it has a ten-second lease.
 
 **The software talks to the equipment.**
 
@@ -604,8 +615,8 @@ The project is documented as it develops, including architectural decisions, imp
 |---|---|
 | [Architecture](docs/ARCHITECTURE.md) | System design, component responsibilities, and boundaries |
 | [Hardware Design](docs/HARDWARE_DESIGN.md) | Components, GPIO, wiring, and physical design |
-| [Configuration](docs/CONFIGURATION.md) | Config v4 schema, validation, and recovery |
-| [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) | Proposed Config v5 architecture, typed devices, and future pairing |
+| [Configuration](docs/CONFIGURATION.md) | Config v5 schema, typed devices, validation, and recovery |
+| [Configuration Redesign](docs/CONFIGURATION_REDESIGN.md) | Chapter 12 design record, implementation results, and future protocol foundation |
 | [Hardware Parts List](docs/HARDWARE_PARTS_LIST.md) | Actual components, part numbers, and verified mounting/drill sizes |
 | [Firmware & Network](docs/FIRMWARE_NETWORK.md) | Networking, adapters, scheduler, and diagnostics |
 | [Operating Modes](docs/OPERATING_MODES.md) | SERVICE/DEVICE and CONFIG/RUN |
