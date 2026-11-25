@@ -1,8 +1,8 @@
 # The Clonker 10000 — Operating Modes
 
-**Design reference:** November 13, 2026  
+**Updated:** November 25, 2026  
 **Platform:** Raspberry Pi Pico 2 W / CircuitPython 10.3.1  
-**Baseline:** Chapter 9 — physical controls, room selection, custom actions, rechargeable battery operation, and software-managed sleep/wake operational  
+**Baseline:** Chapter 13 — Config v5, physical controls, rechargeable battery operation, software-managed sleep/wake, typed equipment adapters, operational LG webOS, and Wake-on-LAN  
 **Scope:** Boot-time filesystem ownership, runtime management mode, deployment, sleep/wake behavior, recovery, and verified behavior.
 
 > Two switches. Two completely different jobs. One appropriately complicated monster.
@@ -388,7 +388,11 @@ Successful persistence and successful HTTP acknowledgment are separate events. I
 
 A revision conflict should be resolved by refreshing the editor and reconciling changes, not bypassing the check. Backup rotation reduces risk; it does not promise recovery from every interrupted write or sudden power loss.
 
-**Deployment caution:** The Pico's browser-edited `/clonker/device_config.json` may be newer than the repository example. Do not overwrite it blindly while copying firmware in SERVICE mode. Likewise, keep private `settings.toml` credentials out of GitHub.
+**Deployment caution:** The Pico's browser-edited `/clonker/device_config.json` may be newer than the repository example. Do not overwrite it blindly while copying firmware in SERVICE mode. Keep private `settings.toml` credentials, actual LG client keys, and equipment-specific MAC addresses out of published recipes and source files.
+
+If the Windows-mounted configuration file appears stale, compare it with the active configuration returned by `GET /api/config` and the serial save diagnostics. A cold reboot into SERVICE mode and fresh filesystem mount resolved an observed discrepancy during Chapter 13. The precise cause was not established.
+
+The configuration API reports active RAM configuration, not independent verification of persisted bytes.
 
 See [Configuration & Recovery](CONFIGURATION.md) for detailed validation, revision, and backup semantics.
 
@@ -444,7 +448,7 @@ Confirm the selected room is configured, its destination and action mapping are 
 
 - The management HTTP service has no application-level authentication. Keep port 9090 on a trusted LAN; do not forward it to the public internet.
 - CircuitPython Web Workflow is separate from Clonker management HTTP. The development configuration disabled Web Workflow with `CIRCUITPY_WEB_API_PORT = 0` after observed interference; the exact cause was not conclusively established.
-- Outbound generic HTTP remains bounded but blocking. Recognized fundamental Denon volume commands use a persistent TCP adapter with nonblocking 50 ms pacing eligibility, but socket connection and transmission still involve synchronous operations.
+- Outbound generic HTTP, Denon TCP, Roku ECP, LG WebSocket setup and transmission, and Wake-on-LAN UDP transmission involve bounded synchronous operations. Adapter readiness and cooperative maintenance reduce unnecessary blocking but do not make the scheduler preemptive. LG SSAP responses are processed asynchronously.
 - The physical poller targets 1 ms, the action queue 10 ms, and CONFIG management HTTP 1 ms. These are target intervals, not hard real-time deadlines.
 - Physical Power Toggle, room selector, and Bourns volume encoder have passed scoped real-equipment tests. Long uptime, disconnected hardware, network recovery, and all mode combinations have not been exhaustively certified.
 - A commit proves source changed; deployment proves files were copied; a transport acknowledgment is not the same as observed equipment response.

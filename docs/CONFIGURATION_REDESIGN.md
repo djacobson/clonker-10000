@@ -1692,9 +1692,6 @@ The active firmware remains authoritative.
 **The Monster learned another language without forgetting
 how to speak its original ones.**
 
-**The configuration foundation is ready.
-The Monster's next language awaits.**
-
 ---
 
 **THE CLONKER 10000**
