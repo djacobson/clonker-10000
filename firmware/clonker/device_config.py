@@ -132,6 +132,9 @@ def command_is_blank(command):
     if kind == device_types.POINTER:
         return command["button"] == ""
 
+    if kind == device_types.WAKE_ON_LAN:
+        return command["mac"] == ""
+
     raise ValueError("Unknown command kind")
 
 
@@ -303,6 +306,61 @@ def _command(value, device, location, allow_blank=False):
         validated = {
             "kind": kind,
             "button": button,
+        }
+
+    elif kind == device_types.WAKE_ON_LAN:
+        _keys(
+            value,
+            ("kind", "mac", "broadcast", "port"),
+            location
+        )
+
+        mac = value["mac"]
+        broadcast = value["broadcast"]
+        port = value["port"]
+
+        if not isinstance(mac, str):
+            raise ValueError("Invalid MAC address: " + location)
+
+        if mac:
+            parts = mac.split(":")
+
+            if (
+                len(parts) != 6
+                or any(
+                    len(part) != 2
+                    or any(
+                        ch not in "0123456789ABCDEFabcdef"
+                        for ch in part
+                    )
+                    for part in parts
+                )
+            ):
+                raise ValueError(
+                    "Invalid MAC address: " + location
+                )
+
+        if (
+            not isinstance(broadcast, str)
+            or not broadcast
+            or ":" in broadcast
+        ):
+            raise ValueError(
+                "Invalid broadcast address: " + location
+            )
+
+        broadcast = _ip(broadcast, location)
+
+        if type(port) is not int or not 1 <= port <= 65535:
+            raise ValueError(
+                "Invalid Wake-on-LAN port: " + location
+            )
+
+        validated = {
+            "kind": kind,
+            "mac": mac.upper(),
+            "broadcast": broadcast,
+            "port": port,
         }
 
     else:
@@ -498,6 +556,16 @@ def validate_config(config):
                     where + "." + field,
                     allow_blank=True
                 )
+
+                if (
+                    validated_action[field]["kind"]
+                    == device_types.WAKE_ON_LAN
+                    and action_id != "power-toggle"
+                ):
+                    raise ValueError(
+                        "Wake-on-LAN requires power-toggle: "
+                        + where
+                    )
 
             actions[action_id] = validated_action
 
