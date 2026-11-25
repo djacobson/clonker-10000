@@ -24,6 +24,7 @@ The Dumb Queue owns scheduling and failure policy.
 import time
 
 from clonker.net import http_transport
+from clonker.net import wake_on_lan
 from clonker.devices import device_types
 from clonker.devices import denon
 from clonker.devices import roku
@@ -37,6 +38,7 @@ ROKU_BUTTON_TAP = "roku-button-tap"
 GENERIC_HTTP = "generic-http"
 DENON_TCP = "denon-tcp"
 LG_WEBOS = "lg-webos"
+WAKE_ON_LAN = device_types.WAKE_ON_LAN
 
 # Only specialized transport selections are cached.
 #
@@ -69,6 +71,11 @@ def resolve(device, kind, action_id, command):
         raise ValueError(
             "Unsupported command kind for device: " + type_id
         )
+
+    # Wake-on-LAN is independent of the device's
+    # normal control transport.
+    if command_kind == device_types.WAKE_ON_LAN:
+        return WAKE_ON_LAN
 
     # LG commands use the WebSocket transport regardless
     # of fundamental, toggle or Custom Action context.
@@ -280,6 +287,26 @@ def execute(adapter, device, command, action_id=None):
     """
 
     start = time.monotonic_ns()
+
+    if adapter == WAKE_ON_LAN:
+        if (
+            command["kind"] != device_types.WAKE_ON_LAN
+            or not device_types.is_enabled(device["type"])
+            or not device_types.supports_command(
+                device["type"], command["kind"]
+            )
+        ):
+            raise ValueError("Unsupported Wake-on-LAN execution")
+
+        sent = wake_on_lan.send(command)
+
+        return {
+            "accepted": True,
+            "detail": "Wake-on-LAN transmitted ({} bytes)".format(sent),
+            "total_ms": round(
+                (time.monotonic_ns() - start) / 1_000_000, 1
+            ),
+        }
 
     if adapter == LG_WEBOS:
         if (
