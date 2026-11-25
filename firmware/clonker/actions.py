@@ -29,6 +29,7 @@ Power and mute use independent, volatile ON/OFF command histories.
 
 import time
 
+from clonker.system import logger
 from clonker.devices import device_adapters
 from clonker.devices import device_types
 from clonker import device_config
