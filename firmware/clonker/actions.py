@@ -31,8 +31,6 @@ import time
 
 from clonker.devices import device_adapters
 from clonker.devices import device_types
-from clonker.system import logger
-from clonker.devices import device_adapters
 from clonker import device_config
 from clonker.display import oled
 
