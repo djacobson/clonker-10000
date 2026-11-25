@@ -339,13 +339,25 @@ def poll():
                 _last_error = None
                 return True
 
-            adapter = device_adapters.lookup(
-                room_id, action_id
-            )
+            if (
+                device["type"] == "lg-webos"
+                and action_id in (
+                    "mute-toggle", "power-toggle"
+                )
+            ):
+                adapter = device_adapters.resolve(
+                    device, kind, action_id, command
+                )
+            else:
+                adapter = device_adapters.lookup(
+                    room_id, action_id
+                )
 
         # Adapter readiness preserves queue ordering.
         # An ineligible command stays queued.
-        if not device_adapters.ready(adapter):
+        if not device_adapters.ready(
+            adapter, device, command
+        ):
             return False
 
         if kind != "hold":
@@ -487,6 +499,43 @@ def poll():
         )
 
         return True
+
+
+def fail_async(adapter, error):
+    """Apply queue failure policy to a transmitted command.
+
+    The failed command has already left the queue.
+    Discard remaining tasks without replaying commands
+    or rolling back remembered toggle directions.
+    """
+    global _last_error, _last_result
+
+    discarded = len(_queue)
+    _queue.clear()
+
+    try:
+        device_adapters.cancel_active()
+    except Exception as cleanup_error:
+        logger.warning(
+            "ADAPTER: Failure cleanup failed: {}".format(
+                repr(cleanup_error)
+            )
+        )
+
+    _last_error = "{}: {}".format(
+        adapter, repr(error)
+    )
+
+    _last_result = (
+        "FAILED; {} pending tasks discarded"
+    ).format(discarded)
+
+    logger.warning(
+        "DUMB QUEUE: {}".format(_last_error)
+    )
+    logger.warning(
+        "DUMB QUEUE: {}".format(_last_result)
+    )
 
 
 def clear(reason="Manual reset", reset_toggles=False):
