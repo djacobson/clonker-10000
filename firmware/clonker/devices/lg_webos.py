@@ -1,22 +1,23 @@
 # The Clonker 10000
 # clonker/devices/lg_webos.py
-# Chapter 11 -- LG webOS adapter design draft (NOT ROUTED)
+# Chapter 13 -- Typed LG webOS device adapter
 # Clonker Designed by David Jacobson
 
-"""Experimental adapter, intentionally not imported by device_adapters.py.
+"""LG webOS adapter for validated Config v5 device and command records.
 
-Lab evidence: registered control socket reuse, 10-second idle retirement,
-nonblocking RX, three outstanding read-only requests matched by ID, pointer
-navigation, volume and explicit mute. Cold control requests took ~160 ms;
-warm requests ~14-27 ms. Burst replies arrived in ~32-53 ms.
+Supports SSAP requests with optional JSON payloads and pointer buttons.
+Authentication credentials are supplied by the active configuration.
 
-Connect, upgrade, registration and transmission remain bounded blocking I/O.
-Normal response processing is cooperative. Pointer acquisition is currently
-bounded blocking too; consider a cooperative setup state machine later.
-No internal command queue, automatic replay, pairing UI or filesystem writes.
-Draft v2 adds isolated cooperative pairing helpers and local development keys.
-A successful send is NOT proof of execution. Poll failures must eventually
-reach the shared action failure handler; integration is deliberately deferred.
+Execution uses transmit-and-continue semantics. SSAP responses are
+matched asynchronously by request ID. Outstanding request metadata
+does not constitute an execution queue.
+
+Connect, upgrade, registration, pointer acquisition and transmission
+use bounded blocking I/O. Normal response polling is cooperative.
+
+No automatic replay, filesystem writes or internal execution queue.
+Pairing helpers are retained for future configuration UI integration.
+The separate tested runtime and pairing manifests remain unchanged.
 """
 import binascii
 import json
@@ -24,6 +25,7 @@ import os
 import time
 import socketpool
 import wifi
+from clonker.devices import device_types
 
 IDLE_NS = 10_000_000_000
 OP_TIMEOUT = 0.5
@@ -59,28 +61,14 @@ PAIR_MANIFEST = {
     'permissions': _PAIR_PERMISSIONS,
 }
 PAIR_WAIT_NS = 45_000_000_000
-# LOCAL Pico copy only. Never commit actual keys.
-DEV_CLIENT_KEYS = {
-    # '192.168.50.47:3000': 'PASTE_CLIENT_KEY_HERE',
-}
 
-# Proposed adapter-local command vocabulary, NOT a config schema decision.
-SSAP_COMMANDS = {
-    'volume-up': ('ssap://audio/volumeUp', None),
-    'volume-down': ('ssap://audio/volumeDown', None),
-    'mute-on': ('ssap://audio/setMute', {'mute': True}),
-    'mute-off': ('ssap://audio/setMute', {'mute': False}),
-    'get-volume': ('ssap://audio/getVolume', None),
-    'launch-home': ('ssap://system.launcher/launch', {'id': 'com.webos.app.home'}),
-}
-BUTTON_COMMANDS = {'nav-up': 'UP', 'nav-down': 'DOWN', 'nav-left': 'LEFT',
-                   'nav-right': 'RIGHT', 'select': 'ENTER', 'back': 'BACK', 'home': 'HOME'}
 POINTER_URI = 'ssap://com.webos.service.networkinput/getPointerInputSocket'
 
 _pool = None
 _control = None
 _pointer = None
 _endpoint = None
+_client_key = None
 _sequence = 0
 _pending = {}  # Sent request metadata only; never queued commands.
 _stats = dict.fromkeys(('control_opens', 'pointer_opens', 'control_reuses',
@@ -349,12 +337,16 @@ def _close_one(name):
 
 
 def close():
-    global _endpoint
+    global _endpoint, _client_key
+
     _close_one('pointer')
     _close_one('control')
+
     _stats['abandoned'] += len(_pending)
     _pending.clear()
+
     _endpoint = None
+    _client_key = None
 
 
 def _failure(stage, error):
@@ -388,69 +380,129 @@ def _parse_endpoint(endpoint):
     return host, port
 
 
-def _resolve_key(endpoint, client_key):
-    if client_key is None:
-        client_key = DEV_CLIENT_KEYS.get(endpoint)
-    if not isinstance(client_key, str) or not client_key:
-        raise ValueError("LG pairing key required")
+def _resolve_key(client_key):
+    """Require an explicitly supplied operational credential."""
+    if (
+        not isinstance(client_key, str)
+        or not client_key.strip()
+        or client_key == 'PASTE_OR_PAIR_CLIENT_KEY_HERE'
+    ):
+        raise ValueError('LG pairing key required')
     return client_key
 
 
-def ready(endpoint, command):
-    """No I/O. False means leave the original command in the Dumb Queue."""
+def ready(device, command):
+    """No I/O. False leaves the original command in the Dumb Queue."""
+    host, port = _parse_endpoint(device['endpoint'])
+    endpoint = '{}:{}'.format(host, port)
+    client_key = _resolve_key(device['client_key'])
+
     if _pair_conn is not None:
         return False
-    host, port = _parse_endpoint(endpoint)
-    endpoint = '{}:{}'.format(host, port)
-    if _pending and endpoint != _endpoint:
+
+    if _pending and (
+        endpoint != _endpoint or client_key != _client_key
+    ):
         return False
-    if command in BUTTON_COMMANDS and _pointer is None and _pending:
+
+    if (
+        command['kind'] == device_types.POINTER
+        and _pointer is None
+        and _pending
+    ):
         return False
+
     return len(_pending) < MAX_PENDING
 
 
-def execute(endpoint, command, client_key=None):
-    """Draft interface; endpoint is IPv4:port or IPv4 (default 3000).
+def execute(device, command):
+    """Transmit one validated Config v5 command.
 
-    Client key supplied externally; never persisted or printed here.
-    True acceptance means transmitted, not acknowledged. No replay on failure.
+    Acceptance means transmitted, not acknowledged.
+    Credentials belong to configuration.
+    No automatic replay or internal execution queue.
     """
-    global _endpoint
-    if command not in SSAP_COMMANDS and command not in BUTTON_COMMANDS:
-        raise ValueError('Unsupported LG command')
-    host, port = _parse_endpoint(endpoint)
+    global _endpoint, _client_key
+
+    kind = command['kind']
+
+    if kind not in (device_types.SSAP, device_types.POINTER):
+        raise ValueError('Unsupported LG command kind')
+
+    host, port = _parse_endpoint(device['endpoint'])
     endpoint = '{}:{}'.format(host, port)
-    client_key = _resolve_key(endpoint, client_key)
-    if _pair_conn is not None:
-        return {'accepted': False, 'detail': 'LG pairing active'}
+    client_key = _resolve_key(device['client_key'])
+
     try:
         if not wifi.radio.connected:
             raise OSError('Wi-Fi disconnected')
+
         _expire()
-        if not ready(endpoint, command):
-            return {'accepted': False, 'detail': 'LG busy'}
-        if endpoint != _endpoint:
+
+        if not ready(device, command):
+            return {
+                'accepted': False,
+                'detail': 'LG busy',
+            }
+
+        if (
+            endpoint != _endpoint
+            or client_key != _client_key
+        ):
             close()
             _endpoint = endpoint
+            _client_key = client_key
+
         _connect_control(host, port, client_key)
-        if command in BUTTON_COMMANDS:
+
+        if kind == device_types.POINTER:
             _connect_pointer(host)
             started = _now()
-            payload = ('type:button\nname:{}\n\n'.format(BUTTON_COMMANDS[command])).encode('ascii')
-            _pointer.send(1, payload, started + SETUP_NS)
+
+            payload = (
+                'type:button\nname:{}\n\n'.format(
+                    command['button']
+                )
+            ).encode('ascii')
+
+            _pointer.send(
+                1, payload, started + SETUP_NS
+            )
+
             _stats['pointer_sent'] += 1
+            detail = 'LG pointer transmitted'
+
         else:
-            uri, payload = SSAP_COMMANDS[command]
-            msg = _request_message(uri, payload)
+            msg = _request_message(
+                command['uri'],
+                command.get('payload'),
+            )
+
             started = _now()
-            _json_send(_control, msg, started + SETUP_NS)
-            _pending[msg['id']] = (command, started, _now() + RESPONSE_NS)
+
+            _json_send(
+                _control, msg, started + SETUP_NS
+            )
+
+            _pending[msg['id']] = (
+                kind,
+                started,
+                _now() + RESPONSE_NS,
+            )
+
             _stats['ssap_sent'] += 1
+            detail = 'LG SSAP transmitted'
+
         _stats['last_send_ms'] = _ms(started)
-        return {'accepted': True, 'detail': 'LG transmitted {}'.format(command)}
+
+        return {
+            'accepted': True,
+            'detail': detail,
+        }
+
     except Exception as error:
         _failure('execute', error)
-        raise
+        raise RuntimeError('LG transmission failure')
 
 
 def _poll_connection(conn, control):
@@ -513,8 +565,10 @@ def poll():
                 raise OSError('LG response timeout')
         _expire()
     except Exception as error:
+        had_pending = bool(_pending)
         _failure('poll', error)
-        raise
+        if had_pending:
+            raise RuntimeError('LG asynchronous request failure')
     finally:
         _stats['last_poll_ms'] = _ms(started)
 
@@ -665,7 +719,7 @@ def verify_client_key(endpoint, client_key=None):
     if _pair_conn is not None or _pending:
         raise RuntimeError('LG adapter busy')
     host, port = _parse_endpoint(endpoint)
-    key = _resolve_key('{}:{}'.format(host, port), client_key)
+    key = _resolve_key(client_key)
     conn = None
     try:
         deadline = _now() + SETUP_NS
