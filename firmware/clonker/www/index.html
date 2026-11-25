@@ -628,9 +628,9 @@
                         choices: Object.keys(types)
                             .sort((a, b) => Number(selectable(b)) - Number(selectable(a)) ||
                                 types[a].label.localeCompare(types[b].label))
-                            .map(value => ({ value, label: types[value].label + (!types[value].enabled ?
-                                (selectable(value) ? ' (configuration only)' : ' (future)') : ''), disabled:
-                                !selectable(value) }))
+                            .map(value => ({ value, label: types[value].label +
+                                (!types[value].enabled ? ' (future)' : ''),
+                                disabled: !selectable(value) }))
                     });
                     field(row, 'Endpoint (default port ' + (types[dev.type].default_port ?? '--') + ')',
                         dev.endpoint, v => dev.endpoint = v);

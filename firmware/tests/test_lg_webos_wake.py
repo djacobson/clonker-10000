@@ -8,8 +8,9 @@ import time
 import wifi
 import socketpool
 
-# Enter the target TV's Ethernet MAC address.
-MAC = "B0:37:95:D6:D4:9F"
+# Replace the synthetic MAC below with the target TV's Ethernet MAC.
+# Do not commit equipment-specific MAC addresses.
+MAC = "02:00:00:00:00:00"
 
 BROADCAST = "192.168.50.255"
 PORT = 9
