@@ -59,6 +59,7 @@ _listener = None
 _client = None
 _request = None
 _response = None
+_payload = None
 _sent = 0
 _sent_total = 0
 _response_total = 0
@@ -93,7 +94,7 @@ def clock_status():
 
 def _close_client(reason="closed"):
     """Release the current connection even if diagnostics fail."""
-    global _client, _request, _response
+    global _client, _request, _response, _payload
     global _sent, _sent_total, _response_total
     global _last_activity, _file
 
@@ -105,6 +106,7 @@ def _close_client(reason="closed"):
     _client = None
     _request = None
     _response = None
+    _payload = None
     _file = None
     _sent = 0
     _sent_total = 0
@@ -276,15 +278,15 @@ def _http_header(status, content_type, content_length,
 
 
 def _build_response(first_line):
-    """Build response bytes or prepare a static-file stream.
+    """Prepare an HTTP header and optional payload or file stream.
 
     Returns:
-        (initial_bytes, file_path, total_response_bytes)
+        (header, payload, file_path, total_response_bytes)
 
-    For static HTML, initial_bytes contains only the HTTP header.
-    The file is opened and streamed separately by poll().
+    Static files are streamed directly from flash.
 
-    For other routes, initial_bytes contains the complete response.
+    Dynamic responses retain separate header and payload buffers
+    to avoid allocating a second complete response in RAM.
     """
     global _stage, _request
     logger.debug("HTTP request: {}".format(first_line))
@@ -357,6 +359,7 @@ def _build_response(first_line):
         config["device_types"] = device_types.DEVICE_TYPES
         _stage = "GET_CONFIG_JSON"
         body = json.dumps(config)
+        del config
         status = "200 OK"
 
     elif first_line.startswith(b"POST /api/clock?utc="):
@@ -510,16 +513,18 @@ def _build_response(first_line):
             status, content_type, file_size,
             download_name
         )
-        return header, file_path, len(header) + file_size
+        return header, None, file_path, len(header) + file_size
 
     _stage = "RESPONSE_ENCODE"
     payload = body.encode("utf-8")
+    del body
+
+    _stage = "RESPONSE_HEADER"
     header = _http_header(
         status, content_type, len(payload)
     )
-    response = header + payload
 
-    return response, None, len(response)
+    return header, payload, None, len(header) + len(payload)
 
 
 def _advance_file():
@@ -550,7 +555,7 @@ def _advance_file():
 
 def poll():
     """Advance at most one accept, receive, or send operation per call."""
-    global _client, _request, _response
+    global _client, _request, _response, _payload
     global _sent, _sent_total, _response_total
     global _last_activity, _file
     global _stage, _expected_request_bytes
@@ -592,6 +597,7 @@ def poll():
             return
         _request = bytearray()
         _response = None
+        _payload = None
         _file = None
         _sent = 0
         _sent_total = 0
@@ -686,8 +692,8 @@ def poll():
 
         try:
             _stage = "BUILD_RESPONSE"
-            response, file_path, total_bytes = _build_response(
-                first_line
+            response, payload, file_path, total_bytes = (
+                _build_response(first_line)
             )
 
             if file_path is not None:
@@ -702,6 +708,7 @@ def poll():
             return
 
         _response = response
+        _payload = payload
         _response_total = total_bytes
         _sent = 0
         _request = None
@@ -714,14 +721,17 @@ def poll():
 
         return
 
-    # Allow lwIP time to transmit queued data and process ACKs
-    # before closing a completed response. This is cooperative
-    # and does not guarantee that the peer acknowledged the data.
+    # Advance to the next response buffer or allow lwIP time
+    # to transmit queued data before closing the connection.
     if _sent >= len(_response):
         if _sent_total >= _response_total:
             _stage = "CLOSE_GRACE"
             if now - _last_activity >= WEB_CLOSE_GRACE_NS:
                 _close_client("complete")
+        elif _payload is not None:
+            _response = _payload
+            _payload = None
+            _sent = 0
         elif _file is not None:
             _advance_file()
         else:
@@ -790,6 +800,7 @@ def abort_low_memory():
     Release resources before constructing diagnostic messages.
     """
     global _client, _request, _response, _file
+    global _payload
     global _sent, _sent_total, _response_total, _last_activity
 
     free_before = gc.mem_free()
@@ -809,6 +820,7 @@ def abort_low_memory():
     _client = None
     _request = None
     _response = None
+    _payload = None
     _file = None
 
     _sent = 0
