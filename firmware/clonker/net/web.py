@@ -45,6 +45,7 @@ MAX_HEADER_BYTES = 2048
 IO_CHUNK_BYTES = 128
 WEB_SEND_CHUNK_BYTES = 512
 WEB_SEND_INTERVAL_NS = 50_000_000       # 50 ms
+WEB_CLOSE_GRACE_NS = 250_000_000        # 250 ms
 
 # Abandon silent browser connections quickly.
 IDLE_CLIENT_TIMEOUT_NS = 200_000_000    # 200 ms
@@ -524,8 +525,8 @@ def _build_response(first_line):
 def _advance_file():
     """Load the next bounded file chunk after the previous one was sent.
 
-    Returns True when another chunk is ready, False when the file
-    has reached EOF or a read error has closed the connection.
+    Returns True when another chunk is ready, False when
+    unexpected EOF or a read error has closed the connection.
     """
     global _response, _sent
     global _stage
@@ -539,7 +540,7 @@ def _advance_file():
         return False
 
     if not data:
-        _close_client("complete")
+        _close_client("response_incomplete")
         return False
 
     _response = data
@@ -713,13 +714,18 @@ def poll():
 
         return
 
-    # If the current buffer has finished, advance the file stream.
-    # Dynamic responses close immediately when their buffer finishes.
+    # Allow lwIP time to transmit queued data and process ACKs
+    # before closing a completed response. This is cooperative
+    # and does not guarantee that the peer acknowledged the data.
     if _sent >= len(_response):
-        if _file is None:
-            _close_client("complete")
-        else:
+        if _sent_total >= _response_total:
+            _stage = "CLOSE_GRACE"
+            if now - _last_activity >= WEB_CLOSE_GRACE_NS:
+                _close_client("complete")
+        elif _file is not None:
             _advance_file()
+        else:
+            _close_client("response_incomplete")
         return
 
     # Cooperatively pace TCP send attempts without sleeping.
@@ -773,10 +779,8 @@ def poll():
     _sent_total += count
     _last_activity = now
 
-    # Dynamic responses are complete once their buffer is sent.
-    # Static streams continue with the next file chunk on a later poll.
-    if _sent >= len(_response) and _file is None:
-        _close_client("complete")
+    # Response completion and cooperative close grace
+    # are handled on a subsequent poll.
 
 
 def abort_low_memory():
