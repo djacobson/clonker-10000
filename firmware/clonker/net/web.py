@@ -44,6 +44,7 @@ MAX_HEADER_BYTES = 2048
 # Inbound HTTP server transport tuning.
 IO_CHUNK_BYTES = 128
 WEB_SEND_CHUNK_BYTES = 512
+WEB_SEND_INTERVAL_NS = 10_000_000       # 10 ms
 
 # Abandon silent browser connections quickly.
 IDLE_CLIENT_TIMEOUT_NS = 200_000_000    # 200 ms
@@ -61,6 +62,7 @@ _sent = 0
 _sent_total = 0
 _response_total = 0
 _last_activity = 0
+_next_send_ns = 0
 # Bounded HTTP processing diagnostics.
 _stage = "IDLE"
 _expected_request_bytes = 0
@@ -552,6 +554,7 @@ def poll():
     global _last_activity, _file
     global _stage, _expected_request_bytes
     global _body_start, _received_request_bytes
+    global _next_send_ns
 
     if _listener is None:
         return
@@ -719,6 +722,11 @@ def poll():
             _advance_file()
         return
 
+    # Cooperatively pace TCP send attempts without sleeping.
+    # Client inactivity timeouts remain active during pacing.
+    if now < _next_send_ns:
+        return
+
     # Send the current response buffer incrementally.
     _stage = "SEND_PREPARE"
     chunk = memoryview(_response)[
@@ -729,13 +737,13 @@ def poll():
     send_started = time.monotonic_ns()
 
     try:
-        # SOCKET STALL GREMLIN:
-        # Intermittent multi-second stalls have been observed inside
-        # this send call. Root cause remains undetermined.
-        # Observed on the config page (index.html), but not yet
-        # observed on the Test Remote page (remote.html).
-        # Investigate browser request patterns, JavaScript fetch
-        # behavior, and CircuitPython socket handling in the future.
+        # CircuitPython 10.3.1's lwip_tcp_send() can block
+        # for up to 10 seconds retrying tcp_write() on ERR_MEM,
+        # even with a nonblocking socket.
+        #
+        # Cooperative send pacing gives lwIP time to process
+        # ACKs and reclaim native TCP resources between sends.
+        # Whether this prevents the observed stalls is unproven.
         _stage = "SEND"
         count = _client.send(chunk)
 
@@ -750,7 +758,9 @@ def poll():
         return
 
     finally:
-        send_duration = time.monotonic_ns() - send_started
+        send_finished = time.monotonic_ns()
+        _next_send_ns = send_finished + WEB_SEND_INTERVAL_NS
+        send_duration = send_finished - send_started
         web_diag.send_duration(send_duration)
 
     if count is None or count <= 0:
