@@ -44,7 +44,7 @@ MAX_HEADER_BYTES = 2048
 # Inbound HTTP server transport tuning.
 IO_CHUNK_BYTES = 128
 WEB_SEND_CHUNK_BYTES = 512
-WEB_SEND_INTERVAL_NS = 10_000_000       # 10 ms
+WEB_SEND_INTERVAL_NS = 50_000_000       # 50 ms
 
 # Abandon silent browser connections quickly.
 IDLE_CLIENT_TIMEOUT_NS = 200_000_000    # 200 ms
