@@ -945,8 +945,16 @@
         };
 
         $('save-config').onclick = save;
-        // updateClock(); // TEMP: Isolate management socket stall.
-        load();
+
+        // Serialize initial management requests to reduce
+        // overlapping TCP connection activity.
+        async function initializePage() {
+            await updateClock();
+            await new Promise(r => setTimeout(r, 500));
+            await load();
+        }
+
+        initializePage();
         </script>
     </body>
 </html>
