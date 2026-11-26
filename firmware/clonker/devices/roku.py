@@ -8,8 +8,9 @@
 Call volume(endpoint, direction) for each observed encoder detent.
 Call poll() regularly, even with an empty action queue.
 
-A failed keyup retains held-key state for paced retries. An unresolved
-release blocks new keydowns, including a change of direction.
+A failed keyup retains held-key state for bounded, paced retries.
+After exhausting retries, abandon the release and clear local state.
+An unresolved release temporarily blocks new keydowns.
 
 This module does not own the action queue. HTTP acknowledgment does not
 prove that the connected AVR actually changed volume.
@@ -22,7 +23,13 @@ from clonker.net import http_transport
 
 IDLE_RELEASE_NS = 250_000_000   # 250 ms
 MAX_HOLD_NS = 2_000_000_000     # 2 seconds; safety limit
-RELEASE_RETRY_NS = 500_000_000  # 500 ms
+# Release recovery must never continue indefinitely.
+MAX_RELEASE_ATTEMPTS = 3
+
+RELEASE_RETRY_DELAYS_NS = (
+    500_000_000,    # First retry: 500 ms
+    2_000_000_000,  # Second retry: 2 seconds
+)
 
 # Recognized configured commands for specialized Roku behavior.
 VOLUME_COMMANDS = {
@@ -47,7 +54,7 @@ BUTTON_COMMANDS = {
 # currently use persistent HTTP.
 #
 # Physical keydown/keyup retain their existing state tracking,
-# paced release retry, and maximum-hold safeguards.
+# bounded release retries, and maximum-hold safeguards.
 #
 # Persistent requests have a 500 ms per-operation timeout
 # and a 1.5-second total deadline.
@@ -125,6 +132,7 @@ _deadline = 0
 _started = 0
 _next_release_attempt = 0
 _release_pending = False
+_release_attempts = 0
 
 
 def _path(operation, direction):
@@ -156,33 +164,56 @@ def held_direction():
 def _reset():
     global _endpoint, _direction, _deadline, _started
     global _next_release_attempt, _release_pending
+    global _release_attempts
+
     _endpoint = None
     _direction = None
     _deadline = 0
     _started = 0
     _next_release_attempt = 0
     _release_pending = False
+    _release_attempts = 0
 
 
 def release():
-    """Release the held key; retain state if keyup fails.
+    """Release the held volume key with bounded recovery attempts.
 
     Return False when no key is held or retry pacing is active.
     Raise on HTTP failure so callers can log the error.
     """
     global _next_release_attempt, _release_pending
+    global _release_attempts
 
     if _direction is None:
         return False
 
-    _release_pending = True
     now = time.monotonic_ns()
+
     if now < _next_release_attempt:
         return False
 
-    # Set pacing before I/O so a failure cannot cause a busy retry loop.
-    _next_release_attempt = now + RELEASE_RETRY_NS
-    _send(_endpoint, "keyup", _direction)
+    _release_pending = True
+    _release_attempts += 1
+
+    try:
+        _send(_endpoint, "keyup", _direction)
+
+    except OSError as error:
+        if _release_attempts >= MAX_RELEASE_ATTEMPTS:
+            _reset()
+            raise OSError(
+                "Roku volume release abandoned; "
+                "local hold cleared: {}".format(error)
+            )
+
+        _next_release_attempt = (
+            time.monotonic_ns()
+            + RELEASE_RETRY_DELAYS_NS[
+                _release_attempts - 1
+            ]
+        )
+        raise
+
     _reset()
     return True
 
@@ -265,13 +296,13 @@ def close():
 # Explicit physical-button holds.
 # Independent of the encoder-driven volume hold.
 BUTTON_MAX_HOLD_NS = 30_000_000_000     # 30 seconds
-BUTTON_RELEASE_RETRY_NS = 500_000_000  # 500 ms
 
 _button_endpoint = None
 _button_key = None
 _button_started = 0
 _button_release_pending = False
 _button_next_release_attempt = 0
+_button_release_attempts = 0
 
 
 def button_held_key():
@@ -283,12 +314,14 @@ def _reset_button():
     global _button_endpoint, _button_key, _button_started
     global _button_release_pending
     global _button_next_release_attempt
+    global _button_release_attempts
 
     _button_endpoint = None
     _button_key = None
     _button_started = 0
     _button_release_pending = False
     _button_next_release_attempt = 0
+    _button_release_attempts = 0
 
 
 def _send_button(endpoint, operation, key):
@@ -338,13 +371,10 @@ def button_down(endpoint, key):
 
 
 def button_up(endpoint=None, key=None):
-    """Release a physical button, retaining state on failure.
-
-    Retry attempts are paced to avoid hammering the Roku.
-    A successful keyup clears the retained hold state.
-    """
+    """Release a physical button with bounded recovery attempts."""
     global _button_release_pending
     global _button_next_release_attempt
+    global _button_release_attempts
 
     if _button_key is None:
         return False
@@ -364,12 +394,26 @@ def button_up(endpoint=None, key=None):
         return False
 
     _button_release_pending = True
-    _button_next_release_attempt = (
-        now + BUTTON_RELEASE_RETRY_NS
-    )
+    _button_release_attempts += 1
 
-    # Retain the original endpoint and key if I/O fails.
-    _send_button(_button_endpoint, "keyup", _button_key)
+    try:
+        _send_button(_button_endpoint, "keyup", _button_key)
+
+    except OSError as error:
+        if _button_release_attempts >= MAX_RELEASE_ATTEMPTS:
+            _reset_button()
+            raise OSError(
+                "Roku button release abandoned; "
+                "local hold cleared: {}".format(error)
+            )
+
+        _button_next_release_attempt = (
+            time.monotonic_ns()
+            + RELEASE_RETRY_DELAYS_NS[
+                _button_release_attempts - 1
+            ]
+        )
+        raise
 
     _reset_button()
     return True
