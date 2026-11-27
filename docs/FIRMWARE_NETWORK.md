@@ -58,7 +58,10 @@ Apple TV and Amazon Fire TV remain future device types.
 
 ### 1.3 Outstanding limitations
 
-- Intermittent management HTTP socket-send stalls.
+- Intermittent management HTTP socket-send stalls
+  and associated network-stack degradation.
+  Chapter 14 mitigation and regression testing are
+  complete; root-cause investigation is deferred.
 - Exhaustive interrupted-write recovery testing.
 - Long-duration battery endurance.
 - Complete reliability under arbitrary network failures.
@@ -321,7 +324,9 @@ It is not a concurrent web server.
 | Maximum configuration size | 16384 UTF-8 bytes |
 | Configuration POST body allowance | 16640 bytes |
 | Receive chunk | 128 bytes |
-| Send chunk | 512 bytes |
+| Send chunk | 1024 bytes |
+| Minimum send interval | 50 ms |
+| Completed-response close grace | 250 ms |
 | Silent-client timeout | 200 ms |
 | Active-client timeout | 4 seconds |
 | Management polling target | 1 ms |
@@ -385,24 +390,34 @@ Static HTML is streamed from flash.
 
 The server retains the response header and current file chunk rather than constructing the entire HTML response in RAM.
 
-Dynamic API responses use the existing response-building path.
+Dynamic API responses retain separate HTTP header
+and encoded payload buffers.
 
 The connection state tracks:
 
 - Current send buffer.
+- Pending dynamic payload or static file stream.
 - Buffer offset.
 - Total transmitted bytes.
 - Expected response size.
 - Connection timing.
 - Response construction timing.
 
-Chapter 8 introduced static streaming after observing unnecessary large allocations during HTML response construction.
+Chapter 8 introduced static streaming to reduce
+unnecessary large HTML allocations.
 
-Chapter 12 increased management send chunks from 128 to 512 bytes.
+Chapter 12 increased management send chunks from
+128 to 512 bytes.
 
-This reduced the number of socket calls needed for ordinary page delivery.
+Chapter 14 increased send chunks to 1,024 bytes,
+introduced cooperative send pacing and close grace,
+and eliminated the combined dynamic response buffer.
 
-It did not eliminate the intermittent ten-second socket-send stall.
+These changes reduce allocation pressure and bound
+application-level work without intentionally sleeping
+inside the HTTP polling path.
+
+They do not guarantee bounded native socket execution.
 
 ### 5.5 Connection-level recovery
 
@@ -476,7 +491,12 @@ A `close=complete` entry establishes completion through the server's socket inte
 
 It does not prove that the browser rendered the response.
 
-Detailed management diagnostics remain useful while the intermittent socket-send investigation is open.
+Detailed management diagnostics are retained for
+future investigation of intermittent socket failures.
+
+Allocation-failure diagnostics additionally identify
+the processing stage, available Python heap before
+and after cleanup, and cleanup failures.
 
 ### 5.8 Security
 
@@ -1274,7 +1294,13 @@ Physical-button hold state is separate from encoder-driven volume hold state.
 
 A maximum hold safety limit bounds continuous remote key activity.
 
-Failed releases retain their state and use paced retry behavior.
+Failed releases use paced, bounded recovery attempts.
+
+If recovery is exhausted, the adapter abandons the
+release and clears its local held-key state.
+
+This protects application survivability but does
+not confirm that the equipment received a keyup.
 
 Uncertain taps and keydowns are not automatically replayed.
 
@@ -2050,23 +2076,29 @@ None has been established as the root cause.
 
 The experiments do not prove a CircuitPython, CYW43, or lwIP defect.
 
-### 19.12 Next recurrence procedure
+### 19.12 Operational recovery procedure
 
 If the failure returns:
 
-1. Preserve serial diagnostics.
-2. Avoid immediately repeating an uncertain configuration POST.
+1. Preserve available serial diagnostics.
+2. Avoid repeating an uncertain configuration POST.
 3. Close Clonker browser tabs.
-4. Leave CONFIG mode unchanged.
-5. Avoid physical equipment commands for two minutes.
-6. Attempt one direct GET of `/api/config`.
-7. Record whether recovery occurred.
+4. If practical, capture a Flight Recorder snapshot
+   using the manual reboot handshake.
+5. Perform a cold power cycle if networking remains
+   impaired.
+6. Verify configuration readback before repeating
+   an uncertain save.
+7. Verify normal physical remote operation.
 
-This proposed passive-recovery experiment separates elapsed time and browser disconnection from outbound equipment activity.
+A soft restart may restore operation, but a cold
+power cycle has been the more dependable recovery
+during the observed investigations.
 
-If passive recovery fails, repeat the previously successful outbound-control experiment.
+Passive recovery and listener restart remain useful
+diagnostic experiments, not guaranteed recovery methods.
 
-Do not introduce speculative networking changes until the evidence justifies them.
+Automatic network-stack recovery is not implemented.
 
 ### 19.13 Engineering conclusion
 
@@ -2087,6 +2119,139 @@ The socket pacing laboratory and useful production connection diagnostics should
 The stall has been observed with the configuration page (`index.html`), but not yet with the Test Remote (`remote.html`). Browser request patterns, JavaScript fetch behavior and CircuitPython socket handling are investigation candidates, not established causes. A comment at the management `_client.send(chunk)` call preserves this observation. No speculative transport change was made.
 
 A separate stale Windows mounted-filesystem observation showed an older configuration despite successful activation and browser readback. A USB service-mode reboot/remount exposed the expected file. This supports a stale host view but does not establish its root cause or a firmware persistence defect.
+
+### 19.15 Chapter 14 investigation
+
+Chapter 14 focused on reducing application-level
+allocation pressure, improving failure diagnostics,
+and preserving application survivability during
+network-stack degradation.
+
+#### Native socket findings
+
+Inspection of CircuitPython 10.3.1's Raspberry Pi
+socket implementation identified a retry loop in
+`lwip_tcp_send()`.
+
+Following `tcp_write()` returning `ERR_MEM`, the
+implementation can retry for approximately ten seconds,
+even when the socket is configured as nonblocking.
+
+Source reference:
+
+- [CircuitPython 10.3.1 Socket.c](https://github.com/adafruit/circuitpython/blob/10.3.1/ports/raspberrypi/common-hal/socketpool/Socket.c)
+
+This is consistent with the repeatedly observed
+10,004 ms socket-send durations.
+
+The native resource condition responsible for these
+stalls has not been directly measured.
+
+#### Memory allocation findings
+
+One configuration response failed while attempting
+to allocate 9,476 bytes, despite reporting 229,712
+bytes of free Python heap.
+
+Cleanup and garbage collection restored free memory
+to 246,576 bytes, close to the boot baseline.
+
+A subsequent configuration GET succeeded before
+the persistent socket failure appeared.
+
+Heap fragmentation is a plausible explanation for
+the allocation failure, but its relationship to
+the native socket stalls remains unproven.
+
+Python heap availability alone does not establish
+the availability of native networking resources.
+
+#### Application improvements
+
+Chapter 14 retained the following improvements:
+
+- Reusable HTTP receive storage.
+- Cached request-length and header-parsing state.
+- Improved socket ownership and cleanup.
+- Stage-specific allocation-failure diagnostics.
+- Bounded Roku key-release recovery.
+- Serialized browser initialization requests.
+- 1,024-byte management send chunks.
+- Cooperative 50 ms send pacing.
+- Cooperative 250 ms completed-response close grace.
+- Separate dynamic HTTP header and payload buffers.
+
+Separating dynamic response buffers eliminates
+an unnecessary contiguous allocation approximately
+equal to the complete HTTP response size.
+
+The pacing and close-grace settings remain
+conservative experimental transport parameters.
+Their individual effectiveness has not been isolated.
+
+#### Persistent network degradation
+
+The failure can occur during ordinary sequential
+configuration saves and reloads, without deliberately
+interrupting browser requests.
+
+Once established, the condition can affect both
+inbound management HTTP and outbound Roku HTTP.
+
+Stopping and restarting the management listener
+did not reliably restore networking.
+
+Extended idle periods also failed to restore
+normal operation in some experiments.
+
+Physical input processing, OLED feedback, queue
+management, and the manual reboot handshake remained
+operational after the bounded-release improvements.
+
+Remote command delivery and equipment state cannot
+be guaranteed during this condition.
+
+#### Final regression
+
+Experiment E verified the separate header and
+payload implementation on CircuitPython 10.3.1.
+
+The final test sequence included:
+
+- Cold startup and physical controls.
+- Configuration loading, saving, and readback.
+- Test Remote commands in two rooms.
+- Ten additional consecutive configuration saves.
+- Ten consecutive full configuration page reloads.
+- Final physical navigation taps, holds, and releases.
+
+All tests succeeded.
+
+Boot free memory was 247,216 bytes.
+The five-minute checkpoint reported 245,200 bytes,
+a reduction of approximately 0.82 percent.
+
+No allocation failures or slow socket sends were
+observed during the final regression.
+
+#### Investigation disposition
+
+The current implementation is accepted as the
+working baseline.
+
+The intermittent socket gremlin remains a known
+limitation rather than a confirmed resolved defect.
+
+Further repetitive stress testing and speculative
+networking workarounds are deferred.
+
+CircuitPython 10.3.1 remains the production runtime.
+Future stable CircuitPython releases and relevant
+native networking improvements may justify renewed
+investigation.
+
+The objective remains a reliable remote control,
+not a general-purpose embedded networking laboratory.
 
 ---
 
