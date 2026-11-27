@@ -45,7 +45,13 @@ This is cooperative scheduling, not parallel execution. Synchronous operations e
 
 Clonker uses nonblocking sockets for its HTTP listener and active client.
 
-The server maintains connection state between polling iterations rather than waiting inside a blocking read or write.
+The server maintains connection state between polling
+iterations rather than intentionally waiting inside
+a blocking read or write.
+
+Native socket implementations may nevertheless
+introduce blocking behavior outside the application's
+direct control.
 
 Important characteristics:
 
@@ -55,8 +61,10 @@ Important characteristics:
 | Listening backlog | 2 |
 | Active clients | 1 |
 | Socket mode | Nonblocking |
-| Receive operation | Up to 512 bytes per poll |
-| Send operation | Up to 512 bytes per poll |
+| Receive operation | Up to 128 bytes per poll |
+| Send operation | Up to 1,024 bytes per poll |
+| Minimum interval between send attempts | 50 ms |
+| Completed-response close grace | 250 ms |
 | Maximum request | 10,240 bytes |
 | Maximum headers | 2,048 bytes |
 | Idle, zero-byte client timeout | 200 ms |
@@ -100,7 +108,8 @@ Between chunks, the HTTP service returns control to the main dispatcher.
 
 This allows other tasks to continue operating while the browser downloads a page.
 
-The implementation uses 512-byte chunks.
+The current implementation uses 1,024-byte send
+chunks, with cooperative pacing between send attempts.
 
 Streaming significantly reduced the memory pressure and page-freezing problems encountered during development.
 
@@ -164,6 +173,40 @@ When a connection completes, fails, or times out, the server releases its associ
 
 Cleanup includes closing the socket, closing any active response file, and clearing references to connection-specific buffers and state.
 
+Connection ownership is registered immediately after
+acceptance. Connection-specific references are cleared
+before potentially failing cleanup operations.
+
+Memory allocation failures discard the active client,
+release its response buffers and file resources,
+and invoke garbage collection.
+
+The listening socket remains available for subsequent
+requests when possible.
+
+### Dynamic response memory management
+
+Dynamic HTTP responses retain separate header and
+encoded payload buffers.
+
+The server transmits the header first, then advances
+to the payload using the existing cooperative
+response state.
+
+This avoids allocating another contiguous buffer
+containing the complete header and payload.
+
+For a configuration response of approximately 9.5 KB,
+this eliminates an unnecessary allocation of
+approximately the same size.
+
+Temporary configuration references are released
+after JSON serialization.
+
+The receive path also reuses a small receive buffer
+and retains the validated expected request length
+rather than repeatedly parsing POST headers.
+
 **Key principle:** Every connection must have a bounded lifetime and a reliable cleanup path.
 
 ## 6. Integration with the Cooperative Dispatcher
@@ -196,6 +239,29 @@ Examples include:
 These operations must be evaluated separately from inbound HTTP socket handling.
 
 The goal is not necessarily to eliminate every blocking operation, but to keep latency acceptable without introducing unnecessary complexity.
+
+### Native socket behavior
+
+Nonblocking socket configuration does not guarantee
+that every native socket operation returns promptly.
+
+Inspection of CircuitPython 10.3.1's Raspberry Pi
+socket implementation revealed that `lwip_tcp_send()`
+can retry `tcp_write()` following `ERR_MEM` for
+approximately ten seconds, even on a nonblocking socket.
+
+This is consistent with the recurring ten-second
+HTTP send stalls observed during Clonker development.
+
+The exact native resource exhaustion mechanism has
+not been established.
+
+Cooperative send pacing and delayed connection closure
+are retained as conservative transport measures,
+not as proven corrections for the underlying defect.
+
+See [Firmware Networking](FIRMWARE_NETWORK.md)
+for the investigation and operational limitations.
 
 ## 7. Diagnostics and Endurance Testing
 
