@@ -888,6 +888,19 @@ Cleanup is best effort.
 
 A network failure can prevent confirmation that a remote key or session was successfully released.
 
+Adapter-specific recovery must remain bounded.
+
+Chapter 14 verified that failed Roku physical-button
+releases can exhaust their recovery attempts and clear
+local hold state without indefinitely monopolizing
+adapter maintenance.
+
+Abandoning local release state does not establish
+that the equipment received the corresponding keyup.
+
+Application survivability takes precedence over
+indefinite attempts to restore remote equipment state.
+
 ### 9.6 Architectural intent
 
 **Specialize where necessary. Keep the common architecture simple.**
@@ -1392,24 +1405,43 @@ The problem also occurred on ordinary GET requests without configuration saves.
 
 A successful configuration persistence operation could precede a stalled HTTP response.
 
-The observed configuration allocation failures were
-substantially improved through save-pipeline optimization
-and reduced HTTP response allocation pressure.
+Increasing management send chunks from 128 to 512 bytes
+during Chapter 12 improved ordinary response efficiency
+but did not eliminate the intermittent stall.
 
-Chapter 14 also improved connection cleanup,
-failure diagnostics, and bounded Roku release recovery.
+Chapter 14 introduced additional refinements:
 
-The intermittent socket-send stall has not been
-conclusively eliminated.
+- Reusable receive storage and reduced request allocations.
+- Separate dynamic HTTP header and payload buffers.
+- 1,024-byte send chunks.
+- Cooperative send pacing and completed-response close grace.
+- Improved connection cleanup and failure diagnostics.
 
-The current implementation has passed focused
-functional and endurance regression testing.
+Persistent network degradation can affect both inbound
+management HTTP and outbound equipment communications.
 
-Further root-cause investigation is deferred pending
-new evidence or relevant CircuitPython improvements.
+Listener restart and extended idle periods do not
+guarantee recovery.
 
-Do not describe the current firmware as universally
-fault-free.
+Inspection of CircuitPython 10.3.1 identified native
+TCP send retry behavior consistent with the observed
+ten-second stalls.
+
+The precise underlying resource condition remains
+unconfirmed.
+
+The cooperative scheduler cannot preempt a lower-level
+socket call that has already blocked.
+
+Application-level recovery must therefore prioritize
+bounded cleanup, physical-control survivability,
+and preservation of diagnostic evidence.
+
+The current implementation is accepted as the working
+baseline. Further investigation is deferred.
+
+See [Firmware Networking](FIRMWARE_NETWORK.md)
+for detailed findings and operational recovery guidance.
 
 ### 13.6 Distinguish persistence from response delivery
 
