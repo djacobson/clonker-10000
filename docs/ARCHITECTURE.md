@@ -1392,19 +1392,24 @@ The problem also occurred on ordinary GET requests without configuration saves.
 
 A successful configuration persistence operation could precede a stalled HTTP response.
 
-Increasing the send chunk from 128 to 512 bytes improved ordinary response efficiency but did not eliminate the intermittent stall.
+The observed configuration allocation failures were
+substantially improved through save-pipeline optimization
+and reduced HTTP response allocation pressure.
 
-Recovery without a reboot was observed.
+Chapter 14 also improved connection cleanup,
+failure diagnostics, and bounded Roku release recovery.
 
-The precise trigger and recovery mechanism remain unknown.
+The intermittent socket-send stall has not been
+conclusively eliminated.
 
-Chapter 13 observations associate the stall with the configuration page rather than the Test Remote so far. Browser request patterns and CircuitPython socket behavior remain investigation candidates, not established causes.
+The current implementation has passed focused
+functional and endurance regression testing.
 
-Physical controls, Roku commands, Denon volume, and Custom Actions remained functional between stalled management requests.
+Further root-cause investigation is deferred pending
+new evidence or relevant CircuitPython improvements.
 
-Responsiveness during an individual blocking socket operation has not been established.
-
-The cooperative scheduler cannot preempt a lower-level socket call that has already blocked.
+Do not describe the current firmware as universally
+fault-free.
 
 ### 13.6 Distinguish persistence from response delivery
 
@@ -1921,13 +1926,24 @@ Remaining boundaries include:
 - Future hardware-assisted sleep.
 - Possible audible feedback.
 
-The observed configuration allocation failures were substantially improved through save-pipeline optimization.
+The observed configuration allocation failures were
+substantially improved through save-pipeline optimization
+and reduced HTTP response allocation pressure.
 
-The intermittent socket-send stall has not been eliminated.
+Chapter 14 also improved connection cleanup,
+failure diagnostics, and bounded Roku release recovery.
 
-These are separate engineering findings.
+The intermittent socket-send stall has not been
+conclusively eliminated.
 
-Do not describe the current firmware as universally fault-free.
+The current implementation has passed focused
+functional and endurance regression testing.
+
+Further root-cause investigation is deferred pending
+new evidence or relevant CircuitPython improvements.
+
+Do not describe the current firmware as universally
+fault-free.
 
 ---
 
