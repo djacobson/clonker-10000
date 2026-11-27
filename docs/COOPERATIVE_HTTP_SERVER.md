@@ -65,7 +65,7 @@ Important characteristics:
 | Send operation | Up to 1,024 bytes per poll |
 | Minimum interval between send attempts | 50 ms |
 | Completed-response close grace | 250 ms |
-| Maximum request | 10,240 bytes |
+| Maximum request | 18,432 bytes |
 | Maximum headers | 2,048 bytes |
 | Idle, zero-byte client timeout | 200 ms |
 | Active connection inactivity timeout | 4 seconds |
