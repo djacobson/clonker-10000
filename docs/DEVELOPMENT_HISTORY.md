@@ -5649,6 +5649,132 @@ And it still has only one Dumb Queue™.
 
 ---
 
+## Chapter 14 — The Monster Versus the Gremlin
+
+November 26–27, 2026
+
+### Objective
+
+Investigate the recurring ten-second management HTTP
+socket stall while improving the Monster's ability
+to survive unexpected network failures.
+
+The objective was not to replace CircuitPython's
+networking stack or build a general-purpose web server.
+
+### Following the evidence
+
+The gremlin continued to appear during repeated
+configuration saves and page reloads.
+
+Experiments demonstrated that:
+
+- Aggressive browser reloads were not required
+  to reproduce the failure.
+- Small HTTP responses could succeed while larger
+  responses repeatedly stalled.
+- Outbound Roku communications could deteriorate
+  alongside inbound management HTTP.
+- Restarting the management listener did not
+  reliably restore networking.
+- Extended idle periods did not guarantee recovery.
+
+Inspection of CircuitPython 10.3.1 source code
+identified a native TCP send retry loop consistent
+with the observed ten-second stalls.
+
+The precise underlying resource condition remains
+unconfirmed.
+
+### Making the Monster more resilient
+
+The investigation produced several improvements
+worth retaining independently of the gremlin:
+
+- Reduced temporary HTTP request allocations.
+- Reusable receive storage.
+- Improved socket ownership and cleanup.
+- More informative allocation-failure diagnostics.
+- Bounded Roku key-release recovery.
+- Serialized browser initialization requests.
+- Cooperative send pacing and connection close grace.
+
+The bounded Roku release behavior was particularly
+important.
+
+A failed remote key release must not become an
+endless maintenance task that compromises the
+application's ability to process physical controls.
+
+The Monster must remain in control of itself,
+even when it cannot control the equipment.
+
+### One more unnecessary allocation
+
+Flight Recorder evidence captured a failed allocation
+of 9,476 bytes during HTTP response construction,
+despite substantial reported free Python memory.
+
+The existing implementation constructed a JSON
+string, encoded it into bytes, and then allocated
+another complete response containing the HTTP
+header and encoded payload.
+
+The final optimization eliminated that combined
+response allocation.
+
+Dynamic responses now transmit separate header
+and payload buffers through the existing cooperative
+HTTP response machinery.
+
+No new transport architecture was required.
+
+### Final regression — Experiment E
+
+The revised firmware passed:
+
+- Cold startup and physical-control verification.
+- Configuration loading, saving, and readback.
+- Test Remote commands in the Den and Sunroom.
+- Ten additional consecutive configuration saves.
+- Ten consecutive full configuration page reloads.
+- Final physical navigation taps, holds, and releases.
+
+The five-minute memory checkpoint retained
+approximately 99.18 percent of the boot free-memory
+baseline.
+
+No memory allocation failures or slow socket sends
+were observed during the final regression.
+
+### Engineering conclusion
+
+The gremlin has not been conclusively eliminated.
+
+However, the Monster is now more memory-efficient,
+more diagnosable, and better equipped to survive
+network failures than it was before this investigation.
+
+The current implementation is accepted as the
+working baseline.
+
+Further speculative networking workarounds and
+repetitive stress testing are deferred.
+
+CircuitPython 10.3.1 remains the production runtime.
+Relevant future stable releases may provide an
+opportunity to revisit the investigation.
+
+Detailed technical findings and operational recovery
+guidance reside in [Firmware Networking](FIRMWARE_NETWORK.md).
+
+The Monster does not need to solve CircuitPython
+in order to be a good remote control.
+
+**The gremlin hunt is suspended. The CLONKing continues.**
+
+---
+
 **THE CLONKER 10000**
 
 *Less sleek. More CLONK.*
